@@ -29,11 +29,11 @@ export function EntryChips({ entry, fc }: { entry: IndexEntry; fc: FcStatusEntry
 
 export function CountsLine({ entry }: { entry: IndexEntry }) {
   const c = entry.counts;
-  const parts = [`${c.open} open`, `${c.defs} ${c.defs === 1 ? "def" : "defs"}`, `${entry.lean_lines} lines`];
   return (
     <span className="counts">
-      {parts.join(" · ")}
+      {c.open} open
       {c.known > 0 && <span className="muted"> · +{c.known} known {c.known === 1 ? "result" : "results"}</span>}
+      {` · ${c.defs} ${c.defs === 1 ? "def" : "defs"} · ${entry.lean_lines} lines`}
       <span className="muted" title="The automated reviewer's confidence that every statement in the file is faithful">
         {" "}
         · confidence {entry.confidence.toFixed(2)}
