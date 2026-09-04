@@ -18,15 +18,17 @@ export interface ListState {
   defs: DefsFilter;
 }
 
+// everything in the filter row (not area, search or sort)
 export const NO_FILTERS = {
   confMin: null,
   confMax: null,
   linesMin: null,
   linesMax: null,
   defs: "any" as DefsFilter,
+  hideFc: false,
 };
 
-export const DEFAULT_STATE: ListState = { q: "", area: null, subarea: null, hideFc: false, sort: "area", ...NO_FILTERS };
+export const DEFAULT_STATE: ListState = { q: "", area: null, subarea: null, sort: "area", ...NO_FILTERS };
 
 // thresholds offered for the length filter (lines); the data's own values are used for confidence
 export const LINE_STEPS = [50, 75, 100, 150, 200, 300, 500];
@@ -70,7 +72,12 @@ export function serializeState(state: ListState): URLSearchParams {
 
 export function hasFilters(state: ListState): boolean {
   return (
-    state.confMin !== null || state.confMax !== null || state.linesMin !== null || state.linesMax !== null || state.defs !== "any"
+    state.confMin !== null ||
+    state.confMax !== null ||
+    state.linesMin !== null ||
+    state.linesMax !== null ||
+    state.defs !== "any" ||
+    state.hideFc
   );
 }
 

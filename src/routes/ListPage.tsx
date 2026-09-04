@@ -88,10 +88,6 @@ export function ListPage() {
               onChange={(e) => onSearch(e.target.value)}
               aria-label="Search"
             />
-            <label className="toggle">
-              <input type="checkbox" checked={state.hideFc} onChange={(e) => update({ hideFc: e.target.checked })} disabled={!fcData} />
-              Hide files already in FC{nFc ? ` (${nFc})` : ""}
-            </label>
             <label className="sort">
               Sort
               <select value={state.sort} onChange={(e) => update({ sort: e.target.value as ListState["sort"] })}>
@@ -103,7 +99,7 @@ export function ListPage() {
               {visible.length === entries.length ? `${entries.length} files` : `${visible.length} of ${entries.length} files`}
             </span>
           </div>
-          <Filters state={state} entries={entries} onChange={update} />
+          <Filters state={state} entries={entries} onChange={update} nFc={nFc} fcReady={!!fcData} />
           {visible.length === 0 && <p className="muted empty">No files match.</p>}
           <ol className="rows">
             {visible.map((e, i) => {
@@ -131,8 +127,21 @@ export function ListPage() {
   );
 }
 
-// Bounds on the reviewer's confidence and the file length, and whether the file adds definitions.
-function Filters({ state, entries, onChange }: { state: ListState; entries: IndexEntry[]; onChange: (patch: Partial<ListState>) => void }) {
+// Bounds on the reviewer's confidence and the file length, whether the file adds
+// definitions, and the FC toggle.
+function Filters({
+  state,
+  entries,
+  onChange,
+  nFc,
+  fcReady,
+}: {
+  state: ListState;
+  entries: IndexEntry[];
+  onChange: (patch: Partial<ListState>) => void;
+  nFc: number;
+  fcReady: boolean;
+}) {
   const confidences = useMemo(() => distinctConfidences(entries), [entries]);
   return (
     <div className="filters" role="group" aria-label="Filters">
@@ -156,6 +165,10 @@ function Filters({ state, entries, onChange }: { state: ListState; entries: Inde
           <option value="none">none</option>
           <option value="some">1 or more</option>
         </select>
+      </label>
+      <label className="filter toggle">
+        <input type="checkbox" checked={state.hideFc} onChange={(e) => onChange({ hideFc: e.target.checked })} disabled={!fcReady} />
+        Hide files already in FC{nFc ? ` (${nFc})` : ""}
       </label>
       {hasFilters(state) && (
         <button className="clear" onClick={() => onChange(NO_FILTERS)}>
