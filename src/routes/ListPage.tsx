@@ -4,7 +4,19 @@ import { AreaSelect, AreaSidebar } from "../components/AreaSidebar";
 import { CountsLine, EntryChips } from "../components/Chips";
 import { MathText } from "../components/MathText";
 import { TopBar } from "../components/TopBar";
-import { applyFilters, capitalize, formatDate, parseState, serializeState, type ListState } from "../data/filters";
+import {
+  LINE_STEPS,
+  NO_FILTERS,
+  applyFilters,
+  capitalize,
+  distinctConfidences,
+  formatDate,
+  hasFilters,
+  parseState,
+  serializeState,
+  type DefsFilter,
+  type ListState,
+} from "../data/filters";
 import { useFcStatus, useIndex } from "../data/load";
 import type { FcStatusEntry, IndexEntry } from "../data/schema";
 
@@ -96,6 +108,7 @@ export function ListPage() {
               {visible.length === entries.length ? `${entries.length} files` : `${visible.length} of ${entries.length} files`}
             </span>
           </div>
+          <Filters state={state} entries={entries} onChange={update} />
           {visible.length === 0 && <p className="muted empty">No files match.</p>}
           <ol className="rows">
             {visible.map((e, i) => {
@@ -120,6 +133,70 @@ export function ListPage() {
         </div>
       </div>
     </Shell>
+  );
+}
+
+// Bounds on the reviewer's confidence and the file length, and whether the file adds definitions.
+function Filters({ state, entries, onChange }: { state: ListState; entries: IndexEntry[]; onChange: (patch: Partial<ListState>) => void }) {
+  const confidences = useMemo(() => distinctConfidences(entries), [entries]);
+  return (
+    <div className="filters" role="group" aria-label="Filters">
+      <span className="filter">
+        Confidence
+        <Bound value={state.confMin} options={confidences} empty="min" label="Lowest reviewer confidence to show" fmt={(n) => n.toFixed(2)} onChange={(v) => onChange({ confMin: v })} />
+        <span className="muted">–</span>
+        <Bound value={state.confMax} options={confidences} empty="max" label="Highest reviewer confidence to show" fmt={(n) => n.toFixed(2)} onChange={(v) => onChange({ confMax: v })} />
+      </span>
+      <span className="filter">
+        Length
+        <Bound value={state.linesMin} options={LINE_STEPS} empty="min" label="Shortest file to show, in lines" fmt={String} onChange={(v) => onChange({ linesMin: v })} />
+        <span className="muted">–</span>
+        <Bound value={state.linesMax} options={LINE_STEPS} empty="max" label="Longest file to show, in lines" fmt={String} onChange={(v) => onChange({ linesMax: v })} />
+        lines
+      </span>
+      <label className="filter">
+        New definitions
+        <select value={state.defs} onChange={(e) => onChange({ defs: e.target.value as DefsFilter })}>
+          <option value="any">any</option>
+          <option value="none">none</option>
+          <option value="some">1 or more</option>
+        </select>
+      </label>
+      {hasFilters(state) && (
+        <button className="clear" onClick={() => onChange(NO_FILTERS)}>
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Bound({
+  value,
+  options,
+  empty,
+  label,
+  fmt,
+  onChange,
+}: {
+  value: number | null;
+  options: number[];
+  empty: string;
+  label: string;
+  fmt: (n: number) => string;
+  onChange: (v: number | null) => void;
+}) {
+  // a value that arrived in the URL but is not one of the offered steps stays selectable
+  const opts = value !== null && !options.includes(value) ? [...options, value].sort((a, b) => a - b) : options;
+  return (
+    <select value={value === null ? "" : String(value)} aria-label={label} title={label} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}>
+      <option value="">{empty}</option>
+      {opts.map((v) => (
+        <option key={v} value={String(v)}>
+          {fmt(v)}
+        </option>
+      ))}
+    </select>
   );
 }
 

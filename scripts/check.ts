@@ -40,6 +40,11 @@ for (const row of index.entries) {
   const e = parsed.data;
   if (e.id !== row.id) problems.push(`${row.id}: id mismatch`);
   if (e.title !== row.title) problems.push(`${row.id}: title differs between index and entry`);
+  if (e.confidence !== row.confidence) problems.push(`${row.id}: confidence differs between index and entry`);
+  if (e.lean_lines !== row.lean_lines) problems.push(`${row.id}: lean_lines differs between index and entry`);
+  const nl = e.lean.split("\n").length - (e.lean.endsWith("\n") || e.lean === "" ? 1 : 0);
+  if (e.lean_lines !== nl) problems.push(`${row.id}: lean_lines=${e.lean_lines} but the file has ${nl} lines`);
+  if (e.confidence < index.meta.min_confidence) problems.push(`${row.id}: confidence ${e.confidence} below meta.min_confidence`);
   if (e.statement_segments.map((s) => s.text).join("") !== e.statement)
     problems.push(`${row.id}: statement_segments do not concatenate to statement`);
   if (e.blocks.map((b) => b.text).join("") !== e.lean)

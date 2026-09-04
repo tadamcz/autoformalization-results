@@ -2,6 +2,7 @@
 import type { FcStatus, IndexEntry } from "./schema";
 
 export type Sort = "area" | "title";
+export type DefsFilter = "any" | "none" | "some";
 
 export interface ListState {
   q: string;
@@ -9,17 +10,46 @@ export interface ListState {
   subarea: string | null;
   hideFc: boolean;
   sort: Sort;
+  // bounds on the reviewer's confidence and the file length; null = unbounded
+  confMin: number | null;
+  confMax: number | null;
+  linesMin: number | null;
+  linesMax: number | null;
+  defs: DefsFilter;
 }
 
-export const DEFAULT_STATE: ListState = { q: "", area: null, subarea: null, hideFc: false, sort: "area" };
+export const NO_FILTERS = {
+  confMin: null,
+  confMax: null,
+  linesMin: null,
+  linesMax: null,
+  defs: "any" as DefsFilter,
+};
+
+export const DEFAULT_STATE: ListState = { q: "", area: null, subarea: null, hideFc: false, sort: "area", ...NO_FILTERS };
+
+// thresholds offered for the length filter (lines); the data's own values are used for confidence
+export const LINE_STEPS = [50, 75, 100, 150, 200, 300, 500];
+
+function num(v: string | null): number | null {
+  if (v === null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 
 export function parseState(params: URLSearchParams): ListState {
+  const defs = params.get("defs");
   return {
     q: params.get("q") ?? "",
     area: params.get("area"),
     subarea: params.get("sub"),
     hideFc: params.get("fc") === "hide",
     sort: params.get("sort") === "title" ? "title" : "area",
+    confMin: num(params.get("cmin")),
+    confMax: num(params.get("cmax")),
+    linesMin: num(params.get("lmin")),
+    linesMax: num(params.get("lmax")),
+    defs: defs === "none" || defs === "some" ? defs : "any",
   };
 }
 
@@ -30,13 +60,35 @@ export function serializeState(state: ListState): URLSearchParams {
   if (state.subarea) p.set("sub", state.subarea);
   if (state.hideFc) p.set("fc", "hide");
   if (state.sort !== "area") p.set("sort", state.sort);
+  if (state.confMin !== null) p.set("cmin", String(state.confMin));
+  if (state.confMax !== null) p.set("cmax", String(state.confMax));
+  if (state.linesMin !== null) p.set("lmin", String(state.linesMin));
+  if (state.linesMax !== null) p.set("lmax", String(state.linesMax));
+  if (state.defs !== "any") p.set("defs", state.defs);
   return p;
+}
+
+export function hasFilters(state: ListState): boolean {
+  return (
+    state.confMin !== null || state.confMax !== null || state.linesMin !== null || state.linesMax !== null || state.defs !== "any"
+  );
+}
+
+export function distinctConfidences(entries: IndexEntry[]): number[] {
+  return [...new Set(entries.map((e) => e.confidence))].sort((a, b) => a - b);
+}
+
+export function median(values: number[]): number | null {
+  if (!values.length) return null;
+  const s = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
 export function fold(text: string): string {
   return text
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
 
@@ -55,6 +107,13 @@ export function applyFilters(
   if (state.area) out = out.filter((e) => e.area === state.area);
   if (state.subarea) out = out.filter((e) => e.subarea === state.subarea);
   if (state.hideFc && fc) out = out.filter((e) => !fc.entries[e.id]);
+  const { confMin, confMax, linesMin, linesMax } = state;
+  if (confMin !== null) out = out.filter((e) => e.confidence >= confMin);
+  if (confMax !== null) out = out.filter((e) => e.confidence <= confMax);
+  if (linesMin !== null) out = out.filter((e) => e.lean_lines >= linesMin);
+  if (linesMax !== null) out = out.filter((e) => e.lean_lines <= linesMax);
+  if (state.defs === "none") out = out.filter((e) => e.counts.defs === 0);
+  if (state.defs === "some") out = out.filter((e) => e.counts.defs > 0);
   if (state.q) out = out.filter((e) => matchesQuery(e, state.q));
   const byTitle = (a: IndexEntry, b: IndexEntry) => fold(a.title).localeCompare(fold(b.title)) || a.id.localeCompare(b.id);
   if (state.sort === "title") {

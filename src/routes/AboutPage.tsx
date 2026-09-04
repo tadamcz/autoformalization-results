@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link } from "react-router";
 import { TopBar } from "../components/TopBar";
 import { HOW_PRODUCED, proverSentence } from "../components/ProvenanceDrawer";
-import { formatDate } from "../data/filters";
+import { formatDate, median } from "../data/filters";
 import { useIndex } from "../data/load";
 
 const REPO_URL = "https://github.com/tadamcz/autoformalization-results";
@@ -24,6 +24,8 @@ export function AboutPage() {
   const o = m.outcomes;
   const accepted = (o.shown ?? 0) + (o.below_threshold ?? 0);
   const gens = m.models.generators.map((g) => g.name);
+  const settled = m.prover_settled_confidences;
+  const med = median(index.data.entries.map((e) => e.confidence));
   return (
     <>
       <TopBar />
@@ -48,8 +50,17 @@ export function AboutPage() {
           The pipeline attempted {o.attempted} entries. It produced a file it was willing to stand behind for {accepted}; for {o.refused} it produced nothing (no attempt could
           state the entry faithfully, or the entry had no statable claim), and {o.failed} were discarded because the final file failed a check or the prover settled a
           statement. Of the {accepted} accepted files, the {m.n_entries} shown here are those whose automated reviewer reported a confidence of at least {m.min_confidence} that
-          every statement in the file is faithful; the {o.below_threshold} below that cut are not shown. The confidence number itself is not shown on file pages: in this run it did
-          not separate the files later found wrong from the rest, so it would only lend false precision.
+          every statement in the file is faithful; the {o.below_threshold} below that cut are not shown. Each file page shows that confidence and the list can be filtered by it.
+          Treat it as a weak signal
+          {settled.length > 0 ? (
+            <>
+              : the prover later proved or refuted a statement in {settled.length} {settled.length === 1 ? "file" : "files"} the reviewer had passed, with{" "}
+              {settled.length === 1 ? "confidence" : "confidences"} {settled.map((c) => c.toFixed(2)).join(", ")}
+              {med !== null ? `; the median across the files shown here is ${med.toFixed(2)}` : ""}.
+            </>
+          ) : (
+            "."
+          )}
         </p>
 
         <h2>How each file was produced</h2>

@@ -2,7 +2,7 @@
 // is the producer; scripts/check.ts validates data/** against these at build).
 import { z } from "zod";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2; // 2: confidence + lean_lines on entries and index rows
 
 const nullableString = z.string().nullable();
 
@@ -31,6 +31,8 @@ export const IndexEntry = z.object({
   subarea: nullableString,
   counts: Counts,
   outcome: Outcome,
+  confidence: z.number(),
+  lean_lines: z.number(),
   ams: z.array(z.number()),
   flags: z.array(z.string()),
   fc_path: z.string(),
@@ -65,6 +67,7 @@ export const Meta = z.object({
     prover: ModelRef,
   }),
   attempts_per_entry: z.number(),
+  prover_settled_confidences: z.array(z.number()),
   probe_budget_minutes: z.number(),
   transcript_base: z.string(),
   wikipedia_snapshot: nullableString,
@@ -177,6 +180,9 @@ export const Entry = z.object({
     mathlib_rev: nullableString,
   }),
   outcome: Outcome,
+  // the automated reviewer's confidence (0–1) that every statement in the file is faithful
+  confidence: z.number(),
+  lean_lines: z.number(),
   lean: z.string(),
   blocks: z.array(Block),
   claims: z.array(Claim),

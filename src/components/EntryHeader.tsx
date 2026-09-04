@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import type { Entry, FcStatusEntry, Meta } from "../data/schema";
-import { capitalize, formatDate } from "../data/filters";
+import { capitalize, formatDate, plural } from "../data/filters";
 
 function basename(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
@@ -83,10 +83,6 @@ export function Actions({ entry, fc }: { entry: Entry; fc: FcStatusEntry | undef
       <button className="btn" onClick={download}>
         Download {filename}
       </button>
-      <a className="btn link" href={entry.article_url} target="_blank" rel="noopener noreferrer">
-        Wikipedia
-        {entry.reference_url.includes("%23") || entry.reference_url.includes("#") ? " §" : ""}
-      </a>
       <a className="btn link" href={entry.transcript_url} target="_blank" rel="noopener noreferrer" title="The pipeline's full transcript for this entry (Inspect log viewer)">
         Transcript
       </a>
@@ -114,17 +110,21 @@ export function FileLine({ entry }: { entry: Entry }) {
   const c = entry.checks;
   const mathlib = entry.fc.mathlib_rev ? `, Mathlib ${entry.fc.mathlib_rev.slice(0, 7)}` : "";
   const lean = entry.fc.lean_toolchain.replace("leanprover/lean4:", "Lean 4 ").replace(/^Lean 4 v/, "Lean ");
+  // "Compiles" already says no errors; only warnings other than sorry are worth a word
   const warnings =
     c.disallowed_warnings.length > 0
-      ? ` with ${c.disallowed_warnings.length} ${c.disallowed_warnings.length === 1 ? "warning" : "warnings"} besides \`sorry\``
+      ? ` with ${plural(c.disallowed_warnings.length, "warning")} besides sorry`
       : c.other_warnings.length > 0
-        ? ` with no errors and ${c.other_warnings.length} allowed ${c.other_warnings.length === 1 ? "warning" : "warnings"} besides sorry`
-        : " with no errors and no warnings besides sorry";
+        ? ` with ${plural(c.other_warnings.length, "allowed warning")} besides sorry`
+        : "";
   return (
     <p className="fileline muted">
-      <code>{entry.fc.path}</code> · Compiles against Formal Conjectures <code>{entry.fc.commit.slice(0, 7)}</code> (
+      <code>{entry.fc.path}</code> · {plural(entry.lean_lines, "line")} · Compiles against Formal Conjectures <code>{entry.fc.commit.slice(0, 7)}</code> (
       {formatDate(entry.fc.commit_date)}; {lean}
-      {mathlib}){warnings}.
+      {mathlib}){warnings}.{" "}
+      <span className="confidence" title="The automated reviewer's confidence, from 0 to 1, that every statement in this file is faithful to the source. Files below the cut described on the About page are not shown.">
+        Automated reviewer's confidence: {entry.confidence.toFixed(2)}.
+      </span>
     </p>
   );
 }
