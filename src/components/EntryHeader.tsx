@@ -107,7 +107,7 @@ export function Actions({ entry, fc }: { entry: Entry; fc: FcStatusEntry | undef
   );
 }
 
-export function FileLine({ entry, meta }: { entry: Entry; meta: Meta }) {
+export function FileLine({ entry }: { entry: Entry }) {
   const c = entry.checks;
   const mathlib = entry.fc.mathlib_rev ? ` · Mathlib ${entry.fc.mathlib_rev.slice(0, 7)}` : "";
   const lean = entry.fc.lean_toolchain.replace("leanprover/lean4:", "Lean 4 ").replace(/^Lean 4 v/, "Lean ");
@@ -118,16 +118,11 @@ export function FileLine({ entry, meta }: { entry: Entry; meta: Meta }) {
       : c.other_warnings.length > 0
         ? ` with ${plural(c.other_warnings.length, "allowed warning")} besides sorry`
         : "";
-  // the pin's facts live behind a hover; the link opens the tree at that commit
+  // the pin's facts live behind a hover
   const pin = `commit ${entry.fc.commit.slice(0, 7)} · ${formatDate(entry.fc.commit_date)} · ${lean}${mathlib}`;
   return (
     <p className="fileline muted">
-      <code>{entry.fc.path}</code> · {plural(entry.lean_lines, "line")} · Compiles against{" "}
-      <Tip tip={pin}>
-        <a href={`${meta.fc_repo_url}/tree/${entry.fc.commit}`} target="_blank" rel="noopener noreferrer">
-          Formal Conjectures
-        </a>
-      </Tip>
+      <code>{entry.fc.path}</code> · {plural(entry.lean_lines, "line")} · Compiles against <Tip tip={pin}>Formal Conjectures</Tip>
       {warnings}.{" "}
       <span className="confidence" title="The automated reviewer's confidence, from 0 to 1, that every statement in this file is faithful to the source. Files below the cut described on the About page are not shown.">
         Automated reviewer's confidence: {entry.confidence.toFixed(2)}.

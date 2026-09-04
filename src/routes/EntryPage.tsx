@@ -91,7 +91,7 @@ export function EntryPage() {
             </h1>
             <StatusLine entry={entry.data} fc={fcData?.entries[entry.data.id]} />
             <Actions entry={entry.data} fc={fcData?.entries[entry.data.id]} />
-            <FileLine entry={entry.data} meta={index.data.meta} />
+            <FileLine entry={entry.data} />
             <SourcePane entry={entry.data} onJump={jump} />
             <InFileChips entry={entry.data} onJump={jump} search={search} />
             <LeanFile

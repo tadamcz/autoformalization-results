@@ -259,7 +259,7 @@ function DeclBlock({ block: b, entry, claim, alts, requestAlts, altsLoading, onJ
       {definition && <DefinitionNotes block={b} />}
       {kept && claim && claim.reviewer_why && (
         <Disclosure summary={<><strong>Notes on this statement</strong> <span className="muted">· <MathText text={shorten(firstSentence(claim.reviewer_why), 220)} /></span></>} className="statement-notes">
-          <p className="verbatim-label muted">The automated reviewer's note on this statement, verbatim:</p>
+          <p className="verbatim-label muted">The automated reviewer's note on this statement:</p>
           <Markdown text={claim.reviewer_why} />
         </Disclosure>
       )}
