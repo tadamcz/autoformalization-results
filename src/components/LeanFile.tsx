@@ -248,7 +248,6 @@ function DeclBlock({ block: b, entry, claim, alts, requestAlts, altsLoading }: D
   const definition = role === "definition";
   const blocksById = entry.blocks;
   const uses = (b.uses ?? []).map((i) => blocksById[i]).filter((x) => x.role === "definition");
-  const usedBy = (b.used_by ?? []).map((i) => blocksById[i]);
   const caption =
     kept && claim && claim.source_text !== entry.statement ? claim.source_text : known ? (kept ? "known result, stated as part of the problem" : "known result") : null;
   const theme = declTheme(b.decl_kind);
@@ -287,7 +286,7 @@ function DeclBlock({ block: b, entry, claim, alts, requestAlts, altsLoading }: D
           ))}
         </p>
       )}
-      {definition && <DefinitionNotes block={b} usedBy={usedBy} />}
+      {definition && <DefinitionNotes block={b} />}
       {kept && claim && claim.reviewer_why && (
         <Disclosure summary={<><strong>Notes on this statement</strong> <span className="muted">· <MathText text={shorten(firstSentence(claim.reviewer_why), 220)} /></span></>} className="statement-notes">
           <p className="verbatim-label muted">The automated reviewer's note on this statement, verbatim:</p>
@@ -309,42 +308,18 @@ function jumpTo(target: Block) {
   };
 }
 
-function DefinitionNotes({ block: b, usedBy }: { block: Block; usedBy: Block[] }) {
+function DefinitionNotes({ block: b }: { block: Block }) {
   const j = b.justification;
+  if (!j) return <p className="def-notes muted">Added or edited by the automated reviewer; see its notes below.</p>;
+  if (!j.why_needed) return null;
   return (
     <div className="def-notes">
-      {j ? (
-        <>
-          {j.closest_existing_considered && (
-            <p className="mathlib muted">
-              Mathlib: <MathText text={j.closest_existing_considered} />
-            </p>
-          )}
-          {j.why_needed && (
-            <Disclosure summary={<span className="muted">Why needed</span>} className="why-needed">
-              <p>
-                <MathText text={j.why_needed} />
-              </p>
-              <p className="muted small">From the formalizer's report ({j.from_attempt}).</p>
-            </Disclosure>
-          )}
-        </>
-      ) : (
-        <p className="muted">Added or edited by the automated reviewer; see its notes below.</p>
-      )}
-      {usedBy.length > 0 && (
-        <p className="used-by muted">
-          used in:{" "}
-          {usedBy.map((u, k) => (
-            <span key={u.i}>
-              {k > 0 ? ", " : ""}
-              <a href={`#${blockAnchor(u)}`} onClick={jumpTo(u)}>
-                <code>{u.fq_name ? shortName(u.fq_name) : u.decl_kind}</code>
-              </a>
-            </span>
-          ))}
+      <Disclosure summary={<span className="muted">Why needed</span>} className="why-needed">
+        <p>
+          <MathText text={j.why_needed} />
         </p>
-      )}
+        <p className="muted small">From the formalizer's report ({j.from_attempt}).</p>
+      </Disclosure>
     </div>
   );
 }
