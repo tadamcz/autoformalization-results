@@ -3,9 +3,9 @@ import { Link } from "react-router";
 import { orderedSources } from "../components/AreaSidebar";
 import { TopBar } from "../components/TopBar";
 import { howProduced, proverBudget } from "../components/ProvenanceDrawer";
-import { formatDate, median } from "../data/filters";
+import { formatDate } from "../data/filters";
 import { useIndex } from "../data/load";
-import type { IndexEntry, Meta, SourceMeta } from "../data/schema";
+import type { Meta, SourceMeta } from "../data/schema";
 
 const REPO_URL = "https://github.com/tadamcz/autoformalization-results";
 
@@ -56,7 +56,7 @@ export function AboutPage() {
 
         <h2>Selection</h2>
         {sources.map(([key, s]) => (
-          <Selection key={key} s={s} meta={m} entries={index.data.entries.filter((e) => e.source === key)} />
+          <Selection key={key} s={s} meta={m} />
         ))}
         <p>Each file page shows the reviewer's confidence and the list can be filtered by it.</p>
 
@@ -115,28 +115,16 @@ export function AboutPage() {
   );
 }
 
-// One source's funnel: attempted -> accepted -> shown, and the calibration
-// caveat computed from the files the prover settled after the reviewer passed them.
-function Selection({ s, meta, entries }: { s: SourceMeta; meta: Meta; entries: IndexEntry[] }) {
+// One source's funnel: attempted -> accepted -> shown.
+function Selection({ s, meta }: { s: SourceMeta; meta: Meta }) {
   const o = s.run.outcomes;
   const accepted = (o.shown ?? 0) + (o.below_threshold ?? 0);
-  const settled = s.run.prover_settled_confidences;
-  const med = median(entries.map((e) => e.confidence));
   return (
     <p>
       <strong>{s.short_name}.</strong> The pipeline attempted {o.attempted} entries. It produced a file it was willing to stand behind for {accepted}; for {o.refused} it produced
       nothing (no attempt could state the entry faithfully, or the entry had no statable claim), and {o.failed} were discarded because the final file failed a check or the
       prover settled a statement. Of the {accepted} accepted files, the {s.n_entries} shown here are those whose automated reviewer reported a confidence of at least{" "}
-      {meta.min_confidence} that every statement in the file is faithful; the {o.below_threshold} below that cut are not shown. Treat that confidence as a weak signal
-      {settled.length > 0 ? (
-        <>
-          : the prover later proved or refuted a statement in {settled.length} {settled.length === 1 ? "file" : "files"} the reviewer had passed, with{" "}
-          {settled.length === 1 ? "confidence" : "confidences"} {settled.map((c) => c.toFixed(2)).join(", ")}
-          {med !== null ? `; the median across the files shown here is ${med.toFixed(2)}` : ""}.
-        </>
-      ) : (
-        "."
-      )}
+      {meta.min_confidence} that every statement in the file is faithful; the {o.below_threshold} below that cut are not shown.
     </p>
   );
 }
