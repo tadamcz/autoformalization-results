@@ -105,7 +105,10 @@ export function AboutPage() {
         </p>
 
         <p className="made-by">
-          Made by Tom Adamczewski · <a href="mailto:tom@epoch.ai">tom@epoch.ai</a>
+          Made by{" "}
+          <a href="https://tadamcz.com/" target="_blank" rel="noopener noreferrer">
+            Tom Adamczewski
+          </a>
         </p>
         <p>
           <Link to="/">← All files</Link>
