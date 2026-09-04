@@ -2,6 +2,7 @@
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
+import { remarkBareUrls } from "./linkify";
 
 // `$$…$$` inside a paragraph (as Lean docstrings write it) is not a math block
 // for remark-math; give every display run its own lines.
@@ -14,7 +15,7 @@ export function Markdown({ text, className, dropHeading = false }: { text: strin
   return (
     <div className={`md ${className ?? ""}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkMath]}
+        remarkPlugins={[remarkMath, remarkBareUrls]}
         rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: "ignore" }]]}
         components={{
           a: ({ href, children }) => (

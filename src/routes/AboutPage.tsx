@@ -70,17 +70,6 @@ export function AboutPage() {
           claims and the final review were done by {m.models.adjudicator.name}; the prover was {m.models.prover.name}. {proverSentence(m.probe_budget_minutes)}
         </p>
 
-        <h2>Known failure modes</h2>
-        <p>Things the pipeline's own notes and the earlier runs show it gets wrong, and which a reader should look for first:</p>
-        <ul>
-          <li>Reading a heuristic or statistical claim as a sharp statement (for example, a "Poisson distributed" prediction turned into a limit statement with a modelling choice the source does not make).</li>
-          <li>Stating a known result as if it were open, or attaching the wrong category to a variant.</li>
-          <li>Wrong quantifier structure: hypotheses placed on the wrong side, or a universal claim where the source asks for existence.</li>
-          <li>Lean "junk values" (division by zero, logarithms of non-positive numbers, subtraction on natural numbers) making a statement trivially true or false.</li>
-          <li>Bespoke definitions that quietly differ from the standard notion when Mathlib lacks it.</li>
-        </ul>
-        <p>Every file page shows the source passage next to each statement and the reviewer's own notes so that these can be checked in minutes rather than found later.</p>
-
         <h2>Data</h2>
         <p>
           The Wikipedia list and articles were read on {formatDate(m.wikipedia_snapshot)}. The files compile against Formal Conjectures commit <code>{m.fc.commit.slice(0, 7)}</code>{" "}
@@ -101,7 +90,7 @@ export function AboutPage() {
         </p>
 
         <p className="made-by">
-          Made by Tom Adamczewski · <a href="mailto:tom@epochai.org">tom@epochai.org</a>
+          Made by Tom Adamczewski · <a href="mailto:tom@epoch.ai">tom@epoch.ai</a>
         </p>
         <p>
           <Link to="/">← All files</Link>

@@ -1,12 +1,13 @@
 // Client-side Lean highlighting: Shiki's JavaScript regex engine with the lean4
 // grammar and the github-light theme, loaded once on first use. The data files
-// stay exactly what the exporter wrote; nothing is pre-rendered.
+// stay exactly what the exporter wrote; nothing is pre-rendered. Code.tsx
+// renders the tokens itself so that URLs inside comments can become links.
 import { useEffect, useState } from "react";
-import type { HighlighterCore } from "shiki/core";
+import type { HighlighterCore, ThemedToken } from "shiki/core";
 
 let highlighter: HighlighterCore | null = null;
 let loading: Promise<HighlighterCore> | null = null;
-const cache = new Map<string, string>();
+const cache = new Map<string, ThemedToken[][]>();
 
 export function loadHighlighter(): Promise<HighlighterCore> {
   if (highlighter) return Promise.resolve(highlighter);
@@ -28,16 +29,14 @@ export function loadHighlighter(): Promise<HighlighterCore> {
   return loading;
 }
 
-/** Inner HTML of the highlighted code (the <span class="line"> elements), or
- * null until the highlighter has loaded. */
-export function highlightLean(code: string): string | null {
+/** One token list per line, or null until the highlighter has loaded. */
+export function tokenizeLean(code: string): ThemedToken[][] | null {
   if (!highlighter) return null;
   const hit = cache.get(code);
   if (hit !== undefined) return hit;
-  const html = highlighter.codeToHtml(code, { lang: "lean4", theme: "github-light" });
-  const inner = html.replace(/^<pre[^>]*><code>/, "").replace(/<\/code><\/pre>$/, "");
-  cache.set(code, inner);
-  return inner;
+  const { tokens } = highlighter.codeToTokens(code, { lang: "lean4", theme: "github-light" });
+  cache.set(code, tokens);
+  return tokens;
 }
 
 export function useHighlighter(): boolean {

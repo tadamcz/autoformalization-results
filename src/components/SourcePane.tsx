@@ -80,13 +80,15 @@ function Coverage({ claims, onJump }: { claims: Claim[]; onJump: (block: number)
   const stated = claims.filter((c) => c.kind === "stated").length;
   const omitted = claims.filter((c) => c.kind === "omitted").length;
   const notStated = claims.filter((c) => c.kind === "not_stated").length;
-  const summary = [
-    `${stated} of ${stated + omitted} ${stated + omitted === 1 ? "statement" : "statements"} stated`,
-    omitted ? `${omitted} omitted` : null,
-    notStated ? `${notStated} not stated` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // one denominator (the passages listed below) so the counts add up at a glance
+  const n = claims.length;
+  const summary =
+    stated === n
+      ? `all ${n} passages stated`
+      : `${n} passages: ` +
+        [stated ? `${stated} stated` : null, omitted ? `${omitted} omitted` : null, notStated ? `${notStated} not stated` : null]
+          .filter(Boolean)
+          .join(", ");
   const rows = (
     <ol className="coverage-list">
       {claims.map((c) => {
