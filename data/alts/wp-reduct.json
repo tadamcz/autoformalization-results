@@ -1,0 +1,428 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reducts of homogeneous structures (Thomas' conjecture)\n\nA *reduct* of a structure $M$ is a structure on the same domain obtained by forgetting some of\nthe relations of $M$. In the theory of homogeneous structures, \"reduct\" is used in the wider\nsense of a structure $N$ on the domain of $M$ all of whose relations are first-order definable\nin $M$ without parameters. Two such reducts $N$, $N'$ are *first-order interdefinable* if every\nrelation of $N$ is definable without parameters in $N'$ and vice versa, i.e. if $N$ and $N'$\nhave the same definable relations. Reducts are counted up to interdefinability; otherwise\nthe count is trivially infinite.\n\nThomas' conjecture (1991) asks whether every countably infinite homogeneous structure in a\nfinite relational language has only finitely many reducts up to first-order interdefinability.\nThe Wikipedia list of unsolved problems phrases this as: \"Does a finitely presented homogeneous\nstructure for a finite relational language have finitely many reducts?\" Since such a structure\nis $\\omega$-categorical, this is equivalent to asking whether there are only finitely many\nclosed permutation groups $G$ with $\\mathrm{Aut}(M) \\le G \\le \\mathrm{Sym}(M)$.\n\nThe conjecture is known for the random graph (Thomas, 1991), the countable dense linear order\n(Cameron, 1976), the random hypergraphs (Thomas, 1996), the random tournament (Bennett, 1997),\nand several other homogeneous structures. It is open in general.\n\n*References:*\n- [Wikipedia: Reduct](https://en.wikipedia.org/wiki/reduct)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- S. Thomas, *Reducts of the random graph*, J. Symbolic Logic 56 (1991), 176--181.\n- S. Thomas, *Reducts of random hypergraphs*, Ann. Pure Appl. Logic 80 (1996), 165--193.\n- M. Bodirsky, M. Pinsker, *Reducts of Ramsey structures*, Model Theoretic Methods in Finite\n  Combinatorics, Contemp. Math. 558 (2011), 489--519.\n-/\n\nnamespace Reduct\n\nopen FirstOrder FirstOrder.Language\n\nuniverse u v w\n\nvariable {M : Type u}\n\n/-- A family of relations on `M`: for every arity `n`, a set of `n`-ary relations on `M`,\nwhere an `n`-ary relation is a set of `n`-tuples `Fin n → M`. -/\nabbrev RelationFamily (M : Type u) : Type u := ∀ n : ℕ, Set (Set (Fin n → M))\n\n/-- The relational language with one `n`-ary relation symbol for every relation in `D n`. -/\ndef relLanguage (D : RelationFamily M) : FirstOrder.Language.{u, u} where\n  Functions _ := PEmpty\n  Relations n := D n\n\ninstance (D : RelationFamily M) : (relLanguage D).IsRelational :=\n  fun _ => inferInstanceAs (IsEmpty PEmpty)\n\n/-- The `relLanguage D`-structure on `M` in which each relation symbol is interpreted by the\nrelation it names. -/\ninstance relStructure (D : RelationFamily M) : (relLanguage D).Structure M where\n  funMap f := PEmpty.elim f\n  RelMap R x := x ∈ R.1\n\n/-- The family of all relations on `M` that are first-order definable without parameters from the\nrelations in `D`. -/\ndef definableClosure (D : RelationFamily M) : RelationFamily M :=\n  fun n => {s : Set (Fin n → M) | (∅ : Set M).Definable (relLanguage D) s}\n\n/-- The family of all relations on `M` that are first-order definable without parameters in the\n`L`-structure `M`. -/\ndef definableRelations (L : FirstOrder.Language.{v, w}) (M : Type u) [L.Structure M] :\n    RelationFamily M :=\n  fun n => {s : Set (Fin n → M) | (∅ : Set M).Definable L s}\n\n/-- The reducts of the `L`-structure `M`, up to first-order interdefinability.\n\nA reduct of `M` is a structure `N` on the domain `M` all of whose relations are first-order\ndefinable without parameters in `M`. Two reducts are interdefinable if they have the same\ndefinable relations. Identifying a reduct `N` with the family of all relations definable in `N`,\nthe interdefinability classes of reducts of `M` correspond exactly to the families of relations\non `M` that consist of relations definable in `M` and are closed under first-order\ndefinability. -/\ndef reducts (L : FirstOrder.Language.{v, w}) (M : Type u) [L.Structure M] :\n    Set (RelationFamily M) :=\n  {D | D ≤ definableRelations L M ∧ definableClosure D = D}\n\n/-- Every relation of `D` is definable from `D`. -/\n@[category API, AMS 3]\ntheorem le_definableClosure (D : RelationFamily M) : D ≤ definableClosure D := by\n  intro n s hs\n  refine Set.empty_definable_iff.2\n    ⟨Relations.formula (⟨s, hs⟩ : (relLanguage D).Relations n) Term.var, ?_⟩\n  ext x\n  simp [Formula.realize_rel, relStructure]\n\n/-- The empty relation of every arity is definable from any family. -/\n@[category test, AMS 3]\ntheorem empty_mem_definableClosure (D : RelationFamily M) (n : ℕ) :\n    (∅ : Set (Fin n → M)) ∈ definableClosure D n :=\n  Set.definable_empty\n\n/-- **Thomas' conjecture.** \"Does a finitely presented homogeneous structure for a finite\nrelational language have finitely many reducts?\" That is: does every countably infinite\nhomogeneous (ultrahomogeneous) structure $M$ in a finite relational language have only finitely\nmany reducts up to first-order interdefinability?\n\nHere a *reduct* of $M$ is a structure on the domain of $M$ whose relations are first-order\ndefinable without parameters in $M$, and two reducts are *interdefinable* if each relation of\none is definable without parameters in the other. Reducts are identified with the families of\nrelations definable in them, see `Reduct.reducts`. The conjectured answer is yes. -/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(sorry) ↔ ∀ (L : FirstOrder.Language.{v, w}) [L.IsRelational] [Finite L.Symbols]\n      (M : Type u) [L.Structure M] [Countable M] [Infinite M],\n      L.IsUltrahomogeneous M → (reducts L M).Finite := by\n  sorry\n\nend Reduct\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's reading (count reducts up to first-order interdefinability; 'finitely presented' = countable/countably infinite homogeneous structure in a finite relational language; universal implicit quantifier; positive answer conjectured) matches Thomas' conjecture as stated in the literature.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Finitely presented' (list-entry wording) is read, per the decomposition notes and the literature (Thomas 1991), as 'countably infinite': hypotheses `[Countable M] [Infinite M]`. The finite case is trivially true, so including/excluding it does not change the mathematical content; `Infinite M` was included to match the notes' explicit 'countably infinite'.",
+    "'Homogeneous' is Mathlib's `FirstOrder.Language.IsUltrahomogeneous` (every embedding of a finitely generated substructure extends to an automorphism). In a relational language finitely generated substructures are exactly finite subsets (checked in a scratch example), so this is the standard notion of (ultra)homogeneity.",
+    "'Finite relational language' is `[L.IsRelational] [Finite L.Symbols]`; `Finite L.Symbols` bounds the total number of relation symbols over all arities (not just per arity).",
+    "'Reduct' is taken in the sense used for Thomas' conjecture: a structure on the domain of M all of whose relations are first-order definable without parameters in M (the literal 'drop symbols' notion would make the conjecture trivial for finite languages). Reducts are counted up to first-order interdefinability (same parameter-free definable relations).",
+    "Rather than quantifying over structures in arbitrary languages (universe issues), an interdefinability class of reducts is identified with the family `D : ∀ n, Set (Set (Fin n → M))` of all relations definable in the reduct. `reducts L M := {D | D ≤ definableRelations L M ∧ definableClosure D = D}`, where `definableClosure D` is the family of relations ∅-definable in the canonical structure `relStructure D` whose relation symbols are the members of `D`. Every reduct N gives such a D (Def(N) ⊆ Def(M) and Def(Def(N)) = Def(N) by substituting defining formulas), interdefinable reducts give the same D, and every such D is Def of the reduct `(M, relStructure D)`; so `(reducts L M).Finite` is exactly 'finitely many reducts up to interdefinability'.",
+    "Definability uses Mathlib's `Set.Definable` with parameter set `∅` (first-order formulas with equality, no parameters), matching the Aut(M)-closed-supergroup formulation for ω-categorical M.",
+    "The equivalent closed-permutation-group formulation was not used, since the definability formulation is the literal one; the group formulation is mentioned in the docstring only.",
+    "Answer `answer(sorry)` is used as the problem is open; `answer(True)` corresponds to the conjectured positive answer."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "No Mathlib notion of a family of relations of all arities; `Set.Definable` works per-arity only.",
+     "name": "Reduct.RelationFamily",
+     "why_needed": "Abbreviation `∀ n : ℕ, Set (Set (Fin n → M))` for a family of relations (of all arities) on M, used to represent a reduct via its definable relations."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.mk₂`, `Language.graph`, `Language.order` — all fixed languages, not built from a family of relations.",
+     "name": "Reduct.relLanguage",
+     "why_needed": "The relational language whose n-ary relation symbols are the members of `D n`; needed to speak of first-order definability from an arbitrary family of relations."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Structure.mk₂` (only arities ≤ 2).",
+     "name": "Reduct.relStructure",
+     "why_needed": "The `relLanguage D`-structure on M interpreting each symbol by the relation it names."
+    },
+    {
+     "closest_existing_considered": "`Set.Definable` (per single set, fixed language); no definable-closure operator on families of relations exists in Mathlib.",
+     "name": "Reduct.definableClosure",
+     "why_needed": "The family of all relations ∅-definable from the relations in D; used to express closure under first-order definability (interdefinability)."
+    },
+    {
+     "closest_existing_considered": "`Set.Definable` (per single set); `FirstOrder.Language.DefinableSet` is per-arity and bundled, not a family.",
+     "name": "Reduct.definableRelations",
+     "why_needed": "The family of all relations ∅-definable in the L-structure M."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.LHom.reduct` / `ModelType.reduct` (reduct along a language map — literal symbol-dropping, not up to interdefinability, and not what the conjecture counts).",
+     "name": "Reduct.reducts",
+     "why_needed": "The set of interdefinability classes of reducts of M, represented as definably closed subfamilies of the definable relations of M."
+    }
+   ],
+   "per_slot": {
+    "reduct": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (L : Language) [L.IsRelational] [Finite L.Symbols] (M : Type u) [L.Structure M] [Countable M] [Infinite M], L.IsUltrahomogeneous M → (reducts L M).Finite`, where `reducts L M` is the set of families of relations on M that consist of ∅-definable relations of M and are closed under first-order definability; these are in canonical bijection with the first-order interdefinability classes of reducts of M (a reduct N ↦ the family of all relations ∅-definable in N). Uses Mathlib's `Set.Definable` (with parameter set ∅), `IsUltrahomogeneous`, `IsRelational`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reduct": "/-- **Thomas' conjecture.** \"Does a finitely presented homogeneous structure for a finite\nrelational language have finitely many reducts?\" That is: does every countably infinite\nhomogeneous (ultrahomogeneous) structure $M$ in a finite relational language have only finitely\nmany reducts up to first-order interdefinability?\n\nHere a *reduct* of $M$ is a structure on the domain of $M$ whose relations are first-order\ndefinable without parameters in $M$, and two reducts are *interdefinable* if each relation of\none is definable without parameters in the other. Reducts are identified with the families of\nrelations definable in them, see `Reduct.reducts`. The conjectured answer is yes. -/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(sorry) ↔ ∀ (L : FirstOrder.Language.{v, w}) [L.IsRelational] [Finite L.Symbols]\n      (M : Type u) [L.Structure M] [Countable M] [Infinite M],\n      L.IsUltrahomogeneous M → (reducts L M).Finite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reducts of homogeneous structures (Thomas' conjecture)\n\nA *reduct* of a structure $M$ is a structure on the same domain whose relations are all\nfirst-order definable without parameters in $M$. Two reducts are *interdefinable* if each is a\nreduct of the other, i.e. they define exactly the same relations. Reducts are counted up to\ninterdefinability: otherwise every structure has infinitely many reducts.\n\nThomas conjectured in 1991 that a countable homogeneous structure in a finite relational language\nhas only finitely many reducts up to first-order interdefinability. Here *homogeneous* means\n*ultrahomogeneous*: every isomorphism between finite substructures extends to an automorphism.\nThis is known for many specific structures (e.g. the random graph, which has exactly five reducts),\nbut open in general.\n\nThe Wikipedia list entry asks whether \"a finitely presented homogeneous structure for a finite\nrelational language\" has finitely many reducts; the conjecture concerns countably infinite\nstructures (a finite structure trivially has finitely many reducts up to interdefinability).\n\n*References:*\n- [Wikipedia: Reduct](https://en.wikipedia.org/wiki/reduct)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- S. Thomas, *Reducts of the random graph*, J. Symbolic Logic 56 (1991), 176–181.\n  <https://doi.org/10.2307/2274912>\n- M. Bodirsky, M. Pinsker, *Reducts of Ramsey structures*, in: Model Theoretic Methods in Finite\n  Combinatorics, Contemporary Mathematics 558 (2011), 489–519. <https://arxiv.org/abs/1105.6073>\n-/\n\nnamespace Reduct\n\nopen FirstOrder FirstOrder.Language\n\nuniverse u v w\n\nvariable {M : Type w}\n\n/-- A relation of some finite arity `n` on `M`, i.e. a set of `n`-tuples of elements of `M`. -/\nabbrev Relation (M : Type w) : Type w :=\n  Σ n : ℕ, Set (Fin n → M)\n\n/-- The relations on `M` (of every finite arity) that are first-order definable without\nparameters in the `L`-structure `M`. -/\ndef definableRelations (L : FirstOrder.Language.{u, v}) (M : Type w) [L.Structure M] :\n    Set (Relation M) :=\n  {R | (∅ : Set M).Definable L R.2}\n\n/-- The relational language with one `n`-ary relation symbol for each `n`-ary relation in `S`. -/\ndef relLanguage (S : Set (Relation M)) : FirstOrder.Language.{w, w} :=\n  ⟨fun _ => PEmpty, fun n => {R : Set (Fin n → M) // ⟨n, R⟩ ∈ S}⟩\n\ninstance instRelLanguageIsRelational (S : Set (Relation M)) : (relLanguage S).IsRelational :=\n  fun _ => inferInstanceAs (IsEmpty PEmpty)\n\n/-- The structure on `M` in which each relation symbol of `relLanguage S` is interpreted by\nthe relation in `S` that names it. -/\ninstance instRelLanguageStructure (S : Set (Relation M)) : (relLanguage S).Structure M where\n  RelMap R x := x ∈ R.1\n\n/-- The relations on `M` that are first-order definable without parameters from the\nrelations in `S`. -/\ndef definableClosure (S : Set (Relation M)) : Set (Relation M) :=\n  definableRelations (relLanguage S) M\n\n/-- The reducts of the `L`-structure `M` up to first-order interdefinability.\n\nA reduct of `M` is a structure on the domain `M` whose set of relations `S` consists of relations\nfirst-order definable without parameters in `M`. Two reducts are interdefinable exactly when\nthey define the same relations, so a reduct up to interdefinability is determined by\n`definableClosure S`. -/\ndef reducts (L : FirstOrder.Language.{u, v}) (M : Type w) [L.Structure M] :\n    Set (Set (Relation M)) :=\n  {D | ∃ S ⊆ definableRelations L M, definableClosure S = D}\n\n@[category API, AMS 3]\ntheorem mem_definableRelations_of_relMap (L : FirstOrder.Language.{u, v}) [L.Structure M] {n : ℕ}\n    (r : L.Relations n) : ⟨n, {x | Structure.RelMap r x}⟩ ∈ definableRelations L M := by\n  refine Set.empty_definable_iff.2 ⟨r.formula Term.var, ?_⟩\n  ext x\n  simp\n\n@[category API, AMS 3]\ntheorem subset_definableClosure (S : Set (Relation M)) : S ⊆ definableClosure S := by\n  rintro ⟨n, R⟩ hR\n  exact mem_definableRelations_of_relMap (relLanguage S) (⟨R, hR⟩ : (relLanguage S).Relations n)\n\n@[category API, AMS 3]\ntheorem definableClosure_mem_reducts (L : FirstOrder.Language.{u, v}) [L.Structure M]\n    {S : Set (Relation M)}\n    (hS : S ⊆ definableRelations L M) : definableClosure S ∈ reducts L M :=\n  ⟨S, hS, rfl⟩\n\n/-- **Thomas' conjecture** (1991).\n\nDoes every countably infinite homogeneous (i.e. ultrahomogeneous) structure `M` in a finite\nrelational language `L` have only finitely many reducts up to first-order interdefinability,\nwhere a reduct of `M` is a structure on the domain `M` all of whose relations are first-order\ndefinable without parameters in `M`? -/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(sorry) ↔\n      ∀ (L : FirstOrder.Language.{u, v}) [L.IsRelational] [Finite L.Symbols]\n        (M : Type w) [L.Structure M] [Countable M] [Infinite M],\n        L.IsUltrahomogeneous M → (reducts L M).Finite := by\n  sorry\n\nend Reduct\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (reducts up to first-order interdefinability, parameter-free definability, 'finitely presented' read as countable/countably infinite, universal quantification over all such structures) match Thomas' conjecture as stated in the literature.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Finitely presented' (non-standard list-entry wording) is read, per the decomposition notes and the literature (Thomas 1991; Bodirsky–Pinsker survey), as 'countable (countably infinite)': hypotheses `[Countable M] [Infinite M]`. Finite structures trivially have finitely many reducts up to interdefinability, so including `Infinite M` neither strengthens nor weakens the conjecture; a reviewer may prefer to drop it.",
+    "'Homogeneous' is taken as ultrahomogeneous (Fraïssé sense) via Mathlib's `FirstOrder.Language.IsUltrahomogeneous`; in a relational language `Substructure.FG ↔ Finite`, so this is exactly the classical definition used by Thomas.",
+    "'Finite relational language' is `[L.IsRelational] [Finite L.Symbols]`.",
+    "'Reduct' is taken in the sense of Thomas' conjecture (as the decomposition notes prescribe): a structure on the same domain whose relations are all first-order definable WITHOUT parameters in M, counted up to first-order interdefinability. Definability uses Mathlib's `Set.Definable` with parameter set `∅`.",
+    "Interdefinability classes are represented by sets of relations: a reduct is given by a set `S` of relations on `M` each in `definableRelations L M`; two such reducts are interdefinable iff they define the same relations, i.e. iff `definableClosure S` agrees. So `reducts L M = {D | ∃ S ⊆ definableRelations L M, definableClosure S = D}` is in bijection with the reducts of M up to interdefinability. The closure `definableClosure S` is computed as the parameter-free definable relations of the tautological structure on the relational language `relLanguage S` (one n-ary symbol per n-ary relation in S), which avoids quantifying over languages in arbitrary universes.",
+    "Reducts are taken to be relational (sets of relations), as in Thomas' setting; a reduct with function symbols would be interdefinable with the relational structure of their graphs, so no classes are lost.",
+    "Relations of arity 0 are allowed in `Relation M`; they are always definable (⊥/⊤), so they do not affect the count.",
+    "The theorem is universe-polymorphic in the universes of `L` and `M`; the mathematical content is universe-independent."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Rel α β` (binary only) and `FirstOrder.Language.DefinableSet A α` (fixed arity index type); neither packages all finite arities together.",
+     "name": "Reduct.Relation",
+     "why_needed": "Abbreviation `Σ n : ℕ, Set (Fin n → M)` for a finitary relation on M of arbitrary arity, needed to collect definable relations of all arities into one set."
+    },
+    {
+     "closest_existing_considered": "`Set.Definable` (used inside it) and `FirstOrder.Language.DefinableSet`, which are per-arity and do not form a single set over all arities.",
+     "name": "Reduct.definableRelations",
+     "why_needed": "The set of all relations (of every arity) on M first-order definable without parameters in the L-structure M; this is the interdefinability invariant of a structure."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.graph` / `SimpleGraph.structure` (single fixed relation), `Language.mk` used directly; nothing in Mathlib builds a language from an arbitrary family of relations.",
+     "name": "Reduct.relLanguage (with instances instRelLanguageIsRelational, instRelLanguageStructure)",
+     "why_needed": "The relational language with one n-ary symbol per n-ary relation in a set S, with the tautological structure on M; this realises the reduct 'M with relations S' as a genuine `FirstOrder.Language.Structure` without quantifying over languages in arbitrary universes."
+    },
+    {
+     "closest_existing_considered": "`Set.Definable` for a fixed language; no closure operator on sets of relations exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Reduct.definableClosure",
+     "why_needed": "The set of relations definable without parameters from a set of relations S (i.e. `definableRelations (relLanguage S) M`); two reducts are interdefinable iff their closures coincide."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `LHom.reduct`/`IsExpansionOn` (syntactic reducts along a language map, not up to interdefinability, and not a collection to count); `FirstOrder.Language.Equiv` automorphism group (would give the closed-supergroup formulation, equivalent only via ω-categoricity).",
+     "name": "Reduct.reducts",
+     "why_needed": "The set of reducts of the L-structure M up to first-order interdefinability, represented by the definable closures of sets of M-definable relations; the conjecture asserts this set is finite."
+    }
+   ],
+   "per_slot": {
+    "reduct": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (L : FirstOrder.Language) [L.IsRelational] [Finite L.Symbols] (M : Type w) [L.Structure M] [Countable M] [Infinite M], L.IsUltrahomogeneous M → (reducts L M).Finite`, where `reducts L M` is the set of interdefinability classes of reducts, realised as the set of definable closures of sets of parameter-free-definable relations on M. Homogeneity uses Mathlib's `IsUltrahomogeneous` (which in a relational language is exactly 'every isomorphism between finite substructures extends to an automorphism', since `Substructure.fg_iff_finite`). answer(True) is the positive (conjectured) answer."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reduct": "/-- **Thomas' conjecture** (1991).\n\nDoes every countably infinite homogeneous (i.e. ultrahomogeneous) structure `M` in a finite\nrelational language `L` have only finitely many reducts up to first-order interdefinability,\nwhere a reduct of `M` is a structure on the domain `M` all of whose relations are first-order\ndefinable without parameters in `M`? -/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(sorry) ↔\n      ∀ (L : FirstOrder.Language.{u, v}) [L.IsRelational] [Finite L.Symbols]\n        (M : Type w) [L.Structure M] [Countable M] [Infinite M],\n        L.IsUltrahomogeneous M → (reducts L M).Finite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reducts of homogeneous structures\n\n*References:*\n- [Wikipedia: Reduct](https://en.wikipedia.org/wiki/reduct)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace Reduct\n\nopen FirstOrder\n\nuniverse u v w\n\n/-- A finitary relation on `M`, bundled with its arity. -/\nabbrev FinitaryRelation (M : Type w) := Σ n : ℕ, Set (Fin n → M)\n\n/-- The finitary relations on `M` that are definable without parameters in its `L`-structure. -/\ndef definableRelations (L : FirstOrder.Language.{u, v}) (M : Type w) [L.Structure M] :\n    Set (FinitaryRelation M) :=\n  {r | (∅ : Set M).Definable L r.2}\n\n/-- The relational language with one symbol for each relation in `R`. -/\ndef relationsLanguage {M : Type w} (R : Set (FinitaryRelation M)) : FirstOrder.Language.{0, w} where\n  Functions := fun _ ↦ Empty\n  Relations := fun n ↦ {r : Set (Fin n → M) // ⟨n, r⟩ ∈ R}\n\n/-- The canonical structure in which every symbol belonging to `R` denotes that relation. -/\ndef relationsStructure {M : Type w} (R : Set (FinitaryRelation M)) :\n    (relationsLanguage R).Structure M where\n  funMap := fun f ↦ f.elim\n  RelMap := fun r ↦ r.1\n\n/-- All relations definable without parameters after naming the relations in `R`. -/\ndef definableClosure {M : Type w} (R : Set (FinitaryRelation M)) :\n    Set (FinitaryRelation M) :=\n  letI := relationsStructure R\n  {r | (∅ : Set M).Definable (relationsLanguage R) r.2}\n\n/--\nThe reducts of an `L`-structure on `M`, up to first-order interdefinability, represented by their\nsets of parameter-free definable finitary relations.\n-/\ndef reducts (L : FirstOrder.Language.{u, v}) (M : Type w) [L.Structure M] :\n    Set (Set (FinitaryRelation M)) :=\n  definableClosure '' {R | R ⊆ definableRelations L M}\n\n/--\nDoes every countably infinite ultrahomogeneous structure in a finite relational language have\nonly finitely many reducts, where reducts are counted up to parameter-free first-order\ninterdefinability?\n-/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(sorry) ↔\n      ∀ (L : FirstOrder.Language.{u, v}) (M : Type w) (s : L.Structure M),\n        L.IsRelational → Finite L.Symbols → Countable M → Infinite M →\n          @Language.IsUltrahomogeneous L M s → (@reducts L M s).Finite := by\n  sorry\n\nend Reduct\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the list entry's non-standard phrase “finitely presented homogeneous structure” as the standard Thomas-conjecture domain: every countably infinite ultrahomogeneous structure in a finite relational signature, as directed by the decomposition table.",
+    "Used `Finite L.Symbols` for finiteness of the whole signature, `L.IsRelational` to exclude function symbols, and both `Countable M` and `Infinite M` for a countably infinite carrier.",
+    "Used Mathlib's `FirstOrder.Language.IsUltrahomogeneous`; in a relational language its finitely generated substructures are exactly finite substructures.",
+    "Counted reducts up to parameter-free first-order interdefinability. A presentation is a set `R` of parameter-free definable finitary relations of the original structure; its interdefinability class is represented canonically by the set of all parameter-free relations definable after naming `R`. Thus equality of represented closures is precisely interdefinability.",
+    "Allowed arbitrary relational presentations of reducts rather than only sublanguages of the original finite signature. This is necessary for the standard model-theoretic reduct notion and avoids the trivially finite sublanguage interpretation.",
+    "Made the statement universe-polymorphic over the original language and carrier."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `Set (Fin n → M)` is the existing fixed-arity representation used by `Set.Definable`, but no bundled all-arities relation type was found.",
+     "name": "FinitaryRelation",
+     "why_needed": "Bundles a relation on the carrier with its finite arity so reduct presentations and their definability closures can be collected in one set."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides the pointwise predicate `(∅ : Set M).Definable L r`, but not the all-arities collection needed to parameterize reduct presentations.",
+     "name": "definableRelations",
+     "why_needed": "Collects all finitary relations definable without parameters in the original structure."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `FirstOrder.Language` and several specific languages, but no constructor that names an arbitrary set of finitary relations.",
+     "name": "relationsLanguage",
+     "why_needed": "Builds the canonical relational signature having one symbol for each relation in a proposed reduct presentation."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `FirstOrder.Language.Structure`, but no canonical structure for an arbitrary set of named relations.",
+     "name": "relationsStructure",
+     "why_needed": "Interprets each symbol of `relationsLanguage R` as the relation it names on the fixed carrier."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Set.Definable` tests one fixed-arity relation; no interdefinability closure or reduct abstraction was found.",
+     "name": "definableClosure",
+     "why_needed": "Assigns to a reduct presentation its complete set of parameter-free definable relations, giving a canonical representative of its first-order interdefinability class."
+    },
+    {
+     "closest_existing_considered": "No reduct or first-order interdefinability primitive was found in Mathlib or `FormalConjecturesForMathlib`.",
+     "name": "reducts",
+     "why_needed": "Defines the set of canonical interdefinability classes generated by arbitrary collections of relations parameter-free definable in the original structure."
+    }
+   ],
+   "per_slot": {
+    "reduct": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reduct": "/--\nDoes every countably infinite ultrahomogeneous structure in a finite relational language have\nonly finitely many reducts, where reducts are counted up to parameter-free first-order\ninterdefinability?\n-/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(sorry) ↔\n      ∀ (L : FirstOrder.Language.{u, v}) (M : Type w) (s : L.Structure M),\n        L.IsRelational → Finite L.Symbols → Countable M → Infinite M →\n          @Language.IsUltrahomogeneous L M s → (@reducts L M s).Finite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reducts of homogeneous structures (Thomas' conjecture)\n\nThomas' conjecture (1991): every countably infinite homogeneous structure in a finite relational\nlanguage has only finitely many reducts up to first-order interdefinability.\n\nHere a *reduct* of a structure $M$ is a structure on the same domain each of whose relations is\nfirst-order definable without parameters in $M$. Two such structures are *interdefinable* if each\nis a reduct of the other, i.e. if they have the same definable relations. Reducts are counted up\nto interdefinability; otherwise the count is trivially infinite.\n\n*References:*\n* [Wikipedia, Reduct](https://en.wikipedia.org/wiki/reduct)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* Thomas, Simon. *Reducts of the random graph.* J. Symbolic Logic 56 (1991), 176–181.\n  [doi:10.2307/2274912](https://doi.org/10.2307/2274912)\n* Bodirsky, Manuel; Pinsker, Michael. *Reducts of Ramsey structures.* Contemp. Math. 558 (2011).\n  [arXiv:1105.6073](https://arxiv.org/abs/1105.6073)\n-/\n\nnamespace Reduct\n\nopen FirstOrder FirstOrder.Language FirstOrder.Language.Structure\n\nuniverse u\n\nvariable (M : Type u)\n\n/-- The set of all finitary relations on `M` (an `n`-ary relation being a subset of `Fin n → M`)\nthat are first-order definable without parameters in the `L`-structure `M`. -/\ndef definableRelations (L : FirstOrder.Language) [L.Structure M] :\n    Set (Σ n : ℕ, Set (Fin n → M)) :=\n  {R | (∅ : Set M).Definable L R.2}\n\n/-- An `L'`-structure on `M` is a *reduct* of the `L`-structure `M` if every relation of the\n`L'`-structure, and the graph of every function of the `L'`-structure, is first-order definable\nwithout parameters in the `L`-structure `M`. -/\ndef IsReduct (L L' : FirstOrder.Language) [L.Structure M] [L'.Structure M] : Prop :=\n  (∀ (n : ℕ) (r : L'.Relations n), (∅ : Set M).Definable L (setOf (RelMap r))) ∧\n    ∀ (n : ℕ) (f : L'.Functions n),\n      (∅ : Set M).Definable L {x : Fin (n + 1) → M | funMap f (Fin.tail x) = x 0}\n\n/-- The reducts of the `L`-structure `M`, up to first-order interdefinability.\n\nTwo reducts are interdefinable exactly when they have the same definable relations, so the\ninterdefinability class of a reduct `N` is determined by `definableRelations M L'` (computed in\n`N`). This set collects these sets of definable relations over all reducts `N` of `M`. -/\ndef reductsUpToInterdefinability (L : FirstOrder.Language) [L.Structure M] :\n    Set (Set (Σ n : ℕ, Set (Fin n → M))) :=\n  {D | ∃ (L' : FirstOrder.Language.{u, u}) (_ : L'.Structure M),\n    IsReduct M L L' ∧ D = definableRelations M L'}\n\n/-- Every structure is a reduct of itself. -/\n@[category API, AMS 3]\ntheorem isReduct_self (L : FirstOrder.Language) [L.Structure M] : IsReduct M L L := by\n  refine ⟨fun n r => ?_, fun n f => ?_⟩\n  · rw [Set.empty_definable_iff]\n    exact ⟨r.formula Term.var, by ext x; simp⟩\n  · rw [Set.empty_definable_iff]\n    refine ⟨Formula.graph f, ?_⟩\n    ext x\n    simp only [Formula.graph, Formula.realize_equal, Term.realize, Set.mem_setOf_eq, eq_comm]\n    rfl\n\n/-- The pure set `M` (the structure in the empty language) is a reduct of every structure on `M`. -/\n@[category test, AMS 3]\ntheorem isReduct_empty (L : FirstOrder.Language) [L.Structure M]\n    [FirstOrder.Language.empty.Structure M] : IsReduct M L FirstOrder.Language.empty :=\n  ⟨fun _ r => r.elim, fun _ f => f.elim⟩\n\n/-- The interdefinability class of a structure is one of its reducts. -/\n@[category API, AMS 3]\ntheorem definableRelations_mem_reductsUpToInterdefinability (L : FirstOrder.Language.{u, u})\n    [L.Structure M] : definableRelations M L ∈ reductsUpToInterdefinability M L :=\n  ⟨L, inferInstance, isReduct_self M L, rfl⟩\n\n/-- **Thomas' conjecture.** \"Does a finitely presented homogeneous structure for a finite\nrelational language have finitely many reducts?\"\n\nPrecisely: let $M$ be a countably infinite structure in a finite relational language $L$ that is\nhomogeneous, i.e. every isomorphism between finite substructures of $M$ extends to an\nautomorphism of $M$. Does $M$ have only finitely many reducts up to first-order\ninterdefinability, where a reduct of $M$ is a structure on the same domain all of whose relations\nare first-order definable without parameters in $M$? The conjectured answer is yes. -/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(sorry) ↔ ∀ (L : FirstOrder.Language.{0, 0}) (M : Type) [L.Structure M]\n      [L.IsRelational] [Finite L.Symbols] [Countable M] [Infinite M], L.IsUltrahomogeneous M →\n        (reductsUpToInterdefinability M L).Finite := by\n  sorry\n\nend Reduct\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (count up to first-order interdefinability, parameter-free definability, 'finitely presented' read as countable, universal quantification over all such structures, answer(True) as the positive candidate) match Thomas' conjecture (1991) as stated in the literature and are what the file formalizes.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'finitely presented' (list-entry wording) is read as 'countable' as in Thomas' conjecture; formalized as `Countable M` together with `Infinite M` (countably infinite). Including finite M would not change the truth value, since finite structures trivially have finitely many reducts up to interdefinability.",
+    "'homogeneous' is read as ultrahomogeneous and formalized with Mathlib's `FirstOrder.Language.IsUltrahomogeneous` (every embedding of a finitely generated substructure into M extends to an automorphism). In a relational language, finitely generated substructures are exactly the finite substructures, and this is equivalent to the usual 'every isomorphism between finite substructures extends to an automorphism'.",
+    "'finite relational language' = `L.IsRelational` (no function symbols) and `Finite L.Symbols`. The language and domain live in universe 0 (`Language.{0,0}`, `M : Type`), following the repository convention `∀ (X : Type)`; every finite language and every countable structure has an isomorphic copy there.",
+    "A reduct of M is a structure N on the same domain (any language L', any structure instance) each of whose basic relations, and the graph of each of whose basic functions, is first-order definable WITHOUT parameters in M (`Set.Definable (∅ : Set M) L _`). Allowing function symbols in the reduct language is harmless: a function is definable iff its graph is. Graph convention follows Mathlib's `Formula.graph` (value in coordinate 0).",
+    "Reducts are counted up to first-order interdefinability: two reducts are interdefinable iff they have the same ∅-definable relations, so the interdefinability class of N is identified with `definableRelations M L'` (the set of all ∅-definable finitary relations of N, as elements of Σ n, Set (Fin n → M)). The set `reductsUpToInterdefinability M L` collects these sets over all reducts, and the conjecture asserts it is `Set.Finite`. This avoids building a Setoid whose transitivity would require formalizing translation of formulas between interdefinable structures.",
+    "In `reductsUpToInterdefinability` the reduct language ranges over `Language.{u,u}` where `M : Type u` (so `Language.{0,0}` in the theorem). This loses nothing: any structure on M whose relations/functions are definable in M has the same set of definable relations as one whose relation symbols are literally the relations themselves, which live in `Type u`.",
+    "The group-theoretic reformulation (finitely many closed supergroups of Aut(M) in Sym(M)) was deliberately NOT used, since its equivalence with the definability formulation relies on Ryll-Nardzewski/ω-categoricity; the definability formulation is the literal one in Thomas (1991) and Bodirsky–Pinsker.",
+    "AMS tag 3 (Mathematical logic and foundations). Category `research open` with `answer(sorry)`; `answer(True)` is the conjectured (positive) answer."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `Set.Definable` (used as the building block) and `FirstOrder.Language.DefinableSet` (fixed arity/variable type only, not the union over all arities).",
+     "name": "Reduct.definableRelations",
+     "why_needed": "The set of all finitary relations on M (of every arity n, as subsets of Fin n → M) that are ∅-definable in the L-structure M; this is the invariant that determines a reduct up to interdefinability."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.LHom.reduct`, `FirstOrder.Language.LHom.IsExpansionOn`, `Set.Definable`.",
+     "name": "Reduct.IsReduct",
+     "why_needed": "The notion of reduct in Thomas' broad sense: a structure on the same domain whose relations (and function graphs) are ∅-definable in M. Mathlib's `LHom.reduct`/`IsExpansionOn` only covers reducts obtained by forgetting symbols along a language map, which is the narrow notion and makes the count trivially infinite/uninteresting."
+    },
+    {
+     "closest_existing_considered": "A Quotient by an interdefinability Setoid (rejected because proving transitivity requires a formula-translation theorem absent from Mathlib); the lattice of closed supergroups of Aut(M) (rejected as non-literal, requires Ryll-Nardzewski).",
+     "name": "Reduct.reductsUpToInterdefinability",
+     "why_needed": "The set of interdefinability classes of reducts of M, represented by their sets of definable relations; needed to state 'finitely many reducts up to first-order interdefinability'."
+    }
+   ],
+   "per_slot": {
+    "reduct": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `Reduct.reduct`: answer(sorry) ↔ for every finite relational language L (Language.{0,0}, IsRelational, Finite L.Symbols) and every countably infinite L-structure M (Countable M, Infinite M) that is ultrahomogeneous (Mathlib's `L.IsUltrahomogeneous M`), the set of reducts of M up to first-order interdefinability is finite. Mathlib supplies languages, structures, ∅-definability (`Set.Definable`) and ultrahomogeneity; 'reduct' and 'reducts up to interdefinability' had to be defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reduct": "/-- **Thomas' conjecture.** \"Does a finitely presented homogeneous structure for a finite\nrelational language have finitely many reducts?\"\n\nPrecisely: let $M$ be a countably infinite structure in a finite relational language $L$ that is\nhomogeneous, i.e. every isomorphism between finite substructures of $M$ extends to an\nautomorphism of $M$. Does $M$ have only finitely many reducts up to first-order\ninterdefinability, where a reduct of $M$ is a structure on the same domain all of whose relations\nare first-order definable without parameters in $M$? The conjectured answer is yes. -/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(sorry) ↔ ∀ (L : FirstOrder.Language.{0, 0}) (M : Type) [L.Structure M]\n      [L.IsRelational] [Finite L.Symbols] [Countable M] [Infinite M], L.IsUltrahomogeneous M →\n        (reductsUpToInterdefinability M L).Finite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reducts of homogeneous structures\n\n*References:*\n- [Wikipedia, Reduct](https://en.wikipedia.org/wiki/reduct)\n- [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace Reduct\n\nopen FirstOrder FirstOrder.Language\n\nuniverse u w\n\n/-- A relational structure on the same domain as an `L`-structure whose basic relations are all\nparameter-free definable in the `L`-structure. -/\nstructure FirstOrderReduct (L : Language.{u}) (M : Type w) [L.Structure M] where\n  language : Language.{u}\n  struc : language.Structure M\n  isRelational : language.IsRelational\n  relations_definable : ∀ {n} (r : language.Relations n),\n    (∅ : Set M).Definable L {x | @Structure.RelMap language M struc n r x}\n\n/-- The collection of all parameter-free definable finite-arity relations of a reduct. Two reducts\nare first-order interdefinable exactly when these collections are equal. -/\ndef FirstOrderReduct.definableRelations {L : Language.{u}} {M : Type w} [L.Structure M]\n    (R : FirstOrderReduct L M) : Set (Σ n : ℕ, Set (Fin n → M)) :=\n  {s | @Set.Definable M (∅ : Set M) R.language R.struc (Fin s.1) s.2}\n\n/-- **Thomas' conjecture (1991).** Does every countably infinite ultrahomogeneous structure in a\nfinite relational language have only finitely many reducts, where reducts are counted up to\nfirst-order interdefinability without parameters? -/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(True) ↔ ∀ (L : Language.{u}) (M : Type w) [L.Structure M] [L.IsRelational]\n      [Finite L.Symbols] [Countable M] [Infinite M], L.IsUltrahomogeneous M →\n      (Set.range (FirstOrderReduct.definableRelations (L := L) (M := M))).Finite := by\n  sorry\n\nend Reduct\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the list entry's non-standard phrase “finitely presented homogeneous structure” as Thomas' conjecture for every countably infinite ultrahomogeneous structure in a finite relational signature, as specified by the decomposition table.",
+    "Used `answer(True)` for the conjectured positive answer: universally, every such structure has finitely many reducts.",
+    "Modeled a reduct as a relational structure on the same domain whose basic relations are parameter-free first-order definable in the original structure.",
+    "Counted reducts up to first-order interdefinability by mapping each reduct to its full set of parameter-free definable finite-arity relations. Equality of these profiles is precisely interdefinability, so finiteness of the range is finiteness of interdefinability classes rather than finiteness of raw presentations.",
+    "Used Mathlib's `FirstOrder.Language.IsUltrahomogeneous`, `Finite L.Symbols`, `Countable M`, and `Infinite M` for ultrahomogeneity, finite signature, and a countably infinite domain."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.LHom.reduct` and `Set.Definable`",
+     "name": "Reduct.FirstOrderReduct",
+     "why_needed": "Mathlib's `Language.LHom.reduct` only forgets or renames symbols along a language homomorphism; Thomas reducts may use any parameter-free definable relations and are considered up to first-order interdefinability."
+    },
+    {
+     "closest_existing_considered": "`Set.Definable` and quotient/setoid patterns such as `VaughtConjecture.numberOfCountableModels`",
+     "name": "Reduct.FirstOrderReduct.definableRelations",
+     "why_needed": "A canonical interdefinability profile is needed to count reducts up to parameter-free first-order interdefinability without constructing a bespoke quotient and proving a translation-based setoid API."
+    }
+   ],
+   "per_slot": {
+    "reduct": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reduct": "/-- **Thomas' conjecture (1991).** Does every countably infinite ultrahomogeneous structure in a\nfinite relational language have only finitely many reducts, where reducts are counted up to\nfirst-order interdefinability without parameters? -/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(True) ↔ ∀ (L : Language.{u}) (M : Type w) [L.Structure M] [L.IsRelational]\n      [Finite L.Symbols] [Countable M] [Infinite M], L.IsUltrahomogeneous M →\n      (Set.range (FirstOrderReduct.definableRelations (L := L) (M := M))).Finite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reducts of homogeneous structures (Thomas' conjecture)\n\n\"Does a finitely presented homogeneous structure for a finite relational language have finitely\nmany reducts?\"\n\nThis is Thomas' conjecture (1991) on the reducts of countably infinite homogeneous structures in a\nfinite relational language. Here a *reduct* of a structure $M$ is a relational structure $N$ on\nthe same domain each of whose relations is first-order definable in $M$ without parameters, and\nreducts are counted up to first-order interdefinability (two reducts are identified when each is\na reduct of the other, i.e. when they have the same sets definable without parameters).\n\n*References:*\n- [Wikipedia: Reduct](https://en.wikipedia.org/wiki/reduct)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- S. Thomas, *Reducts of the random graph*, J. Symbolic Logic 56 (1991), 176–181.\n-/\n\nnamespace Reduct\n\nopen FirstOrder FirstOrder.Language\n\nuniverse u v w u' v'\n\nvariable (L : FirstOrder.Language.{u, v}) (M : Type w) [L.Structure M]\n\n/-- The set of all finitary relations on `M` (recorded together with their arity) that are\nfirst-order definable without parameters in the `L`-structure `M`. -/\ndef definableRelations : Set (Σ n : ℕ, Set (Fin n → M)) :=\n  {R | (∅ : Set M).Definable L R.2}\n\n/-- A structure `N` on the same domain `M` (in a language `L'`) is a *reduct* of the\n`L`-structure `M` if every relation of `N` is first-order definable without parameters in `M`. -/\ndef IsReduct {L' : FirstOrder.Language.{u', v'}} (N : L'.Structure M) : Prop :=\n  ∀ (n : ℕ) (R : L'.Relations n), (∅ : Set M).Definable L {x | N.RelMap R x}\n\n/-- The reducts of the `L`-structure `M` up to first-order interdefinability. Each reduct `N`\n(a structure on `M` in a relational language) is represented by the set of relations definable\nwithout parameters in `N`; two reducts are interdefinable exactly when these sets coincide. -/\ndef reductClasses : Set (Set (Σ n : ℕ, Set (Fin n → M))) :=\n  {D | ∃ (L' : FirstOrder.Language.{u', v'}) (_ : L'.IsRelational) (N : L'.Structure M),\n    IsReduct L M N ∧ D = @definableRelations L' M N}\n\n/-- Every structure is a reduct of itself. -/\n@[category API, AMS 3]\ntheorem isReduct_self : IsReduct L M ‹L.Structure M› := by\n  intro n R\n  refine ⟨(L.lhomWithConstants (∅ : Set M)).onFormula (Relations.formula R Term.var), ?_⟩\n  ext x\n  simp only [Set.mem_setOf_eq, LHom.realize_onFormula, Formula.realize_rel, Term.realize_var]\n\n/-- The interdefinability class of a relational structure is one of its own reduct classes. -/\n@[category API, AMS 3]\ntheorem definableRelations_mem_reductClasses [L.IsRelational] :\n    definableRelations L M ∈ reductClasses.{u, v, w, u, v} L M :=\n  ⟨L, inferInstance, ‹L.Structure M›, isReduct_self L M, rfl⟩\n\n/--\n**Thomas' conjecture** (1991). \"Does a finitely presented homogeneous structure for a finite\nrelational language have finitely many reducts?\"\n\nPrecisely: is it true that for every countably infinite structure $M$ in a finite relational\nlanguage which is homogeneous (every isomorphism between finite substructures of $M$ extends to\nan automorphism of $M$), there are only finitely many reducts of $M$ up to first-order\ninterdefinability? The conjectured answer is yes.\n-/\n@[category research open, AMS 3]\ntheorem reduct : answer(sorry) ↔\n    ∀ (L : FirstOrder.Language.{u, v}) (M : Type w) [L.Structure M] [L.IsRelational]\n      [Finite L.Symbols] [Countable M] [Infinite M],\n      L.IsUltrahomogeneous M → (reductClasses.{u, v, w, u', v'} L M).Finite := by\n  sorry\n\nend Reduct\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The single slot and its notes (reducts up to first-order interdefinability, 'finitely presented' read as countable/countably infinite, universal quantification over all such structures, answer(True) as the positive candidate) match Thomas' 1991 conjecture and were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Finitely presented' in the list entry is read (per the decomposition notes and Thomas' original conjecture) as 'countable'; formalized as `[Countable M] [Infinite M]` (countably infinite). Including `Infinite M` follows the notes' 'countably infinite'; the finite case is trivially true, so the statement is equivalent to Thomas' 'countable' wording either way.",
+    "'Finite relational language' is formalized as `[L.IsRelational] [Finite L.Symbols]` (no function symbols, including no constants; finitely many relation symbols in total).",
+    "'Homogeneous' is formalized with Mathlib's `FirstOrder.Language.IsUltrahomogeneous`: every embedding of a finitely generated substructure into M extends to an automorphism. For relational languages FG substructures are exactly the finite ones (`Substructure.fg_iff_finite`), and extending embeddings of finite substructures is equivalent to extending isomorphisms between finite substructures.",
+    "A reduct is taken in Thomas' sense: a structure N on the same domain M in a *relational* language whose relation symbols are all interpreted by sets first-order definable in M without parameters (`Set.Definable` with parameter set `∅`). Restricting reducts to relational languages matches the source; allowing function symbols with definable graphs would give the same interdefinability classes.",
+    "'Finitely many reducts' is counted up to first-order interdefinability: `reductClasses L M` is the set of `definableRelations` of reducts, so its finiteness is exactly finiteness of the number of interdefinability classes. The alternative reformulation via closed supergroups of Aut(M) in Sym(M) was not used since it relies on a theorem (Ryll-Nardzewski/ω-categoricity) rather than the definition.",
+    "The reduct languages range over `FirstOrder.Language.{u', v'}` with the theorem universe-polymorphic in u', v' (and in the universes of L and M). Every reduct in any universe is interdefinable with one in any fixed universe, so this is equivalent to the informal statement; universes are passed explicitly as `reductClasses.{u, v, w, u', v'}`.",
+    "Two `@[category API]` lemmas (`isReduct_self`, `definableRelations_mem_reductClasses`) were added as basic tests of the bespoke definitions, both with complete short proofs.",
+    "The theorem uses the `answer(sorry) ↔ ∀ ...` yes/no form; `answer(True)` is the conjectured positive answer."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Set.Definable` (used as the building block, with parameter set ∅) and `FirstOrder.Language.DefinableSet` (which is per fixed arity α and does not bundle all arities).",
+     "name": "Reduct.definableRelations",
+     "why_needed": "The set of all finitary relations on M (with arity) that are 0-definable in the L-structure M; this is the invariant that determines a structure up to first-order interdefinability. Needed to identify interdefinable reducts."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.LHom.reduct` — this is the purely syntactic reduct along a language map (omitting symbols), which would make the count trivially infinite/meaningless for the conjecture; `LHom.IsExpansionOn` is likewise syntactic.",
+     "name": "Reduct.IsReduct",
+     "why_needed": "Thomas' notion of reduct: a structure N (in language L') on the same domain M each of whose relations is first-order definable without parameters in M. Mathlib has no definability-based reduct notion."
+    },
+    {
+     "closest_existing_considered": "No Mathlib or FormalConjecturesForMathlib notion of interdefinability or of closed supergroups of Aut(M) in Sym(M) exists; the group-theoretic reformulation would additionally rely on the ω-categoricity theorem rather than the definition.",
+     "name": "Reduct.reductClasses",
+     "why_needed": "The set of interdefinability classes of reducts of M: each relational reduct N is represented by `definableRelations` of N, and two reducts are interdefinable iff these sets coincide, so `Set.Finite` of this set says 'finitely many reducts up to first-order interdefinability'."
+    }
+   ],
+   "per_slot": {
+    "reduct": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `Reduct.reduct : answer(sorry) ↔ ∀ (L : FirstOrder.Language) (M : Type w) [L.Structure M] [L.IsRelational] [Finite L.Symbols] [Countable M] [Infinite M], L.IsUltrahomogeneous M → (reductClasses L M).Finite`. Mathlib supplies `IsRelational`, `Finite L.Symbols`, `IsUltrahomogeneous` (for relational languages FG substructures are exactly the finite ones, so this is the standard homogeneity) and `Set.Definable` with parameter set `∅` (0-definability). Mathlib's only reduct notion (`LHom.reduct`) is purely syntactic, so small bespoke definitions were needed to count reducts up to first-order interdefinability."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reduct": "/--\n**Thomas' conjecture** (1991). \"Does a finitely presented homogeneous structure for a finite\nrelational language have finitely many reducts?\"\n\nPrecisely: is it true that for every countably infinite structure $M$ in a finite relational\nlanguage which is homogeneous (every isomorphism between finite substructures of $M$ extends to\nan automorphism of $M$), there are only finitely many reducts of $M$ up to first-order\ninterdefinability? The conjectured answer is yes.\n-/\n@[category research open, AMS 3]\ntheorem reduct : answer(sorry) ↔\n    ∀ (L : FirstOrder.Language.{u, v}) (M : Type w) [L.Structure M] [L.IsRelational]\n      [Finite L.Symbols] [Countable M] [Infinite M],\n      L.IsUltrahomogeneous M → (reductClasses.{u, v, w, u', v'} L M).Finite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reducts of homogeneous structures\n\n*References:*\n- [Wikipedia, Reduct](https://en.wikipedia.org/wiki/reduct)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace Reduct\n\nopen FirstOrder\n\n/-- A finitary relation on `M`, bundled with its arity. -/\nabbrev FinitaryRelation (M : Type*) := Σ n : ℕ, Set (Fin n → M)\n\n/-- The family of all parameter-free first-order definable finitary relations in a structure. -/\ndef definableRelations (L : Language) (M : Type*) [L.Structure M] :\n    Set (FinitaryRelation M) :=\n  { R | Set.Definable (∅ : Set M) L R.2 }\n\n/-- The relational language having one symbol for each relation in `S`. -/\ndef relationsLanguage (M : Type*) (S : Set (FinitaryRelation M)) : Language where\n  Functions := fun _ ↦ Empty\n  Relations := fun n ↦ { R : Set (Fin n → M) // ⟨n, R⟩ ∈ S }\n\n/-- The canonical interpretation of `relationsLanguage M S`, in which every symbol denotes the\nrelation indexing it. -/\ndef relationsStructure (M : Type*) (S : Set (FinitaryRelation M)) :\n    (relationsLanguage M S).Structure M where\n  funMap := fun f ↦ f.elim\n  RelMap := fun R ↦ R.1\n\n/-- The parameter-free first-order definability closure of a family of finitary relations. -/\ndef definabilityClosure (M : Type*) (S : Set (FinitaryRelation M)) :\n    Set (FinitaryRelation M) :=\n  @definableRelations (relationsLanguage M S) M (relationsStructure M S)\n\n/-- The reducts of an `L`-structure on `M`, up to first-order interdefinability. A reduct is\nrepresented by its full family of parameter-free definable finitary relations. -/\ndef reducts (L : Language) (M : Type*) [L.Structure M] :\n    Set (Set (FinitaryRelation M)) :=\n  { D | ∃ S ⊆ definableRelations L M, D = definabilityClosure M S }\n\n/--\nDoes every countably infinite ultrahomogeneous structure in a finite relational language have\nonly finitely many reducts, where reducts are identified up to parameter-free first-order\ninterdefinability?\n-/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(True) ↔\n      ∀ (L : Language) (M : Type*) [L.Structure M] [L.IsRelational] [Finite L.Symbols]\n        [Countable M] [Infinite M], L.IsUltrahomogeneous M → (reducts L M).Finite := by\n  sorry\n\nend Reduct\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the list entry's non-standard phrase “finitely presented homogeneous structure” as the standard scope of Thomas' conjecture: a countably infinite ultrahomogeneous structure in a finite relational language.",
+    "Used `Language.IsUltrahomogeneous`; for a relational language Mathlib's finitely generated substructures are exactly the finite substructures, so this matches the usual model-theoretic notion.",
+    "Expressed finiteness of the original relational signature by `[Finite L.Symbols]` together with `[L.IsRelational]`, and countable infinitude of the domain by `[Countable M] [Infinite M]`.",
+    "Counted reducts up to parameter-free first-order interdefinability, not as syntactic presentations. A class is represented by its full set of parameter-free definable finitary relations.",
+    "Represented every reduct class as the definability closure of an arbitrary subset of the original structure's parameter-free definable relations. This permits any relational presentation while collapsing duplicate symbols and interdefinable presentations.",
+    "Used `answer(True) ↔ ...` because the conjectured answer to the yes/no question is positive."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `Set (α → M)` at each fixed variable type/arity, but no bundled type of all finitary relations.",
+     "name": "FinitaryRelation",
+     "why_needed": "Provides one type containing relations of every finite arity so full definability families can be compared and counted."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Set.Definable` supplies definability at a fixed arity and parameter set; this definition bundles its instances over all finite arities and specializes to the empty parameter set.",
+     "name": "definableRelations",
+     "why_needed": "Collects all parameter-free definable finitary relations of a fixed structure into one set."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `FirstOrder.Language`, `Language.empty`, and language maps, but no language canonically generated by a family of concrete finitary relations.",
+     "name": "relationsLanguage",
+     "why_needed": "Builds a canonical relational signature whose symbols are exactly a selected family of concrete relations, allowing its first-order closure to be formed without quantifying over syntactic presentations."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Language.Structure` and induced structures, but no canonical structure for a language indexed by concrete relations.",
+     "name": "relationsStructure",
+     "why_needed": "Interprets each symbol of `relationsLanguage` by the concrete relation indexing it."
+    },
+    {
+     "closest_existing_considered": "No definability-closure or interdefinability primitive was found; it is constructed from Mathlib's `Set.Definable` via the canonical language and structure.",
+     "name": "definabilityClosure",
+     "why_needed": "Forms the full parameter-free first-order definability family generated by a selected family of relations."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Theory.ModelType.reduct` concerns reduct along a language homomorphism and does not model arbitrary definable reducts or quotient them by first-order interdefinability; no suitable primitive exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "reducts",
+     "why_needed": "Defines the set of reduct classes to which finiteness can be applied, with classes represented extensionally by full definability families."
+    }
+   ],
+   "per_slot": {
+    "reduct": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reduct": "/--\nDoes every countably infinite ultrahomogeneous structure in a finite relational language have\nonly finitely many reducts, where reducts are identified up to parameter-free first-order\ninterdefinability?\n-/\n@[category research open, AMS 3]\ntheorem reduct :\n    answer(True) ↔\n      ∀ (L : Language) (M : Type*) [L.Structure M] [L.IsRelational] [Finite L.Symbols]\n        [Countable M] [Infinite M], L.IsUltrahomogeneous M → (reducts L M).Finite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reducts of homogeneous structures\n\n*Reference:* [Wikipedia, Reduct](https://en.wikipedia.org/wiki/reduct)\n\n*Reference:* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace Reduct\n\nopen FirstOrder FirstOrder.Language FirstOrder.Language.Structure\n\n/-- A subgroup of the symmetric group is closed in the pointwise-convergence topology when every\npermutation that can be matched on each finite set by an element of the subgroup belongs to it. -/\ndef IsClosedPermutationSubgroup {M : Type*} (G : Subgroup (Equiv.Perm M)) : Prop :=\n  ∀ g : Equiv.Perm M,\n    (∀ s : Finset M, ∃ h : G, ∀ x ∈ s, h.1 x = g x) → g ∈ G\n\n/-- The closed permutation groups containing all automorphisms of the `L`-structure on `M`.\nFor an ω-categorical structure, these classify its reducts up to first-order interdefinability. -/\ndef ReductGroups (L : FirstOrder.Language) (M : Type*) [L.IsRelational] [L.Structure M] :=\n  {G : Subgroup (Equiv.Perm M) //\n    IsClosedPermutationSubgroup G ∧\n      ∀ g : Equiv.Perm M,\n        (∀ n (r : L.Relations n) (x : Fin n → M), RelMap r (g ∘ x) ↔ RelMap r x) → g ∈ G}\n\n/--\nDoes every countably infinite ultrahomogeneous structure in a finite relational language have only\nfinitely many reducts, counted up to parameter-free first-order interdefinability? Equivalently here,\nare there only finitely many closed supergroups of its automorphism group in the symmetric group?\n-/\n@[category research open, AMS 3]\ntheorem reduct : answer(True) ↔\n    ∀ (L : FirstOrder.Language) [L.IsRelational] [Finite L.Symbols]\n      (M : Type*) [L.Structure M] [Countable M] [Infinite M],\n      L.IsUltrahomogeneous M → Finite (ReductGroups L M) := by\n  sorry\n\nend Reduct\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the list entry's non-standard phrase “finitely presented homogeneous structure” as the standard scope of Thomas' conjecture: a countably infinite ultrahomogeneous structure in a finite relational language.",
+    "Represented finiteness of reducts up to parameter-free first-order interdefinability by finiteness of the closed supergroups of the structure's automorphism group in `Equiv.Perm M`. This is the equivalent formulation for the ω-categorical structures in scope and avoids counting syntactically different presentations of the same reduct.",
+    "Expressed closure in the pointwise-convergence topology by the equivalent finite-agreement criterion, because no suitable topology on `Equiv.Perm M` was found in Mathlib.",
+    "Represented a finite relational language with `[L.IsRelational]` and `[Finite L.Symbols]`, and a countably infinite domain with `[Countable M]` and `[Infinite M]`.",
+    "Used `answer(True)` as the positive candidate answer (“yes”), with all universal quantifiers scoped after it, as directed by the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's topological `IsClosed`; no existing pointwise-convergence topology instance or closed permutation subgroup predicate for `Equiv.Perm M` was found.",
+     "name": "Reduct.IsClosedPermutationSubgroup",
+     "why_needed": "Needed to state closedness of a subgroup of the full symmetric group in the pointwise-convergence topology via finite agreement."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FirstOrder.Language.LHom.reduct` and model reduct constructions only restrict structures along a language homomorphism; they do not represent all first-order reducts up to interdefinability or classify them by closed automorphism supergroups.",
+     "name": "Reduct.ReductGroups",
+     "why_needed": "Packages the closed supergroups of the automorphism group whose finite cardinality is the interdefinability-invariant count asked for by Thomas' conjecture."
+    }
+   ],
+   "per_slot": {
+    "reduct": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reduct": "/--\nDoes every countably infinite ultrahomogeneous structure in a finite relational language have only\nfinitely many reducts, counted up to parameter-free first-order interdefinability? Equivalently here,\nare there only finitely many closed supergroups of its automorphism group in the symmetric group?\n-/\n@[category research open, AMS 3]\ntheorem reduct : answer(True) ↔\n    ∀ (L : FirstOrder.Language) [L.IsRelational] [Finite L.Symbols]\n      (M : Type*) [L.Structure M] [Countable M] [Infinite M],\n      L.IsUltrahomogeneous M → Finite (ReductGroups L M) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "reduct": "c06"
+ },
+ "id": "wp-reduct",
+ "main_attempt": "c06"
+}

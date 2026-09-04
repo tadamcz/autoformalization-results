@@ -1,0 +1,417 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Albertson conjecture\n\nThe Albertson conjecture compares the crossing number and chromatic number of a finite simple\ngraph. It states that among graphs with a given chromatic number, the complete graph has the\nsmallest crossing number.\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Albertson_conjecture)\n-/\n\nnamespace AlbertsonConjecture\n\nopen Set\nopen scoped unitInterval\n\n/--\nA drawing of a finite simple graph in the plane. Vertices are represented by distinct points and\neach edge by a simple continuous arc between its endpoints. The interior of an edge arc is not\nallowed to pass through a vertex.\n-/\nstructure PlaneDrawing {n : ℕ} (G : SimpleGraph (Fin n)) where\n  vertex : Fin n → ℝ × ℝ\n  vertex_injective : Function.Injective vertex\n  edge : (e : G.edgeSet) → Path (vertex e.1.out.1) (vertex e.1.out.2)\n  edge_injective : ∀ e, Function.Injective (edge e)\n  edge_avoids_vertices : ∀ (e) (t : unitInterval) (v),\n    edge e t = vertex v → v ∈ e.1\n\n/-- The points traced by the interior of an edge in a plane drawing. -/\ndef PlaneDrawing.edgeInterior {n : ℕ} {G : SimpleGraph (Fin n)} (D : PlaneDrawing G)\n    (e : G.edgeSet) : Set (ℝ × ℝ) :=\n  D.edge e '' Ioo (0 : unitInterval) 1\n\n/-- The points lying in the interiors of two distinct edges of a plane drawing. -/\ndef PlaneDrawing.crossingPoints {n : ℕ} {G : SimpleGraph (Fin n)} (D : PlaneDrawing G) :\n    Set (ℝ × ℝ) :=\n  {p | ∃ e₁ e₂ : G.edgeSet, e₁ ≠ e₂ ∧ p ∈ D.edgeInterior e₁ ∧ p ∈ D.edgeInterior e₂}\n\n/--\nA good drawing is a plane drawing with finitely many crossing points and with no point in the\ninteriors of three distinct edges. Thus every crossing point belongs to exactly two edge arcs and\nis counted once.\n-/\nstructure GoodDrawing {n : ℕ} (G : SimpleGraph (Fin n)) extends PlaneDrawing G where\n  crossingPoints_finite : toPlaneDrawing.crossingPoints.Finite\n  no_triple_crossing : ∀ (p : ℝ × ℝ) (e₁ e₂ e₃ : G.edgeSet),\n    p ∈ toPlaneDrawing.edgeInterior e₁ →\n    p ∈ toPlaneDrawing.edgeInterior e₂ →\n    p ∈ toPlaneDrawing.edgeInterior e₃ →\n    e₁ = e₂ ∨ e₁ = e₃ ∨ e₂ = e₃\n\n/--\nThe crossing number of a finite simple graph is the minimum, over all good drawings in the plane,\nof the number of crossing points.\n-/\nnoncomputable def crossingNumber {n : ℕ} (G : SimpleGraph (Fin n)) : ℕ∞ :=\n  ⨅ D : GoodDrawing G, (D.toPlaneDrawing.crossingPoints.ncard : ℕ∞)\n\n/--\n**Albertson conjecture.** For every finite simple graph $G$, its crossing number is at least the\ncrossing number of the complete graph whose number of vertices is the chromatic number of $G$.\nEquivalently, among all graphs with a given chromatic number, the complete graph has the smallest\ncrossing number.\n-/\n@[category research open, AMS 5]\ntheorem albertson_conjecture :\n    ∀ (n : ℕ) (G : SimpleGraph (Fin n)),\n      crossingNumber (SimpleGraph.completeGraph (Fin G.chromaticNumber.toNat)) ≤ crossingNumber G := by\n  sorry\n\nend AlbertsonConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite simple graphs are represented as `SimpleGraph (Fin n)`, which ranges over all finite simple graphs up to relabeling and ensures Mathlib's `chromaticNumber` is finite.",
+    "The list-entry formulation `cr(G) ≥ cr(K_{χ(G)})` is used directly. Since Mathlib's chromatic number has type `ℕ∞`, `G.chromaticNumber.toNat` supplies the ordinary natural chromatic number; this is valid for graphs on `Fin n`, which are finitely colorable.",
+    "A plane drawing sends distinct vertices to points of `ℝ × ℝ` and represents every unordered edge by an injective continuous unit-interval path between its endpoints. Edge interiors may not pass through vertices.",
+    "The crossing number is the infimum in `ℕ∞` of the finite numbers of crossing points over good drawings. Good drawings prohibit self-intersecting edges, infinitely many intersections, and triple crossings, so each crossing point is counted once. Using `ℕ∞` also avoids assigning a spurious value of zero if the drawing type were empty.",
+    "The strengthened formulation using Guy's conjectural formula and the weaker asymptotic formulation were intentionally omitted, as required by the source statement and decomposition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `Path` supplies continuous edge arcs but does not package a graph drawing.",
+     "name": "PlaneDrawing",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no representation of drawings of finite simple graphs in the plane."
+    },
+    {
+     "closest_existing_considered": "The image of `Set.Ioo (0 : unitInterval) 1` under a Mathlib `Path`; no graph-edge-specific existing definition was found.",
+     "name": "PlaneDrawing.edgeInterior",
+     "why_needed": "Crossings must exclude the endpoints of edge arcs."
+    },
+    {
+     "closest_existing_considered": "Mathlib set intersection/image primitives; no graph crossing-point definition was found.",
+     "name": "PlaneDrawing.crossingPoints",
+     "why_needed": "The crossing number requires the set of points shared by interiors of distinct edge arcs."
+    },
+    {
+     "closest_existing_considered": "`PlaneDrawing` together with Mathlib's `Set.Finite`; no existing good-drawing predicate or structure was found.",
+     "name": "GoodDrawing",
+     "why_needed": "Finite crossing counts and generic-position conditions are needed to make counting intersection points faithfully model edge crossings."
+    },
+    {
+     "closest_existing_considered": "Mathlib's infimum-based graph invariants such as `SimpleGraph.chromaticNumber` and `SimpleGraph.dist`; none models plane edge crossings.",
+     "name": "crossingNumber",
+     "why_needed": "The crossing number is absent from Mathlib and FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "albertson_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "albertson_conjecture": "/--\n**Albertson conjecture.** For every finite simple graph $G$, its crossing number is at least the\ncrossing number of the complete graph whose number of vertices is the chromatic number of $G$.\nEquivalently, among all graphs with a given chromatic number, the complete graph has the smallest\ncrossing number.\n-/\n@[category research open, AMS 5]\ntheorem albertson_conjecture :\n    ∀ (n : ℕ) (G : SimpleGraph (Fin n)),\n      crossingNumber (SimpleGraph.completeGraph (Fin G.chromaticNumber.toNat)) ≤ crossingNumber G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Albertson conjecture\n\nThe Albertson conjecture (2007) relates the crossing number and the chromatic number of a\ngraph: among all graphs with chromatic number $r$, the complete graph $K_r$ has the smallest\ncrossing number. Equivalently, if $\\chi(G) = r$ then $\\operatorname{cr}(G) \\ge\n\\operatorname{cr}(K_r)$.\n\nThe crossing number $\\operatorname{cr}(G)$ of a graph $G$ is the minimum number of edge\ncrossings over all drawings of $G$ in the plane. Since Mathlib has no notion of a drawing of a\ngraph, this file defines drawings and the crossing number from scratch.\n\n*References:*\n- [Wikipedia, Albertson conjecture](https://en.wikipedia.org/wiki/Albertson_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Albertson, Cranston, Fox, *Colorings, crossings, and cliques*](https://arxiv.org/abs/1006.3783)\n- [Barát, Tóth, *Towards the Albertson conjecture*](https://arxiv.org/abs/0909.0413)\n-/\n\nnamespace AlbertsonConjecture\n\nopen SimpleGraph\nopen scoped EuclideanGeometry\n\nvariable {V : Type*}\n\n/-- A *drawing* of a simple graph `G` in the plane `ℝ²`: the vertices are placed at distinct\npoints, and each edge is represented by a simple arc (a continuous injective curve parametrised\nby the unit interval) joining the points of its two endpoints and passing through no vertex\npoint in its interior. -/\nstructure Drawing (G : SimpleGraph V) where\n  /-- The point of the plane at which the vertex `v` is placed. -/\n  toFun : V → ℝ²\n  /-- Distinct vertices are placed at distinct points. -/\n  injective : Function.Injective toFun\n  /-- The curve representing the edge `e`, parametrised by the unit interval `[0, 1]`. -/\n  arc : G.edgeSet → unitInterval → ℝ²\n  /-- Each edge is drawn as a continuous curve. -/\n  continuous_arc (e : G.edgeSet) : Continuous (arc e)\n  /-- Each edge is drawn as a simple arc, i.e. the curve does not cross itself. -/\n  arc_injective (e : G.edgeSet) : Function.Injective (arc e)\n  /-- The two ends of the arc of an edge are the points of the two endpoints of that edge. -/\n  arc_endpoints (e : G.edgeSet) : s(arc e 0, arc e 1) = Sym2.map toFun e\n  /-- The interior of the arc of an edge passes through no vertex point. -/\n  arc_notMem_range (e : G.edgeSet) (t : unitInterval) (h₀ : t ≠ 0) (h₁ : t ≠ 1) :\n    arc e t ∉ Set.range toFun\n\nnamespace Drawing\n\nvariable {G : SimpleGraph V} (D : Drawing G)\n\n/-- The interior of the arc drawing the edge `e`: the arc without its two ends. -/\ndef arcInterior (e : G.edgeSet) : Set ℝ² :=\n  D.arc e '' {t | t ≠ 0 ∧ t ≠ 1}\n\n/-- The number of crossings of the drawing `D`, as an element of `ℕ∞`: the number of pairs\nconsisting of two distinct edges of `G` together with a point of the plane lying in the interiors\nof both of their arcs. In a drawing in which no two edges touch without crossing, and no three\nedges pass through a common point, this is exactly the number of edge crossings. -/\nnoncomputable def crossings : ℕ∞ :=\n  {p : Sym2 G.edgeSet × ℝ² | ¬ p.1.IsDiag ∧ ∀ e ∈ p.1, p.2 ∈ D.arcInterior e}.encard\n\nend Drawing\n\n/-- The *crossing number* $\\operatorname{cr}(G)$ of a graph `G`: the minimum number of edge\ncrossings over all drawings of `G` in the plane, as an element of `ℕ∞`. For a finite graph the\nvalue is finite, since a straight-line drawing with the vertices in general position has finitely\nmany crossings. -/\nnoncomputable def crossingNumber (G : SimpleGraph V) : ℕ∞ :=\n  ⨅ D : Drawing G, D.crossings\n\n/-- A drawing of the edgeless graph has no crossings. -/\n@[category API, AMS 5]\ntheorem Drawing.crossings_bot (D : Drawing (⊥ : SimpleGraph V)) : D.crossings = 0 := by\n  rw [Drawing.crossings, Set.encard_eq_zero, Set.eq_empty_iff_forall_notMem]\n  rintro ⟨p, x⟩ -\n  induction p using Sym2.ind with\n  | h e f => simpa using e.2\n\n/-- The edgeless graph on a countable vertex set has crossing number `0`. In particular the\ndrawings of a graph can exist, so `crossingNumber` is not vacuously `⊤`. -/\n@[category API, AMS 5]\ntheorem crossingNumber_bot [Countable V] : crossingNumber (⊥ : SimpleGraph V) = 0 := by\n  obtain ⟨f, hf⟩ := Countable.exists_injective_nat V\n  have hbot : ∀ e : (⊥ : SimpleGraph V).edgeSet, False := fun e => by simpa using e.2\n  let D : Drawing (⊥ : SimpleGraph V) :=\n    { toFun := fun v => EuclideanSpace.single 0 (f v : ℝ)\n      injective := fun u v huv => by\n        have h := congrArg (fun x : ℝ² => x 0) huv\n        simp only [EuclideanSpace.single_apply, if_true, Nat.cast_inj] at h\n        exact hf h\n      arc := fun e => (hbot e).elim\n      continuous_arc := fun e => (hbot e).elim\n      arc_injective := fun e => (hbot e).elim\n      arc_endpoints := fun e => (hbot e).elim\n      arc_notMem_range := fun e => (hbot e).elim }\n  exact le_antisymm (iInf_le_of_le D (Drawing.crossings_bot D).le) (zero_le _)\n\n/-- **Albertson conjecture.** For every finite simple graph $G$ with chromatic number\n$\\chi(G) = r$, the crossing number of $G$ is at least the crossing number of the complete graph\n$K_r$ on $r$ vertices:\n$$\\operatorname{cr}(G) \\ge \\operatorname{cr}(K_{\\chi(G)}).$$\nIn other words, among all graphs with the same chromatic number as $G$, the complete graph has\nthe smallest crossing number. -/\n@[category research open, AMS 5]\ntheorem albertson_conjecture [Fintype V] (G : SimpleGraph V) (r : ℕ)\n    (hr : G.chromaticNumber = r) :\n    crossingNumber (completeGraph (Fin r)) ≤ crossingNumber G := by\n  sorry\n\nend AlbertsonConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.88,
+   "decomposition_objections": "None. The single-slot decomposition is correct: the statement poses only the basic conjecture cr(G) ≥ cr(K_{χ(G)}); the strengthened form (via Guy's formula) and the Ω(n^4) asymptotic form are not part of the list entry and were not formalized.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Form of the conjecture: used the hypothesis `G.chromaticNumber = r` (Barát–Tóth: 'if χ(G) = r then cr(G) ≥ cr(K_r)'), which is the literal reading of 'a complete graph with the same chromatic number'. The Albertson–Cranston–Fox form with `r ≤ χ(G)` is equivalent given monotonicity of cr(K_r) in r but was not added as a separate variant.",
+    "Graphs are finite simple graphs (`[Fintype V]`, `SimpleGraph V`), as in all sources; K_r is `SimpleGraph.completeGraph (Fin r)`.",
+    "Crossing number lives in ℕ∞ (infimum over drawings of an ℕ∞-valued count). For finite graphs the value is finite (straight-line drawings in general position exist), so ⊤ is never reached in the conjecture; the inequality is compared in ℕ∞. `chromaticNumber` is also ℕ∞-valued in current Mathlib, hence the cast `(r : ℕ∞)`.",
+    "Crossings are counted as incidences (unordered pair of distinct edges, common interior point), via `Set.encard`. This equals the usual crossing count on 'good' drawings; on degenerate drawings it counts touchings, k-fold points with multiplicity C(k,2), and overlapping arcs as ⊤. None of these lower the infimum, and since only common interior points are counted (shared endpoints excluded, and arc interiors avoid vertex points), the infimum is exactly the standard crossing number. Counting pairs of edges instead would have yielded the pair crossing number, a different (conjecturally equal) invariant — deliberately avoided.",
+    "Drawings require edges to be simple arcs (injective continuous maps from unitInterval) and vertex placement injective, matching standard definitions; these restrictions do not change the minimum.",
+    "The plane is `EuclideanSpace ℝ (Fin 2)` via the repo's scoped `ℝ²` notation (drawings in the plane and on the sphere give the same crossing number).",
+    "Two provable `@[category API]` lemmas (`Drawing.crossings_bot`, `crossingNumber_bot`) are included as sanity checks that the `Drawing` structure is inhabitable and that the edgeless graph has crossing number 0; they are not slots.",
+    "Definitions are kept in the problem file (inside `namespace AlbertsonConjecture`) because the task restricts output to the single candidate file; a reviewer may prefer moving `Drawing`/`crossingNumber` to FormalConjecturesForMathlib."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Path (Mathlib) — has ordered endpoints, awkward for unordered Sym2 edges; SimpleGraph.UnitDistanceEmbeddable / UnitDistancePlaneGraph (repo) — only place vertices, no edge curves; no IsPlanar/embedding definition exists anywhere.",
+     "name": "AlbertsonConjecture.Drawing",
+     "why_needed": "No notion of a drawing of a graph in the plane exists in Mathlib or the repo (the repo has no planarity/embedding primitives at all). Structure: injective vertex placement V → ℝ² (EuclideanSpace ℝ (Fin 2)); for each edge e : G.edgeSet a continuous injective arc unitInterval → ℝ² whose two ends are the placed endpoints of e (s(arc e 0, arc e 1) = Sym2.map toFun e) and whose interior avoids all vertex points."
+    },
+    {
+     "closest_existing_considered": "interior (topological interior) — not the right notion; Set.image directly (inlined would hurt readability).",
+     "name": "AlbertsonConjecture.Drawing.arcInterior",
+     "why_needed": "Helper: the image of the open parameter set {t | t ≠ 0 ∧ t ≠ 1} under the arc of an edge, used to define crossings."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib; Set.ncard rejected since it returns 0 on infinite sets (which would let degenerate overlapping drawings win the infimum).",
+     "name": "AlbertsonConjecture.Drawing.crossings",
+     "why_needed": "Number of crossings of a drawing, in ℕ∞: encard of {(p, x) : Sym2 G.edgeSet × ℝ² | ¬p.IsDiag ∧ ∀ e ∈ p, x ∈ arcInterior e}, i.e. incidences of unordered pairs of distinct edges with common interior points. Counting points (not merely crossing pairs of edges) is essential: counting pairs would give the pair crossing number, a different invariant."
+    },
+    {
+     "closest_existing_considered": "No crossing number anywhere in Mathlib or the repo (rg for 'crossing' returns nothing).",
+     "name": "AlbertsonConjecture.crossingNumber",
+     "why_needed": "cr(G) := ⨅ over all drawings of crossings, in ℕ∞. Standard definition (minimum number of crossings over all drawings in the plane). Finite for every finite graph."
+    }
+   ],
+   "per_slot": {
+    "albertson_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G on a Fintype V and every r : ℕ with G.chromaticNumber = r, crossingNumber (completeGraph (Fin r)) ≤ crossingNumber G (in ℕ∞). This is the literal Barát–Tóth form 'if χ(G) = r then cr(G) ≥ cr(K_r)', i.e. cr(G) ≥ cr(K_{χ(G)}). No crossing number or graph-drawing notion exists in Mathlib or FormalConjecturesForMathlib, so a Drawing structure, a crossings count and crossingNumber were defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "albertson_conjecture": "/-- **Albertson conjecture.** For every finite simple graph $G$ with chromatic number\n$\\chi(G) = r$, the crossing number of $G$ is at least the crossing number of the complete graph\n$K_r$ on $r$ vertices:\n$$\\operatorname{cr}(G) \\ge \\operatorname{cr}(K_{\\chi(G)}).$$\nIn other words, among all graphs with the same chromatic number as $G$, the complete graph has\nthe smallest crossing number. -/\n@[category research open, AMS 5]\ntheorem albertson_conjecture [Fintype V] (G : SimpleGraph V) (r : ℕ)\n    (hr : G.chromaticNumber = r) :\n    crossingNumber (completeGraph (Fin r)) ≤ crossingNumber G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Albertson conjecture\n\nThe *Albertson conjecture* relates the crossing number of a graph to its chromatic number:\namong all graphs with chromatic number $n$, the complete graph $K_n$ has the smallest crossing\nnumber. Equivalently, every finite graph $G$ satisfies\n$\\operatorname{cr}(G) \\ge \\operatorname{cr}(K_{\\chi(G)})$.\n\nThe *crossing number* $\\operatorname{cr}(G)$ of a finite graph $G$ is the minimum number of edge\ncrossings over all drawings of $G$ in the plane. A drawing places the vertices at distinct points\nand represents each edge by a simple arc between the images of its endpoints which does not pass\nthrough the image of any vertex. A crossing is a point of the plane that lies in the interior of\nthe arcs of two distinct edges. The crossing number is not in Mathlib, so it is defined here.\nNo genericity conditions (\"good drawing\") are imposed on drawings: they do not change the\nminimum.\n\n*References:*\n- [Wikipedia, Albertson conjecture](https://en.wikipedia.org/wiki/Albertson_conjecture)\n- [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [M. O. Albertson, D. W. Cranston, J. Fox, *Colorings, crossings, and\n  cliques*](https://arxiv.org/abs/1006.3783)\n-/\n\nopen scoped EuclideanGeometry unitInterval\n\nnamespace AlbertsonConjecture\n\nvariable {V : Type*}\n\n/-- A drawing of a simple graph `G` in the plane. The vertices are placed at distinct points,\nand each edge is represented by a simple arc (a continuous injective map from the unit interval)\nwhose endpoints are the images of the two endpoints of the edge and whose interior does not pass\nthrough the image of any vertex. -/\nstructure Drawing (G : SimpleGraph V) where\n  /-- The point of the plane at which a vertex is placed. -/\n  vertex : V → ℝ²\n  vertex_injective : Function.Injective vertex\n  /-- The arc representing an edge. -/\n  arc : G.edgeSet → I → ℝ²\n  arc_continuous (e : G.edgeSet) : Continuous (arc e)\n  arc_injective (e : G.edgeSet) : Function.Injective (arc e)\n  /-- The endpoints of the arc of an edge are the images of the endpoints of the edge. -/\n  arc_endpoints (e : G.edgeSet) : Sym2.map vertex e = s(arc e 0, arc e 1)\n  /-- The interior of an arc does not pass through the image of any vertex. -/\n  arc_interior_not_mem_range (e : G.edgeSet) (t : I) (ht : t ∈ Set.Ioo 0 1) :\n    arc e t ∉ Set.range vertex\n\nvariable {G : SimpleGraph V}\n\n/-- The crossings of a drawing: an unordered pair of distinct edges together with a point of the\nplane lying in the interior of both of their arcs. -/\ndef Drawing.crossings (D : Drawing G) : Set (Sym2 G.edgeSet × ℝ²) :=\n  {c | ∃ e f : G.edgeSet, e ≠ f ∧ c.1 = s(e, f) ∧\n    c.2 ∈ D.arc e '' Set.Ioo 0 1 ∧ c.2 ∈ D.arc f '' Set.Ioo 0 1}\n\n/-- The crossing number of a graph: the minimum number of crossings over all of its drawings in\nthe plane. This is `⊤` if the graph has no drawing, which cannot happen for finite graphs. -/\nnoncomputable def crossingNumber (G : SimpleGraph V) : ℕ∞ :=\n  ⨅ D : Drawing G, D.crossings.encard\n\n/-- A drawing of a graph with no edges has no crossings. -/\n@[category API, AMS 5]\ntheorem Drawing.crossings_bot (D : Drawing (⊥ : SimpleGraph V)) : D.crossings = ∅ := by\n  ext ⟨p, x⟩\n  simp only [Drawing.crossings, Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false]\n  rintro ⟨⟨e, he⟩, -⟩\n  simp at he\n\n/-- A graph with no edges on a countable vertex set has crossing number zero. -/\n@[category API, AMS 5]\ntheorem crossingNumber_bot [Countable V] : crossingNumber (⊥ : SimpleGraph V) = 0 := by\n  obtain ⟨f, hf⟩ := exists_injective_nat V\n  have hbot : ∀ e : (⊥ : SimpleGraph V).edgeSet, False := fun e => by simpa using e.2\n  let D : Drawing (⊥ : SimpleGraph V) :=\n    { vertex := fun v => EuclideanSpace.single 0 (f v : ℝ)\n      vertex_injective := fun v w hvw => by\n        have := congrArg (fun p : ℝ² => p 0) hvw\n        simpa [EuclideanSpace.single_apply, hf.eq_iff] using this\n      arc := fun e => (hbot e).elim\n      arc_continuous := fun e => (hbot e).elim\n      arc_injective := fun e => (hbot e).elim\n      arc_endpoints := fun e => (hbot e).elim\n      arc_interior_not_mem_range := fun e => (hbot e).elim }\n  rw [crossingNumber, ENat.iInf_eq_zero]\n  exact ⟨D, by rw [D.crossings_bot, Set.encard_empty]⟩\n\n/-- The crossing number is monotone: a drawing of `G` restricts to a drawing of any subgraph\n`H ≤ G` with no more crossings. -/\n@[category API, AMS 5]\ntheorem crossingNumber_mono {H : SimpleGraph V} (hHG : H ≤ G) :\n    crossingNumber H ≤ crossingNumber G := by\n  let ι : H.edgeSet → G.edgeSet := fun e => ⟨e, SimpleGraph.edgeSet_mono hHG e.2⟩\n  have hι : Function.Injective ι := fun e f h => Subtype.ext (congrArg Subtype.val h :)\n  refine le_iInf fun D => ?_\n  let D' : Drawing H :=\n    { vertex := D.vertex\n      vertex_injective := D.vertex_injective\n      arc := fun e => D.arc (ι e)\n      arc_continuous := fun e => D.arc_continuous (ι e)\n      arc_injective := fun e => D.arc_injective (ι e)\n      arc_endpoints := fun e => D.arc_endpoints (ι e)\n      arc_interior_not_mem_range := fun e => D.arc_interior_not_mem_range (ι e) }\n  refine (iInf_le _ D').trans ?_\n  have hinj : Function.Injective (Prod.map (Sym2.map ι) (id : ℝ² → ℝ²)) :=\n    (Sym2.map.injective hι).prodMap Function.injective_id\n  rw [← hinj.encard_image]\n  refine Set.encard_le_encard ?_\n  rintro ⟨p, x⟩ ⟨⟨q, y⟩, ⟨e, f, hef, rfl, hx1, hx2⟩, h⟩\n  simp only [Prod.map, id, Prod.mk.injEq] at h\n  obtain ⟨rfl, rfl⟩ := h\n  exact ⟨ι e, ι f, fun h => hef (hι h), by simp, hx1, hx2⟩\n\n/--\n**Albertson conjecture**\n\nEvery finite simple graph $G$ has crossing number at least that of the complete graph with the\nsame chromatic number: if $\\chi(G) = n$, then $\\operatorname{cr}(G) \\ge \\operatorname{cr}(K_n)$.\nEquivalently, among all graphs with chromatic number $n$, the complete graph $K_n$ has the\nsmallest crossing number.\n-/\n@[category research open, AMS 5]\ntheorem albertson_conjecture [Finite V] (G : SimpleGraph V) (n : ℕ)\n    (hn : G.chromaticNumber = n) :\n    crossingNumber (SimpleGraph.completeGraph (Fin n)) ≤ crossingNumber G := by\n  sorry\n\nend AlbertsonConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition is correct; both suggested forms (equality of chromatic number, or r ≤ χ(G)) are faithful, and the equality form was used to match 'the same chromatic number' verbatim.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Used the 'same chromatic number' form of the list entry (χ(G) = n → cr(K_n) ≤ cr(G)) rather than the Albertson–Cranston–Fox form (r ≤ χ(G) → cr(K_r) ≤ cr(G)); the two agree since cr(K_r) is monotone in r (a special case of the proved lemma crossingNumber_mono).",
+    "Graphs are finite ([Finite V]) simple graphs (Mathlib's SimpleGraph), as in the source; the chromatic number is Mathlib's SimpleGraph.chromaticNumber (in ℕ∞), pinned to a natural number n by the hypothesis.",
+    "A drawing (structure Drawing G) is the classical topological one: vertices mapped injectively to ℝ² = EuclideanSpace ℝ (Fin 2); each edge e mapped to a Jordan arc, i.e. a continuous injective map unitInterval → ℝ², whose endpoint set {arc e 0, arc e 1} equals the image of the edge's two endpoints (orientation free, via Sym2.map), and whose interior avoids all vertex images. No 'good drawing' genericity conditions (adjacent edges don't cross, no touchings, no triple points, pairs cross at most once, finitely many intersections) are imposed; these are WLOG and do not change the minimum.",
+    "A crossing of a drawing is an unordered pair of DISTINCT edges together with a point of the plane lying in the interior images of both arcs (Set (Sym2 G.edgeSet × ℝ²)). Counting uses Set.encard (so two arcs overlapping along a segment contribute ⊤, never a spurious 0 as Set.ncard would). The number of crossings of a drawing in this convention coincides with the standard count on good drawings, and every drawing dominates some good drawing, so the infimum is the standard crossing number.",
+    "crossingNumber G : ℕ∞ := ⨅ D : Drawing G, D.crossings.encard. For finite graphs drawings exist (e.g. straight-line drawings with vertices in general position), so the value is a finite natural number and the inequality is not vacuous; the ⊤ case can only occur for graphs with no drawing at all.",
+    "Because the task restricts all writing to the candidate file, the reusable definitions Drawing/crossings/crossingNumber live in the problem file under namespace AlbertsonConjecture; in a real PR they would belong in FormalConjecturesForMathlib/Combinatorics/SimpleGraph/CrossingNumber.lean. Two proved API lemmas (crossingNumber_bot, crossingNumber_mono) and Drawing.crossings_bot test the definitions.",
+    "Only the conjecture itself is stated: Guy's formula strengthening, the Ω(n^4) weaker form, and the n ≤ 18 special cases are not posed by the statement and are omitted, per the decomposition notes.",
+    "AMS tag 5 (Combinatorics: graph coloring 05C15 and topological graph theory 05C10)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's Path (needs oriented endpoints, awkward for Sym2 edges), IsEmbedding (used in Wikipedia/InscribedSquare for Jordan curves; an injective continuous map from compact I is equivalent), SimpleGraph.Coloring/planarity (Mathlib mentions planar graphs only in a comment; no planarity definition exists in Mathlib or FormalConjecturesForMathlib).",
+     "name": "AlbertsonConjecture.Drawing",
+     "why_needed": "Mathlib has no notion of a drawing/embedding of a graph in the plane; the crossing number is a minimum over such drawings. Structure: injective vertex placement V → ℝ², and for each edge a continuous injective arc unitInterval → ℝ² whose endpoints are the images of the edge's endpoints (Sym2.map vertex e = s(arc e 0, arc e 1)) and whose interior avoids Set.range vertex."
+    },
+    {
+     "closest_existing_considered": "No existing notion; Set.encard is used to count it (chosen over Set.ncard so infinite intersections give ⊤ rather than 0).",
+     "name": "AlbertsonConjecture.Drawing.crossings",
+     "why_needed": "The set of crossings of a drawing: pairs (s(e,f), x) with e ≠ f edges and x a point in the interior images of both arcs. Needed to count crossings."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjecturesForMathlib for crossingNumber / crossing number / planar / drawing: nothing exists.",
+     "name": "AlbertsonConjecture.crossingNumber",
+     "why_needed": "The crossing number cr(G) = ⨅ over drawings of the encard of the crossing set, in ℕ∞. Not in Mathlib or FormalConjecturesForMathlib (rg for 'crossing' found nothing)."
+    }
+   ],
+   "per_slot": {
+    "albertson_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G and n : ℕ with G.chromaticNumber = n, crossingNumber (completeGraph (Fin n)) ≤ crossingNumber G, i.e. cr(G) ≥ cr(K_{χ(G)}). The crossing number is absent from Mathlib and the repo, so a topological drawing and the crossing number are defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "albertson_conjecture": "/--\n**Albertson conjecture**\n\nEvery finite simple graph $G$ has crossing number at least that of the complete graph with the\nsame chromatic number: if $\\chi(G) = n$, then $\\operatorname{cr}(G) \\ge \\operatorname{cr}(K_n)$.\nEquivalently, among all graphs with chromatic number $n$, the complete graph $K_n$ has the\nsmallest crossing number.\n-/\n@[category research open, AMS 5]\ntheorem albertson_conjecture [Finite V] (G : SimpleGraph V) (n : ℕ)\n    (hn : G.chromaticNumber = n) :\n    crossingNumber (SimpleGraph.completeGraph (Fin n)) ≤ crossingNumber G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Albertson conjecture\n\nThe *crossing number* $\\operatorname{cr}(G)$ of a graph $G$ is the minimum number of edge\ncrossings in a drawing of $G$ in the plane. The Albertson conjecture (2007) relates it to the\nchromatic number $\\chi(G)$: among all graphs with chromatic number $r$, the complete graph $K_r$\nhas the smallest crossing number, i.e. $\\chi(G) = r$ implies\n$\\operatorname{cr}(G) \\ge \\operatorname{cr}(K_r)$.\n\nMathlib has no notion of crossing number, so this file defines drawings of a graph in the\nplane and their crossings. A drawing sends the vertices to distinct points and each edge to a\nJordan arc joining the images of its endpoints and passing through no other vertex. A crossing\nis a point, other than the image of a vertex, lying on the arcs of two distinct edges; it is\ncounted once for each pair of edges meeting there. The crossing number is the infimum of the\nnumber of crossings over all drawings. Counting every such meeting of two arcs (including, say,\ntouchings) does not change this minimum, since a meeting that is not a transversal crossing can be\nremoved by redrawing, so this agrees with the usual crossing number.\n\n*References:*\n- [Wikipedia, Albertson conjecture](https://en.wikipedia.org/wiki/Albertson_conjecture)\n- [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [ACF09] Albertson, M. O., Cranston, D. W., Fox, J., *Colorings, crossings, and cliques*,\n  Electron. J. Combin. 16 (2009), R45. [arXiv:1006.3783](https://arxiv.org/abs/1006.3783)\n- [BT10] Barát, J., Tóth, G., *Towards the Albertson conjecture*, Electron. J. Combin. 17 (2010),\n  R73. [arXiv:0909.0413](https://arxiv.org/abs/0909.0413)\n-/\n\nnamespace AlbertsonConjecture\n\nopen SimpleGraph\nopen scoped EuclideanGeometry\n\nvariable {V : Type*}\n\nsection Drawing\n\nvariable (G : SimpleGraph V)\n\n/-- A drawing of the graph `G` in the plane. Each vertex is drawn as a point, distinct vertices\nbeing drawn as distinct points, and each edge `e` is drawn as a Jordan arc `arc e` (the image of an\ninjective path) joining the points of its two endpoints and passing through no other vertex.\nNo condition is imposed on how the arcs of two distinct edges meet; such meetings are the\ncrossings of the drawing, see `PlaneDrawing.crossings`. -/\nstructure PlaneDrawing where\n  /-- The point at which a vertex is drawn. -/\n  pos : V → ℝ²\n  pos_injective : Function.Injective pos\n  /-- The arc along which an edge is drawn. -/\n  arc : G.edgeSet → Set ℝ²\n  exists_path_range_eq_arc : ∀ e : G.edgeSet, ∃ (u v : V) (γ : Path (pos u) (pos v)),\n    (e : Sym2 V) = s(u, v) ∧ Function.Injective γ ∧ Set.range γ = arc e\n  mem_of_pos_mem_arc : ∀ (e : G.edgeSet) (w : V), pos w ∈ arc e → w ∈ (e : Sym2 V)\n\nnamespace PlaneDrawing\n\nvariable {G} (D : PlaneDrawing G)\n\n/-- Two edges `e` and `f` cross at the point `p` if they are distinct and `p` lies on both of their\narcs but is not the image of a vertex (so `p` is not a common endpoint of `e` and `f`). -/\ndef CrossesAt (p : ℝ²) (e f : G.edgeSet) : Prop :=\n  e ≠ f ∧ p ∈ D.arc e ∧ p ∈ D.arc f ∧ p ∉ Set.range D.pos\n\nlemma crossesAt_symm (p : ℝ²) : Symmetric (D.CrossesAt p) :=\n  fun _ _ ⟨hne, he, hf, hp⟩ => ⟨hne.symm, hf, he, hp⟩\n\n/-- The crossings of the drawing `D`: pairs of a point `p` and an unordered pair of distinct\nedges whose arcs cross at `p`. A point lying on the arcs of `k` edges thus contributes\n`k.choose 2` crossings. -/\ndef crossings : Set (ℝ² × Sym2 G.edgeSet) :=\n  {x | x.2 ∈ Sym2.fromRel (D.crossesAt_symm x.1)}\n\n/-- The number of crossings of the drawing `D`, or `⊤` if there are infinitely many. -/\nnoncomputable def numCrossings : ℕ∞ := D.crossings.encard\n\n/-- The drawing of a subgraph `H ≤ G` obtained by restricting a drawing of `G`. -/\ndef ofLE {H : SimpleGraph V} (h : H ≤ G) : PlaneDrawing H where\n  pos := D.pos\n  pos_injective := D.pos_injective\n  arc e := D.arc (Set.inclusion (edgeSet_mono h) e)\n  exists_path_range_eq_arc e := D.exists_path_range_eq_arc (Set.inclusion (edgeSet_mono h) e)\n  mem_of_pos_mem_arc e := D.mem_of_pos_mem_arc (Set.inclusion (edgeSet_mono h) e)\n\n/-- Restricting a drawing to a subgraph does not increase the number of crossings. -/\n@[category API, AMS 5]\nlemma numCrossings_ofLE_le {H : SimpleGraph V} (h : H ≤ G) :\n    (D.ofLE h).numCrossings ≤ D.numCrossings := by\n  refine Set.encard_le_encard_of_injOn\n    (f := Prod.map id (Sym2.map (Set.inclusion (edgeSet_mono h)))) ?_ ?_\n  · rintro ⟨p, z⟩ hz\n    induction z using Sym2.ind with\n    | h e f =>\n      simp only [crossings, Set.mem_setOf_eq, Sym2.fromRel_prop, Prod.map_apply, id_eq,\n        Sym2.map_pair_eq] at hz ⊢\n      obtain ⟨hne, he, hf, hp⟩ := hz\n      exact ⟨fun h' => hne (Set.inclusion_injective _ h'), he, hf, hp⟩\n  · exact (Function.injective_id.prodMap (Sym2.map.injective (Set.inclusion_injective _))).injOn\n\n/-- A drawing of the edgeless graph on a finite vertex type: the vertices are placed at distinct\npoints of a line, and there are no edges to draw. -/\nnoncomputable def bot [Fintype V] : PlaneDrawing (⊥ : SimpleGraph V) where\n  pos v := EuclideanSpace.single 0 ((Fintype.equivFin V v : ℕ) : ℝ)\n  pos_injective := by\n    intro v w hvw\n    have := congrArg (fun x : ℝ² => x 0) hvw\n    exact (Fintype.equivFin V).injective\n      (Fin.ext (by simpa [EuclideanSpace.single_apply] using this))\n  arc e := (by simpa using e.2 : False).elim\n  exists_path_range_eq_arc e := (by simpa using e.2 : False).elim\n  mem_of_pos_mem_arc e := (by simpa using e.2 : False).elim\n\nend PlaneDrawing\n\n/-- The crossing number $\\operatorname{cr}(G)$ of a graph $G$: the minimum number of crossings in\na drawing of $G$ in the plane. It is `⊤` if `G` admits no drawing, which can only happen for\ninfinite graphs. -/\nnoncomputable def crossingNumber : ℕ∞ := ⨅ D : PlaneDrawing G, D.numCrossings\n\nvariable {G}\n\n/-- The crossing number of a subgraph is at most the crossing number of the whole graph. -/\n@[category API, AMS 5]\nlemma crossingNumber_mono {H : SimpleGraph V} (h : H ≤ G) :\n    crossingNumber H ≤ crossingNumber G :=\n  le_iInf fun D => iInf_le_of_le (D.ofLE h) (D.numCrossings_ofLE_le h)\n\n/-- The edgeless graph on a finite vertex type has crossing number `0`. -/\n@[category test, AMS 5]\nlemma crossingNumber_bot [Fintype V] : crossingNumber (⊥ : SimpleGraph V) = 0 := by\n  refine le_antisymm (iInf_le_of_le PlaneDrawing.bot ?_) (zero_le _)\n  have : IsEmpty (⊥ : SimpleGraph V).edgeSet := ⟨fun e => by simpa using e.2⟩\n  rw [PlaneDrawing.numCrossings, nonpos_iff_eq_zero, Set.encard_eq_zero]\n  exact Set.eq_empty_of_isEmpty _\n\nend Drawing\n\n/--\n**Albertson conjecture.** If a finite graph $G$ has chromatic number $r$, then its crossing number\nis at least that of the complete graph $K_r$ on $r$ vertices:\n$$\\chi(G) = r \\implies \\operatorname{cr}(G) \\ge \\operatorname{cr}(K_r).$$\nEquivalently, among all graphs with chromatic number $r$, the complete graph $K_r$ has the smallest\ncrossing number.\n-/\n@[category research open, AMS 5]\ntheorem albertson_conjecture [Fintype V] (G : SimpleGraph V) (r : ℕ)\n    (hr : G.chromaticNumber = r) :\n    crossingNumber (⊤ : SimpleGraph (Fin r)) ≤ crossingNumber G := by\n  sorry\n\nend AlbertsonConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate: the list entry poses exactly one universal statement, and the strengthened (Guy's formula) and weakened (Ω(n^4)) forms are correctly excluded.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Precise form chosen (from the article and ACF09/BT10): for every finite graph G with χ(G) = r, cr(G) ≥ cr(K_r). Stated with an explicit r : ℕ and hypothesis G.chromaticNumber = (r : ℕ∞) rather than the ACF form 'χ(G) ≥ r → cr(G) ≥ cr(K_r)'; the two agree because cr(K_r) is monotone in r (K_r ≤ K_{r'} as subgraphs, cf. crossingNumber_mono). The '=' form is the literal reading of 'complete graph with the same chromatic number'.",
+    "Graphs are restricted to finite vertex types via [Fintype V], following the sources (all graphs in ACF09/BT10 are finite). For finite graphs χ(G) is always finite, so the hypothesis is satisfiable and the statement is not vacuous.",
+    "Crossing number is defined via arbitrary topological drawings (Jordan arcs = ranges of injective Mathlib Paths in EuclideanSpace ℝ (Fin 2)) with no 'good drawing' restriction; every meeting point of two distinct edge arcs other than a vertex point is counted (per pair of edges), and the count is an encard in ℕ∞ so overlapping arcs give ⊤. Standard (folklore) arguments show the minimum over such drawings equals the usual crossing number: non-transversal meetings, repeated meetings of the same pair, and crossings between adjacent edges can all be removed by redrawing without increasing the count, and good drawings are among the allowed ones. A reviewer should check they accept this equivalence.",
+    "crossingNumber is ℕ∞-valued (⨅ over drawings), so for infinite graphs with no drawing it is ⊤ rather than a spurious 0; this does not affect the conjecture, which only involves finite graphs (drawings with finitely many crossings, e.g. straight-line ones in general position, always exist).",
+    "K_r is modelled as (⊤ : SimpleGraph (Fin r)); the r = 0 and r ≤ 4 cases are trivially true (cr(K_r) = 0), consistent with the article's remark that the conjecture is vacuous for n ≤ 4.",
+    "Added proven API/test lemmas crossingNumber_mono and crossingNumber_bot to validate the bespoke definitions; no solved variants (e.g. r ≤ 18, Guy's formula, Ω(n^4)) were added since the decomposition table does not pose them."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.UnitDistancePlaneGraph / UnitDistanceEmbeddable (FormalConjecturesForMathlib) only place vertices, not edges; Mathlib's Path / IsEmbedding give single arcs but no graph drawing; Mathlib has no planarity notion at all (only a mention in Coloring.lean docs).",
+     "name": "AlbertsonConjecture.PlaneDrawing",
+     "why_needed": "No notion of a drawing of a graph in the plane exists in Mathlib or FormalConjecturesForMathlib. A drawing is: an injective vertex placement pos : V → ℝ², and for each edge e a set arc e ⊆ ℝ² which is the range of an injective Path from pos u to pos v where e = s(u,v) (a Jordan arc), with no vertex point other than the endpoints lying on the arc."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib; Sym2.fromRel used to form unordered pairs.",
+     "name": "AlbertsonConjecture.PlaneDrawing.CrossesAt / crossings / numCrossings",
+     "why_needed": "Crossings of a drawing: the set of pairs (p, s(e,f)) with e ≠ f, p on both arcs and p not a vertex point (so common endpoints of adjacent edges are excluded); numCrossings is its encard in ℕ∞ (⊤ for infinitely many meetings). A point on k arcs contributes k.choose 2, matching the usual convention."
+    },
+    {
+     "closest_existing_considered": "No crossing-number primitive anywhere in Mathlib or the repository (grep for 'crossing', 'planar', 'drawing').",
+     "name": "AlbertsonConjecture.crossingNumber",
+     "why_needed": "cr(G) := ⨅ over all plane drawings D of D.numCrossings, in ℕ∞. Finite graphs always admit drawings with finitely many crossings, so the value is finite for the graphs in the conjecture."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "AlbertsonConjecture.PlaneDrawing.ofLE, PlaneDrawing.bot",
+     "why_needed": "Auxiliary constructions used only for the API/test lemmas crossingNumber_mono (cr(H) ≤ cr(G) for H ≤ G) and crossingNumber_bot (cr(⊥) = 0), which sanity-check the bespoke definitions with actual proofs."
+    }
+   ],
+   "per_slot": {
+    "albertson_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G (Fintype V) and r : ℕ with G.chromaticNumber = r, crossingNumber (⊤ : SimpleGraph (Fin r)) ≤ crossingNumber G. Mathlib has chromaticNumber and complete graphs but no crossing number or graph drawings, so the file defines plane drawings, crossings and the crossing number."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "albertson_conjecture": "/--\n**Albertson conjecture.** If a finite graph $G$ has chromatic number $r$, then its crossing number\nis at least that of the complete graph $K_r$ on $r$ vertices:\n$$\\chi(G) = r \\implies \\operatorname{cr}(G) \\ge \\operatorname{cr}(K_r).$$\nEquivalently, among all graphs with chromatic number $r$, the complete graph $K_r$ has the smallest\ncrossing number.\n-/\n@[category research open, AMS 5]\ntheorem albertson_conjecture [Fintype V] (G : SimpleGraph V) (r : ℕ)\n    (hr : G.chromaticNumber = r) :\n    crossingNumber (⊤ : SimpleGraph (Fin r)) ≤ crossingNumber G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Albertson conjecture\n\nThe Albertson conjecture relates the crossing number and chromatic number of a finite simple\ngraph.\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Albertson_conjecture)\n-/\n\nopen SimpleGraph\n\nnamespace AlbertsonConjecture\n\n/--\nA good topological drawing of a simple graph in the plane. Vertices are represented by distinct\npoints and edges by continuous Jordan arcs. The interior of an edge contains no vertex, distinct\nedges have only finitely many interior intersection points, and no three edge interiors meet at a\npoint.\n-/\nstructure TopologicalDrawing {V : Type*} (G : SimpleGraph V) where\n  vertex : V → ℝ × ℝ\n  edge : G.edgeSet → ℝ → ℝ × ℝ\n  vertex_injective : Function.Injective vertex\n  edge_continuous : ∀ e, Continuous (edge e)\n  edge_injective : ∀ e, Set.InjOn (edge e) (Set.Icc 0 1)\n  edge_start : ∀ e, edge e 0 = vertex e.1.out.1\n  edge_end : ∀ e, edge e 1 = vertex e.1.out.2\n  edge_interior_avoids_vertices :\n    ∀ e t, t ∈ Set.Ioo (0 : ℝ) 1 → ∀ v, edge e t ≠ vertex v\n  finite_intersections : ∀ e f, e ≠ f →\n    (edge e '' Set.Ioo (0 : ℝ) 1 ∩ edge f '' Set.Ioo (0 : ℝ) 1).Finite\n  no_triple_intersections : ∀ e f g, e ≠ f → e ≠ g → f ≠ g →\n    edge e '' Set.Ioo (0 : ℝ) 1 ∩ edge f '' Set.Ioo (0 : ℝ) 1 ∩\n      edge g '' Set.Ioo (0 : ℝ) 1 = ∅\n\nnamespace TopologicalDrawing\n\n/--\nThe crossings of a good topological drawing, recorded by the unordered pair of edges and their\ncommon interior point.\n-/\ndef crossingSet {V : Type*} {G : SimpleGraph V} (D : TopologicalDrawing G) :\n    Set (Sym2 G.edgeSet × (ℝ × ℝ)) :=\n  {c | let ef := c.1.out\n    ef.1 ≠ ef.2 ∧ c.2 ∈ D.edge ef.1 '' Set.Ioo (0 : ℝ) 1 ∩\n      D.edge ef.2 '' Set.Ioo (0 : ℝ) 1}\n\nend TopologicalDrawing\n\n/--\nThe crossing number of a finite simple graph is the minimum number of crossings among its good\ntopological drawings in the plane.\n-/\nnoncomputable def crossingNumber {V : Type*} [Fintype V] (G : SimpleGraph V) : ℕ :=\n  sInf {n : ℕ | ∃ D : TopologicalDrawing G, D.crossingSet.ncard = n}\n\n/--\n**Albertson conjecture.** For every finite simple graph $G$, its crossing number is at least the\ncrossing number of the complete graph whose number of vertices is the chromatic number of $G$:\n$\\operatorname{cr}(G) \\geq \\operatorname{cr}(K_{\\chi(G)})$.\n-/\n@[category research open, AMS 5]\ntheorem albertson_conjecture :\n    ∀ {V : Type*} [Fintype V] (G : SimpleGraph V),\n      crossingNumber (completeGraph (Fin G.chromaticNumber.toNat)) ≤ crossingNumber G := by\n  sorry\n\nend AlbertsonConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry was resolved using the supplied Albertson-conjecture article as the universal formulation: for every finite simple graph G, cr(G) ≥ cr(K_{χ(G)}). No Guy-formula strengthening or asymptotic weakening was included.",
+    "Crossing number is defined using normalized good topological drawings in the plane: vertices are distinct points; edges are continuous simple arcs; edge interiors avoid vertices; pairwise interior intersections are finite; and triple interior intersections are excluded.",
+    "A crossing is recorded by an unordered pair of distinct edges together with a common interior point. Thus multiple crossings of one pair are counted separately, while the no-triple-intersection condition makes each geometric crossing belong to exactly one edge pair.",
+    "Mathlib's chromaticNumber is ℕ∞. The complete graph is placed on Fin G.chromaticNumber.toNat; this is faithful because every graph quantified over has a finite vertex type and hence finite chromatic number.",
+    "Edge arcs are represented by continuous maps ℝ → ℝ² and only their restriction to [0,1] is used. Requiring an extension to all of ℝ causes no mathematical restriction, since an interval arc extends by clamping the parameter to [0,1]."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib SimpleGraph APIs and FormalConjecturesForMathlib were searched for drawing, embedding, planar, and crossing-number notions; no graph-drawing or graph-planarity primitive was available.",
+     "name": "TopologicalDrawing",
+     "why_needed": "Encodes a normalized drawing of a finite simple graph by Jordan arcs in the plane, the prerequisite for defining crossing number."
+    },
+    {
+     "closest_existing_considered": "Set intersections and Sym2 from Mathlib supply components, but there was no existing graph-drawing crossing set.",
+     "name": "TopologicalDrawing.crossingSet",
+     "why_needed": "Records precisely the unordered edge-pair/intersection-point events counted as crossings in a good drawing."
+    },
+    {
+     "closest_existing_considered": "Mathlib graph invariants include chromaticNumber and other combinatorial quantities, but repository-wide searches found no crossingNumber or equivalent drawing-based invariant.",
+     "name": "crossingNumber",
+     "why_needed": "Defines the minimum number of edge crossings over all good plane drawings, which is essential to state the conjecture."
+    }
+   ],
+   "per_slot": {
+    "albertson_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Mathlib and FormalConjecturesForMathlib provide finite simple graphs, complete graphs, and chromatic number, but no crossing number or graph-drawing primitive. The file therefore defines good topological drawings and their crossing number, then states cr(K_{χ(G)}) ≤ cr(G) for every finite simple graph G."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "albertson_conjecture": "/--\n**Albertson conjecture.** For every finite simple graph $G$, its crossing number is at least the\ncrossing number of the complete graph whose number of vertices is the chromatic number of $G$:\n$\\operatorname{cr}(G) \\geq \\operatorname{cr}(K_{\\chi(G)})$.\n-/\n@[category research open, AMS 5]\ntheorem albertson_conjecture :\n    ∀ {V : Type*} [Fintype V] (G : SimpleGraph V),\n      crossingNumber (completeGraph (Fin G.chromaticNumber.toNat)) ≤ crossingNumber G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Albertson conjecture\n\nThe crossing number of a finite simple graph is the minimum number of edge crossings among its\ndrawings in the plane. The Albertson conjecture says that the complete graph with the same\nchromatic number minimizes the crossing number.\n\n*References:*\n- [Wikipedia, Albertson conjecture](https://en.wikipedia.org/wiki/Albertson_conjecture)\n- [Albertson, Cranston, and Fox, *Colorings, crossings, and cliques*](https://arxiv.org/abs/1006.3783)\n-/\n\nopen Set SimpleGraph\n\nnamespace AlbertsonConjecture\n\n/-- The real plane in which graphs are drawn. -/\nabbrev Plane := ℝ × ℝ\n\n/-- A Jordan arc representing an edge, together with an orientation of its two endpoints. -/\nstructure DrawnEdge {V : Type*} (G : SimpleGraph V) (position : V → Plane)\n    (e : G.edgeSet) where\n  fst : V\n  snd : V\n  edge_eq : (e : Sym2 V) = s(fst, snd)\n  arc : Path (position fst) (position snd)\n  arc_injective : Function.Injective arc\n\n/-- The image of a drawn edge with its two endpoints removed. -/\ndef DrawnEdge.interior {V : Type*} {G : SimpleGraph V} {position : V → Plane}\n    {e : G.edgeSet} (d : DrawnEdge G position e) : Set Plane :=\n  {p | ∃ t : unitInterval, t ≠ 0 ∧ t ≠ 1 ∧ d.arc t = p}\n\n/-- A topological drawing assigns distinct plane points to vertices and Jordan arcs to edges. -/\nstructure TopologicalDrawing {V : Type*} (G : SimpleGraph V) where\n  position : V → Plane\n  position_injective : Function.Injective position\n  edge : ∀ e : G.edgeSet, DrawnEdge G position e\n\n/-- The plane points lying in the interiors of at least two distinct drawn edges. -/\ndef TopologicalDrawing.crossingSet {V : Type*} {G : SimpleGraph V}\n    (D : TopologicalDrawing G) : Set Plane :=\n  {p | ∃ e f : G.edgeSet, e ≠ f ∧ p ∈ (D.edge e).interior ∧ p ∈ (D.edge f).interior}\n\n/--\nA good drawing has no edge passing through a vertex, no intersections between distinct incident\nedges, no point common to three distinct edge interiors, and only finitely many crossings.\n-/\ndef TopologicalDrawing.IsGood {V : Type*} {G : SimpleGraph V}\n    (D : TopologicalDrawing G) : Prop :=\n  (∀ (e : G.edgeSet) (v : V), D.position v ∉ (D.edge e).interior) ∧\n  (∀ (e f : G.edgeSet), e ≠ f →\n    (∃ v : V, v ∈ (e : Sym2 V) ∧ v ∈ (f : Sym2 V)) →\n      Disjoint (D.edge e).interior (D.edge f).interior) ∧\n  (∀ (e f g : G.edgeSet), e ≠ f → e ≠ g → f ≠ g →\n    Disjoint ((D.edge e).interior ∩ (D.edge f).interior) (D.edge g).interior) ∧\n  D.crossingSet.Finite\n\n/--\nThe crossing number of a simple graph: the minimum number of crossing points over all good\nJordan-arc drawings of the graph in the real plane.\n-/\nnoncomputable def crossingNumber {V : Type*} (G : SimpleGraph V) : ℕ :=\n  sInf {n : ℕ | ∃ D : TopologicalDrawing G, D.IsGood ∧ D.crossingSet.ncard = n}\n\n/--\n**Albertson conjecture.** For every finite simple graph $G$, its crossing number is at least the\ncrossing number of the complete graph $K_{\\chi(G)}$ with the same chromatic number.\n-/\n@[category research open, AMS 5]\ntheorem albertson_conjecture :\n    ∀ {V : Type*} [Fintype V] (G : SimpleGraph V),\n      crossingNumber (⊤ : SimpleGraph (Fin G.chromaticNumber.toNat)) ≤ crossingNumber G := by\n  sorry\n\nend AlbertsonConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list entry is read, following the background article and primary literature, as the universal finite-simple-graph statement cr(G) ≥ cr(K_{χ(G)}), rather than Guy's strengthened formula or the weaker asymptotic bound.",
+    "Mathlib's `SimpleGraph.chromaticNumber` is `ℕ∞`; for a graph on a `Fintype` it is finite, so `G.chromaticNumber.toNat` indexes the vertex type `Fin G.chromaticNumber.toNat` of the complete graph.",
+    "Crossing number is modeled using standard good topological drawings in the real plane: vertices are distinct points, edges are injective continuous paths (Jordan arcs) joining their endpoints, edge interiors avoid vertices, distinct incident edges do not meet in their interiors, no three distinct edge interiors share a point, and the crossing set is finite. The primary sources explicitly justify restricting crossing-number minimization to such good drawings.",
+    "Under the no-triple-intersection condition, counting crossing points agrees with counting pairs of crossing edges together with their crossing point. Interior contacts are represented as intersections; non-crossing tangencies can be removed by general-position perturbation and therefore do not affect the minimum."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "The existing product type `ℝ × ℝ`; `Plane` is only a local abbreviation for readability.",
+     "name": "Plane",
+     "why_needed": "Provides the real plane used as the codomain of graph drawings."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Path` supplies continuous endpoint-preserving paths, but does not associate them to `SimpleGraph` edges or enforce injectivity.",
+     "name": "DrawnEdge",
+     "why_needed": "Packages an edge's endpoints and its injective continuous Jordan arc in the plane; no graph-drawing edge primitive was found."
+    },
+    {
+     "closest_existing_considered": "`Path.range` exists, but there was no existing endpoint-deleted path image tailored to drawn graph edges.",
+     "name": "DrawnEdge.interior",
+     "why_needed": "Defines the edge-arc image with endpoint parameters removed, needed to identify crossings and forbid passage through vertices."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `SimpleGraph.Embedding`, but that is a combinatorial graph embedding, not a drawing in the plane.",
+     "name": "TopologicalDrawing",
+     "why_needed": "Represents a simple graph drawing by injective vertex positions and a Jordan arc for every edge; no such primitive exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "No crossing or graph-drawing intersection set was found.",
+     "name": "TopologicalDrawing.crossingSet",
+     "why_needed": "Collects plane points common to interiors of distinct drawn edges."
+    },
+    {
+     "closest_existing_considered": "No existing good-drawing or topological-graph predicate was found.",
+     "name": "TopologicalDrawing.IsGood",
+     "why_needed": "Encodes the standard regularity conditions under which interior intersection points faithfully count crossings and the count is finite."
+    },
+    {
+     "closest_existing_considered": "Existing graph invariants and `SimpleGraph.Embedding` do not model plane drawings or edge crossings; `sInf` and `Set.ncard` are reused to take the minimum and count finite crossing sets.",
+     "name": "crossingNumber",
+     "why_needed": "The conjecture requires the minimum number of edge crossings over all plane drawings, which is absent from Mathlib and the repository helpers."
+    }
+   ],
+   "per_slot": {
+    "albertson_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "albertson_conjecture": "/--\n**Albertson conjecture.** For every finite simple graph $G$, its crossing number is at least the\ncrossing number of the complete graph $K_{\\chi(G)}$ with the same chromatic number.\n-/\n@[category research open, AMS 5]\ntheorem albertson_conjecture :\n    ∀ {V : Type*} [Fintype V] (G : SimpleGraph V),\n      crossingNumber (⊤ : SimpleGraph (Fin G.chromaticNumber.toNat)) ≤ crossingNumber G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Albertson conjecture\n\nThe Albertson conjecture compares the crossing number of a finite simple graph with that of the\ncomplete graph having the same chromatic number.\n\n*Reference:* [Wikipedia, Albertson conjecture](https://en.wikipedia.org/wiki/Albertson_conjecture)\n-/\n\nnamespace AlbertsonConjecture\n\nopen Set SimpleGraph unitInterval\n\nuniverse u\n\n/-- A good drawing of a finite simple graph in the plane.\n\nVertices are represented by distinct points. Edges are represented by simple continuous arcs\nwhose interiors contain no vertex. Distinct arcs meet in their interiors at most once, and no\nthree arc interiors meet at a point. These are the standard general-position conditions under\nwhich pairs of crossing edges correspond exactly to crossing points. -/\nstructure GoodDrawing {V : Type*} (G : SimpleGraph V) where\n  vertex : V → ℝ × ℝ\n  vertex_injective : Function.Injective vertex\n  edge : G.edgeSet → I → ℝ × ℝ\n  edge_continuous : ∀ e, Continuous (edge e)\n  edge_injective : ∀ e, Function.Injective (edge e)\n  edge_endpoints : ∀ (e : G.edgeSet) (v : V), v ∈ (e : Sym2 V) →\n    edge e 0 = vertex v ∨ edge e 1 = vertex v\n  interior_avoids_vertices : ∀ (e : G.edgeSet) (v : V),\n    vertex v ∉ edge e '' Ioo (0 : I) 1\n  pair_general_position : ∀ e₁ e₂, e₁ ≠ e₂ →\n    (edge e₁ '' Ioo (0 : I) 1 ∩ edge e₂ '' Ioo (0 : I) 1).Subsingleton\n  no_triple_crossing : ∀ e₁ e₂ e₃, e₁ ≠ e₂ → e₁ ≠ e₃ → e₂ ≠ e₃ →\n    edge e₁ '' Ioo (0 : I) 1 ∩ edge e₂ '' Ioo (0 : I) 1 ∩\n      edge e₃ '' Ioo (0 : I) 1 = ∅\n\n/-- The number of crossings in a good drawing. Every crossing is counted twice by the set of\nordered pairs and hence the cardinality is divided by two. -/\nnoncomputable def GoodDrawing.crossingCount {V : Type*} [Finite V] {G : SimpleGraph V}\n    (D : GoodDrawing G) : ℕ :=\n  Set.ncard {p : G.edgeSet × G.edgeSet |\n    p.1 ≠ p.2 ∧\n      (D.edge p.1 '' Ioo (0 : I) 1 ∩ D.edge p.2 '' Ioo (0 : I) 1).Nonempty} / 2\n\n/-- The crossing number of a finite simple graph is the minimum number of edge crossings among\nall its good drawings in the plane. -/\nnoncomputable def crossingNumber {V : Type*} [Finite V] (G : SimpleGraph V) : ℕ :=\n  sInf {n : ℕ | ∃ D : GoodDrawing G, D.crossingCount = n}\n\n/--\nThe Albertson conjecture: every finite simple graph has crossing number at least the crossing\nnumber of the complete graph whose number of vertices is the chromatic number of the graph,\nthat is, $\\operatorname{cr}(G) \\geq \\operatorname{cr}(K_{\\chi(G)})$.\n-/\n@[category research open, AMS 05]\ntheorem albertson_conjecture :\n    ∀ (V : Type u) [Fintype V] (G : SimpleGraph V),\n      crossingNumber (completeGraph (Fin G.chromaticNumber.toNat)) ≤ crossingNumber G := by\n  sorry\n\nend AlbertsonConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list entry was read, using the background Albertson-conjecture article, as the universal statement cr(G) ≥ cr(K_{χ(G)}) for every finite simple graph G; no Guy-formula strengthening or asymptotic weakening is included.",
+    "The crossing number is modeled using topological good drawings in ℝ × ℝ, not straight-line drawings. Edges are injective continuous arcs, vertex points are distinct, edge interiors avoid vertices, two distinct edge interiors meet at most once, and triple interior intersections are excluded. These are the standard normal-form conditions attainable by crossing-minimal drawings.",
+    "Under the good-drawing conditions, a crossing point corresponds to an unordered pair of distinct edge interiors that meet. The implementation counts ordered crossing edge-pairs and divides by two.",
+    "Mathlib's chromatic number is ENat-valued. Because the theorem quantifies over finite vertex types, `G.chromaticNumber.toNat` is the ordinary finite chromatic number and indexes `completeGraph (Fin ...)`.",
+    "The statement is universe-polymorphic and quantifies over all finite simple graphs, including empty and small graphs; their natural boundary cases agree with the informal conjecture."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `Path`/unit-interval topology and `SimpleGraph.edgeSet`; these provide component primitives but no graph-drawing structure.",
+     "name": "GoodDrawing",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no notion of a topological drawing of a graph in the plane or its crossings."
+    },
+    {
+     "closest_existing_considered": "`Set.ncard` on the finite set of ordered pairs of crossing edges.",
+     "name": "GoodDrawing.crossingCount",
+     "why_needed": "A good drawing needs a natural-number count of its crossing points; no existing graph-drawing crossing count was found."
+    },
+    {
+     "closest_existing_considered": "A hard repository-wide search found no crossing-number or graph-planarity drawing API; `sInf` on natural-number drawing crossing counts supplies the required minimum.",
+     "name": "crossingNumber",
+     "why_needed": "The conjecture fundamentally requires the minimum number of crossings over all plane drawings, which is absent from Mathlib and FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "albertson_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "albertson_conjecture": "/--\nThe Albertson conjecture: every finite simple graph has crossing number at least the crossing\nnumber of the complete graph whose number of vertices is the chromatic number of the graph,\nthat is, $\\operatorname{cr}(G) \\geq \\operatorname{cr}(K_{\\chi(G)})$.\n-/\n@[category research open, AMS 05]\ntheorem albertson_conjecture :\n    ∀ (V : Type u) [Fintype V] (G : SimpleGraph V),\n      crossingNumber (completeGraph (Fin G.chromaticNumber.toNat)) ≤ crossingNumber G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Albertson conjecture\n\nThe *crossing number* $\\mathrm{cr}(G)$ of a graph $G$ is the minimum number of edge crossings in\na drawing of $G$ in the plane. The Albertson conjecture states that among all graphs with\nchromatic number $r$, the complete graph $K_r$ has the smallest crossing number: if\n$\\chi(G) = r$ then $\\mathrm{cr}(G) \\ge \\mathrm{cr}(K_r)$.\n\n*References:*\n- [Wikipedia, Albertson conjecture](https://en.wikipedia.org/wiki/Albertson_conjecture)\n- [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- M. O. Albertson, D. W. Cranston, J. Fox, *Crossings, colorings, and cliques*,\n  [arXiv:1006.3783](https://arxiv.org/abs/1006.3783)\n- J. Barát, G. Tóth, *Towards the Albertson conjecture*,\n  [arXiv:0909.0413](https://arxiv.org/abs/0909.0413)\n-/\n\nopen SimpleGraph\nopen scoped EuclideanGeometry\n\nnamespace AlbertsonConjecture\n\nvariable {V : Type*}\n\n/-- A *drawing* of a simple graph `G` in the plane `ℝ²`. Distinct vertices are represented by\ndistinct points, and each edge `s(u, v)` is represented by a Jordan arc (the range of an injective\npath) from the point of `u` to the point of `v` that passes through no vertex point other than its\ntwo endpoints. -/\nstructure Drawing (G : SimpleGraph V) where\n  /-- The point of the plane representing a vertex. -/\n  vertex : V → ℝ²\n  vertex_injective : Function.Injective vertex\n  /-- The arc of the plane representing an edge. -/\n  arc : G.edgeSet → Set ℝ²\n  /-- The edge `s(u, v)` is drawn as a Jordan arc from `vertex u` to `vertex v`. -/\n  exists_path (u v : V) (h : G.Adj u v) : ∃ γ : Path (vertex u) (vertex v),\n    Function.Injective γ ∧ Set.range γ = arc ⟨s(u, v), h⟩\n  /-- The only vertex points on the arc of an edge are its two endpoints. -/\n  mem_of_vertex_mem_arc (e : G.edgeSet) (w : V) : vertex w ∈ arc e → w ∈ (e : Sym2 V)\n\n/-- The *crossings* of a drawing: an unordered pair of distinct edges together with a point of the\nplane lying in the interior of both of their arcs. A point at which `k` arcs meet accounts for\n`k.choose 2` crossings, as usual. -/\ndef Drawing.crossings {G : SimpleGraph V} (D : Drawing G) : Set (Sym2 G.edgeSet × ℝ²) :=\n  {x | ¬ x.1.IsDiag ∧ ∀ e ∈ x.1, x.2 ∈ D.arc e \\ Set.range D.vertex}\n\n/-- The *crossing number* $\\mathrm{cr}(G)$ of a graph `G`: the minimum number of crossings in a\ndrawing of `G` in the plane. It is an extended natural number; a drawing with infinitely many\ncrossings contributes `⊤`. -/\nnoncomputable def crossingNumber (G : SimpleGraph V) : ℕ∞ :=\n  ⨅ D : Drawing G, D.crossings.encard\n\n/-- The crossing number is at most the number of crossings of any drawing. -/\n@[category API, AMS 5]\ntheorem crossingNumber_le_encard_crossings {G : SimpleGraph V} (D : Drawing G) :\n    crossingNumber G ≤ D.crossings.encard :=\n  iInf_le _ D\n\n/-- A drawing of a graph without edges has no crossings. -/\n@[category API, AMS 5]\ntheorem Drawing.crossings_bot (D : Drawing (⊥ : SimpleGraph V)) : D.crossings = ∅ := by\n  ext ⟨s, p⟩\n  induction s using Sym2.ind with\n  | h e _ => simpa using e.2\n\n/-- A graph without edges on a countable vertex set has crossing number `0`. -/\n@[category test, AMS 5]\ntheorem crossingNumber_bot [Countable V] : crossingNumber (⊥ : SimpleGraph V) = 0 := by\n  obtain ⟨f, hf⟩ := Countable.exists_injective_nat V\n  let D : Drawing (⊥ : SimpleGraph V) :=\n    { vertex := fun v => WithLp.toLp 2 fun _ => (f v : ℝ)\n      vertex_injective := fun u v h => hf <| Nat.cast_injective <|\n        congrFun (WithLp.toLp_injective 2 h) 0\n      arc := fun e => (by simpa using e.2 : False).elim\n      exists_path := fun _ _ h => h.elim\n      mem_of_vertex_mem_arc := fun e => (by simpa using e.2 : False).elim }\n  exact le_antisymm ((crossingNumber_le_encard_crossings D).trans_eq (by simp [D.crossings_bot]))\n    (zero_le _)\n\n/-- **Albertson conjecture.** If a finite simple graph $G$ has chromatic number $r$, then its\ncrossing number is at least that of the complete graph on $r$ vertices:\n$\\chi(G) = r \\implies \\mathrm{cr}(G) \\ge \\mathrm{cr}(K_r)$. That is, the crossing number of a\ngraph is lower-bounded by the crossing number of the complete graph with the same chromatic\nnumber. -/\n@[category research open, AMS 5]\ntheorem albertson_conjecture [Fintype V] (G : SimpleGraph V) (r : ℕ)\n    (hr : G.chromaticNumber = r) :\n    crossingNumber (completeGraph (Fin r)) ≤ crossingNumber G := by\n  sorry\n\nend AlbertsonConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The single-slot decomposition is correct; Guy's formula and the Ω(n^4) bound are rightly excluded.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Chose the form 'χ(G) = r ⇒ cr(K_r) ≤ cr(G)' (hypothesis G.chromaticNumber = (r : ℕ∞), conclusion in ℕ∞) rather than writing cr(K_{χ(G)}) with ENat.toNat; this is the literal 'same chromatic number' form and the exact wording in Barát–Tóth / Albertson–Cranston–Fox. For a finite graph χ(G) is always a finite r, so the hypothesis is never vacuous; r = 0 (empty graph) is trivially true.",
+    "G is required finite via [Fintype V]; the crossing number is a finite-graph invariant and all sources state the conjecture for finite graphs.",
+    "Drawings use general topological Jordan arcs (ranges of injective Mathlib `Path`s in EuclideanSpace ℝ (Fin 2)), not polygonal arcs; the crossing number is the same for either class of drawings.",
+    "Crossings are counted as (unordered pair of distinct edges, common interior point). Tangential touchings and interior points shared by adjacent edges are counted too, and k arcs through one point count k.choose 2; the minimum over all drawings is unchanged by these conventions (a touching or adjacent-edge intersection can be removed by local redrawing, and points shared by k arcs split into k.choose 2 crossings), so the infimum is the classical cr(G). Drawings with infinitely many shared interior points get encard = ⊤ and never realize the minimum.",
+    "crossingNumber takes values in ℕ∞ (⊤ if no drawing existed, which cannot happen for finite graphs), matching Mathlib's ℕ∞-valued chromaticNumber.",
+    "Interior of an arc is expressed as `arc e \\ Set.range D.vertex`; this equals arc minus its two endpoints because of the field `mem_of_vertex_mem_arc` together with `vertex_injective`.",
+    "Bespoke definitions are kept in the problem file (problem-specific) with API/test lemmas: crossingNumber ≤ crossings of any drawing, a drawing of ⊥ has no crossings, and crossingNumber ⊥ = 0 for countable vertex types (which also witnesses that drawings exist)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Path`, `IsEmbedding` (used in Wikipedia/InscribedSquare for Jordan curves); FormalConjecturesForMathlib `UnitDistanceEmbeddable` (only places vertices, no edge arcs); no planarity or crossing notion exists anywhere.",
+     "name": "AlbertsonConjecture.Drawing",
+     "why_needed": "No notion of a drawing of a graph in the plane exists in Mathlib or the repo. A drawing places distinct vertices at distinct points of ℝ² (EuclideanSpace ℝ (Fin 2)) and represents each edge s(u,v) by a Jordan arc (the range of an injective Mathlib `Path` from vertex u to vertex v) whose only vertex points are its endpoints."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib; Set.encard is used to count it.",
+     "name": "AlbertsonConjecture.Drawing.crossings",
+     "why_needed": "The set of crossings of a drawing: an unordered pair (Sym2) of distinct edges together with a point of the plane lying in the interior of both arcs. A point where k arcs meet gives k.choose 2 crossings (standard convention)."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib (grep for crossing/planar/drawing finds only unrelated hits).",
+     "name": "AlbertsonConjecture.crossingNumber",
+     "why_needed": "cr(G) := ⨅ over drawings D of D.crossings.encard, an ℕ∞ (drawings with infinitely many common interior points contribute ⊤ and never realize the minimum; a finite graph always has a drawing with finitely many crossings so the value is finite and equals the classical cr(G))."
+    }
+   ],
+   "per_slot": {
+    "albertson_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G (V a Fintype) and every r : ℕ with G.chromaticNumber = r, crossingNumber (completeGraph (Fin r)) ≤ crossingNumber G, i.e. χ(G) = r ⇒ cr(G) ≥ cr(K_r), the form given by Barát–Tóth and Albertson–Cranston–Fox and equivalent to the list entry. The crossing number does not exist in Mathlib or FormalConjecturesForMathlib, so a Drawing structure, its crossings and crossingNumber were defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "albertson_conjecture": "/-- **Albertson conjecture.** If a finite simple graph $G$ has chromatic number $r$, then its\ncrossing number is at least that of the complete graph on $r$ vertices:\n$\\chi(G) = r \\implies \\mathrm{cr}(G) \\ge \\mathrm{cr}(K_r)$. That is, the crossing number of a\ngraph is lower-bounded by the crossing number of the complete graph with the same chromatic\nnumber. -/\n@[category research open, AMS 5]\ntheorem albertson_conjecture [Fintype V] (G : SimpleGraph V) (r : ℕ)\n    (hr : G.chromaticNumber = r) :\n    crossingNumber (completeGraph (Fin r)) ≤ crossingNumber G := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "albertson_conjecture": "c03"
+ },
+ "id": "wp-albertson-conjecture",
+ "main_attempt": "c03"
+}

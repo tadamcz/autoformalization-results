@@ -1,0 +1,488 @@
+{
+ "attempts": [
+  {
+   "bailed": true,
+   "cid": "c01",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The intended precise reading is Peretz Definition 1(4): L may be many-sorted, T is complete, work in a sufficiently saturated monster model, and a and b may be imaginary; whenever a is not independent from b over A, there is a stable formula ψ(x,y) in L(A) with ψ(a,b), such that ψ(x,b) forks over A. Stability means that no sequences (a_i) and (b_j) indexed by ω satisfy ψ(a_i,b_j) iff i ≤ j; simplicity means that no formula has the tree property.",
+    "I did not replace this with the real-tuple-only, single-sorted version expressible using Mathlib's current Language API, because that is one of the inequivalent weakenings the decomposition explicitly rules out.",
+    "The prompt refers to /workspace/background/article.md, but that file is absent. I used the supplied arXiv source math/0412356 directly; lines 100–104 state the many-sorted/monster/possibly-imaginary convention and lines 134–145 give stability and stable forking."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "stable_forking_conjecture_for_simple_theories": {
+     "outcome": "missing_primitives",
+     "why": "A faithful statement requires a possibly many-sorted monster model, imaginary sorts (T^eq), saturation, indiscernible sequences over parameter sets, dividing/forking, stable formulas, and the tree property. Mathlib and FormalConjecturesForMathlib provide single-sorted first-order syntax/semantics and complete theories, but no T^eq/imaginary-element construction, model-theoretic saturation, indiscernibility, dividing/forking, or simplicity API. In particular, restricting a and b to tuples from an ordinary Mathlib model would omit the source's explicitly required possibly imaginary cases. Introducing an uninterpreted forking predicate or a nominal 'monster model' structure would not tie these notions to T and would not faithfully formalize the conjecture. A faithful implementation therefore needs a substantial reusable model-theory foundation beyond a conjecture-local definition."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Stable forking conjecture for simple theories\n\nThe formulation below is the stable-forking conjecture used by Kim--Pillay and Peretz:\nevery instance of forking in a complete simple first-order theory is witnessed by a stable\nformula over the base set. The definitions are semantic, in the ambient model conventionally\ntaken to be a monster model. Finite tuples are represented by `Fin n`.\n\nA possibly imaginary element is covered by applying the statement to the usual one-sorted\ncoding of $T^{\\mathrm{eq}}$, in which it is an element of a home sort. This fixes the\n$L(A)$, rather than parameter-free $L$, version of the conjecture.\n\n*References:*\n- [Assaf Peretz, *Geometry of forking in simple theories*](https://arxiv.org/abs/math/0412356)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace StableForkingConjectureForSimpleTheories\n\nopen FirstOrder FirstOrder.Language\n\nuniverse u v w\n\nvariable {L : FirstOrder.Language.{u, v}} {M : Type w} [L.Structure M]\n\n/-- The valuation of a formula whose variables consist of indexed base parameters, an\n`x`-tuple, and a `y`-tuple. -/\ndef parameterValuation {ι : Type*} (base : ι → M) {m n : ℕ}\n    (a : Fin m → M) (b : Fin n → M) : ι ⊕ Fin m ⊕ Fin n → M\n  | Sum.inl c => base c\n  | Sum.inr (Sum.inl i) => a i\n  | Sum.inr (Sum.inr j) => b j\n\n/-- A sequence of `n`-tuples is indiscernible over the image of `base` if increasing finite\nsubsequences have the same type over those parameters. -/\ndef IndiscernibleOver {ι : Type*} (base : ι → M) {n : ℕ}\n    (b : ℕ → Fin n → M) : Prop :=\n  ∀ (k : ℕ) (φ : L.Formula (ι ⊕ (Fin k × Fin n)))\n    (i j : Fin k → ℕ), StrictMono i → StrictMono j →\n      φ.Realize (fun z => match z with\n        | Sum.inl c => base c\n        | Sum.inr r => b (i r.1) r.2) ↔\n      φ.Realize (fun z => match z with\n        | Sum.inl c => base c\n        | Sum.inr r => b (j r.1) r.2)\n\n/-- A formula instance divides over the image of `base` if its parameter tuple starts an\nindiscernible sequence whose corresponding instances have a finite inconsistent subfamily. -/\ndef DividesOver (base : ι → M) {m n : ℕ} (φ : L.Formula (ι ⊕ Fin m ⊕ Fin n))\n    (b : Fin n → M) : Prop :=\n  ∃ (bseq : ℕ → Fin n → M) (k : ℕ),\n    bseq 0 = b ∧ IndiscernibleOver (L := L) base bseq ∧ 0 < k ∧\n    ∀ (i : Fin k → ℕ), Function.Injective i →\n      ¬ ∃ a : Fin m → M, ∀ r : Fin k,\n        φ.Realize (parameterValuation base a (bseq (i r)))\n\n/-- A formula instance forks over `A` if, in an elementary extension, it implies a finite\ndisjunction of formula instances that divide over the embedded copy of `A`. -/\ndef ForksOver (A : Set M) {m n : ℕ} (φ : L.Formula (A ⊕ Fin m ⊕ Fin n))\n    (b : Fin n → M) : Prop :=\n  ∃ (N : Theory.ModelType.{u, v, max u v w} (L.completeTheory M))\n    (e : M ↪ₑ[L] N) (p r : ℕ)\n    (θ : Fin r → L.Formula (A ⊕ Fin m ⊕ Fin p)) (c : Fin r → Fin p → N),\n      (∀ i, DividesOver (L := L) (fun z : A => e z) (θ i) (c i)) ∧\n      ∀ a : Fin m → N,\n        φ.Realize (parameterValuation (fun z : A => e z) a (e ∘ b)) →\n          ∃ i, (θ i).Realize (parameterValuation (fun z : A => e z) a (c i))\n\n/-- A formula over `A` is stable if it has no infinite order pattern\n`ψ(aᵢ,bⱼ) ↔ i ≤ j` in any elementary extension containing the parameters. -/\ndef StableOver (A : Set M) {m n : ℕ} (ψ : L.Formula (A ⊕ Fin m ⊕ Fin n)) : Prop :=\n  ¬ ∃ (N : Theory.ModelType.{u, v, max u v w} (L.completeTheory M))\n    (e : M ↪ₑ[L] N) (a : ℕ → Fin m → N) (b : ℕ → Fin n → N),\n      ∀ i j, ψ.Realize (parameterValuation (fun z : A => e z) (a i) (b j)) ↔ i ≤ j\n\n/-- A formula has the tree property in `M` if its parameters can be placed on the tree\n`ℕ^{<ω}` so that every branch is finitely consistent and the immediate successors of every\nnode are uniformly finitely inconsistent. -/\ndef HasTreePropertyIn (M : Type w) [L.Structure M] {m n : ℕ}\n    (φ : L.Formula (Fin m ⊕ Fin n)) : Prop :=\n  ∃ (b : List ℕ → Fin n → M) (k : ℕ), 0 < k ∧\n    (∀ branch : ℕ → ℕ, ∀ q : ℕ,\n      ∃ a : Fin m → M, ∀ t < q,\n        φ.Realize (Sum.elim a (b (List.ofFn fun i : Fin t => branch i)))) ∧\n    ∀ node : List ℕ, ∀ children : Fin k → ℕ, Function.Injective children →\n      ¬ ∃ a : Fin m → M, ∀ i : Fin k,\n        φ.Realize (Sum.elim a (b (node ++ [children i])))\n\n/-- A theory has the tree property if some formula has the tree property in a model of the\ntheory. -/\ndef HasTreeProperty (T : L.Theory) : Prop :=\n  ∃ (M : Theory.ModelType.{u, v, max u v} T) (m n : ℕ)\n    (φ : L.Formula (Fin m ⊕ Fin n)),\n    HasTreePropertyIn M φ\n\n/-- A first-order theory is simple if no formula has the tree property. -/\ndef IsSimple (T : L.Theory) : Prop :=\n  ¬ HasTreeProperty T\n\n/--\n**Stable forking conjecture for simple theories (Kim--Pillay/Peretz formulation).**\n\nEvery complete simple first-order theory has stable forking. More precisely, in an ambient\nmonster model of such a theory, for every parameter set $A$ and tuples $a,b$, if\n$a \\not\\mathrel{\\perp}_A b$ (that is, some formula in $\\operatorname{tp}(a/Ab)$ forks over\n$A$), then there is a stable formula $\\psi(x,y) \\in L(A)$ such that $\\psi(a,b)$ holds and\n$\\psi(x,b)$ forks over $A$. Here stable means that there are no infinite sequences\n$(a_i),(b_j)$ with $\\psi(a_i,b_j)$ if and only if $i \\le j$. Applying the assertion to\n$T^{\\mathrm{eq}}$ includes possibly imaginary $a$ and $b$.\n-/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories\n    (T : L.Theory) (hcomplete : T.IsComplete) (hsimple : IsSimple T)\n    (M : Type w) [Nonempty M] [L.Structure M] [M ⊨ T] :\n    ∀ (A : Set M) (m n : ℕ) (a : Fin m → M) (b : Fin n → M),\n      (∃ φ : L.Formula (A ⊕ Fin m ⊕ Fin n),\n        φ.Realize (parameterValuation (fun z : A => (z : M)) a b) ∧ ForksOver A φ b) →\n      ∃ ψ : L.Formula (A ⊕ Fin m ⊕ Fin n),\n        StableOver A ψ ∧\n          ψ.Realize (parameterValuation (fun z : A => (z : M)) a b) ∧ ForksOver A ψ b := by\n  sorry\n\nend StableForkingConjectureForSimpleTheories\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Fixed the Kim–Pillay/Peretz L(A) formulation: every forking instance tp(a/Ab) is witnessed by a stable ψ(x,y) in L(A) such that ψ(a,b) and ψ(x,b) forks over A.",
+    "Represented first-order tuples by Fin-indexed families. Parameters from A are free variables indexed by the subtype A, so each formula can mention only finitely many of them syntactically.",
+    "Modeled monster semantics invariantly through elementary extensions of the ambient model's complete theory. Stability excludes the stated order pattern in every such extension, and forking witnesses may be taken in one such extension.",
+    "Defined forking as implication by a finite disjunction of dividing formulas. Dividing is witnessed by an A-indiscernible sequence and a finite inconsistent subfamily.",
+    "Defined simplicity as absence of the standard tree property: branchwise finite consistency together with uniform finite inconsistency among immediate successors.",
+    "Handled possibly imaginary elements by applying the universally quantified statement to the standard one-sorted coding of T^eq. This avoids silently restricting the mathematical claim to real home-sort elements while using Mathlib's one-sorted first-order syntax."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib FirstOrder.Language.Formula.Realize accepts a valuation but has no valuation constructor for this parameter/tuple decomposition.",
+     "name": "parameterValuation",
+     "why_needed": "Evaluates formulas whose free variables are split into base parameters, an x-tuple, and a y-tuple."
+    },
+    {
+     "closest_existing_considered": "No indiscernibility notion was found in Mathlib.ModelTheory or FormalConjecturesForMathlib.",
+     "name": "IndiscernibleOver",
+     "why_needed": "Forking and dividing require indiscernible sequences over a parameter set."
+    },
+    {
+     "closest_existing_considered": "No dividing or forking API was found in Mathlib.ModelTheory or FormalConjecturesForMathlib.",
+     "name": "DividesOver",
+     "why_needed": "Defines dividing over a base via an indiscernible sequence and finite inconsistency."
+    },
+    {
+     "closest_existing_considered": "No dividing or forking API was found in Mathlib.ModelTheory or FormalConjecturesForMathlib; Mathlib's elementary embeddings and formula semantics were reused.",
+     "name": "ForksOver",
+     "why_needed": "Defines formula forking as finite disjunctive coverage by dividing formulas, with elementary-extension semantics."
+    },
+    {
+     "closest_existing_considered": "No model-theoretic formula-stability predicate was found in Mathlib.ModelTheory or FormalConjecturesForMathlib.",
+     "name": "StableOver",
+     "why_needed": "Expresses stability of a parameter formula by exclusion of the infinite order pattern from the cited definition."
+    },
+    {
+     "closest_existing_considered": "No model-theoretic tree-property predicate was found in Mathlib.ModelTheory or FormalConjecturesForMathlib.",
+     "name": "HasTreePropertyIn",
+     "why_needed": "Expresses the tree property for a formula semantically in a model."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides theories, models, and satisfiability, but no simple-theory or tree-property API.",
+     "name": "HasTreeProperty",
+     "why_needed": "Lifts the formula-level tree property to a first-order theory."
+    },
+    {
+     "closest_existing_considered": "No simple-theory predicate was found in Mathlib.ModelTheory or FormalConjecturesForMathlib.",
+     "name": "IsSimple",
+     "why_needed": "States that no formula of the theory has the tree property, as required by the decomposition."
+    }
+   ],
+   "per_slot": {
+    "stable_forking_conjecture_for_simple_theories": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "stable_forking_conjecture_for_simple_theories": "/--\n**Stable forking conjecture for simple theories (Kim--Pillay/Peretz formulation).**\n\nEvery complete simple first-order theory has stable forking. More precisely, in an ambient\nmonster model of such a theory, for every parameter set $A$ and tuples $a,b$, if\n$a \\not\\mathrel{\\perp}_A b$ (that is, some formula in $\\operatorname{tp}(a/Ab)$ forks over\n$A$), then there is a stable formula $\\psi(x,y) \\in L(A)$ such that $\\psi(a,b)$ holds and\n$\\psi(x,b)$ forks over $A$. Here stable means that there are no infinite sequences\n$(a_i),(b_j)$ with $\\psi(a_i,b_j)$ if and only if $i \\le j$. Applying the assertion to\n$T^{\\mathrm{eq}}$ includes possibly imaginary $a$ and $b$.\n-/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories\n    (T : L.Theory) (hcomplete : T.IsComplete) (hsimple : IsSimple T)\n    (M : Type w) [Nonempty M] [L.Structure M] [M ⊨ T] :\n    ∀ (A : Set M) (m n : ℕ) (a : Fin m → M) (b : Fin n → M),\n      (∃ φ : L.Formula (A ⊕ Fin m ⊕ Fin n),\n        φ.Realize (parameterValuation (fun z : A => (z : M)) a b) ∧ ForksOver A φ b) →\n      ∃ ψ : L.Formula (A ⊕ Fin m ⊕ Fin n),\n        StableOver A ψ ∧\n          ψ.Realize (parameterValuation (fun z : A => (z : M)) a b) ∧ ForksOver A ψ b := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The stable forking conjecture for simple theories\n\nLet $T$ be a complete first-order theory. A formula $\\varphi(x, y)$ has the *tree property* if\nthere are $k < \\omega$ and parameters $(b_\\eta : \\eta \\in \\omega^{<\\omega})$ such that for every\nnode $\\eta$ the set $\\{\\varphi(x, b_{\\eta \\frown i}) : i < \\omega\\}$ is $k$-inconsistent, while\nfor every branch $\\sigma \\in \\omega^\\omega$ the set $\\{\\varphi(x, b_{\\sigma | n}) : n < \\omega\\}$\nis consistent. $T$ is *simple* if no formula has the tree property.\n\nA formula $\\varphi(x, b)$ *divides* over a set $A$ if there are $k < \\omega$ and a sequence\n$(b_i : i < \\omega)$ of realizations of $\\operatorname{tp}(b / A)$ such that\n$\\{\\varphi(x, b_i) : i < \\omega\\}$ is $k$-inconsistent. It *forks* over $A$ if it implies a finite\ndisjunction of formulas each of which divides over $A$. We write $a \\not\\downarrow_A b$ if some\nformula of $\\operatorname{tp}(a / A b)$ forks over $A$. A formula $\\psi(x, y)$ is *stable* if there\nare no sequences $(a_i : i < \\omega)$, $(b_j : j < \\omega)$ with $\\psi(a_i, b_j)$ iff $i \\le j$.\n\nFollowing Kim–Pillay and Peretz, $T$ has *stable forking* if whenever $a \\not\\downarrow_A b$ there\nis a stable formula $\\psi(x, y) \\in L(A)$ with $\\psi(a, b)$ such that $\\psi(x, b)$ forks over $A$.\nThe stable forking conjecture asserts that every simple theory has stable forking.\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [A. Peretz, *Geometry of forking in simple theories*](https://arxiv.org/abs/math/0412356),\n  Definition (items 3 and 4) and the sentence following it.\n- B. Kim and A. Pillay, *Around stable forking*, Fundamenta Mathematicae 170 (2001), 107–118.\n-/\n\nuniverse u v w\n\nopen FirstOrder FirstOrder.Language\n\nnamespace StableForkingConjectureForSimpleTheories\n\nvariable {L : FirstOrder.Language.{u, v}} {M : Type w} [L.Structure M] {α β : Type*}\n\n/-- `Divides θ b` says that the formula `θ(x, b)` divides (over `∅`): there are `k < ω` and, in\nsome elementary extension `N` of `M`, a sequence `(c i : i < ω)` of realizations of the type of\n`b` over `∅` such that `{θ(x, c i) : i < ω}` is `k`-inconsistent, i.e. no `k` of these formulas\nhave a common realization.\n\nDividing over a set of parameters `A ⊆ M` is obtained by applying this to the language `L[[A]]`. -/\ndef Divides (θ : L.Formula (α ⊕ β)) (b : β → M) : Prop :=\n  ∃ (N : Type (max u v w)) (_ : L.Structure N) (f : M ↪ₑ[L] N) (c : ℕ → β → N) (k : ℕ),\n    (∀ (i : ℕ) (χ : L.Formula β), χ.Realize (c i) ↔ χ.Realize (f ∘ b)) ∧\n    ∀ s : Finset ℕ, s.card = k → ¬ ∃ x : α → N, ∀ i ∈ s, θ.Realize (Sum.elim x (c i))\n\n/-- `Forks θ b` says that the formula `θ(x, b)` forks (over `∅`): in some elementary extension `N`\nof `M` there are finitely many formulas `χ j (x, c j)`, with parameters `c j` from `N`, each of\nwhich divides over `∅`, such that `θ(x, b)` implies their disjunction.\n\nForking over a set of parameters `A ⊆ M` is obtained by applying this to the language `L[[A]]`. -/\ndef Forks (θ : L.Formula (α ⊕ β)) (b : β → M) : Prop :=\n  ∃ (N : Type (max u v w)) (_ : L.Structure N) (f : M ↪ₑ[L] N) (n : ℕ)\n    (χ : Fin n → Σ m : ℕ, L.Formula (α ⊕ Fin m)) (c : ∀ j, Fin (χ j).1 → N),\n    (∀ j, Divides (χ j).2 (c j)) ∧\n    ∀ x : α → N, θ.Realize (Sum.elim x (f ∘ b)) → ∃ j, (χ j).2.Realize (Sum.elim x (c j))\n\nvariable (L) in\n/-- `Indep L A a b` says that `a` is independent from `b` over `A`, written `a ⫝_A b`: no formula\nof the type of `a` over `A ∪ b`, i.e. no formula `χ(x, b)` with `χ(x, y) ∈ L(A)` and `χ(a, b)`,\nforks over `A`. -/\ndef Indep (A : Set M) (a : α → M) (b : β → M) : Prop :=\n  ∀ χ : L[[A]].Formula (α ⊕ β), χ.Realize (Sum.elim a b) → ¬ Forks χ b\n\n/-- `IsStable M ψ` says that the formula `ψ(x, y)` is stable in the theory of `M`: in no elementary\nextension `N` of `M` are there sequences `(a i : i < ω)`, `(b j : j < ω)` such that\n`ψ(a i, b j)` holds iff `i ≤ j`.\n\nStability of a formula `ψ(x, y) ∈ L(A)` with parameters from `A ⊆ M` is obtained by applying this\nto the language `L[[A]]`. -/\ndef IsStable (M : Type w) [L.Structure M] (ψ : L.Formula (α ⊕ β)) : Prop :=\n  ¬ ∃ (N : Type (max u v w)) (_ : L.Structure N) (_ : M ↪ₑ[L] N) (a : ℕ → α → N) (b : ℕ → β → N),\n    ∀ i j, ψ.Realize (Sum.elim (a i) (b j)) ↔ i ≤ j\n\n/-- `HasTreeProperty T φ` says that the formula `φ(x, y)` has the tree property in `T`: in some\nmodel `N` of `T` there are `k < ω` and parameters `(b η : η ∈ ω^{<ω})` such that for every node `η`\nthe set `{φ(x, b (η ⌢ i)) : i < ω}` is `k`-inconsistent, and for every branch `σ ∈ ω^ω` the set\n`{φ(x, b (σ | n)) : n < ω}` is consistent (i.e. finitely satisfiable in `N`). -/\ndef HasTreeProperty (T : L.Theory) (φ : L.Formula (α ⊕ β)) : Prop :=\n  ∃ (N : Theory.ModelType.{u, v, max u v} T) (b : List ℕ → β → N) (k : ℕ),\n    (∀ (η : List ℕ) (s : Finset ℕ), s.card = k →\n      ¬ ∃ x : α → N, ∀ i ∈ s, φ.Realize (Sum.elim x (b (η ++ [i])))) ∧\n    ∀ (σ : ℕ → ℕ) (n : ℕ), ∃ x : α → N, ∀ m < n, φ.Realize (Sum.elim x (b ((List.range m).map σ)))\n\n/-- A theory `T` is simple if no formula `φ(x, y)` has the tree property in `T`. -/\ndef IsSimple (T : L.Theory) : Prop :=\n  ∀ (n m : ℕ) (φ : L.Formula (Fin n ⊕ Fin m)), ¬ HasTreeProperty T φ\n\n/-- A formula that divides forks. -/\n@[category API, AMS 3]\ntheorem forks_of_divides {m : ℕ} (θ : L.Formula (α ⊕ Fin m)) (b : Fin m → M) (h : Divides θ b) :\n    Forks θ b := by\n  obtain ⟨N, _, f, c, k, hc, hk⟩ := h\n  refine ⟨N, inferInstance, f, 1, fun _ => ⟨m, θ⟩, fun _ => f ∘ b, fun _ => ?_, fun x hx => ⟨0, hx⟩⟩\n  exact ⟨N, inferInstance, ElementaryEmbedding.refl L N, c, k, fun i χ => by simpa using hc i χ, hk⟩\n\n/-- **The stable forking conjecture for simple theories** (Kim–Pillay; Peretz).\n\nEvery complete simple theory `T` has stable forking: for every model `M` of `T`, every set of\nparameters `A ⊆ M` and all (finite tuples) `a`, `b` in `M` with `a ⫝̸_A b`, there is a stable\nformula `ψ(x, y) ∈ L(A)` such that `ψ(a, b)` holds and `ψ(x, b)` forks over `A`.\n\nHere `a ⫝̸_A b` means that some formula of `tp(a / A ∪ b)` forks over `A`. Independence, forking and\nstability are invariant under elementary extensions, so ranging over all models `M` of `T` is the\nsame as working in a monster model. Peretz allows `a`, `b` to be imaginary; since the conjecture\nranges over all simple theories and `T^eq` is simple whenever `T` is, the version for real tuples\nstated here is equivalent to the version with imaginaries. -/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories {T : L.Theory}\n    (hT : T.IsComplete) (hsimple : IsSimple T) (M : Theory.ModelType.{u, v, w} T) (A : Set M)\n    {n m : ℕ} (a : Fin n → M) (b : Fin m → M) (hab : ¬ Indep L A a b) :\n    ∃ ψ : L[[A]].Formula (Fin n ⊕ Fin m),\n      IsStable M ψ ∧ ψ.Realize (Sum.elim a b) ∧ Forks ψ b := by\n  sorry\n\nend StableForkingConjectureForSimpleTheories\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single slot is appropriate; the notes correctly identify that a precise version must be fixed, and the Kim–Pillay/Peretz version was used.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Version fixed: the Kim–Pillay/Peretz formulation (Peretz, arXiv:math/0412356, Definition items 3–4 and following sentence): for all a, b, A with a ⫝̸_A b there is a stable ψ(x,y) ∈ L(A) with ψ(a,b) and ψ(x,b) forking over A; simple = no formula has the tree property; T complete (hypothesis `T.IsComplete`).",
+    "Imaginaries: Peretz allows a, b to be (possibly imaginary) elements and L to be many-sorted; Mathlib is single-sorted with no T^eq. The file quantifies over real finite tuples `a : Fin n → M`, `b : Fin m → M`. Because the conjecture ranges over all complete simple theories and T^eq (rendered single-sorted) is again complete and simple, and forking/stability of real formulas over real parameters agree in T and T^eq, the universal statement over real tuples is equivalent to the version with imaginaries. A reviewer should confirm they accept this reduction.",
+    "Monster model replaced by 'all models M of T' (universe-polymorphic `M : Theory.ModelType.{u,v,w} T`, so parameter sets A of any cardinality are covered) with dividing/forking/stability defined via existence of an elementary extension `N : Type (max u v w)`. These notions are invariant under elementary extension, and Löwenheim–Skolem ensures witnesses fit in that universe, so this matches the monster-model formulation.",
+    "Parameters over A handled by the standard trick of working in the language L[[A]] (Mathlib's `withConstants` with `paramsStructure`): dividing/forking over A = dividing/forking over ∅ in L[[A]]; an L(A)-formula is an `L[[A]].Formula`; the elementary embedding in the L[[A]] language automatically fixes the constants from A.",
+    "Dividing uses Kim–Pillay's definition (sequence of realizations of tp(b/A), k-inconsistent for some k, with k-inconsistency stated via `Finset ℕ` of card k) rather than the equivalent indiscernible-sequence version; forking = implies a finite disjunction of dividing formulas with parameters from an elementary extension (n = 0 allowed, so inconsistent formulas fork, as usual).",
+    "a ⫝̸_A b is formalized as `¬ Indep L A a b`, i.e. some formula χ(x,b) of tp(a/Ab) with χ ∈ L(A) forks over A (a complete type forks iff one of its formulas forks, since types are closed under conjunction).",
+    "Tree property/consistency of branches formalized as finite satisfiability in the witnessing model N ⊨ T, taken in `Type (max u v)` as in Mathlib's `Theory.IsSatisfiable`; by compactness this loses nothing. Both k-inconsistency clauses with k = 0 are unsatisfiable in nonempty structures, so allowing all k : ℕ is harmless.",
+    "Stability of a formula follows Peretz's definition literally (infinite sequences with ψ(a_i,b_j) iff i ≤ j), placed in an elementary extension of (M, A).",
+    "The generic definitions (Divides, Forks, IsStable, HasTreeProperty, IsSimple, Indep) live in the problem file because the task allows only one file; in a real PR they would belong in FormalConjecturesForMathlib/ModelTheory. One proven API lemma `forks_of_divides` (dividing implies forking) is included as a test of the definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Nothing in Mathlib.ModelTheory or FormalConjecturesForMathlib (only CompleteType, ElementaryEmbedding, withConstants exist).",
+     "name": "StableForkingConjectureForSimpleTheories.Divides",
+     "why_needed": "Mathlib has no notion of dividing. `Divides θ b`: there are k < ω and, in some elementary extension N of M, a sequence (c i : i < ω) of realizations of tp(b/∅) such that {θ(x, c i)} is k-inconsistent (Kim–Pillay's definition of k-dividing; equivalent to the indiscernible-sequence version). Dividing over A is obtained by applying it in the language L[[A]]."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib/repo.",
+     "name": "StableForkingConjectureForSimpleTheories.Forks",
+     "why_needed": "Mathlib has no notion of forking. `Forks θ b`: in some elementary extension N of M there are finitely many formulas χ_j(x, c_j) (c_j from N, arities via a Σ-type), each dividing, with θ(x,b) implying their disjunction (Shelah/Kim–Pillay definition). Forking over A via L[[A]]."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib/repo (ProbabilityTheory independence unrelated).",
+     "name": "StableForkingConjectureForSimpleTheories.Indep",
+     "why_needed": "`Indep L A a b` (a ⫝_A b): no formula χ(x,b) with χ ∈ L(A) and χ(a,b) forks over A, i.e. tp(a/Ab) does not fork over A. The conjecture's hypothesis is ¬ Indep L A a b."
+    },
+    {
+     "closest_existing_considered": "Mathlib has no stability theory at all.",
+     "name": "StableForkingConjectureForSimpleTheories.IsStable",
+     "why_needed": "Stability of a formula ψ(x,y) in Th(M) (Peretz, Definition item 3): no elementary extension of M contains sequences (a_i), (b_j) with ψ(a_i,b_j) iff i ≤ j. Applied to L[[A]]-formulas for ψ ∈ L(A)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib/repo.",
+     "name": "StableForkingConjectureForSimpleTheories.HasTreeProperty",
+     "why_needed": "Tree property of a formula φ(x,y) in T: some model N of T (in Type (max u v), as in Mathlib's satisfiability) carries parameters (b η : η ∈ List ℕ) and k with every sibling family {φ(x, b(η ++ [i]))} k-inconsistent and every branch {φ(x, b(σ|n))} finitely satisfiable in N (= consistent)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib/repo.",
+     "name": "StableForkingConjectureForSimpleTheories.IsSimple",
+     "why_needed": "A theory is simple iff no formula φ(x,y) (x, y finite tuples) has the tree property, as required by the decomposition notes."
+    }
+   ],
+   "per_slot": {
+    "stable_forking_conjecture_for_simple_theories": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `stable_forking_conjecture_for_simple_theories`: for every complete theory T with no formula having the tree property (IsSimple), every model M of T, every parameter set A ⊆ M and finite tuples a, b with a ⫝̸_A b (some L(A)-formula χ(x,b) in tp(a/Ab) forks over A), there is a stable ψ(x,y) ∈ L(A) with ψ(a,b) and ψ(x,b) forking over A. This is the Kim–Pillay/Peretz formulation fixed by the decomposition notes. Mathlib has no dividing/forking/stability/tree property, so these are defined in the file (Kim–Pillay definitions, via elementary extensions in place of a monster model; parameters over A are handled by working in the language L[[A]])."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "stable_forking_conjecture_for_simple_theories": "/-- **The stable forking conjecture for simple theories** (Kim–Pillay; Peretz).\n\nEvery complete simple theory `T` has stable forking: for every model `M` of `T`, every set of\nparameters `A ⊆ M` and all (finite tuples) `a`, `b` in `M` with `a ⫝̸_A b`, there is a stable\nformula `ψ(x, y) ∈ L(A)` such that `ψ(a, b)` holds and `ψ(x, b)` forks over `A`.\n\nHere `a ⫝̸_A b` means that some formula of `tp(a / A ∪ b)` forks over `A`. Independence, forking and\nstability are invariant under elementary extensions, so ranging over all models `M` of `T` is the\nsame as working in a monster model. Peretz allows `a`, `b` to be imaginary; since the conjecture\nranges over all simple theories and `T^eq` is simple whenever `T` is, the version for real tuples\nstated here is equivalent to the version with imaginaries. -/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories {T : L.Theory}\n    (hT : T.IsComplete) (hsimple : IsSimple T) (M : Theory.ModelType.{u, v, w} T) (A : Set M)\n    {n m : ℕ} (a : Fin n → M) (b : Fin m → M) (hab : ¬ Indep L A a b) :\n    ∃ ψ : L[[A]].Formula (Fin n ⊕ Fin m),\n      IsStable M ψ ∧ ψ.Realize (Sum.elim a b) ∧ Forks ψ b := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c04",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The intended precise reading is the Kim–Pillay/Peretz L(A) version: every complete simple first-order theory, with simplicity meaning that no formula has the tree property, has stable forking for all possibly imaginary a and b and parameter sets A. If a is not independent from b over A, there must be a stable formula ψ(x,y) over A such that ψ(a,b) holds and ψ(x,b) forks over A; stability excludes sequences (a_i) and (b_j) with ψ(a_i,b_j) exactly when i ≤ j.",
+    "No real-sort-only or weak-stable-forking surrogate was stated, because the source explicitly permits imaginary elements and the decomposition warns that published variants are inequivalent."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "stable_forking_conjecture_for_simple_theories": {
+     "outcome": "missing_primitives",
+     "why": "A faithful Kim–Pillay/Peretz statement requires model-theoretic monster/saturated models, indiscernible sequences, dividing and forking over parameter sets, the tree property and simple theories, and T^eq (or an equivalent treatment of possibly imaginary elements and formulas over imaginary parameters). Hard searches of all Mathlib sources and FormalConjecturesForMathlib found none of these APIs. Mathlib has first-order syntax, semantics, complete theories, elementary maps, types, and quotient structures, but its quotient-structure API is not an API for imaginary sorts. Omitting imaginaries, quantifying only over real tuples, or introducing an abstract unconstrained 'forking' predicate would change the conjecture. Building the entire missing classification-theory and T^eq foundation as problem-local definitions would not be a small bespoke definition and would risk an incomplete/placeholder API, forbidden by the repository rules."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The stable forking conjecture for simple theories\n\nLet $T$ be a complete first-order theory. A formula $\\psi(x, y)$ (possibly with parameters) is\n*stable* if there are no sequences $(a_i)_{i < \\omega}$, $(b_j)_{j < \\omega}$ (in a model of $T$)\nwith $\\psi(a_i, b_j)$ if and only if $i \\le j$. The theory $T$ is *simple* if no formula\n$\\varphi(x, y)$ has the tree property.\n\nAn instance of forking $a \\not\\perp_A b$ (i.e. $\\operatorname{tp}(a / Ab)$ forks over $A$) is\n*stable* if it is witnessed by a stable formula: there is a stable formula $\\psi(x, y) \\in L(A)$\nsuch that $\\psi(a, b)$ holds and $\\psi(x, b)$ forks over $A$. The theory $T$ *satisfies stable\nforking* if every instance of forking is stable.\n\nThe **stable forking conjecture** (Kim–Pillay) states that every simple theory satisfies stable\nforking. We formalize the version given in Peretz's paper (Definition, item 4 and the sentence\nfollowing it): the witnessing formula may have parameters from the base set $A$.\n\nForking, dividing, indiscernibility and stability are usually defined inside a monster model.\nHere they are defined inside an arbitrary model `M` of `T`, with the relevant sequences and\nparameters taken in an elementary extension of `M`; by compactness this is equivalent.\nSince every complete simple theory `T` is quantified over, and the conjecture applies in\nparticular to (a single-sorted coding of) `T^{eq}`, the restriction to real tuples is harmless.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Stable theory](https://en.wikipedia.org/wiki/Stable_theory)\n- A. Peretz, *Geometry of forking in simple theories*, [arXiv:math/0412356](https://arxiv.org/abs/math/0412356)\n- B. Kim, A. Pillay, *Around stable forking*, Fund. Math. 170 (2001), 107–118\n-/\n\nnamespace StableForkingConjectureForSimpleTheories\n\nopen FirstOrder FirstOrder.Language\n\nuniverse u v w\n\nvariable {L : FirstOrder.Language.{u, v}} {M : Type w} [L.Structure M]\n\n/-- The formula `ψ(x, y, c)`, with parameters `c` from `M`, is *stable* if there are no\nsequences `(aᵢ)`, `(bⱼ)` in an elementary extension `N` of `M` such that `ψ(aᵢ, bⱼ, c)` holds\nif and only if `i ≤ j`. -/\ndef IsStableFormula {n m k : ℕ} (ψ : L.Formula (Fin n ⊕ Fin m ⊕ Fin k)) (c : Fin k → M) : Prop :=\n  ¬ ∃ (N : Type (max u v w)) (_ : L.Structure N) (f : M ↪ₑ[L] N)\n    (a : ℕ → Fin n → N) (b : ℕ → Fin m → N),\n    ∀ i j, ψ.Realize (Sum.elim (a i) (Sum.elim (b j) (f ∘ c))) ↔ i ≤ j\n\n/-- The formula `x = y` is stable. -/\n@[category test, AMS 3]\ntheorem isStableFormula_equal :\n    IsStableFormula ((Term.var (Sum.inl 0)).equal (Term.var (Sum.inr (Sum.inl 0))) :\n      L.Formula (Fin 1 ⊕ Fin 1 ⊕ Fin 0)) (M := M) finZeroElim := by\n  rintro ⟨N, _, f, a, b, h⟩\n  simp only [Formula.realize_equal, Term.realize_var, Sum.elim_inl, Sum.elim_inr] at h\n  have h00 := (h 0 0).2 le_rfl\n  have h01 := (h 0 1).2 zero_le_one\n  have h11 := (h 1 1).2 le_rfl\n  exact absurd ((h 1 0).1 (h11.trans (h01.symm.trans h00))) (by norm_num)\n\n/-- The formula `φ(x, y)` has the *tree property* with respect to the theory `T` if there are\n`k` and a tree `(b_η)_{η ∈ ω^{<ω}}` of parameter tuples in some model of `T` such that\nfor every node `η` the family `{φ(x, b_{η⌢i}) : i < ω}` is `k`-inconsistent, and for every\nbranch `σ ∈ ω^ω` the set `{φ(x, b_{σ|j}) : j < ω}` is consistent (finitely satisfiable). -/\ndef HasTreeProperty (T : L.Theory) {n m : ℕ} (φ : L.Formula (Fin n ⊕ Fin m)) : Prop :=\n  ∃ (N : Theory.ModelType.{u, v, max u v} T) (k : ℕ) (b : List ℕ → Fin m → N),\n    (∀ (η : List ℕ) (s : Finset ℕ), s.card = k →\n      ¬ ∃ x : Fin n → N, ∀ i ∈ s, φ.Realize (Sum.elim x (b (η ++ [i])))) ∧\n    ∀ (σ : ℕ → ℕ) (l : ℕ), ∃ x : Fin n → N, ∀ j < l, φ.Realize (Sum.elim x (b ((List.range j).map σ)))\n\n/-- A theory `T` is *simple* if no formula `φ(x, y)` has the tree property. -/\ndef IsSimple (T : L.Theory) : Prop :=\n  ∀ (n m : ℕ) (φ : L.Formula (Fin n ⊕ Fin m)), ¬ HasTreeProperty T φ\n\n/-- The tree property is witnessed in a model, so a theory without models is (vacuously) simple. -/\n@[category API, AMS 3]\ntheorem isSimple_of_not_isSatisfiable {T : L.Theory} (hT : ¬ T.IsSatisfiable) : IsSimple T := by\n  rintro n m φ ⟨N, -⟩\n  exact hT ⟨N⟩\n\nvariable (L) in\n/-- A sequence `(dᵢ)_{i < ω}` of tuples in `M` is *indiscernible over* a set `B ⊆ M` if for\nevery formula `θ(y₀, …, y_{l-1}, z)` and every tuple `c` of parameters from `B`, the truth value\nof `θ(d_{i₀}, …, d_{i_{l-1}}, c)` is the same for all increasing index tuples `i₀ < ⋯ < i_{l-1}`.\n-/\ndef IsIndiscernibleOver {β : Type*} (B : Set M) (d : ℕ → β → M) : Prop :=\n  ∀ (l k : ℕ) (θ : L.Formula (Fin l × β ⊕ Fin k)) (c : Fin k → M), (∀ i, c i ∈ B) →\n    ∀ (i j : Fin l → ℕ), StrictMono i → StrictMono j →\n      (θ.Realize (Sum.elim (fun p => d (i p.1) p.2) c) ↔\n        θ.Realize (Sum.elim (fun p => d (j p.1) p.2) c))\n\n/-- The formula `φ(x, d)`, with parameters `d` from `M`, *divides over* a set `A ⊆ M` if in some\nelementary extension `N` of `M` there is a sequence `(dᵢ)_{i < ω}` indiscernible over `A` with\n`d₀ = d` such that `{φ(x, dᵢ) : i < ω}` is `k`-inconsistent for some `k`. -/\ndef Divides {n : ℕ} {β : Type*} (φ : L.Formula (Fin n ⊕ β)) (d : β → M) (A : Set M) : Prop :=\n  ∃ (N : Type (max u v w)) (_ : L.Structure N) (f : M ↪ₑ[L] N) (d' : ℕ → β → N) (k : ℕ),\n    d' 0 = f ∘ d ∧ IsIndiscernibleOver L (f '' A) d' ∧\n    ∀ s : Finset ℕ, s.card = k → ¬ ∃ x : Fin n → N, ∀ i ∈ s, φ.Realize (Sum.elim x (d' i))\n\n/-- The formula `φ(x, d)`, with parameters `d` from `M`, *forks over* a set `A ⊆ M` if it implies\na finite disjunction `⋁ᵢ ψᵢ(x, eᵢ)` of formulas, each of which divides over `A`. The parameters\n`eᵢ` may lie in an elementary extension `N` of `M`. -/\ndef Forks {n : ℕ} {β : Type*} (φ : L.Formula (Fin n ⊕ β)) (d : β → M) (A : Set M) : Prop :=\n  ∃ (N : Type (max u v w)) (_ : L.Structure N) (f : M ↪ₑ[L] N) (l : ℕ) (m : Fin l → ℕ)\n    (ψ : ∀ i, L.Formula (Fin n ⊕ Fin (m i))) (e : ∀ i, Fin (m i) → N),\n    (∀ i, Divides (ψ i) (e i) (f '' A)) ∧\n    ∀ x : Fin n → N, φ.Realize (Sum.elim x (f ∘ d)) → ∃ i, (ψ i).Realize (Sum.elim x (e i))\n\nvariable (L) in\n/-- The tuple `a` is *independent from* the tuple `b` *over* the set `A ⊆ M`, written\n`a ⫝_A b`, if the type `tp(a / A b)` does not fork over `A`: no formula `φ(x, b, c)` with\n`c` from `A` that is satisfied by `a` forks over `A`. -/\ndef IsIndependent {n m : ℕ} (A : Set M) (a : Fin n → M) (b : Fin m → M) : Prop :=\n  ¬ ∃ (k : ℕ) (φ : L.Formula (Fin n ⊕ Fin m ⊕ Fin k)) (c : Fin k → M),\n    (∀ i, c i ∈ A) ∧ φ.Realize (Sum.elim a (Sum.elim b c)) ∧ Forks φ (Sum.elim b c) A\n\n/-- **The stable forking conjecture for simple theories** (Kim–Pillay; in the form of Peretz,\narXiv:math/0412356, Definition item 4): every complete simple theory `T` satisfies stable forking.\nThat is, for every model `M` of `T`, every set `A ⊆ M` and all tuples `a`, `b` in `M` with\n`a ⫝̸_A b`, there is a stable formula `ψ(x, y) ∈ L(A)` (i.e. `ψ(x, y, c)` with `c` from `A`)\nsuch that `ψ(a, b)` holds and `ψ(x, b)` forks over `A`. -/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories {T : L.Theory} (hT : T.IsComplete)\n    (hsimple : IsSimple T) [M ⊨ T] (A : Set M) {n m : ℕ} (a : Fin n → M) (b : Fin m → M)\n    (hab : ¬ IsIndependent L A a b) :\n    ∃ (k : ℕ) (ψ : L.Formula (Fin n ⊕ Fin m ⊕ Fin k)) (c : Fin k → M),\n      (∀ i, c i ∈ A) ∧ IsStableFormula ψ c ∧ ψ.Realize (Sum.elim a (Sum.elim b c)) ∧\n      Forks ψ (Sum.elim b c) A := by\n  sorry\n\nend StableForkingConjectureForSimpleTheories\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single slot is appropriate. Note only that the table's notes describe the version with ψ ∈ L(A) as 'the Kim–Pillay/Peretz one'; the file follows exactly Peretz's Definition item 4 (ψ(x,y) ∈ L(A), ψ(a,b), ψ(x,b) forks over A) and quantifies over real tuples in all complete simple theories, which covers the '(possibly imaginary)' clause by applying the statement to T^eq.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Version fixed: the Kim–Pillay/Peretz form (Peretz arXiv:math/0412356, Definition item 4): witness formula ψ(x,y) ∈ L(A), i.e. an L-formula ψ(x,y,z) with a parameter tuple c from A; stability is required of the L(A)-formula ψ(x,y,c) (with c fixed), not of the parameter-free ψ(x,y,z). Peretz's 'i ≤ j' convention for the order property is kept.",
+    "Monster model replaced by elementary extensions: all notions are defined in an arbitrary model M of T; sequences (order-property sequences, indiscernible sequences) and the parameters of the dividing formulas in the definition of forking are taken in an elementary extension N of M (via Mathlib's `M ↪ₑ[L] N`), living in `Type (max u v w)` (the universe Mathlib's compactness produces for the elementary diagram). By compactness this is equivalent to the monster-model definitions. The conjecture then quantifies over all models M (universe-polymorphic) rather than one monster.",
+    "Imaginaries: Peretz allows a, b to be imaginary elements. The file uses real finite tuples `Fin n → M`, `Fin m → M`. Because the theorem quantifies over all complete simple theories in all languages/universes, it applies in particular to (a single-sorted coding of) T^eq, which is complete and simple whenever T is, so the imaginary version is recovered; conversely the stated version is a special case of the imaginary one. Many-sorted languages of Peretz are handled by the same single-sorted coding.",
+    "Dividing is defined Kim–Pillay style: φ(x,d) divides over A iff in some elementary extension there is an A-indiscernible sequence (d_i) with d_0 = d and {φ(x,d_i)} k-inconsistent for some k (k-inconsistent = every k-element subfamily is unsatisfiable). The alternative textbook variants (tp(d_i/A)=tp(d/A) instead of d_0 = d; 'inconsistent' instead of 'k-inconsistent') are equivalent.",
+    "Forking: φ(x,d) forks over A iff it implies (in the extension N, equivalently everywhere) a finite disjunction of formulas ψ_i(x,e_i), each dividing over A, with e_i allowed in an elementary extension; the disjuncts have individual parameter lengths m i. An empty disjunction is allowed, so inconsistent formulas fork (standard). Forking is NOT replaced by dividing (Kim's theorem is not used).",
+    "a ⫝̸_A b is unfolded as: some formula φ(x,b,c) with c from A, satisfied by a, forks over A (i.e. tp(a/Ab) forks over A); `IsIndependent L A a b` is its negation and the theorem hypothesis is `¬ IsIndependent L A a b`.",
+    "Tree property: witnessed in some model of T in `Type (max u v)` (Mathlib's `T.ModelType`), tree indexed by `List ℕ` with children `η ++ [i]`, branch restrictions `(List.range j).map σ`; sibling families k-inconsistent for a single k; branches consistent in the sense of finitely satisfiable in that model (equivalent to consistency by compactness). k = 0 or 1 cannot witness the tree property, so no explicit `2 ≤ k` is needed.",
+    "Parameter index type β in `Divides`/`Forks` is an arbitrary type (needed to pass the concatenated parameter tuple `Sum.elim b c`); formulas only mention finitely many variables so this agrees with the finite-tuple definitions.",
+    "Hypothesis `T.IsComplete` is included as in Peretz ('T is a complete first order theory'); Mathlib's `IsComplete` includes satisfiability, so models of T are nonempty and no degenerate empty-structure case arises.",
+    "Two short proved sanity statements were added (`isStableFormula_equal`: x = y is stable; `isSimple_of_not_isSatisfiable`: a theory without models is vacuously simple) as basic API tests for the bespoke definitions, per CONTRIBUTING.md."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Nothing in Mathlib.ModelTheory (searched for Stable/orderProperty/indiscernible); FormalConjecturesForMathlib has no model theory.",
+     "name": "StableForkingConjectureForSimpleTheories.IsStableFormula",
+     "why_needed": "Mathlib has no notion of a stable formula / order property. Defines: ψ(x,y,c) is stable iff there are no sequences (a_i), (b_j) in an elementary extension with ψ(a_i,b_j,c) ↔ i ≤ j (Peretz Definition item 3)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.ModelTheory.",
+     "name": "StableForkingConjectureForSimpleTheories.HasTreeProperty",
+     "why_needed": "Mathlib has no tree property. Defines the tree property of φ(x,y) with respect to T via a tree of parameters in a model of T with k-inconsistent siblings and consistent branches."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.ModelTheory.",
+     "name": "StableForkingConjectureForSimpleTheories.IsSimple",
+     "why_needed": "Simplicity of a theory (no formula has the tree property), as prescribed by the decomposition notes."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (grep for indiscernible returned nothing).",
+     "name": "StableForkingConjectureForSimpleTheories.IsIndiscernibleOver",
+     "why_needed": "Indiscernible sequences over a parameter set are needed for the definition of dividing."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (grep for fork/divid returned nothing).",
+     "name": "StableForkingConjectureForSimpleTheories.Divides",
+     "why_needed": "Dividing of a formula with parameters over a set, via an indiscernible sequence in an elementary extension with a k-inconsistent family."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "StableForkingConjectureForSimpleTheories.Forks",
+     "why_needed": "Forking of a formula over a set: implies a finite disjunction of dividing formulas (parameters in an elementary extension)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "StableForkingConjectureForSimpleTheories.IsIndependent",
+     "why_needed": "Nonforking independence a ⫝_A b (tp(a/Ab) does not fork over A), whose negation is the hypothesis of the conjecture."
+    }
+   ],
+   "per_slot": {
+    "stable_forking_conjecture_for_simple_theories": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `stable_forking_conjecture_for_simple_theories`: for every language L, complete theory T with no formula having the tree property (IsSimple), every model M of T, set A ⊆ M and finite tuples a, b with a not independent from b over A (tp(a/Ab) forks over A), there is a stable formula ψ(x,y) ∈ L(A) (an L-formula ψ(x,y,z) with parameters c ∈ A) such that ψ(a,b) holds and ψ(x,b) forks over A. This is exactly Peretz's Definition item 4 plus 'T satisfies stable forking', with 'simple' = no formula has the tree property, as required by the decomposition notes. Mathlib has no stability/forking/simplicity, so the notions are defined bespoke in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "stable_forking_conjecture_for_simple_theories": "/-- **The stable forking conjecture for simple theories** (Kim–Pillay; in the form of Peretz,\narXiv:math/0412356, Definition item 4): every complete simple theory `T` satisfies stable forking.\nThat is, for every model `M` of `T`, every set `A ⊆ M` and all tuples `a`, `b` in `M` with\n`a ⫝̸_A b`, there is a stable formula `ψ(x, y) ∈ L(A)` (i.e. `ψ(x, y, c)` with `c` from `A`)\nsuch that `ψ(a, b)` holds and `ψ(x, b)` forks over `A`. -/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories {T : L.Theory} (hT : T.IsComplete)\n    (hsimple : IsSimple T) [M ⊨ T] (A : Set M) {n m : ℕ} (a : Fin n → M) (b : Fin m → M)\n    (hab : ¬ IsIndependent L A a b) :\n    ∃ (k : ℕ) (ψ : L.Formula (Fin n ⊕ Fin m ⊕ Fin k)) (c : Fin k → M),\n      (∀ i, c i ∈ A) ∧ IsStableFormula ψ c ∧ ψ.Realize (Sum.elim a (Sum.elim b c)) ∧\n      Forks ψ (Sum.elim b c) A := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The stable forking conjecture for simple theories\n\nThe stable forking conjecture asserts that in a simple theory every instance of forking is\nwitnessed by a stable formula. The precise version stated here is the one of Kim and Pillay\n(2001), as recorded in Peretz (Definition, item 4):\n\nA complete theory `T` *satisfies stable forking* if for all (tuples) `a`, `b` and all parameter\nsets `A` in a model of `T` with `a ⫝̸_A b` (i.e. `tp(a/Ab)` forks over `A`), there is a\n*stable* formula `ψ(x, y) ∈ L(A)` such that `ψ(a, b)` holds and `ψ(x, b)` forks over `A`.\nHere `ψ(x, y)` is *stable* if there are no sequences `(a_i)_{i < ω}`, `(b_j)_{j < ω}` with\n`ψ(a_i, b_j) ↔ i ≤ j`, and `T` is *simple* if no formula has the tree property.\n\nThe conjecture: every complete simple theory satisfies stable forking.\n\nSeveral inequivalent formulations appear in the literature (formulas in `L` versus `L(A)`,\ntypes over `B ⊇ A`, `T^eq` and hyperimaginaries, \"weak\" stable forking), and counterexamples are\nknown to some of them. This file fixes the Kim–Pillay/Peretz formulation above.\n\nPeretz works in `T^eq` (with imaginary elements). Since `T^eq` is itself a complete simple\ntheory (after the standard one-sorted encoding), the statement \"every complete simple theory\nsatisfies stable forking\" is the same whether or not imaginaries are allowed, so the\nformalisation below only uses tuples of real elements.\n\nAll definitions are given semantically, relative to a model `M` and its elementary extensions\n(playing the role of the monster model); by compactness this agrees with the usual definitions\nin a monster model. As for `FirstOrder.Language.Theory.IsSatisfiable`, elementary extensions of\n`M : Type w` are taken in `Type (max u v w)`, where `L : FirstOrder.Language.{u, v}`.\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Stable theory](https://en.wikipedia.org/wiki/Stable_theory)\n- A. Peretz, *Geometry of forking in simple theories*, [arXiv:math/0412356](https://arxiv.org/abs/math/0412356)\n- B. Kim and A. Pillay, *Around stable forking*, Fund. Math. 170 (2001), 107–118.\n-/\n\nuniverse u v w\n\nopen FirstOrder FirstOrder.Language\n\nnamespace StableForkingConjectureForSimpleTheories\n\nvariable {L : FirstOrder.Language.{u, v}} {M : Type w} [L.Structure M] {N : Type*} [L.Structure N]\n\n/-- `RealizesTypeOver f A e e'` says that the tuple `e'` (in an elementary extension `N` of `M`\nalong `f`) realizes the type `tp(e/A)` of the tuple `e` over the set `A ⊆ M`: every `L`-formula\nwith parameters from `A` satisfied by `e` in `M` is satisfied by `e'` in `N`, and conversely. -/\ndef RealizesTypeOver {β : Type*} (f : M ↪ₑ[L] N) (A : Set M) (e : β → M) (e' : β → N) : Prop :=\n  ∀ (k : ℕ) (θ : L.Formula (β ⊕ Fin k)) (d : Fin k → M), (∀ i, d i ∈ A) →\n    (θ.Realize (Sum.elim e' (f ∘ d)) ↔ θ.Realize (Sum.elim e d))\n\n/-- `Divides A φ e` says that the formula `φ(x, e)` (with `x` a tuple of `n` variables and\nparameters `e` from `M`) *divides over* `A ⊆ M`: in some elementary extension `N` of `M` there\nis a sequence `(e_i)_{i < ω}` of realizations of `tp(e/A)` and a `k` such that\n`{φ(x, e_i) : i < ω}` is `k`-inconsistent, i.e. no `k` of these formulas have a common\nrealization. -/\ndef Divides {n : ℕ} {β : Type*} (A : Set M) (φ : L.Formula (Fin n ⊕ β)) (e : β → M) : Prop :=\n  ∃ (k : ℕ) (N : Type (max u v w)) (_ : L.Structure N) (f : M ↪ₑ[L] N) (e' : ℕ → β → N),\n    (∀ i, RealizesTypeOver f A e (e' i)) ∧\n      ∀ s : Finset ℕ, s.card = k → ¬ ∃ x : Fin n → N, ∀ i ∈ s, φ.Realize (Sum.elim x (e' i))\n\n/-- `Forks A φ e` says that the formula `φ(x, e)` (with parameters `e` from `M`) *forks over*\n`A ⊆ M`: in some elementary extension `N` of `M` there are finitely many formulas\n`ψ_1(x, d_1), …, ψ_r(x, d_r)` with parameters `d_i` from `N`, each dividing over `A`, such that\n`φ(x, e)` implies `ψ_1(x, d_1) ∨ … ∨ ψ_r(x, d_r)`. -/\ndef Forks {n : ℕ} {β : Type*} (A : Set M) (φ : L.Formula (Fin n ⊕ β)) (e : β → M) : Prop :=\n  ∃ (N : Type (max u v w)) (_ : L.Structure N) (f : M ↪ₑ[L] N) (r : ℕ) (m : Fin r → ℕ)\n    (ψ : (i : Fin r) → L.Formula (Fin n ⊕ Fin (m i))) (d : (i : Fin r) → Fin (m i) → N),\n    (∀ i, Divides (f '' A) (ψ i) (d i)) ∧\n      ∀ x : Fin n → N, φ.Realize (Sum.elim x (f ∘ e)) → ∃ i, (ψ i).Realize (Sum.elim x (d i))\n\nvariable (L) in\n/-- `TypeForksOver L A a b` says that `tp(a/A ∪ b)` *forks over* `A`, written `a ⫝̸_A b`\n(`a` is not independent from `b` over `A`): some `L`-formula `φ(x, b, c)` with parameters\n`c` from `A` is satisfied by `a` and forks over `A`. -/\ndef TypeForksOver {n m : ℕ} (A : Set M) (a : Fin n → M) (b : Fin m → M) : Prop :=\n  ∃ (k : ℕ) (φ : L.Formula (Fin n ⊕ Fin m ⊕ Fin k)) (c : Fin k → M),\n    (∀ i, c i ∈ A) ∧ φ.Realize (Sum.elim a (Sum.elim b c)) ∧ Forks A φ (Sum.elim b c)\n\n/-- `IsStableFormula ψ c` says that the formula `ψ(x, y, c)` with parameters `c` from `M`\n(an `L(A)`-formula when the `c i` lie in `A`) is *stable*: there are no sequences\n`(a_i)_{i < ω}`, `(b_j)_{j < ω}` (in any elementary extension of `M`) such that\n`ψ(a_i, b_j, c)` holds if and only if `i ≤ j`. -/\ndef IsStableFormula {n m k : ℕ} (ψ : L.Formula (Fin n ⊕ Fin m ⊕ Fin k)) (c : Fin k → M) : Prop :=\n  ¬ ∃ (N : Type (max u v w)) (_ : L.Structure N) (f : M ↪ₑ[L] N) (a : ℕ → Fin n → N)\n    (b : ℕ → Fin m → N), ∀ i j, ψ.Realize (Sum.elim (a i) (Sum.elim (b j) (f ∘ c))) ↔ i ≤ j\n\n/-- `HasTreeProperty T φ` says that the formula `φ(x, y)` has the *tree property* with respect\nto the theory `T`: there are `k < ω`, a model `N` of `T` and a tree `(a_η)_{η ∈ ω^{<ω}}` of\ntuples of `N` such that\n* for every branch `η ∈ ω^ω`, the set `{φ(x, a_{η|l}) : l < ω}` is consistent (realized in `N`);\n* for every node `η ∈ ω^{<ω}`, the set `{φ(x, a_{η⌢i}) : i < ω}` is `k`-inconsistent.\n\nFinite sequences `η ∈ ω^{<ω}` are encoded as lists, `η|l` is `List.ofFn fun i : Fin l ↦ η i`\nand `η⌢i` is `η ++ [i]`. -/\ndef HasTreeProperty {n m : ℕ} (T : L.Theory) (φ : L.Formula (Fin n ⊕ Fin m)) : Prop :=\n  ∃ (k : ℕ) (N : Type (max u v)) (_ : L.Structure N) (_ : N ⊨ T) (a : List ℕ → Fin m → N),\n    (∀ η : ℕ → ℕ, ∃ x : Fin n → N, ∀ l : ℕ,\n      φ.Realize (Sum.elim x (a (List.ofFn fun i : Fin l ↦ η i)))) ∧\n    ∀ (η : List ℕ) (s : Finset ℕ), s.card = k →\n      ¬ ∃ x : Fin n → N, ∀ i ∈ s, φ.Realize (Sum.elim x (a (η ++ [i])))\n\n/-- A theory `T` is *simple* if no formula `φ(x, y)` has the tree property with respect to `T`. -/\ndef IsSimple (T : L.Theory) : Prop :=\n  ∀ {n m : ℕ} (φ : L.Formula (Fin n ⊕ Fin m)), ¬ HasTreeProperty T φ\n\n/-- A theory `T` *satisfies stable forking* (Kim–Pillay; Peretz, Definition item 4) if for every\nmodel `M` of `T`, every parameter set `A ⊆ M` and all tuples `a`, `b` of `M` with `a ⫝̸_A b`,\nthere is a stable formula `ψ(x, y) ∈ L(A)` (i.e. `ψ(x, y, c)` with parameters `c` from `A`) such\nthat `ψ(a, b)` holds and `ψ(x, b)` forks over `A`. -/\ndef HasStableForking (T : L.Theory) : Prop :=\n  ∀ (M : Type w) [L.Structure M] [M ⊨ T] {n m : ℕ} (A : Set M) (a : Fin n → M) (b : Fin m → M),\n    TypeForksOver L A a b →\n      ∃ (k : ℕ) (ψ : L.Formula (Fin n ⊕ Fin m ⊕ Fin k)) (c : Fin k → M),\n        (∀ i, c i ∈ A) ∧ IsStableFormula ψ c ∧ ψ.Realize (Sum.elim a (Sum.elim b c)) ∧\n          Forks A ψ (Sum.elim b c)\n\n/-- The false formula `⊥` is stable. -/\n@[category test, AMS 3]\ntheorem isStableFormula_bot {n m k : ℕ} (c : Fin k → M) :\n    IsStableFormula (⊥ : L.Formula (Fin n ⊕ Fin m ⊕ Fin k)) c := by\n  rintro ⟨N, _, f, a, b, h⟩\n  simpa using (h 0 0).2 le_rfl\n\n/-- The false formula `⊥` does not have the tree property with respect to any theory. -/\n@[category test, AMS 3]\ntheorem not_hasTreeProperty_bot {n m : ℕ} (T : L.Theory) :\n    ¬ HasTreeProperty T (⊥ : L.Formula (Fin n ⊕ Fin m)) := by\n  rintro ⟨k, N, _, _, a, hbranch, -⟩\n  obtain ⟨x, hx⟩ := hbranch 0\n  simpa using hx 0\n\n/--\n**The stable forking conjecture for simple theories** (Kim–Pillay 2001; Peretz, arXiv:math/0412356):\nevery complete simple first-order theory `T` satisfies stable forking. That is, whenever\n`a ⫝̸_A b` (for tuples `a`, `b` and a parameter set `A` in a model of `T`), there is a stable\nformula `ψ(x, y) ∈ L(A)` such that `ψ(a, b)` holds and `ψ(x, b)` forks over `A`.\n-/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories (T : L.Theory) (hT : T.IsComplete)\n    (hsimple : IsSimple T) : HasStableForking.{u, v, w} T := by\n  sorry\n\nend StableForkingConjectureForSimpleTheories\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single slot matches the source; the notes correctly identify the Kim–Pillay/Peretz formulation. Minor remark: the notes ask for '(possibly imaginary) a, b'; the file handles this by the observation that T^eq is itself a complete simple theory covered by the universal quantification, rather than by formalizing T^eq (which Mathlib's one-sorted framework does not directly support).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Version chosen (per the decomposition table): Kim–Pillay 2001 / Peretz Definition item 4: for all tuples a, b and parameter sets A in a model of T with a ⫝̸_A b (tp(a/Ab) forks over A) there is a stable ψ(x,y) ∈ L(A) with ψ(a,b) and ψ(x,b) forking over A. Other inequivalent published variants (formula in L, strong/weak stable forking, hyperimaginaries) are NOT stated; the module docstring records this.",
+    "Imaginaries: Peretz works in T^eq with possibly imaginary a, b, A. The file uses tuples of real elements only. Justification: the conjecture is universally quantified over all complete simple theories, and T^eq (after the standard one-sorted encoding with sort predicates) is itself a complete simple theory, so the statement 'every complete simple theory satisfies stable forking' has the same content with or without imaginaries (real-tuple stable forking for the encoding of T^eq gives Peretz's statement for T; conversely T^eq stable forking restricted to real tuples gives the real version). A reviewer should check they accept this reduction; if not, the file states the real-element version, which is the standard formulation for T (e.g. Kim's book).",
+    "Languages are Mathlib's one-sorted `FirstOrder.Language`; Peretz allows many-sorted languages. Many-sorted theories are covered via the one-sorted encoding with unary sort predicates.",
+    "Monster model replaced by 'a model M together with its elementary extensions': Divides, Forks and IsStableFormula quantify existentially over elementary extensions N of M (via `M ↪ₑ[L] N`), with N : Type (max u v w) following Mathlib's universe convention for `Theory.IsSatisfiable`. By compactness this agrees with the usual monster-model definitions. HasStableForking quantifies over all models M : Type w of T; the theorem is universe polymorphic in w.",
+    "Dividing is defined à la Tent–Ziegler: φ(x,e) divides over A iff (in some elementary extension) there is a sequence (e_i) of realizations of tp(e/A) with {φ(x,e_i)} k-inconsistent for some k (k unconstrained; k ≤ 1 is impossible in nondegenerate cases). This is equivalent to the definition via A-indiscernible sequences with e_0 = e. Forking: φ(x,e) implies a finite disjunction of formulas (with parameters in an elementary extension) that divide over A; the empty disjunction (r = 0) is allowed, so inconsistent formulas fork, as usual.",
+    "L(A)-formulas are represented as L-formulas `L.Formula (Fin n ⊕ Fin m ⊕ Fin k)` together with an explicit parameter tuple `c : Fin k → M` with `∀ i, c i ∈ A`, rather than via Mathlib's `L[[A]]` constants language. Tuples a, b, x, y are finite tuples `Fin n → M`; stability of ψ(x,y,c) is the absence of sequences (a_i), (b_j) in some elementary extension with ψ(a_i,b_j,c) ↔ i ≤ j.",
+    "Tree property: HasTreeProperty T φ asks for k, a model N : Type (max u v) of T and a tree (a_η)_{η ∈ ω^{<ω}} (nodes encoded as `List ℕ`, η|l as `List.ofFn`, children as `η ++ [i]`) with every branch realized in N and every set of siblings k-inconsistent; 'consistent' is rendered as 'realized in N', which is equivalent by compactness since N is existentially quantified. IsSimple T := no formula φ(x,y) (x, y finite tuples) has the tree property.",
+    "Hypothesis `T.IsComplete` (Mathlib: satisfiable and decides every sentence) is included, following Peretz ('T is a complete first order theory'). Empty structures are allowed by Mathlib; the statement is vacuous/trivially true for the theory of the empty structure, so no extra nonemptiness hypothesis was added.",
+    "Bespoke definitions are kept in the problem file (single-file constraint of the task) rather than FormalConjecturesForMathlib; two `@[category test]` lemmas (⊥ is stable; ⊥ lacks the tree property) sanity-check the definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.CompleteType / Theory.typeOf, FirstOrder.Language.ElementaryEmbedding.map_formula",
+     "name": "RealizesTypeOver",
+     "why_needed": "Expresses that a tuple in an elementary extension realizes tp(e/A) (needed for dividing). Mathlib's `CompleteType` is over ∅ in L[[α]] and not convenient for parameters from a subset A of a model."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (searched ModelTheory for divid/fork/indiscern).",
+     "name": "Divides",
+     "why_needed": "Dividing of a formula over a parameter set; absent from Mathlib and the repo."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "Forks",
+     "why_needed": "Forking of a formula over a parameter set (implies a finite disjunction of dividing formulas); absent from Mathlib and the repo."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "TypeForksOver",
+     "why_needed": "a ⫝̸_A b, i.e. tp(a/Ab) forks over A; absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (searched for stable/order property).",
+     "name": "IsStableFormula",
+     "why_needed": "Stability (no order property) of a formula with parameters; Mathlib has no notion of stable formula/theory."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "HasTreeProperty",
+     "why_needed": "Shelah's tree property of a formula modulo a theory; absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "IsSimple",
+     "why_needed": "Simplicity of a theory (no formula has the tree property); absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "HasStableForking",
+     "why_needed": "The stable forking property of a theory in the Kim–Pillay/Peretz form; absent from Mathlib."
+    }
+   ],
+   "per_slot": {
+    "stable_forking_conjecture_for_simple_theories": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `stable_forking_conjecture_for_simple_theories : ∀ complete T, IsSimple T → HasStableForking T` in the Kim–Pillay/Peretz form fixed by the decomposition table (formula in L(A), a ⫝̸_A b, ψ(a,b) ∧ ψ(x,b) forks over A, stable = no order-property sequences, simple = no formula has the tree property). Mathlib has no forking/dividing/stability/tree-property notions, so these are defined semantically from Mathlib's first-order primitives (formulas, realization, elementary embeddings, models)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "stable_forking_conjecture_for_simple_theories": "/--\n**The stable forking conjecture for simple theories** (Kim–Pillay 2001; Peretz, arXiv:math/0412356):\nevery complete simple first-order theory `T` satisfies stable forking. That is, whenever\n`a ⫝̸_A b` (for tuples `a`, `b` and a parameter set `A` in a model of `T`), there is a stable\nformula `ψ(x, y) ∈ L(A)` such that `ψ(a, b)` holds and `ψ(x, b)` forks over `A`.\n-/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories (T : L.Theory) (hT : T.IsComplete)\n    (hsimple : IsSimple T) : HasStableForking.{u, v, w} T := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Stable forking conjecture for simple theories\n\nThe conjecture says that every instance of forking in a complete simple first-order theory is\nwitnessed by a stable formula.\n\n*References:*\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [A. Peretz, *Geometry of forking in simple theories*](https://arxiv.org/abs/math/0412356)\n-/\n\nnamespace StableForkingConjectureForSimpleTheories\n\nopen FirstOrder\nopen FirstOrder.Language\n\nuniverse u v w\n\nvariable {L : FirstOrder.Language.{u, v}} (T : L.Theory)\n\n/-- A formula belongs to a complete type, via the equivalent sentence with named constants. -/\ndef Holds {V : Type w} (p : T.CompleteType V) (φ : L.Formula V) : Prop :=\n  Formula.equivSentence φ ∈ p\n\n/-- Two maps into the variables of a complete type induce the same type. -/\ndef SameTypeIn {V W : Type w} (p : T.CompleteType W) (f g : V → W) : Prop :=\n  ∀ φ : L.Formula V, Holds T p (φ.relabel f) ↔ Holds T p (φ.relabel g)\n\n/-- A complete type of a sequence indexed by `ℕ` is indiscernible over the variables `A`. -/\ndef IsIndiscernibleOver {Y A : Type w} (q : T.CompleteType ((ℕ × Y) ⊕ A)) : Prop :=\n  ∀ (n : ℕ) (i j : Fin n → ℕ), StrictMono i → StrictMono j →\n    SameTypeIn T q\n      (Sum.map (fun z : Fin n × Y ↦ (i z.1, z.2)) id)\n      (Sum.map (fun z : Fin n × Y ↦ (j z.1, z.2)) id)\n\n/-- A complete type `r` extends `q` along the variable map `f`. -/\ndef ExtendsType {V W : Type w} (q : T.CompleteType V) (r : T.CompleteType W)\n    (f : V → W) : Prop :=\n  ∀ φ : L.Formula V, Holds T q φ ↔ Holds T r (φ.relabel f)\n\n/--\nThe formula `φ(x,y,A)` divides over `A` at the tuple represented by `p`: there is an\n`A`-indiscernible sequence starting with the `y`-part of `p` for which the corresponding set of\ninstances of `φ` is inconsistent. In a simple theory, dividing and forking coincide.\n-/\ndef DividesOver {X Y A : Type w} (p : T.CompleteType ((X ⊕ Y) ⊕ A))\n    (φ : L.Formula ((X ⊕ Y) ⊕ A)) : Prop :=\n  ∃ q : T.CompleteType ((ℕ × Y) ⊕ A),\n    IsIndiscernibleOver T q ∧\n    (∀ θ : L.Formula (Y ⊕ A),\n      Holds T p (θ.relabel (Sum.map (fun y ↦ Sum.inr y) id)) ↔\n      Holds T q (θ.relabel (Sum.map (fun y ↦ (0, y)) id))) ∧\n    ¬ ∃ r : T.CompleteType (X ⊕ ((ℕ × Y) ⊕ A)),\n      ExtendsType T q r Sum.inr ∧\n      ∀ i : ℕ, Holds T r (φ.relabel (fun z ↦ match z with\n        | Sum.inl (Sum.inl x) => Sum.inl x\n        | Sum.inl (Sum.inr y) => Sum.inr (Sum.inl (i, y))\n        | Sum.inr a => Sum.inr (Sum.inr a)))\n\n/-- The tuple `x` represented by `p` is independent from its `y`-part over `A`. -/\ndef IndependentOver {X Y A : Type w} (p : T.CompleteType ((X ⊕ Y) ⊕ A)) : Prop :=\n  ∀ φ : L.Formula ((X ⊕ Y) ⊕ A), Holds T p φ → ¬ DividesOver T p φ\n\n/--\nA formula `φ(x,y,A)` is stable over the `A`-part of `p` if no complete type contains an order\npattern `φ(aᵢ,bⱼ,A) ↔ i ≤ j` while having the same type on `A` as `p`.\n-/\ndef IsStableOver {X Y A : Type w} (p : T.CompleteType ((X ⊕ Y) ⊕ A))\n    (φ : L.Formula ((X ⊕ Y) ⊕ A)) : Prop :=\n  ¬ ∃ q : T.CompleteType (((ℕ × X) ⊕ (ℕ × Y)) ⊕ A),\n    (∀ θ : L.Formula A,\n      Holds T p (θ.relabel Sum.inr) ↔ Holds T q (θ.relabel Sum.inr)) ∧\n    ∀ i j : ℕ, Holds T q (φ.relabel (fun z ↦ match z with\n      | Sum.inl (Sum.inl x) => Sum.inl (Sum.inl (i, x))\n      | Sum.inl (Sum.inr y) => Sum.inl (Sum.inr (j, y))\n      | Sum.inr a => Sum.inr a)) ↔ i ≤ j\n\n/-- A formula has the tree property in `T`. -/\ndef HasTreeProperty {X Y : Type w} (φ : L.Formula (X ⊕ Y)) : Prop :=\n  ∃ (k : ℕ) (_hk : 2 ≤ k) (q : T.CompleteType (List ℕ × Y)),\n    (∀ branch : ℕ → ℕ,\n      ∃ r : T.CompleteType (X ⊕ (List ℕ × Y)),\n        ExtendsType T q r Sum.inr ∧\n        ∀ n : ℕ, Holds T r (φ.relabel (fun z ↦ match z with\n          | Sum.inl x => Sum.inl x\n          | Sum.inr y => Sum.inr (List.ofFn (fun i : Fin n ↦ branch i), y)))) ∧\n    ∀ (node : List ℕ) (children : Fin k → ℕ), Function.Injective children →\n      ¬ ∃ r : T.CompleteType (X ⊕ (List ℕ × Y)),\n        ExtendsType T q r Sum.inr ∧\n        ∀ i : Fin k, Holds T r (φ.relabel (fun z ↦ match z with\n          | Sum.inl x => Sum.inl x\n          | Sum.inr y => Sum.inr (node ++ [children i], y)))\n\n/-- A theory is simple if no formula has the tree property. -/\ndef IsSimple : Prop :=\n  ∀ (X Y : Type w) (φ : L.Formula (X ⊕ Y)), ¬ HasTreeProperty T φ\n\n/--\nThe stable forking conjecture for simple theories states the following precise version. Let `T` be\nany complete simple first-order theory, and let `a`, `b`, and `A` be possibly imaginary tuples and\na parameter set. If `a` is not independent from `b` over `A`, then some stable formula\n`ψ(x,y) ∈ L(A)` holds of `(a,b)` and `ψ(x,b)` forks over `A`. Here stability means that there are\nno infinite sequences `aᵢ`, `bⱼ` with `ψ(aᵢ,bⱼ)` if and only if `i ≤ j`, simplicity means that no\nformula has the tree property, and forking is represented by dividing, which is equivalent to it\nin a simple theory. Possibly imaginary tuples are read in `Tᵉᵠ`, as in the cited formulation.\n-/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories\n    (hcomplete : T.IsComplete) (hsimple : IsSimple.{u, v, w} T) :\n    ∀ (X Y A : Type w) (p : T.CompleteType ((X ⊕ Y) ⊕ A)),\n      ¬ IndependentOver T p →\n      ∃ ψ : L.Formula ((X ⊕ Y) ⊕ A),\n        Holds T p ψ ∧ IsStableOver T p ψ ∧ DividesOver T p ψ := by\n  sorry\n\nend StableForkingConjectureForSimpleTheories\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.82,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Mathlib complete types to represent tuples and parameter sets in a monster-model-independent way. Formula membership is transported through `Formula.equivSentence`, and consistency is represented by existence of a complete-type extension.",
+    "Used dividing for the occurrences of forking and independence. For complete simple theories, forking and dividing coincide, so this is equivalent to the Kim–Pillay/Peretz formulation under the theorem's simplicity hypothesis.",
+    "Fixed simplicity to mean absence of the standard tree property: along every branch the instances are consistent, while the immediate successors at every node are uniformly k-inconsistent for some k ≥ 2.",
+    "Read possibly imaginary tuples in the standard way by applying the universally quantified statement to `Tᵉᵠ`. Mathlib's first-order language API is one-sorted and has no construction of `Tᵉᵠ`; a many-sorted `Tᵉᵠ` may be represented by a one-sorted coding.",
+    "Allowed arbitrary variable-index types for tuples and parameter sets. Mathlib formulas use only finitely many free variables, so this includes the usual finite tuples while allowing arbitrary parameter sets."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Formula.equivSentence` and `FirstOrder.Language.Theory.CompleteType`",
+     "name": "Holds",
+     "why_needed": "Complete types in Mathlib are set-like over sentences in a language expanded by constants, while the conjecture is naturally phrased using formulas."
+    },
+    {
+     "closest_existing_considered": "Mathlib complete types and formula relabeling; no same-type-over-parameters predicate exists.",
+     "name": "SameTypeIn",
+     "why_needed": "Indiscernibility requires comparing the types induced by two variable maps."
+    },
+    {
+     "closest_existing_considered": "No indiscernibility notion was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsIndiscernibleOver",
+     "why_needed": "Dividing is defined using an indiscernible sequence over the base parameter set."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Theory.CompleteType`; no restriction/extension predicate for complete types was found.",
+     "name": "ExtendsType",
+     "why_needed": "Consistency of infinite families of instances over fixed parameters is encoded by complete-type extensions."
+    },
+    {
+     "closest_existing_considered": "Mathlib complete types, formula relabeling, and satisfiability infrastructure.",
+     "name": "DividesOver",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no model-theoretic dividing or forking relation."
+    },
+    {
+     "closest_existing_considered": "No model-theoretic independence relation was found.",
+     "name": "IndependentOver",
+     "why_needed": "The premise of the conjecture is non-independence over a parameter set."
+    },
+    {
+     "closest_existing_considered": "No model-theoretic stability or order-property predicate was found.",
+     "name": "IsStableOver",
+     "why_needed": "The source defines formula stability by exclusion of an infinite order pattern with fixed base parameters."
+    },
+    {
+     "closest_existing_considered": "No model-theoretic tree-property predicate was found; Mathlib's unrelated data-tree and graph-tree APIs were considered and rejected.",
+     "name": "HasTreeProperty",
+     "why_needed": "The decomposition requires simple to mean that no formula has the tree property."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Theory.IsComplete` exists, but no simplicity API exists.",
+     "name": "IsSimple",
+     "why_needed": "Mathlib has no predicate for a simple first-order theory."
+    }
+   ],
+   "per_slot": {
+    "stable_forking_conjecture_for_simple_theories": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "stable_forking_conjecture_for_simple_theories": "/--\nThe stable forking conjecture for simple theories states the following precise version. Let `T` be\nany complete simple first-order theory, and let `a`, `b`, and `A` be possibly imaginary tuples and\na parameter set. If `a` is not independent from `b` over `A`, then some stable formula\n`ψ(x,y) ∈ L(A)` holds of `(a,b)` and `ψ(x,b)` forks over `A`. Here stability means that there are\nno infinite sequences `aᵢ`, `bⱼ` with `ψ(aᵢ,bⱼ)` if and only if `i ≤ j`, simplicity means that no\nformula has the tree property, and forking is represented by dividing, which is equivalent to it\nin a simple theory. Possibly imaginary tuples are read in `Tᵉᵠ`, as in the cited formulation.\n-/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories\n    (hcomplete : T.IsComplete) (hsimple : IsSimple.{u, v, w} T) :\n    ∀ (X Y A : Type w) (p : T.CompleteType ((X ⊕ Y) ⊕ A)),\n      ¬ IndependentOver T p →\n      ∃ ψ : L.Formula ((X ⊕ Y) ⊕ A),\n        Holds T p ψ ∧ IsStableOver T p ψ ∧ DividesOver T p ψ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The stable forking conjecture for simple theories\n\nLet $T$ be a complete first-order theory. $T$ is *simple* if no formula has the tree property.\nA formula $\\varphi(x, y)$ is *stable* if there are no sequences $(a_i)_{i < \\omega}$,\n$(b_j)_{j < \\omega}$ (in a model of $T$) with $\\varphi(a_i, b_j)$ if and only if $i \\le j$.\nAn instance of forking $a \\not\\perp_A b$ is *stable* if it is witnessed by a stable formula, i.e.\nthere is a stable formula $\\psi(x, y) \\in L(A)$ such that $\\psi(a, b)$ holds and $\\psi(x, b)$\nforks over $A$. The theory $T$ *satisfies stable forking* if every instance of forking is stable.\n\nThe **stable forking conjecture** (Kim–Pillay) asserts that every simple theory satisfies stable\nforking. We follow the formulation of Peretz (Definition, items 3–4 and the following sentence).\nThe conjecture exists in several inequivalent published forms; this file states the one above.\n\nElements are finite tuples of a model. Since the statement is quantified over all complete simple\ntheories, the version for (possibly imaginary) elements follows by applying it to $T^{eq}$, which is\nitself a complete simple theory. Consistency of an infinite set of formulas is finite\nsatisfiability, and witnesses that need not exist in a given model (indiscernible sequences,\norder-property sequences, parameters of forking formulas) are taken in an elementary extension.\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [A. Peretz, *Geometry of forking in simple theories*](https://arxiv.org/abs/math/0412356)\n- B. Kim, A. Pillay, *Around stable forking*, Fund. Math. 170 (2001), 107–118.\n-/\n\nnamespace StableForkingConjectureForSimpleTheories\n\nopen FirstOrder FirstOrder.Language\n\nuniverse u v w\n\nvariable {L : FirstOrder.Language.{u, v}} {M : Type w} [L.Structure M]\n\n/-- The set of formulas `{φ(x, b i) : i : ι}` with parameters from `M` is *consistent*, i.e. it is\nfinitely satisfiable in `M` (equivalently, by compactness, it is realized in some elementary\nextension of `M`). -/\ndef IsConsistent {n : ℕ} {β ι : Type} (φ : L.Formula (Fin n ⊕ β)) (b : ι → β → M) : Prop :=\n  ∀ s : Finset ι, ∃ x : Fin n → M, ∀ i ∈ s, φ.Realize (Sum.elim x (b i))\n\nvariable (L) in\n/-- A sequence `s` of `β`-tuples from `M` is *indiscernible over* `B ⊆ M`: any two strictly\nincreasing finite subsequences of the same length satisfy the same `L`-formulas with parameters\nfrom `B`. -/\ndef IsIndiscernibleOver {β : Type} (B : Set M) (s : ℕ → β → M) : Prop :=\n  ∀ (k p : ℕ) (ψ : L.Formula ((Fin k × β) ⊕ Fin p)) (c : Fin p → M), (∀ i, c i ∈ B) →\n    ∀ i j : Fin k → ℕ, StrictMono i → StrictMono j →\n      (ψ.Realize (Sum.elim (fun q => s (i q.1) q.2) c) ↔\n        ψ.Realize (Sum.elim (fun q => s (j q.1) q.2) c))\n\n/-- A constant sequence is indiscernible over any set. -/\n@[category API, AMS 3]\ntheorem isIndiscernibleOver_const {β : Type} (B : Set M) (t : β → M) :\n    IsIndiscernibleOver L B fun _ => t :=\n  fun _ _ _ _ _ _ _ _ _ => Iff.rfl\n\n/-- The formula `φ(x, b)` *divides over* `A`: in some elementary extension `N` of `M` there is an\n`A`-indiscernible sequence `(b_i)_{i < ω}` with `b_0 = b` such that `{φ(x, b_i) : i < ω}` is\ninconsistent. -/\ndef Divides {n : ℕ} {β : Type} (φ : L.Formula (Fin n ⊕ β)) (b : β → M) (A : Set M) : Prop :=\n  ∃ (N : Type (max u v w)) (_ : L.Structure N) (f : M ↪ₑ[L] N) (s : ℕ → β → N),\n    s 0 = f ∘ b ∧ IsIndiscernibleOver L (f '' A) s ∧ ¬ IsConsistent φ s\n\n/-- The formula `φ(x, b)` *forks over* `A`: in some elementary extension `N` of `M`, `φ(x, b)`\nimplies a finite disjunction of formulas `ψ_j(x, c_j)`, with parameters `c_j` from `N`, each of\nwhich divides over `A`. -/\ndef Forks {n : ℕ} {β : Type} (φ : L.Formula (Fin n ⊕ β)) (b : β → M) (A : Set M) : Prop :=\n  ∃ (N : Type (max u v w)) (_ : L.Structure N) (f : M ↪ₑ[L] N) (r : ℕ) (m : Fin r → ℕ)\n    (ψ : ∀ j, L.Formula (Fin n ⊕ Fin (m j))) (c : ∀ j, Fin (m j) → N),\n    (∀ j, Divides (ψ j) (c j) (f '' A)) ∧\n      ∀ x : Fin n → N, φ.Realize (Sum.elim x (f ∘ b)) → ∃ j, (ψ j).Realize (Sum.elim x (c j))\n\nvariable (L) in\n/-- The tuple `a` is *independent from* `b` over `A` (written `a ⫝_A b`): no formula in the type\n`tp(a / A b)` forks over `A`. Such a formula is an `L`-formula `φ(x, y, z)` with `z` instantiated\nat a tuple `c` from `A`, satisfied by `(a, b, c)`. -/\ndef Indep {n m : ℕ} (a : Fin n → M) (b : Fin m → M) (A : Set M) : Prop :=\n  ∀ (p : ℕ) (φ : L.Formula (Fin n ⊕ (Fin m ⊕ Fin p))) (c : Fin p → M), (∀ i, c i ∈ A) →\n    φ.Realize (Sum.elim a (Sum.elim b c)) → ¬ Forks φ (Sum.elim b c) A\n\n/-- The formula `ψ(x, y) ∈ L(A)`, given as an `L`-formula `ψ(x, y, z)` with the parameters `z`\ninstantiated at the tuple `c`, is *stable*: there are no sequences `(a_i)_{i < ω}`, `(b_j)_{j < ω}`\nin an elementary extension of `M` such that `ψ(a_i, b_j, c)` holds if and only if `i ≤ j`. -/\ndef IsStable {n m p : ℕ} (ψ : L.Formula (Fin n ⊕ (Fin m ⊕ Fin p))) (c : Fin p → M) : Prop :=\n  ¬ ∃ (N : Type (max u v w)) (_ : L.Structure N) (f : M ↪ₑ[L] N)\n      (a : ℕ → Fin n → N) (b : ℕ → Fin m → N),\n      ∀ i j, ψ.Realize (Sum.elim (a i) (Sum.elim (b j) (f ∘ c))) ↔ i ≤ j\n\n/-- The formula `x = y` is stable. -/\n@[category test, AMS 3]\ntheorem isStable_equal (c : Fin 0 → M) :\n    IsStable (Term.equal (L := L) (var (Sum.inl (0 : Fin 1)))\n      (var (Sum.inr (Sum.inl (0 : Fin 1))))) c := by\n  rintro ⟨N, _, f, a, b, h⟩\n  simp only [Formula.realize_equal, Term.realize_var, Sum.elim_inl, Sum.elim_inr] at h\n  have h00 := (h 0 0).2 le_rfl\n  have h01 := (h 0 1).2 zero_le_one\n  have h11 := (h 1 1).2 le_rfl\n  exact absurd ((h 1 0).1 (h11.trans (h01.symm.trans h00))) (by decide)\n\n/-- The `L`-formula `φ(x, y)` has the *tree property* with respect to the theory `T`: in some model\n`N` of `T` there are `k : ℕ` and a tree of parameters `(b_η)_{η ∈ ω^{<ω}}` such that for every\nnode `η` the set `{φ(x, b_{η ⌢ i}) : i < ω}` is `k`-inconsistent, and for every branch `σ ∈ ω^ω`\nthe set `{φ(x, b_{σ | l}) : l < ω}` is consistent. -/\ndef HasTreeProperty (T : L.Theory) {n m : ℕ} (φ : L.Formula (Fin n ⊕ Fin m)) : Prop :=\n  ∃ (N : Theory.ModelType.{u, v, max u v} T) (k : ℕ) (b : List ℕ → Fin m → N),\n    (∀ (η : List ℕ) (t : Finset ℕ), t.card = k →\n      ¬ ∃ x : Fin n → N, ∀ i ∈ t, φ.Realize (Sum.elim x (b (η ++ [i])))) ∧\n    ∀ σ : ℕ → ℕ, IsConsistent φ fun l => b (List.ofFn fun i : Fin l => σ i)\n\n/-- A theory `T` is *simple* if no formula has the tree property. -/\ndef IsSimple (T : L.Theory) : Prop :=\n  ∀ (n m : ℕ) (φ : L.Formula (Fin n ⊕ Fin m)), ¬ HasTreeProperty T φ\n\n/-- **The stable forking conjecture for simple theories** (Kim–Pillay, in the form of Peretz,\nDefinition, item 4). Every complete simple theory $T$ satisfies *stable forking*: for every model\n$M$ of $T$, every parameter set $A \\subseteq M$ and all tuples $a, b$ from $M$ with\n$a \\not\\perp_A b$, there is a stable formula $\\psi(x, y) \\in L(A)$ such that $\\psi(a, b)$ holds\nand $\\psi(x, b)$ forks over $A$. -/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories {T : L.Theory} (hT : T.IsComplete)\n    (hsimple : IsSimple T) [T.Model M] {n m : ℕ} (A : Set M) (a : Fin n → M) (b : Fin m → M)\n    (hab : ¬ Indep L a b A) :\n    ∃ (p : ℕ) (ψ : L.Formula (Fin n ⊕ (Fin m ⊕ Fin p))) (c : Fin p → M),\n      (∀ i, c i ∈ A) ∧ IsStable ψ c ∧ ψ.Realize (Sum.elim a (Sum.elim b c)) ∧\n        Forks ψ (Sum.elim b c) A := by\n  sorry\n\nend StableForkingConjectureForSimpleTheories\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None substantive. Minor remark: the table labels the chosen form \"Kim–Pillay/Peretz\", but Kim–Pillay's original formulation is phrased via a type p ∈ S(B) forking over A ⊆ B, while the L(A)/fixed a, b form is Peretz's; I followed the explicit formulation given in the table's notes (Peretz, Definition item 4).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Version of the conjecture: the Peretz (arXiv:math/0412356, Definition item 4 and following sentence) form specified by the decomposition table — fixed a, b, A with a ⫝̸_A b, a stable ψ(x,y) ∈ L(A) with ψ(a,b) and ψ(x,b) forking over A — not the 'p ∈ S(B) forks over A ⊆ B with φ ∈ L' variant nor 'weak stable forking'. The docstring attributes the conjecture to Kim–Pillay and the precise form to Peretz.",
+    "Imaginaries: a, b are finite tuples of real elements of a model M and A ⊆ M is a set of real elements. Since the statement is universally quantified over all complete simple theories, the version for imaginary elements follows by applying the statement to (a single-sorted rendering of) T^eq, which is itself complete and simple; conversely the T^eq version implies the real version because forking, stability and independence of real tuples over real sets agree in T and T^eq. A reviewer should confirm they accept this reduction rather than an explicit formalization of T^eq (which Mathlib does not have).",
+    "Language is single-sorted (Mathlib's FirstOrder.Language); Peretz allows many-sorted languages, which reduce to single-sorted ones in the standard way.",
+    "Monster model avoided: the given model M is arbitrary, and objects that need not exist in M (A-indiscernible sequences, order-property sequences, parameters of the dividing formulas in the definition of forking) are taken in an elementary extension N of M, with N in universe `Type (max u v w)`; by compactness this is equivalent to their existence in a saturated model. Consistency of an infinite set of formulas is defined as finite satisfiability in the ambient structure.",
+    "Dividing: `Divides φ b A` = some elementary extension contains an A-indiscernible sequence (b_i) with b_0 = b such that {φ(x,b_i)} is inconsistent (some finite subset has no common realization); with indiscernibility this is equivalent to the k-inconsistent formulation.",
+    "Forking: φ(x,b) implies (in an elementary extension) a finite disjunction of formulas ψ_j(x,c_j), each dividing over A; the disjunction may be empty, so inconsistent formulas fork — matching the standard convention.",
+    "Independence: a ⫝_A b iff no formula of tp(a/Ab) (an L-formula φ(x,y,z) with y := b, z := c ∈ A, satisfied by a) forks over A; the hypothesis of the conjecture is its negation.",
+    "Stability of ψ(x,y) ∈ L(A) is taken with the parameters fixed at c and the partition (x; y): no sequences (a_i), (b_j) in an elementary extension with ψ(a_i,b_j,c) ⟺ i ≤ j (Peretz uses '≤'; the '<' convention gives an equivalent notion).",
+    "Simple = no L-formula φ(x,y) (any tuple lengths n, m) has the tree property, defined with a uniform k: in some model of T (universe max u v) a tree (b_η)_{η ∈ ω^{<ω}}, indexed by `List ℕ`, with siblings' formulas k-inconsistent and each branch (finitely) consistent.",
+    "T is assumed complete (`T.IsComplete`), as in Peretz's conventions. No separate nonemptiness hypothesis on M is imposed; an empty model (possible only for degenerate T) makes the statement vacuous since `¬ Indep` fails there.",
+    "Two short API/test lemmas (`isIndiscernibleOver_const`, `isStable_equal`) are included to exercise the bespoke definitions, per CONTRIBUTING's request for basic API tests."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.IsSatisfiable / IsFinitelySatisfiable (for sentences of a theory, not formulas with parameters in a fixed structure).",
+     "name": "IsConsistent",
+     "why_needed": "Consistency (finite satisfiability) of an infinite set {φ(x, b i)} of formulas with parameters in a structure; used for inconsistency in dividing and branch consistency in the tree property."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib.ModelTheory (searched for 'indiscern').",
+     "name": "IsIndiscernibleOver",
+     "why_needed": "A-indiscernible sequences of tuples are needed for the definition of dividing; Mathlib has no notion of indiscernible sequence."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Divides",
+     "why_needed": "Shelah's dividing of a formula over a parameter set; absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Forks",
+     "why_needed": "Forking of a formula over a parameter set (implies a finite disjunction of dividing formulas); absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Indep",
+     "why_needed": "Forking independence a ⫝_A b (tp(a/Ab) does not fork over A), whose negation is the hypothesis of the conjecture."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib.ModelTheory (searched 'IsStable', 'OrderProperty').",
+     "name": "IsStable",
+     "why_needed": "Stability (no order property) of a formula ψ(x,y) ∈ L(A); Mathlib has no stability theory."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "HasTreeProperty",
+     "why_needed": "Shelah's tree property of a formula relative to a theory, needed to define simplicity."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "IsSimple",
+     "why_needed": "Simple theory = no formula has the tree property, the hypothesis of the conjecture."
+    }
+   ],
+   "per_slot": {
+    "stable_forking_conjecture_for_simple_theories": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `stable_forking_conjecture_for_simple_theories`: for every complete theory T (in any single-sorted language) that is simple (no formula has the tree property), every model M ⊨ T, every parameter set A ⊆ M and all finite tuples a, b from M with a not forking-independent from b over A, there is a formula ψ(x,y) ∈ L(A) (an L-formula ψ(x,y,z) with z instantiated at a tuple c from A) that is stable (no order-property sequences in an elementary extension), with ψ(a,b) true and ψ(x,b) forking over A. Mathlib has languages/formulas/realization/elementary embeddings/ModelType/IsComplete but no stability-theoretic notions, so consistency, indiscernibility, dividing, forking, independence, stable formula, tree property and simplicity are defined in the file following the textbook definitions."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "stable_forking_conjecture_for_simple_theories": "/-- **The stable forking conjecture for simple theories** (Kim–Pillay, in the form of Peretz,\nDefinition, item 4). Every complete simple theory $T$ satisfies *stable forking*: for every model\n$M$ of $T$, every parameter set $A \\subseteq M$ and all tuples $a, b$ from $M$ with\n$a \\not\\perp_A b$, there is a stable formula $\\psi(x, y) \\in L(A)$ such that $\\psi(a, b)$ holds\nand $\\psi(x, b)$ forks over $A$. -/\n@[category research open, AMS 3]\ntheorem stable_forking_conjecture_for_simple_theories {T : L.Theory} (hT : T.IsComplete)\n    (hsimple : IsSimple T) [T.Model M] {n m : ℕ} (A : Set M) (a : Fin n → M) (b : Fin m → M)\n    (hab : ¬ Indep L a b A) :\n    ∃ (p : ℕ) (ψ : L.Formula (Fin n ⊕ (Fin m ⊕ Fin p))) (c : Fin p → M),\n      (∀ i, c i ∈ A) ∧ IsStable ψ c ∧ ψ.Realize (Sum.elim a (Sum.elim b c)) ∧\n        Forks ψ (Sum.elim b c) A := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "stable_forking_conjecture_for_simple_theories": "c05"
+ },
+ "id": "wp-stable-forking-conjecture-for-simple-theories",
+ "main_attempt": "c05"
+}

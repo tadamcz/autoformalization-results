@@ -1,0 +1,507 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Word-representable near-triangulations\n\nA graph $G = (V, E)$ is *word-representable* if there is a word $w$ over the alphabet $V$\nsuch that two distinct letters $x, y$ alternate in $w$ if and only if $xy \\in E$.\nTwo letters alternate in $w$ if deleting all other letters from $w$ leaves a word of the form\n$xyxy\\dots$ or $yxyx\\dots$.\n\nWikipedia's list of unsolved problems asks to characterise the word-representable\nnear-triangulations containing $K_4$, and remarks that \"such a characterisation is known for\n$K_4$-free planar graphs\". The known result is Glen's theorem [Gl19]: a $K_4$-free\nnear-triangulation is word-representable if and only if it is $3$-colourable.\nA *near-triangulation* is a plane graph in which every inner (bounded) face is a triangle.\nThis file states that known result. The open problem itself asks for a characterisation and is\nnot stated here.\n\nSince Mathlib has no notion of a plane graph, this file defines plane drawings directly:\nvertices are distinct points of $\\mathbb{R}^2$, edges are Jordan arcs between their endpoints,\nand distinct arcs meet only in common endpoints. Faces are the connected components of the\ncomplement of the drawing.\n\n*References:*\n- [Wikipedia, Word-representable graph](https://en.wikipedia.org/wiki/Word-representable_graph)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Gl19] M. E. Glen, *Colourability and word-representability of near-triangulations*,\n  Pure Mathematics and Applications 28(1) (2019), 70–76.\n- [HKP16] M. Halldórsson, S. Kitaev, A. Pyatkin, *Semi-transitive orientations and\n  word-representable graphs*, Discrete Applied Mathematics 201 (2016), 164–171.\n-/\n\nnamespace WordRepresentable2\n\nopen SimpleGraph\nopen scoped EuclideanGeometry\n\nvariable {V : Type*}\n\nsection Words\n\nvariable [DecidableEq V]\n\n/--\nThe letters `x` and `y` *alternate* in the word `w` if deleting from `w` all letters other than\n`x` and `y` leaves a word with no two consecutive equal letters, that is, a word of the form\n`xyxy…` or `yxyx…`.\n-/\ndef Alternate (w : List V) (x y : V) : Prop :=\n  (w.filter fun z => z = x ∨ z = y).IsChain (· ≠ ·)\n\n/--\nThe word `w` *represents* the graph `G`: every vertex of `G` occurs in `w`, and two distinct\nvertices alternate in `w` if and only if they are adjacent in `G`.\n-/\ndef Represents (w : List V) (G : SimpleGraph V) : Prop :=\n  (∀ v, v ∈ w) ∧ ∀ x y, x ≠ y → (Alternate w x y ↔ G.Adj x y)\n\n/-- A graph is *word-representable* if some word over its vertex set represents it. -/\ndef WordRepresentable (G : SimpleGraph V) : Prop :=\n  ∃ w : List V, Represents w G\n\n/--\nThe cycle graph on the four vertices $a, b, c, d$ (in cyclic order) is represented by the word\n$abdacdbc$, as in the Wikipedia article: the pairs $ab$, $bc$, $cd$, $ad$ alternate, but $ac$ and\n$bd$ do not.\n-/\n@[category test, AMS 5]\ntheorem cycleGraph_four_wordRepresentable : WordRepresentable (cycleGraph 4) :=\n  ⟨[0, 1, 3, 0, 2, 3, 1, 2], by unfold Represents Alternate; decide⟩\n\nend Words\n\nsection Plane\n\n/--\nA *plane drawing* of the graph `G`, that is, a realisation of `G` as a plane graph: the vertices\nare distinct points `pos v` of the plane, each edge `e` is drawn as a Jordan arc `arc e` joining\nthe positions of its two endpoints, the interior of an arc contains no vertex, and two distinct\narcs meet only in the positions of their common endpoints.\n-/\nstructure PlaneEmbedding (G : SimpleGraph V) where\n  /-- The point of the plane at which the vertex `v` is drawn. -/\n  pos : V → ℝ²\n  pos_injective : Function.Injective pos\n  /-- The set of points of the plane forming the arc drawn for the edge `e`. -/\n  arc : G.edgeSet → Set ℝ²\n  /-- Each arc is a Jordan arc (the image of an injective path) between the positions of the\n  two endpoints of its edge. -/\n  exists_path (e : G.edgeSet) : ∃ u v, (e : Sym2 V) = s(u, v) ∧\n    ∃ γ : Path (pos u) (pos v), Function.Injective γ ∧ Set.range γ = arc e\n  /-- A vertex lies on an arc only if it is an endpoint of that edge. -/\n  pos_mem_arc (v : V) (e : G.edgeSet) : pos v ∈ arc e → v ∈ (e : Sym2 V)\n  /-- Two distinct arcs meet only in the positions of the common endpoints of their edges. -/\n  arc_inter_arc (e e' : G.edgeSet) : e ≠ e' → ∀ p ∈ arc e ∩ arc e',\n    ∃ v, v ∈ (e : Sym2 V) ∧ v ∈ (e' : Sym2 V) ∧ pos v = p\n\nnamespace PlaneEmbedding\n\nvariable {G : SimpleGraph V} (emb : PlaneEmbedding G)\n\n/-- The set of points of the plane covered by the drawing. -/\ndef drawing : Set ℝ² :=\n  Set.range emb.pos ∪ ⋃ e, emb.arc e\n\n/--\nThe *face* of the drawing containing the point `p`: the connected component of `p` in the\ncomplement of the drawing. It is empty when `p` lies on the drawing.\n-/\ndef face (p : ℝ²) : Set ℝ² :=\n  connectedComponentIn emb.drawingᶜ p\n\n/--\nA set `F` of points of the plane is a *triangular face* of the drawing if its frontier is exactly\nthe union of the arcs of three edges forming a triangle of `G`.\n-/\ndef IsTriangleFace (F : Set ℝ²) : Prop :=\n  ∃ (u v w : V) (huv : G.Adj u v) (hvw : G.Adj v w) (huw : G.Adj u w),\n    frontier F = emb.arc ⟨s(u, v), huv⟩ ∪ emb.arc ⟨s(v, w), hvw⟩ ∪ emb.arc ⟨s(u, w), huw⟩\n\nend PlaneEmbedding\n\n/--\nA graph `G` is a *near-triangulation* if it admits a plane drawing in which every inner face,\nthat is, every bounded connected component of the complement of the drawing, is a triangle.\nThe unbounded (outer) face is unrestricted.\n-/\ndef IsNearTriangulation (G : SimpleGraph V) : Prop :=\n  ∃ emb : PlaneEmbedding G, ∀ p ∉ emb.drawing,\n    Bornology.IsBounded (emb.face p) → emb.IsTriangleFace (emb.face p)\n\nend Plane\n\n/--\n**Glen's theorem** [Gl19]. Let $G$ be a $K_4$-free near-triangulation, that is, a finite plane\ngraph with no clique on four vertices in which every inner face is a triangle. Then $G$ is\nword-representable if and only if $G$ is $3$-colourable.\n\nThis is the \"characterisation known for $K_4$-free planar graphs\" mentioned in the Wikipedia\nlist entry \"Characterise word-representable near-triangulations containing the complete graph\n$K_4$ (such a characterisation is known for $K_4$-free planar graphs)\".\n-/\n@[category research solved, AMS 5]\ntheorem word_representable_2 [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    (hG : IsNearTriangulation G) (hK4 : G.CliqueFree 4) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry\n\nend WordRepresentable2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None substantive. I agree that the open problem ('Characterise …') has no statable Prop and that the only formalizable content is the known K4-free counterpart; the table's note that Wikipedia's 'K4-free planar graphs' overstates the cited result (Glen's theorem is about near-triangulations only) is correct and was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Word-representability is defined via the primary (alternation) definition, not via semi-transitive orientations: `Alternate w x y` means the subword of `w` on the letters {x,y} has no two consecutive equal letters (`List.IsChain (· ≠ ·)`), i.e. is of the form xyxy… or yxyx…; `Represents w G` additionally requires every vertex to occur in `w` (the standard convention, which removes the degenerate reading of 'alternate' for absent letters). A `@[category test]` lemma checks the article's example: `abdacdbc` represents the 4-cycle (`cycleGraph 4`).",
+    "Near-triangulation is formalized topologically since Mathlib has no planarity: `PlaneEmbedding G` is a Diestel-style plane graph (injective vertex positions in ℝ² = `EuclideanSpace ℝ (Fin 2)`, each edge drawn as a Jordan arc = range of an injective `Path` between its endpoints, no vertex in the interior of an arc, distinct arcs meeting only at common endpoints). Faces are connected components (`connectedComponentIn`) of the complement of the drawing; inner faces are the `Bornology.IsBounded` ones; a face is a triangle iff its `frontier` equals the union of the arcs of three pairwise adjacent vertices (by the Jordan curve theorem this is equivalent to the face being the interior of a 3-cycle with nothing drawn inside).",
+    "`IsNearTriangulation G` is existential over drawings (G admits some plane drawing whose bounded faces are all triangles); this is the graph-property reading appropriate for a theorem whose conclusion depends only on G.",
+    "No connectivity or 2-connectivity is imposed on near-triangulations (literal reading of 'a planar graph in which each inner bounded face is a triangle'). Under this reading the theorem remains true: every block of such a graph is itself a 2-connected near-triangulation, and word-representability, K4-freeness and 3-colourability all reduce to blocks. The degenerate cases (empty graph, single vertex) satisfy the theorem trivially.",
+    "K4-free is `G.CliqueFree 4` (a K4 subgraph is the same as a 4-clique). 3-colourable is `G.Colorable 3`. The vertex type is `[Fintype V]` (plane graphs are finite); `[DecidableEq V]` is required by the word definitions (`List.filter`).",
+    "The Wikipedia parenthetical says 'K4-free planar graphs', but the cited result (Glen 2019) is only about K4-free near-triangulations; following the decomposition notes and the article body, the theorem is stated for near-triangulations, and the docstring explains this. The topological (rather than combinatorial rotation-system) definition of planarity was chosen because it matches the textbook definition of a plane graph directly and does not depend on an equivalence theorem or on connectedness."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "List.IsChain (used as the building block); no alternation predicate exists.",
+     "name": "WordRepresentable2.Alternate",
+     "why_needed": "Alternation of two letters in a word is the core notion of word-representability and does not exist in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "Digraph.IsOrientation in FormalConjecturesForMathlib (could support the semi-transitive-orientation characterisation, but that is a theorem, not the definition).",
+     "name": "WordRepresentable2.Represents / WordRepresentable2.WordRepresentable",
+     "why_needed": "Word-representability of a graph is absent from Mathlib and FormalConjecturesForMathlib (searched 'word', 'represent', 'alternat', 'semi-transitive')."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.UnitDistance embeddings (vertex-only embeddings into metric spaces, no edges/faces); Path, connectedComponentIn, frontier, Bornology.IsBounded were used as primitives.",
+     "name": "WordRepresentable2.PlaneEmbedding (with fields pos, arc, exists_path, pos_mem_arc, arc_inter_arc) and PlaneEmbedding.drawing / face / IsTriangleFace",
+     "why_needed": "Mathlib has no notion of planar graph, plane drawing, or face (searched 'planar', 'plane graph', 'rotation system', 'combinatorial map', 'Jordan', 'IsArc')."
+    },
+    {
+     "closest_existing_considered": "None; no planarity API exists.",
+     "name": "WordRepresentable2.IsNearTriangulation",
+     "why_needed": "Near-triangulations (plane graphs with all inner faces triangles) are absent from Mathlib and the repo."
+    }
+   ],
+   "per_slot": {
+    "word_representable_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Glen's theorem: for every finite simple graph G that is a near-triangulation (admits a plane drawing all of whose bounded faces are triangles) and is K4-free (`G.CliqueFree 4`), `WordRepresentable G ↔ G.Colorable 3`. Word-representability, plane drawings and near-triangulations are absent from Mathlib and the repo, so bespoke definitions were added in the problem file; tagged `research solved`, AMS 5."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "word_representable_2": "/--\n**Glen's theorem** [Gl19]. Let $G$ be a $K_4$-free near-triangulation, that is, a finite plane\ngraph with no clique on four vertices in which every inner face is a triangle. Then $G$ is\nword-representable if and only if $G$ is $3$-colourable.\n\nThis is the \"characterisation known for $K_4$-free planar graphs\" mentioned in the Wikipedia\nlist entry \"Characterise word-representable near-triangulations containing the complete graph\n$K_4$ (such a characterisation is known for $K_4$-free planar graphs)\".\n-/\n@[category research solved, AMS 5]\ntheorem word_representable_2 [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    (hG : IsNearTriangulation G) (hK4 : G.CliqueFree 4) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Word-representable near-triangulations\n\nThis file states the known counterpart to the open problem of characterising word-representable\nnear-triangulations that contain $K_4$.\n\n*References:*\n- [Wikipedia, *Word-representable graph*](https://en.wikipedia.org/wiki/Word-representable_graph)\n- M. E. Glen, *Colourability and word-representability of near-triangulations*, Pure Mathematics\n  and Applications 28 (2019), 70–76.\n-/\n\nnamespace WordRepresentable2\n\n/-- The letters `a` and `b` alternate in `w` if the subword obtained by deleting every other\nletter has distinct consecutive entries. -/\ndef Alternates {α : Type*} [DecidableEq α] (w : List α) (a b : α) : Prop :=\n  (w.filter fun x ↦ x = a ∨ x = b).IsChain (· ≠ ·)\n\n/-- A graph is word-representable if there is a word containing every vertex in which two\ndistinct letters alternate exactly when the corresponding vertices are adjacent. -/\ndef WordRepresentable {V : Type*} [DecidableEq V] (G : SimpleGraph V) : Prop :=\n  ∃ w : List V, (∀ v, v ∈ w) ∧\n    ∀ ⦃a b⦄, a ≠ b → (G.Adj a b ↔ Alternates w a b)\n\n/-- Two points are in the same forward orbit of a self-map. -/\ndef SameOrbit {α : Type*} (f : α → α) (x y : α) : Prop :=\n  ∃ n : ℕ, f^[n] x = y\n\n/-- A finite simple graph is a near-triangulation if it has a rotation system giving a cellular\nembedding in the sphere for which every face except a distinguished outer face is triangular.\nThe permutation `rotation` cyclically orders the darts leaving each vertex. Its composition with\ndart reversal gives the facial successor permutation. Euler characteristic two says that the\nresulting orientable cellular embedding is in the sphere. -/\ndef IsNearTriangulation {V : Type*} [Fintype V] (G : SimpleGraph V) : Prop :=\n  G.Connected ∧\n  ∃ (rotation : Equiv.Perm G.Dart) (faceRepresentatives : Set G.Dart) (outer : G.Dart),\n    (∀ d, (rotation d).fst = d.fst) ∧\n    (∀ d e, d.fst = e.fst → SameOrbit rotation d e) ∧\n    (∀ d, ∃! r, r ∈ faceRepresentatives ∧\n      SameOrbit (fun e ↦ rotation e.symm) r d) ∧\n    outer ∈ faceRepresentatives ∧\n    (Fintype.card V : ℤ) - G.edgeSet.ncard + faceRepresentatives.ncard = 2 ∧\n    ∀ r ∈ faceRepresentatives, r ≠ outer →\n      Function.minimalPeriod (fun e ↦ rotation e.symm) r = 3\n\n/-- **Glen's theorem.** A finite $K_4$-free near-triangulation is word-representable if and only\nif it is $3$-colourable. This is the known $K_4$-free near-triangulation counterpart mentioned by\nthe list entry; the cited result does not cover all $K_4$-free planar graphs. -/\n@[category research solved, AMS 5]\ntheorem word_representable_2 {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) (hG : G.CliqueFree 4 ∧ IsNearTriangulation G) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry\n\nend WordRepresentable2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.91,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Formalized only the solved parenthetical counterpart required by the fixed decomposition; the open request to characterize near-triangulations containing K4 was not stated.",
+    "Followed the background article's precise scope: Glen's theorem concerns K4-free near-triangulations, not all K4-free planar graphs, despite the terse list entry's broader wording.",
+    "Modeled graphs as finite labeled Mathlib `SimpleGraph`s. Used `G.CliqueFree 4` for K4-freeness and Mathlib's `G.Colorable 3` for 3-colourability.",
+    "Defined word-representability directly via a finite word: every vertex must occur, and for each pair of distinct vertices adjacency is equivalent to consecutive letters being different in the subword filtered to that pair.",
+    "Modeled a near-triangulation by a connected rotation system on darts. Facial orbits are those of rotation after dart reversal; one orbit is distinguished as outer, Euler characteristic two enforces a sphere embedding, and every other facial orbit has minimal period three.",
+    "The chosen near-triangulation encoding uses an outer-face dart and thus concerns nontrivial connected plane graphs with at least one edge, as is standard in the near-triangulation setting."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`List.IsChain`; it supplies the adjacent-distinct test after filtering but not the two-letter alternation concept itself.",
+     "name": "Alternates",
+     "why_needed": "The source defines word-representability through alternation of two letters in a filtered word, for which no graph-word predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib `SimpleGraph` predicates and the equivalent semi-transitive-orientation characterization; no semi-transitive-orientation API was found, so the source's direct word definition was used.",
+     "name": "WordRepresentable",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib has word-representable graphs."
+    },
+    {
+     "closest_existing_considered": "`MulAction.orbit` and `MulAction.orbitRel`; using them would require constructing a cyclic subgroup action, while the equivalent forward-iterate relation is direct for permutations.",
+     "name": "SameOrbit",
+     "why_needed": "The rotation-system encoding needs a lightweight proposition that two darts lie in the same cycle of a permutation."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `SimpleGraph.Dart`, graph walks/cycles, and generic permutation/orbit APIs. Darts were reused, but a rotation-system predicate with facial cycles and Euler characteristic was still required.",
+     "name": "IsNearTriangulation",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no planar embedding, plane graph, or near-triangulation API."
+    }
+   ],
+   "per_slot": {
+    "word_representable_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "word_representable_2": "/-- **Glen's theorem.** A finite $K_4$-free near-triangulation is word-representable if and only\nif it is $3$-colourable. This is the known $K_4$-free near-triangulation counterpart mentioned by\nthe list entry; the cited result does not cover all $K_4$-free planar graphs. -/\n@[category research solved, AMS 5]\ntheorem word_representable_2 {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) (hG : G.CliqueFree 4 ∧ IsNearTriangulation G) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Word-representable near-triangulations\n\nA graph $G = (V, E)$ is *word-representable* if there is a word $w$ over the alphabet $V$\nsuch that two distinct letters $x, y$ alternate in $w$ if and only if $xy \\in E$. Letters $x$ and\n$y$ alternate in $w$ if deleting from $w$ all letters other than the copies of $x$ and $y$ leaves\na word $xyxy\\cdots$ or $yxyx\\cdots$ (of even or odd length).\n\nA *near-triangulation* is a planar graph drawn in the plane so that every inner (bounded) face\nis a triangle; the outer face is not required to be a triangle.\n\nThe Wikipedia list of unsolved problems asks to \"characterise word-representable\nnear-triangulations containing the complete graph $K_4$ (such a characterisation is known for\n$K_4$-free planar graphs)\". This file states the known $K_4$-free counterpart, a theorem of\nGlen: a $K_4$-free near-triangulation is word-representable if and only if it is $3$-colourable.\nThe open problem itself asks for a characterisation and is not a statable proposition.\n\n*References:*\n- [Wikipedia, Word-representable graph](https://en.wikipedia.org/wiki/Word-representable_graph)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Gl19] M. E. Glen, *Colourability and word-representability of near-triangulations*,\n  Pure Mathematics and Applications 28 (2019), 70--76.\n- [KL15] S. Kitaev and V. Lozin, *Words and Graphs*, Springer, 2015.\n-/\n\nnamespace WordRepresentable2\n\nopen SimpleGraph\nopen scoped EuclideanGeometry\n\nvariable {V : Type*}\n\nsection WordRepresentability\n\nvariable [DecidableEq V]\n\n/--\nTwo letters `a` and `b` **alternate** in the word `w` if, after deleting from `w` all letters\nother than the copies of `a` and `b`, no two consecutive letters are equal, i.e. the remaining\nword is of the form `abab...` or `baba...`.\n-/\ndef Alternate (w : List V) (a b : V) : Prop :=\n  (w.filter fun x => x = a ∨ x = b).IsChain (· ≠ ·)\n\n/--\nThe word `w` **represents** the graph `G` if every vertex of `G` occurs in `w` and two distinct\nvertices are adjacent in `G` if and only if they alternate in `w`.\n-/\ndef Represents (w : List V) (G : SimpleGraph V) : Prop :=\n  (∀ v, v ∈ w) ∧ ∀ a b, a ≠ b → (G.Adj a b ↔ Alternate w a b)\n\ninstance (w : List V) (a b : V) : Decidable (Alternate w a b) :=\n  inferInstanceAs (Decidable (List.IsChain _ _))\n\ninstance [Fintype V] (w : List V) (G : SimpleGraph V) [DecidableRel G.Adj] :\n    Decidable (Represents w G) :=\n  inferInstanceAs (Decidable (_ ∧ _))\n\n/-- A graph is **word-representable** if some word over its vertex set represents it. -/\ndef WordRepresentable (G : SimpleGraph V) : Prop :=\n  ∃ w : List V, Represents w G\n\n/-- The letters `0` and `1` alternate in the word `0101`. -/\n@[category test, AMS 5]\ntheorem alternate_example : Alternate [(0 : Fin 2), 1, 0, 1] 0 1 := by\n  decide\n\n/-- The letters `0` and `1` do not alternate in the word `0110`. -/\n@[category test, AMS 5]\ntheorem not_alternate_example : ¬ Alternate [(0 : Fin 2), 1, 1, 0] 0 1 := by\n  decide\n\n/-- The complete graph on three vertices is represented by the word `012`. -/\n@[category test, AMS 5]\ntheorem wordRepresentable_top_fin_three : WordRepresentable (⊤ : SimpleGraph (Fin 3)) :=\n  ⟨[0, 1, 2], by decide⟩\n\n/-- The empty graph on two vertices is represented by the word `0011`. -/\n@[category test, AMS 5]\ntheorem wordRepresentable_bot_fin_two : WordRepresentable (⊥ : SimpleGraph (Fin 2)) :=\n  ⟨[0, 0, 1, 1], by decide⟩\n\nend WordRepresentability\n\nsection NearTriangulation\n\n/--\nA **plane drawing** of a simple graph `G`: each vertex is sent to a point of the plane, distinct\nvertices to distinct points, and each edge `uv` is drawn as a Jordan arc (an injective path) from\nthe point of `u` to the point of `v`. An arc meets the vertex points only in its endpoints, and\ntwo arcs of distinct edges meet only in vertex points (hence only in common endpoints).\nThe arc drawn for `vu` is the reverse of the arc drawn for `uv`.\n-/\nstructure PlaneDrawing (G : SimpleGraph V) where\n  /-- The point of the plane representing a vertex. -/\n  pos : V → ℝ²\n  pos_injective : Function.Injective pos\n  /-- The arc drawn for an edge, as a path from the point of `u` to the point of `v`. -/\n  arc : ∀ ⦃u v⦄, G.Adj u v → Path (pos u) (pos v)\n  arc_symm : ∀ ⦃u v⦄ (h : G.Adj u v), arc h.symm = (arc h).symm\n  arc_injective : ∀ ⦃u v⦄ (h : G.Adj u v), Function.Injective (arc h)\n  arc_inter_range_pos : ∀ ⦃u v⦄ (h : G.Adj u v),\n    Set.range (arc h) ∩ Set.range pos = {pos u, pos v}\n  arc_inter_arc : ∀ ⦃u v u' v'⦄ (h : G.Adj u v) (h' : G.Adj u' v'), s(u, v) ≠ s(u', v') →\n    Set.range (arc h) ∩ Set.range (arc h') ⊆ Set.range pos\n\nnamespace PlaneDrawing\n\nvariable {G : SimpleGraph V} (D : PlaneDrawing G)\n\n/-- The set of points of the plane covered by the drawing: all vertex points and all arcs. -/\ndef support : Set ℝ² :=\n  Set.range D.pos ∪ ⋃ (u) (v) (h : G.Adj u v), Set.range (D.arc h)\n\n/-- A **face** of the drawing is a connected component of the complement of its support. -/\ndef IsFace (F : Set ℝ²) : Prop :=\n  ∃ x ∈ D.supportᶜ, F = connectedComponentIn D.supportᶜ x\n\n/--\nA face is **triangular** if its frontier is the drawing of a triangle of `G`, i.e. the union of\nthe three arcs of the edges of a triangle `a b c` of `G`.\n-/\ndef IsTriangularFace (F : Set ℝ²) : Prop :=\n  D.IsFace F ∧ ∃ (a b c : V) (hab : G.Adj a b) (hbc : G.Adj b c) (hca : G.Adj c a),\n    frontier F = Set.range (D.arc hab) ∪ Set.range (D.arc hbc) ∪ Set.range (D.arc hca)\n\nend PlaneDrawing\n\n/--\nA graph is a **near-triangulation** if it has a plane drawing in which every bounded (inner)\nface is a triangle. The unbounded (outer) face is not required to be a triangle.\n-/\ndef IsNearTriangulation (G : SimpleGraph V) : Prop :=\n  ∃ D : PlaneDrawing G, ∀ F, D.IsFace F → Bornology.IsBounded F → D.IsTriangularFace F\n\n/-- The plane drawing of the graph with no vertices. -/\ndef PlaneDrawing.empty : PlaneDrawing (⊥ : SimpleGraph Empty) where\n  pos := Empty.elim\n  pos_injective a := a.elim\n  arc u := u.elim\n  arc_symm u := u.elim\n  arc_injective u := u.elim\n  arc_inter_range_pos u := u.elim\n  arc_inter_arc u := u.elim\n\n/-- The graph with no vertices is a near-triangulation: its only face is the whole plane. -/\n@[category test, AMS 5]\ntheorem isNearTriangulation_bot_empty : IsNearTriangulation (⊥ : SimpleGraph Empty) := by\n  refine ⟨PlaneDrawing.empty, fun F ⟨x, _, hF⟩ hb => (?_ : False).elim⟩\n  have hsupp : PlaneDrawing.empty.support = ∅ := by\n    simp [PlaneDrawing.support, PlaneDrawing.empty, Set.range_eq_empty]\n  rw [hF, hsupp, Set.compl_empty, connectedComponentIn_univ,\n    PreconnectedSpace.connectedComponent_eq_univ] at hb\n  exact NormedSpace.unbounded_univ ℝ ℝ² hb\n\n/-- The plane drawing of the graph with one vertex, placed at the origin. -/\ndef PlaneDrawing.single : PlaneDrawing (⊥ : SimpleGraph Unit) where\n  pos _ := 0\n  pos_injective _ _ _ := rfl\n  arc _ _ h := h.elim\n  arc_symm _ _ h := h.elim\n  arc_injective _ _ h := h.elim\n  arc_inter_range_pos _ _ h := h.elim\n  arc_inter_arc _ _ _ _ h := h.elim\n\n/-- The graph with one vertex is a near-triangulation: its only face is the punctured plane. -/\n@[category test, AMS 5]\ntheorem isNearTriangulation_bot_unit : IsNearTriangulation (⊥ : SimpleGraph Unit) := by\n  refine ⟨PlaneDrawing.single, fun F ⟨x, hx, hF⟩ hb => (?_ : False).elim⟩\n  have hsupp : PlaneDrawing.single.support = {0} := by\n    simp [PlaneDrawing.support, PlaneDrawing.single]\n  rw [hsupp] at hx hF\n  have hrank : 1 < Module.rank ℝ ℝ² := by\n    rw [← Module.finrank_eq_rank, finrank_euclideanSpace_fin]; norm_num\n  rw [hF, (isConnected_compl_singleton_of_one_lt_rank hrank (0 : ℝ²)).isPreconnected\n    |>.connectedComponentIn hx] at hb\n  have := hb.union (Set.finite_singleton (0 : ℝ²)).isBounded\n  rw [Set.compl_union_self] at this\n  exact NormedSpace.unbounded_univ ℝ ℝ² this\n\n/-- The straight segment from `x` to `y`, as a path. -/\nnoncomputable def segmentPath (x y : ℝ²) : Path x y where\n  toFun t := x + (t : ℝ) • (y - x)\n  continuous_toFun := by fun_prop\n  source' := by simp\n  target' := by simp\n\n@[category API, AMS 5]\nlemma segmentPath_apply (x y : ℝ²) (t : unitInterval) :\n    segmentPath x y t = x + (t : ℝ) • (y - x) :=\n  rfl\n\n@[category API, AMS 5]\nlemma segmentPath_symm (x y : ℝ²) : (segmentPath x y).symm = segmentPath y x := by\n  refine Path.ext (funext fun t => ?_)\n  simp only [Path.symm, Path.coe_mk_mk, Function.comp_apply, segmentPath_apply,\n    unitInterval.coe_symm_eq]\n  module\n\n@[category API, AMS 5]\nlemma segmentPath_injective {x y : ℝ²} (h : x ≠ y) : Function.Injective (segmentPath x y) := by\n  intro s t hst\n  simp only [segmentPath_apply, add_right_inj] at hst\n  have : ((s : ℝ) - t) • (y - x) = 0 := by rw [sub_smul, hst, sub_self]\n  rcases smul_eq_zero.mp this with h1 | h1\n  · exact Subtype.ext (sub_eq_zero.mp h1)\n  · exact absurd (sub_eq_zero.mp h1).symm h\n\n@[category API, AMS 5]\nlemma range_segmentPath_inter (x y : ℝ²) : Set.range (segmentPath x y) ∩ {x, y} = {x, y} := by\n  refine Set.inter_eq_right.mpr ?_\n  rintro p (rfl | rfl)\n  · exact ⟨0, by simp⟩\n  · exact ⟨1, by simp⟩\n\n/-- The vertex `u ∈ {0, 1}` of a single edge is placed at the point `(u, 0)` of the plane. -/\nnoncomputable def edgePos (u : Fin 2) : ℝ² := (u : ℝ) • EuclideanSpace.single 0 1\n\n@[category API, AMS 5]\nlemma edgePos_injective : Function.Injective edgePos := by\n  intro u v huv\n  have := congrArg (· 0) huv\n  simp [edgePos, EuclideanSpace.single_apply] at this\n  exact Fin.ext (by exact_mod_cast this)\n\n/-- A straight-line plane drawing of the graph with a single edge. -/\nnoncomputable def PlaneDrawing.edge : PlaneDrawing (⊤ : SimpleGraph (Fin 2)) where\n  pos := edgePos\n  pos_injective := edgePos_injective\n  arc _ _ _ := segmentPath _ _\n  arc_symm _ _ _ := (segmentPath_symm _ _).symm\n  arc_injective _ _ h := segmentPath_injective (edgePos_injective.ne h)\n  arc_inter_range_pos u v h := by\n    have hrange : Set.range edgePos = {edgePos u, edgePos v} := by\n      ext p\n      simp only [Set.mem_range, Set.mem_insert_iff, Set.mem_singleton_iff]\n      constructor\n      · rintro ⟨w, rfl⟩\n        fin_cases u <;> fin_cases v <;> fin_cases w <;> simp_all\n      · rintro (rfl | rfl) <;> exact ⟨_, rfl⟩\n    rw [hrange]\n    exact range_segmentPath_inter _ _\n  arc_inter_arc u v u' v' _ _ hne := by\n    exfalso\n    apply hne\n    fin_cases u <;> fin_cases v <;> fin_cases u' <;> fin_cases v' <;> simp_all\n\n/-- The graph with a single edge has a plane drawing. -/\n@[category test, AMS 5]\ntheorem nonempty_planeDrawing_edge : Nonempty (PlaneDrawing (⊤ : SimpleGraph (Fin 2))) :=\n  ⟨PlaneDrawing.edge⟩\n\nend NearTriangulation\n\n/--\n**Glen's theorem** [Gl19]: a $K_4$-free near-triangulation is word-representable if and only\nif it is $3$-colourable.\n\nThis is the characterisation \"known for $K_4$-free planar graphs\" referred to in the open\nproblem \"characterise word-representable near-triangulations containing the complete graph\n$K_4$\". The cited result [Gl19] is for $K_4$-free near-triangulations: finite planar graphs\ndrawn so that every inner face is a triangle. The restriction to $K_4$-free graphs is needed,\nsince $K_4$ itself is word-representable but not $3$-colourable.\n-/\n@[category research solved, AMS 5]\ntheorem word_representable_2 [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    (hG : IsNearTriangulation G) (hK4 : G.CliqueFree 4) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry\n\nend WordRepresentable2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's reading is correct: the article body states Glen's theorem for K4-free near-triangulations, and the literal 'K4-free planar graphs' claim is false (Moser spindle counterexample), so restricting to near-triangulations is necessary for faithfulness. Minor note: the task header's 'Status: open' conflicts with the table's own note that this slot is a solved result; I tagged it `research solved` per the table note and repository rules.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Followed the decomposition table: the slot is stated as Glen's theorem for K4-free NEAR-TRIANGULATIONS (the article body: 'A K4-free near-triangulation is 3-colourable if and only if it is word-representable'), not for all K4-free planar graphs. The literal 'K4-free planar graphs' reading would be false: the Moser spindle is planar, K4-free, 4-chromatic, and admits a semi-transitive orientation (hence is word-representable). The theorem docstring records this scope.",
+    "Category tag: the task header says 'Status: open' (referring to the dropped open problem), but this slot is a proven theorem (Glen 2019) and the table notes say it 'would be tagged research solved'. The repository rules require `research solved` for established results, so the declaration is tagged `@[category research solved, AMS 5]`. A reviewer should confirm this is the intended tag.",
+    "Word-representability is defined via alternation: `Alternate w a b` := the sublist of `w` consisting of copies of `a` and `b` has no two consecutive equal letters (`List.IsChain (· ≠ ·)`); `Represents w G` requires every vertex to occur in `w` (standard convention; avoids the degenerate case of a letter occurring 0 or 1 times) and, for distinct a b, `G.Adj a b ↔ Alternate w a b`. The equivalent semi-transitive-orientation characterisation is not used.",
+    "Near-triangulation is modelled topologically (Diestel-style plane graph): `PlaneDrawing G` has injective vertex positions in ℝ² = EuclideanSpace ℝ (Fin 2) and, for each adjacency, an injective `Path` (Jordan arc) between the endpoints, with arcs meeting vertex points only at their endpoints and arcs of distinct edges meeting only in vertex points; the arc of `vu` is the reverse of the arc of `uv`. Faces are connected components (`connectedComponentIn`) of the complement of the drawing's support; a face is triangular iff its `frontier` equals the union of the three arcs of a triangle of G. `IsNearTriangulation G` := ∃ drawing in which every `Bornology.IsBounded` face is triangular. This follows the source definition 'planar graph in which each inner bounded face is a triangle (the outer face need not be)'; the existence of a suitable drawing is used since near-triangularity depends on the embedding.",
+    "Finiteness: the theorem assumes `[Fintype V]` (words are finite lists; Glen's graphs are finite). `[DecidableEq V]` is assumed for `List.filter` in the alternation definition; it does not restrict the mathematical content.",
+    "The definition does not require connectivity or 2-connectivity of the near-triangulation. If the source implicitly assumes 2-connectedness, the stated theorem is a (true) mild generalisation: blocks of a near-triangulation are near-triangulations, word-representability is hereditary, and 3-colourability is determined blockwise.",
+    "Test/API declarations were added to show the bespoke definitions are non-vacuous: alternation examples, K3 and the empty 2-vertex graph are word-representable, the empty graph and the one-vertex graph are near-triangulations, and a straight-line `PlaneDrawing` of a single edge exists (exercising the dependent `arc_symm` field)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "List.IsChain / List.Chain' (used as the building block), List.filter.",
+     "name": "WordRepresentable2.Alternate",
+     "why_needed": "Alternation of two letters in a word (Kitaev's definition) is not in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "None; SimpleGraph API has no word-representation notion.",
+     "name": "WordRepresentable2.Represents",
+     "why_needed": "'w represents G': all vertices occur in w and distinct vertices are adjacent iff they alternate in w. Not in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Colorable (3-colourable graphs are a subclass, not equivalent).",
+     "name": "WordRepresentable2.WordRepresentable",
+     "why_needed": "Word-representable graph: existence of a representing word. Not in Mathlib or the repo (grepped for word-represent/semi-transitive)."
+    },
+    {
+     "closest_existing_considered": "Path, connectedComponentIn, frontier, Bornology.IsBounded from Mathlib (all used as building blocks); FormalConjecturesForMathlib/Combinatorics/SimpleGraph/UnitDistancePlaneGraph.lean (unrelated geometric graph).",
+     "name": "WordRepresentable2.PlaneDrawing (with PlaneDrawing.support, PlaneDrawing.IsFace, PlaneDrawing.IsTriangularFace)",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no planar graph, plane embedding, or face API. A topological plane drawing (vertices as points, edges as Jordan arcs meeting only at common endpoints), its faces (components of the complement) and triangular faces are needed to define near-triangulations."
+    },
+    {
+     "closest_existing_considered": "None (no planarity notion, no graph minors, in Mathlib).",
+     "name": "WordRepresentable2.IsNearTriangulation",
+     "why_needed": "'planar graph in which each inner bounded face is a triangle' has no counterpart in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "Mathlib has no straight-segment `Path` constructor; `Path.refl`/`segment` do not give a `Path x y`.",
+     "name": "WordRepresentable2.segmentPath, WordRepresentable2.edgePos, WordRepresentable2.PlaneDrawing.empty, PlaneDrawing.single, PlaneDrawing.edge",
+     "why_needed": "Helper definitions used only in test/API declarations that show PlaneDrawing and IsNearTriangulation are satisfiable (empty graph, single vertex, single straight edge)."
+    }
+   ],
+   "per_slot": {
+    "word_representable_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Glen's theorem: for every finite simple graph G that is a near-triangulation and K4-free (G.CliqueFree 4), WordRepresentable G ↔ G.Colorable 3. Word-representability (via alternation in a word) and near-triangulation (via a topological plane drawing whose bounded faces are triangles) are absent from Mathlib and the repo, so bespoke definitions were added in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "word_representable_2": "/--\n**Glen's theorem** [Gl19]: a $K_4$-free near-triangulation is word-representable if and only\nif it is $3$-colourable.\n\nThis is the characterisation \"known for $K_4$-free planar graphs\" referred to in the open\nproblem \"characterise word-representable near-triangulations containing the complete graph\n$K_4$\". The cited result [Gl19] is for $K_4$-free near-triangulations: finite planar graphs\ndrawn so that every inner face is a triangle. The restriction to $K_4$-free graphs is needed,\nsince $K_4$ itself is word-representable but not $3$-colourable.\n-/\n@[category research solved, AMS 5]\ntheorem word_representable_2 [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    (hG : IsNearTriangulation G) (hK4 : G.CliqueFree 4) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Word-representable near-triangulations\n\nA graph $G = (V, E)$ is *word-representable* if there is a word $w$ over the alphabet $V$,\ncontaining every letter of $V$, such that two distinct letters $x, y$ alternate in $w$ if and\nonly if $xy \\in E$. Letters $x$ and $y$ alternate in $w$ if deleting all other letters from $w$\nleaves a word $xyxy\\ldots$ or $yxyx\\ldots$.\n\nA *near-triangulation* is a planar graph in which every inner (bounded) face is a triangle;\nthe outer face is unrestricted.\n\nWikipedia lists the following open problem: characterise word-representable near-triangulations\ncontaining the complete graph $K_4$. It adds that \"such a characterisation is known for\n$K_4$-free planar graphs\"; the known result is Glen's theorem, which concerns $K_4$-free\nnear-triangulations: such a graph is word-representable if and only if it is $3$-colourable.\nThis file states Glen's theorem. The open problem itself asks for a characterisation and has\nno statable proposition.\n\n*References:*\n- [Wikipedia, Word-representable graph](https://en.wikipedia.org/wiki/Word-representable_graph)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Gl19] M. E. Glen, *Colourability and word-representability of near-triangulations*,\n  Pure Mathematics and Applications 28 (2019), no. 1, 70–76.\n-/\n\nnamespace WordRepresentable2\n\nvariable {V : Type*}\n\nsection Words\n\nvariable [DecidableEq V]\n\n/-- Letters `x` and `y` alternate in the word `w` if deleting from `w` all letters other than\n`x` and `y` leaves a word of the form `xyxy…` or `yxyx…`, i.e. a word in which no two\nconsecutive letters are equal. -/\ndef Alternate (w : List V) (x y : V) : Prop :=\n  (w.filter fun z => decide (z = x ∨ z = y)).IsChain (· ≠ ·)\n\n/-- The word `w` over the alphabet `V` represents the graph `G` if `w` contains every vertex of\n`G` and two distinct vertices alternate in `w` exactly when they are adjacent in `G`. -/\ndef Represents (G : SimpleGraph V) (w : List V) : Prop :=\n  (∀ v, v ∈ w) ∧ ∀ x y, x ≠ y → (Alternate w x y ↔ G.Adj x y)\n\n/-- A graph is word-representable if some word over its vertex set represents it. -/\ndef IsWordRepresentable (G : SimpleGraph V) : Prop :=\n  ∃ w : List V, Represents G w\n\n/-- The word `abdacdbc` from the Wikipedia article represents the $4$-cycle `a b c d`\n(here `a b c d` are `0 1 2 3`). -/\n@[category test, AMS 5]\ntheorem cycleGraph_four_represents :\n    Represents (SimpleGraph.cycleGraph 4) [0, 1, 3, 0, 2, 3, 1, 2] := by\n  unfold Represents Alternate\n  decide\n\nend Words\n\nsection Planar\n\n/-- A drawing of the graph `G` in the plane without crossings. Vertices are placed at distinct\npoints and every edge `uv` is drawn as a simple arc from `u` to `v` (the arc of `vu` is the\nreverse of the arc of `uv`). An arc passes through no vertex other than its endpoints, and two\narcs of distinct edges meet only in vertices (hence only in common endpoints). -/\nstructure PlaneEmbedding (G : SimpleGraph V) where\n  /-- The point of the plane at which a vertex is drawn. -/\n  vertex : V → ℝ × ℝ\n  vertex_injective : Function.Injective vertex\n  /-- The arc along which an edge is drawn. -/\n  arc : ∀ ⦃u v : V⦄, G.Adj u v → Path (vertex u) (vertex v)\n  arc_injective : ∀ ⦃u v : V⦄ (h : G.Adj u v), Function.Injective (arc h)\n  arc_symm : ∀ ⦃u v : V⦄ (h : G.Adj u v), arc h.symm = (arc h).symm\n  vertex_mem_range_arc : ∀ ⦃u v : V⦄ (h : G.Adj u v) (x : V),\n    vertex x ∈ Set.range (arc h) → x = u ∨ x = v\n  range_arc_inter : ∀ ⦃u v u' v' : V⦄ (h : G.Adj u v) (h' : G.Adj u' v'),\n    s(u, v) ≠ s(u', v') → Set.range (arc h) ∩ Set.range (arc h') ⊆ Set.range vertex\n\nnamespace PlaneEmbedding\n\nvariable {G : SimpleGraph V} (E : PlaneEmbedding G)\n\n/-- The subset of the plane covered by the drawing: all vertex points and all arcs. -/\ndef drawing : Set (ℝ × ℝ) :=\n  Set.range E.vertex ∪ ⋃ (u : V) (v : V) (h : G.Adj u v), Set.range (E.arc h)\n\n/-- The faces of the drawing: the connected components of the complement of the drawing. -/\ndef faces : Set (Set (ℝ × ℝ)) :=\n  {F | ∃ x ∉ E.drawing, F = connectedComponentIn E.drawingᶜ x}\n\n/-- A face `F` is a triangle if its boundary is the union of the arcs of three mutually adjacent\nvertices of `G`. -/\ndef IsTriangleFace (F : Set (ℝ × ℝ)) : Prop :=\n  ∃ (a b c : V) (hab : G.Adj a b) (hbc : G.Adj b c) (hac : G.Adj a c),\n    frontier F = Set.range (E.arc hab) ∪ Set.range (E.arc hbc) ∪ Set.range (E.arc hac)\n\nend PlaneEmbedding\n\n/-- A graph is planar if it admits a drawing in the plane without crossings. -/\ndef IsPlanar (G : SimpleGraph V) : Prop :=\n  Nonempty (PlaneEmbedding G)\n\n/-- A graph is a near-triangulation if it admits a drawing in the plane without crossings in\nwhich every inner (i.e. bounded) face is a triangle. The outer face is unrestricted. -/\ndef IsNearTriangulation (G : SimpleGraph V) : Prop :=\n  ∃ E : PlaneEmbedding G, ∀ F ∈ E.faces, Bornology.IsBounded F → E.IsTriangleFace F\n\n/-- A near-triangulation is planar. -/\n@[category API, AMS 5]\ntheorem IsNearTriangulation.isPlanar {G : SimpleGraph V} (hG : IsNearTriangulation G) :\n    IsPlanar G :=\n  let ⟨E, _⟩ := hG; ⟨E⟩\n\nend Planar\n\n/-- **Glen's theorem** [Gl19]: a $K_4$-free near-triangulation is word-representable if and only if\nit is $3$-colourable.\n\nThis is the known $K_4$-free counterpart of the open problem of characterising word-representable\nnear-triangulations that contain $K_4$. Wikipedia's list of unsolved problems phrases the known\nresult as \"such a characterisation is known for $K_4$-free planar graphs\"; the cited result\n[Gl19] concerns $K_4$-free near-triangulations. -/\n@[category research solved, AMS 5]\ntheorem word_representable_2 [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    (hG : IsNearTriangulation G) (hK₄ : G.CliqueFree 4) :\n    IsWordRepresentable G ↔ G.Colorable 3 := by\n  sorry\n\nend WordRepresentable2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The dropped item ('Characterise word-representable near-triangulations containing K4') indeed asks for an unspecified characterisation and has no statable proposition. One minor note: the slot text says a characterisation is known for 'K4-free planar graphs', but the cited result (Glen 2019) is only for K4-free near-triangulations; the table already anticipates this and the file follows the table.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Following the decomposition notes, the slot formalizes the cited known result (Glen 2019) for K4-free NEAR-TRIANGULATIONS rather than Wikipedia's looser wording 'K4-free planar graphs'; the theorem docstring records this discrepancy.",
+    "Word-representability is defined via alternation in a word (Kitaev's definition): letters x, y alternate in w iff the subword of w on {x, y} has no two equal consecutive letters (List.IsChain (· ≠ ·) on the filtered list); a word represents G if it contains every vertex and distinct vertices alternate iff adjacent. The requirement that every vertex occurs in the word follows the standard definition ('w must contain each letter of V'). The semi-transitive-orientation characterisation was not used.",
+    "Planarity is modelled topologically, not via Kuratowski/Wagner or rotation systems: `PlaneEmbedding G` consists of an injective vertex placement in ℝ × ℝ, and for each adjacency u v a `Path` (continuous map from the unit interval) that is injective (a Jordan arc), with the arc of vu the reverse of the arc of uv, arcs passing through no vertex other than their endpoints, and arcs of distinct edges (s(u,v) ≠ s(u',v')) meeting only in vertex points (hence only in common endpoints). ℝ × ℝ is used instead of EuclideanSpace ℝ (Fin 2); only the topology matters.",
+    "Faces are the connected components (`connectedComponentIn`) of the complement of the drawing (arcs together with all vertex points, so isolated vertices are part of the drawing). Inner faces are the bounded faces (`Bornology.IsBounded`); for a finite drawing exactly one face is unbounded, so this matches 'each inner bounded face is a triangle (the outer face is unrestricted)'.",
+    "'Face is a triangle' is formalized as: the frontier of the face equals the union of the three arcs of some triangle a b c of G. For a bounded face F this forces F to be exactly the interior of that Jordan triangle with nothing drawn inside; it excludes e.g. a face whose boundary walk is a triangle plus a pendant edge, or a triangle with an isolated vertex inside.",
+    "IsNearTriangulation is an abstract-graph property: ∃ a plane embedding in which every bounded face is a triangle. Since word-representability and 3-colourability are abstract graph properties this is equivalent to quantifying over plane graphs. No connectivity or 2-connectivity is imposed (Glen's definition: 'a planar graph in which each inner bounded face is a triangle'); trees, the empty graph, and disjoint unions of near-triangulations therefore qualify. This does not affect the truth of the theorem, since both properties are hereditary and preserved under disjoint unions and gluing at a vertex.",
+    "Graphs are finite ([Fintype V]), as in Glen's paper. [DecidableEq V] is assumed because `Alternate` uses List.filter; on a finite vertex type this is harmless.",
+    "K4-free is formalized as G.CliqueFree 4 (K4 as subgraph = K4 as induced subgraph since K4 is complete); 3-colourable as G.Colorable 3.",
+    "Boundary cases checked: the empty graph and one-vertex graph are (vacuously) near-triangulations and satisfy both sides of the equivalence (empty/singleton word represents them; they are 3-colourable). K3 is a K4-free near-triangulation, so the hypotheses are satisfiable.",
+    "All bespoke definitions live in the problem file because the task allows writing only one file; PlaneEmbedding/IsPlanar/IsNearTriangulation and the word-representability definitions are generic and would ideally be moved to FormalConjecturesForMathlib/Combinatorics/SimpleGraph in a real PR.",
+    "The arXiv link for Glen's paper was deliberately omitted (could not be verified offline); the journal reference from the article's literature list is cited instead."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "List.IsChain (· ≠ ·) (used as the building block), List.Sorted/List.Pairwise (not suitable: alternation is about consecutive letters of the filtered word).",
+     "name": "WordRepresentable2.Alternate",
+     "why_needed": "Kitaev's notion of two letters alternating in a word (subword on {x,y} is xyxy… or yxyx…); no Mathlib counterpart."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or FormalConjecturesForMathlib (searched for word-representable, alternation).",
+     "name": "WordRepresentable2.Represents",
+     "why_needed": "A word w over V represents G: w contains every vertex and distinct vertices alternate in w iff adjacent in G."
+    },
+    {
+     "closest_existing_considered": "None; the semi-transitive orientation characterisation would also need a bespoke definition and is a theorem, not the definition.",
+     "name": "WordRepresentable2.IsWordRepresentable",
+     "why_needed": "Existence of a representing word; the central notion of the problem."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.UnitDistancePlaneGraph / UnitDistanceEmbeddable in FormalConjecturesForMathlib (straight unit segments only, no non-crossing condition, no faces); no minor/Kuratowski API in Mathlib (and faces would still be missing).",
+     "name": "WordRepresentable2.PlaneEmbedding",
+     "why_needed": "Mathlib has no notion of planar graph or plane drawing; a crossing-free drawing (injective vertex placement plus Jordan arcs per edge meeting only at common endpoints) is needed to talk about faces."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "WordRepresentable2.PlaneEmbedding.drawing",
+     "why_needed": "The subset of the plane covered by the drawing, whose complement's components are the faces."
+    },
+    {
+     "closest_existing_considered": "connectedComponentIn (used).",
+     "name": "WordRepresentable2.PlaneEmbedding.faces",
+     "why_needed": "Faces as connected components of the complement of the drawing."
+    },
+    {
+     "closest_existing_considered": "frontier (used).",
+     "name": "WordRepresentable2.PlaneEmbedding.IsTriangleFace",
+     "why_needed": "A face bounded by a triangle of G: its frontier equals the union of the three arcs of a triangle."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib/repo.",
+     "name": "WordRepresentable2.IsPlanar",
+     "why_needed": "Existence of a plane embedding; documents that near-triangulations are planar (API lemma IsNearTriangulation.isPlanar)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib/repo.",
+     "name": "WordRepresentable2.IsNearTriangulation",
+     "why_needed": "Glen's hypothesis: a planar graph with an embedding in which every inner (bounded) face is a triangle."
+    }
+   ],
+   "per_slot": {
+    "word_representable_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Glen's theorem exactly as the article gives it: for every finite simple graph G that is a near-triangulation and K4-free (G.CliqueFree 4), IsWordRepresentable G ↔ G.Colorable 3. Mathlib has no word-representability, planarity, face or near-triangulation API, so these are defined in the file (word-representability via alternation; planarity via a crossing-free drawing in ℝ × ℝ; faces as connected components of the complement; inner triangular faces via frontier = union of three triangle arcs). Tagged research solved."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "word_representable_2": "/-- **Glen's theorem** [Gl19]: a $K_4$-free near-triangulation is word-representable if and only if\nit is $3$-colourable.\n\nThis is the known $K_4$-free counterpart of the open problem of characterising word-representable\nnear-triangulations that contain $K_4$. Wikipedia's list of unsolved problems phrases the known\nresult as \"such a characterisation is known for $K_4$-free planar graphs\"; the cited result\n[Gl19] concerns $K_4$-free near-triangulations. -/\n@[category research solved, AMS 5]\ntheorem word_representable_2 [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    (hG : IsNearTriangulation G) (hK₄ : G.CliqueFree 4) :\n    IsWordRepresentable G ↔ G.Colorable 3 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Word-representable near-triangulations\n\nThe Wikipedia list of unsolved problems asks:\n\"Characterise word-representable near-triangulations containing the complete graph $K_4$\n(such a characterisation is known for $K_4$-free planar graphs)\".\n\nThe open problem itself is a request for a characterisation and has no statable proposition.\nThis file states the known $K_4$-free case referred to in the parenthesis, which is Glen's\ntheorem: a $K_4$-free near-triangulation is word-representable if and only if it is\n$3$-colourable. Note that the cited result is about near-triangulations, not about all\n$K_4$-free planar graphs.\n\nA graph $G = (V, E)$ is *word-representable* if there is a word $w$ over the alphabet $V$\ncontaining every letter of $V$ such that two distinct letters $x, y$ alternate in $w$ if and only\nif $xy \\in E$. Letters $x$ and $y$ alternate in $w$ if deleting all other letters from $w$ leaves\na word $xyxy\\dots$ or $yxyx\\dots$.\n\nA *near-triangulation* is a planar graph in which every face, except possibly the outer face, is\na triangle. Mathlib has no planar embeddings, so we describe embeddings of a finite connected\ngraph combinatorially by rotation systems and use Euler's formula to single out embeddings in\nthe sphere.\n\n*References:*\n- [Wikipedia, Word-representable graph](https://en.wikipedia.org/wiki/Word-representable_graph)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [M. E. Glen, *Colourability and word-representability of near-triangulations*, Pure Mathematics\n  and Applications 28 (2019), 70–76](https://arxiv.org/abs/1605.01688)\n-/\n\nnamespace WordRepresentable2\n\nopen SimpleGraph\n\nvariable {V : Type*}\n\nsection Words\n\nvariable [DecidableEq V]\n\n/-- Letters `a` and `b` alternate in the word `w` if, after deleting from `w` all letters other\nthan the copies of `a` and `b`, no two consecutive letters of the remaining word are equal.\nWhen both `a` and `b` occur in `w`, this says that the remaining word is `abab...` or `baba...`. -/\ndef Alternate (w : List V) (a b : V) : Prop :=\n  (w.filter fun x => x = a ∨ x = b).IsChain (· ≠ ·)\n\n/-- A word `w` over the alphabet `V` represents the graph `G` if every letter of `V` occurs in `w`\nand two distinct letters alternate in `w` if and only if they are adjacent in `G`. -/\ndef Represents (w : List V) (G : SimpleGraph V) : Prop :=\n  (∀ v, v ∈ w) ∧ ∀ a b, a ≠ b → (Alternate w a b ↔ G.Adj a b)\n\n/-- A graph `G` is word-representable if some word over its vertex set represents it. -/\ndef WordRepresentable (G : SimpleGraph V) : Prop :=\n  ∃ w : List V, Represents w G\n\n/-- Examples of alternating and non-alternating pairs of letters. -/\n@[category test, AMS 5]\ntheorem alternate_examples :\n    Alternate [0, 1, 0, 1] 0 1 ∧ Alternate [1, 0, 1] 0 1 ∧ Alternate [0, 2, 1, 2, 0, 2] 0 1 ∧\n      ¬ Alternate [0, 0, 1] 0 1 ∧ ¬ Alternate [0, 1, 1, 0] 0 1 := by\n  unfold Alternate\n  decide\n\n/-- The `4`-cycle with vertices `0, 1, 2, 3` in cyclic order is represented by the word\n`abdacdbc`, where `a = 0`, `b = 1`, `c = 2` and `d = 3`. -/\n@[category test, AMS 5]\ntheorem represents_cycleGraph_four :\n    Represents [0, 1, 3, 0, 2, 3, 1, 2] (cycleGraph 4) := by\n  unfold Represents Alternate\n  decide\n\n/-- A word in which some letter of the alphabet does not occur represents no graph. -/\n@[category test, AMS 5]\ntheorem not_represents_of_not_mem : ¬ Represents [0, 1, 2] (⊤ : SimpleGraph (Fin 4)) := by\n  unfold Represents Alternate\n  decide\n\nend Words\n\nsection Embeddings\n\n/-- A rotation system (combinatorial embedding) of `G`: a permutation `rot` of the darts of `G`\nthat fixes the tail of every dart and acts as a single cycle on the darts leaving each vertex.\nIt records the cyclic order of the edges around each vertex in a cellular embedding of `G` in an\norientable surface. -/\nstructure RotationSystem (G : SimpleGraph V) where\n  /-- The rotations at all vertices, packaged as one permutation of the darts. -/\n  rot : Equiv.Perm G.Dart\n  /-- The rotation keeps every dart at its tail. -/\n  fst_rot (d : G.Dart) : (rot d).fst = d.fst\n  /-- The rotation is a single cycle on the darts leaving each vertex. -/\n  exists_pow_rot_eq (d d' : G.Dart) (h : d.fst = d'.fst) : ∃ n : ℕ, (rot ^ n) d = d'\n\nnamespace RotationSystem\n\nvariable {G : SimpleGraph V} (R : RotationSystem G)\n\n/-- The face permutation of a rotation system: after the dart `d = (u, v)` on the boundary of a\nface comes the dart following the reversed dart `(v, u)` in the rotation at `v`. -/\ndef facePerm : Equiv.Perm G.Dart :=\n  R.rot * Function.Involutive.toPerm _ Dart.symm_involutive\n\n@[category API, AMS 5]\ntheorem facePerm_apply (d : G.Dart) : R.facePerm d = R.rot d.symm :=\n  rfl\n\n/-- The faces of a rotation system: the orbits of the face permutation on darts. Each face is the\nset of darts of its boundary walk. -/\ndef faces : Set (Set G.Dart) :=\n  Set.range fun d => {d' | R.facePerm.SameCycle d d'}\n\n/-- Euler's formula `|V| - |E| + |F| = 2`. For a connected graph, the cellular embedding described\nby a rotation system is an embedding in the sphere if and only if this holds. -/\ndef IsPlanar : Prop :=\n  Nat.card V + R.faces.ncard = Nat.card G.edgeSet + 2\n\nend RotationSystem\n\n/-- A face of an embedding of `G`, given as the set of darts of its boundary walk, is a triangle if\nit has exactly three darts. In a simple graph this means that the face is bounded by a `3`-cycle. -/\ndef IsTriangleFace {G : SimpleGraph V} (f : Set G.Dart) : Prop :=\n  f.ncard = 3\n\n/-- A graph is a near-triangulation if it is a connected planar graph with a plane embedding in\nwhich every face, except possibly the outer face, is a triangle. Since any face of an embedding\nin the sphere can be chosen as the outer face, this says that the graph has a rotation system\nsatisfying Euler's formula in which all faces but at most one are triangles. The one-vertex\ngraph, which has no darts and hence no faces in this formalism, is a near-triangulation. -/\ndef IsNearTriangulation (G : SimpleGraph V) : Prop :=\n  G.Connected ∧ (Subsingleton V ∨\n    ∃ R : RotationSystem G, R.IsPlanar ∧ {f ∈ R.faces | ¬ IsTriangleFace f}.Subsingleton)\n\nsection Test\n\n/-- Two darts of the single-edge graph with the same tail are equal. -/\n@[category API, AMS 5]\nlemma dart_eq_of_fst_eq {d d' : (⊤ : SimpleGraph (Fin 2)).Dart} (h : d.fst = d'.fst) :\n    d = d' := by\n  have h1 := Fin.val_ne_of_ne ((top_adj _ _).1 d.adj)\n  have h2 := Fin.val_ne_of_ne ((top_adj _ _).1 d'.adj)\n  have h3 := congrArg Fin.val h\n  ext <;> omega\n\n/-- The only rotation system of the single-edge graph. -/\ndef singleEdgeRotationSystem : RotationSystem (⊤ : SimpleGraph (Fin 2)) where\n  rot := 1\n  fst_rot _ := rfl\n  exists_pow_rot_eq _ _ h := ⟨0, dart_eq_of_fst_eq h⟩\n\n/-- The single-edge graph has exactly one face. -/\n@[category API, AMS 5]\nlemma singleEdgeRotationSystem_faces : singleEdgeRotationSystem.faces = {Set.univ} := by\n  have key (d d' : (⊤ : SimpleGraph (Fin 2)).Dart) :\n      singleEdgeRotationSystem.facePerm.SameCycle d d' := by\n    by_cases hd : d'.fst = d.fst\n    · rw [dart_eq_of_fst_eq hd]\n    · have h1 := Fin.val_ne_of_ne ((top_adj _ _).1 d.adj)\n      have h2 := Fin.val_ne_of_ne ((top_adj _ _).1 d'.adj)\n      have h3 := Fin.val_ne_of_ne hd\n      have : d' = d.symm :=\n        dart_eq_of_fst_eq (by ext; simp only [Dart.symm_toProd, Prod.fst_swap]; omega)\n      exact ⟨1, by simp [this, RotationSystem.facePerm, singleEdgeRotationSystem]⟩\n  ext f\n  simp only [RotationSystem.faces, Set.mem_range, Set.mem_singleton_iff]\n  constructor\n  · rintro ⟨d, rfl⟩\n    exact Set.eq_univ_of_forall (key d)\n  · rintro rfl\n    exact ⟨⟨(0, 1), by decide⟩, Set.eq_univ_of_forall (key _)⟩\n\n/-- The single-edge graph is a near-triangulation: its only face is the outer face. -/\n@[category test, AMS 5]\ntheorem isNearTriangulation_top_fin_two : IsNearTriangulation (⊤ : SimpleGraph (Fin 2)) := by\n  refine ⟨connected_top, Or.inr ⟨singleEdgeRotationSystem, ?_, ?_⟩⟩\n  · rw [RotationSystem.IsPlanar, singleEdgeRotationSystem_faces, Set.ncard_singleton,\n      Nat.card_eq_fintype_card, Nat.card_eq_fintype_card, ← edgeFinset_card,\n      card_edgeFinset_top_eq_card_choose_two]\n    simp\n  · rw [singleEdgeRotationSystem_faces]\n    exact Set.subsingleton_singleton.anti (Set.sep_subset _ _)\n\nend Test\n\nend Embeddings\n\n/-- **Glen's theorem** (Glen, 2019). A $K_4$-free near-triangulation is word-representable if and\nonly if it is $3$-colourable.\n\nThis is the known characterisation referred to in the Wikipedia entry \"Characterise\nword-representable near-triangulations containing the complete graph $K_4$ (such a\ncharacterisation is known for $K_4$-free planar graphs)\". The cited result concerns $K_4$-free\nnear-triangulations rather than all $K_4$-free planar graphs. -/\n@[category research solved, AMS 5]\ntheorem word_representable_2 [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    (hG : IsNearTriangulation G) (hK₄ : G.CliqueFree 4) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry\n\nend WordRepresentable2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The dropped item ('Characterise word-representable near-triangulations containing K4') is a request for a characterisation with no statable proposition, and the retained slot is correctly identified as Glen's theorem for K4-free near-triangulations (not all K4-free planar graphs, as Wikipedia's wording suggests).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The Wikipedia parenthesis says 'K4-free planar graphs'; following the decomposition notes and the cited paper (Glen 2019), the theorem is stated for K4-free near-triangulations only, and the docstrings say so explicitly.",
+    "Word-representability follows Kitaev's definition: a word w over the alphabet V in which every letter of V occurs, such that distinct letters a, b alternate in w iff they are adjacent. 'Alternate' is formalised as: the sublist of w consisting of the copies of a and b has no two consecutive equal letters (List.IsChain (· ≠ ·) on w.filter); together with the requirement that every letter occurs this is exactly 'abab... or baba...'. The definition uses a [DecidableEq V] instance (for List.filter), so the main theorem carries [Fintype V] [DecidableEq V]; the proposition does not depend on the choice of instance.",
+    "Planarity: Mathlib has no planar graphs, so embeddings are described combinatorially by rotation systems (a permutation of the darts fixing tails and acting as a single cycle at each vertex). Faces are the orbits of the face permutation d ↦ rot(d.symm), and an embedding of a connected graph is in the sphere iff Euler's formula |V| + |F| = |E| + 2 holds (RotationSystem.IsPlanar). This is the standard Heffter–Edmonds correspondence between rotation systems and cellular embeddings in orientable surfaces.",
+    "Near-triangulation = 'planar graph in which every face except possibly the outer face is a triangle'. Since any face of a spherical embedding may serve as outer face, this is formalised as: G is connected and has a rotation system satisfying Euler's formula whose set of non-triangular faces (faces with ≠ 3 darts) is subsingleton. A face with exactly 3 darts in a simple graph is bounded by a 3-cycle.",
+    "Connectivity is required (faces of a rotation system only correspond to plane faces for connected graphs). Glen's phrasing 'a planar graph in which each inner bounded face is a triangle' does not explicitly mention connectivity or 2-connectivity; our definition includes connected but not necessarily 2-connected graphs. For disconnected graphs the informal notion reduces to each component being a near-triangulation and the theorem holds trivially, so this restriction does not change the mathematical content. A reviewer should check whether the intended definition also demands 2-connectivity (the theorem remains true either way, since 3-colourability and word-representability are both preserved by gluing at a vertex and by disjoint union).",
+    "The one-vertex graph has no darts, hence no faces in the rotation-system formalism, so Euler's formula would fail for it; it is included as a near-triangulation via the explicit disjunct `Subsingleton V` (together with Connected this is exactly the one-vertex graph). The empty graph is not connected and hence not a near-triangulation.",
+    "K4-free is formalised as G.CliqueFree 4; 3-colourable as G.Colorable 3.",
+    "Tests: the article's example (C4 represented by abdacdbc), alternation examples, a word missing a letter represents nothing, and the single edge K2 is a near-triangulation (its unique face is the outer face; Euler 2 + 1 = 1 + 2). These are proved, not sorried."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "List.IsChain / List.filter (used as building blocks); no existing alternation predicate.",
+     "name": "WordRepresentable2.Alternate",
+     "why_needed": "No notion of two letters alternating in a word exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "None; searched for 'word-representable', 'semi-transitive', 'alternation' in Mathlib and FormalConjecturesForMathlib.",
+     "name": "WordRepresentable2.Represents",
+     "why_needed": "Word representing a graph (every letter occurs; alternation ↔ adjacency) is absent from Mathlib and the repo."
+    },
+    {
+     "closest_existing_considered": "None found.",
+     "name": "WordRepresentable2.WordRepresentable",
+     "why_needed": "Word-representable graphs are not in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Dart and Equiv.Perm are used as building blocks; no embedding/planarity notion exists (searched 'planar', 'minor', 'rotation system', 'combinatorial map').",
+     "name": "WordRepresentable2.RotationSystem",
+     "why_needed": "Mathlib has no planar graphs, graph embeddings, minors or faces; a rotation system is the standard combinatorial description of a cellular embedding in an orientable surface."
+    },
+    {
+     "closest_existing_considered": "Function.Involutive.toPerm Dart.symm_involutive and Perm multiplication (used).",
+     "name": "WordRepresentable2.RotationSystem.facePerm",
+     "why_needed": "Face permutation d ↦ rot(d.symm) whose orbits are the faces of the embedding."
+    },
+    {
+     "closest_existing_considered": "Equiv.Perm.SameCycle (used to define orbits); MulAction.orbit considered.",
+     "name": "WordRepresentable2.RotationSystem.faces",
+     "why_needed": "Faces of the embedding, needed to say which faces are triangles and to count faces in Euler's formula."
+    },
+    {
+     "closest_existing_considered": "No planarity notion in Mathlib.",
+     "name": "WordRepresentable2.RotationSystem.IsPlanar",
+     "why_needed": "Euler's formula |V| + |F| = |E| + 2, which for a connected graph characterises embeddings in the sphere."
+    },
+    {
+     "closest_existing_considered": "Set.ncard (used).",
+     "name": "WordRepresentable2.IsTriangleFace",
+     "why_needed": "A face is a triangle iff its boundary walk has exactly three darts."
+    },
+    {
+     "closest_existing_considered": "None; no planar graph API exists.",
+     "name": "WordRepresentable2.IsNearTriangulation",
+     "why_needed": "Near-triangulations (planar graphs whose faces, except possibly the outer one, are triangles) are absent from Mathlib and the repo."
+    },
+    {
+     "closest_existing_considered": "n/a (test helper).",
+     "name": "WordRepresentable2.singleEdgeRotationSystem",
+     "why_needed": "Auxiliary object for the test that K2 is a near-triangulation (sanity check of the embedding definitions)."
+    }
+   ],
+   "per_slot": {
+    "word_representable_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Glen's theorem: for every finite graph G that is a near-triangulation and K4-free (G.CliqueFree 4), WordRepresentable G ↔ G.Colorable 3, tagged research solved. Word-representability (alternation in a word) and near-triangulation (connected graph with a spherical rotation system in which all faces but at most one are triangles) are bespoke since neither Mathlib nor FormalConjecturesForMathlib has word-representability, planar embeddings or faces."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "word_representable_2": "/-- **Glen's theorem** (Glen, 2019). A $K_4$-free near-triangulation is word-representable if and\nonly if it is $3$-colourable.\n\nThis is the known characterisation referred to in the Wikipedia entry \"Characterise\nword-representable near-triangulations containing the complete graph $K_4$ (such a\ncharacterisation is known for $K_4$-free planar graphs)\". The cited result concerns $K_4$-free\nnear-triangulations rather than all $K_4$-free planar graphs. -/\n@[category research solved, AMS 5]\ntheorem word_representable_2 [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    (hG : IsNearTriangulation G) (hK₄ : G.CliqueFree 4) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Word-representable near-triangulations\n\nThis file states the known characterization of word-representable, $K_4$-free\nnear-triangulations that motivates the corresponding open characterization problem for\nnear-triangulations containing $K_4$.\n\n*References:*\n- [Wikipedia, Word-representable graph](https://en.wikipedia.org/wiki/Word-representable_graph)\n- M. E. Glen, *Colourability and word-representability of near-triangulations*,\n  Pure Mathematics and Applications **28** (2019), 70–76.\n-/\n\nnamespace WordRepresentable2\n\n/-- A dart of a simple graph is an edge equipped with a direction. -/\ndef Dart {V : Type*} (G : SimpleGraph V) := {p : V × V // G.Adj p.1 p.2}\n\n/-- Reversal of the direction of a dart. -/\ndef dartReverse {V : Type*} (G : SimpleGraph V) : Equiv.Perm (Dart G) where\n  toFun d := ⟨(d.1.2, d.1.1), G.symm d.2⟩\n  invFun d := ⟨(d.1.2, d.1.1), G.symm d.2⟩\n  left_inv _ := rfl\n  right_inv _ := rfl\n\n/--\nA graph is word-representable if some finite word containing every vertex represents its\nadjacency relation: two distinct letters are adjacent exactly when the subword obtained by\ndeleting all other letters alternates between them.\n-/\ndef WordRepresentable {V : Type*} [DecidableEq V] (G : SimpleGraph V) : Prop :=\n  ∃ w : List V, (∀ v, v ∈ w) ∧ ∀ a b, a ≠ b →\n    (G.Adj a b ↔ (w.filter fun x ↦ x = a ∨ x = b).IsChain (· ≠ ·))\n\n/--\nA finite connected simple graph is a near-triangulation if it has a plane rotation system\nin which all faces except possibly one have boundary length three. The permutation `rot`\ngives the cyclic order of darts leaving each vertex. Its composition with dart reversal\ntraces face boundaries, and the Euler characteristic equation says that the resulting\ncellular embedding is on the sphere.\n-/\ndef IsNearTriangulation {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] : Prop :=\n  letI : Finite (Dart G) := by unfold Dart; infer_instance\n  letI : Fintype (Dart G) := Fintype.ofFinite (Dart G)\n  letI : DecidableEq (Dart G) := by unfold Dart; infer_instance\n  G.Connected ∧ ∃ rot : Equiv.Perm (Dart G),\n    (∀ d, (rot d).1.1 = d.1.1) ∧\n    (∀ d e, d.1.1 = e.1.1 → ∃ n : ℕ, (rot ^ n) d = e) ∧\n    (Fintype.card V : ℤ) - G.edgeFinset.card +\n        Multiset.card (rot * dartReverse G).cycleType = 2 ∧\n    Multiset.card ((rot * dartReverse G).cycleType.filter (· ≠ 3)) ≤ 1\n\n/--\n**Glen's theorem (the known $K_4$-free characterization).** Every finite $K_4$-free\nnear-triangulation is word-representable if and only if it is $3$-colourable. This is the\nknown counterpart referred to by the list entry asking for a characterization of\nword-representable near-triangulations that contain $K_4$.\n-/\n@[category research solved, AMS 5]\ntheorem word_representable_2 {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hG : IsNearTriangulation G) (hK4 : G.CliqueFree 4) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry\n\nend WordRepresentable2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.91,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the parenthetical known result as Glen's precise theorem for finite K4-free near-triangulations, rather than the list entry's overstatement about all K4-free planar graphs, following the supplied article and decomposition notes.",
+    "Defined word-representability directly by a finite word containing every vertex, with distinct vertices adjacent exactly when filtering the word to those two letters produces a list whose consecutive entries differ.",
+    "Modeled a plane near-triangulation combinatorially by a connected finite rotation system: the rotation is cyclic on the outgoing darts at each vertex, its face permutation is rotation after dart reversal, Euler characteristic 2 enforces a spherical/plane embedding, and at most one face boundary has length other than 3.",
+    "Used Mathlib's `SimpleGraph.CliqueFree 4` for K4-freeness and `SimpleGraph.Colorable 3` for 3-colourability.",
+    "Tagged the sole stated theorem `research solved` because it is the known Glen theorem isolated by the decomposition, although the surrounding characterization problem has open status."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib SimpleGraph edge sets, walks, graph embeddings, and permutation APIs; no directed-dart or planar rotation-system type was found.",
+     "name": "WordRepresentable2.Dart",
+     "why_needed": "A combinatorial plane embedding via a rotation system acts on directed edge-ends."
+    },
+    {
+     "closest_existing_considered": "Mathlib `Equiv.Perm` and SimpleGraph edge APIs; no dart-reversal permutation was found.",
+     "name": "WordRepresentable2.dartReverse",
+     "why_needed": "Face boundaries of a rotation system are the cycles obtained by composing vertex rotation with reversal of directed edges."
+    },
+    {
+     "closest_existing_considered": "Mathlib `List.filter` and `List.IsChain`, and the repository's graph APIs; these supply components but no existing word-representability predicate.",
+     "name": "WordRepresentable2.WordRepresentable",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines graph word-representability or two-letter alternation in a representing word."
+    },
+    {
+     "closest_existing_considered": "Mathlib SimpleGraph connectivity, edge finsets, walks, embeddings, and `Equiv.Perm.cycleType`; none alone represents plane faces, so they were combined into a finite rotation-system definition.",
+     "name": "WordRepresentable2.IsNearTriangulation",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no planar graph, plane embedding, face, or near-triangulation API."
+    }
+   ],
+   "per_slot": {
+    "word_representable_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "word_representable_2": "/--\n**Glen's theorem (the known $K_4$-free characterization).** Every finite $K_4$-free\nnear-triangulation is word-representable if and only if it is $3$-colourable. This is the\nknown counterpart referred to by the list entry asking for a characterization of\nword-representable near-triangulations that contain $K_4$.\n-/\n@[category research solved, AMS 5]\ntheorem word_representable_2 {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hG : IsNearTriangulation G) (hK4 : G.CliqueFree 4) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Word-representable near-triangulations\n\n*References:*\n- [Wikipedia, Word-representable graph](https://en.wikipedia.org/wiki/Word-representable_graph)\n- M. E. Glen, *Colourability and word-representability of near-triangulations*,\n  Pure Mathematics and Applications 28 (2019), 70–76.\n-/\n\nnamespace WordRepresentable2\n\nopen SimpleGraph\n\n/-- Two distinct letters alternate in a word if every two consecutive letters in the word\nobtained by retaining only those letters are different. -/\ndef AlternatesInWord {V : Type*} [DecidableEq V] (w : List V) (a b : V) : Prop :=\n  a ≠ b ∧ (w.filter fun x ↦ x = a || x = b).IsChain (· ≠ ·)\n\n/-- A graph is word-representable if some finite word containing every vertex makes two distinct\nvertices alternate exactly when they are adjacent. -/\ndef WordRepresentable {V : Type*} [DecidableEq V] (G : SimpleGraph V) : Prop :=\n  ∃ w : List V, (∀ v, v ∈ w) ∧ ∀ a b, G.Adj a b ↔ AlternatesInWord w a b\n\n/-- Reversal of the orientation of a dart, as a permutation. -/\ndef dartReverse {V : Type*} (G : SimpleGraph V) : Equiv.Perm G.Dart :=\n  SimpleGraph.Dart.symm_involutive.toPerm\n\n/-- The face permutation associated to a rotation of the darts of a graph. -/\ndef facePerm {V : Type*} (G : SimpleGraph V) (r : Equiv.Perm G.Dart) : Equiv.Perm G.Dart :=\n  (dartReverse G).trans r\n\n/-- A rotation system cyclically orders precisely the darts issuing from each vertex. -/\ndef IsRotationSystem {V : Type*} {G : SimpleGraph V} (r : Equiv.Perm G.Dart) : Prop :=\n  ∀ d e, r.SameCycle d e ↔ d.fst = e.fst\n\n/-- A finite graph is a near-triangulation if it is connected and has a spherical rotation system\nwhose face cycles consist of one outer face of arbitrary length and triangular bounded faces. The\nedgeless case accounts for the one-vertex plane graph, whose unique face contains no dart. -/\ndef IsNearTriangulation {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    [DecidableRel G.Adj] : Prop :=\n  G.Connected ∧ (G.edgeFinset = ∅ ∨ ∃ (r : Equiv.Perm G.Dart) (k outerLength : ℕ),\n    IsRotationSystem r ∧\n    Fintype.card V + (facePerm G r).partition.parts.card = G.edgeFinset.card + 2 ∧\n    (facePerm G r).partition.parts = {outerLength} + Multiset.replicate k 3)\n\n/-- Glen's theorem: a $K_4$-free near-triangulation is word-representable if and only if it is\n3-colourable. This is the known $K_4$-free counterpart mentioned by the Wikipedia list entry; the\nresult concerns near-triangulations, rather than all $K_4$-free planar graphs. -/\n@[category research solved, AMS 5]\ntheorem word_representable_2 {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hnear : IsNearTriangulation (G := G)) (hK4 : G.CliqueFree 4) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry\n\nend WordRepresentable2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted Wikipedia's parenthetical using the precise result stated in the background article (Glen's theorem): every K4-free near-triangulation is word-representable iff it is 3-colourable. The broader phrase 'K4-free planar graphs' in the list entry was not formalized literally.",
+    "Modeled graphs as finite Mathlib `SimpleGraph`s. Used Mathlib's `SimpleGraph.CliqueFree 4` and `SimpleGraph.Colorable 3`.",
+    "Defined word-representability directly from the cited article: a finite word contains every graph vertex, and for every pair of vertices adjacency is equivalent to alternation after filtering the word to that pair. Equal vertices are explicitly excluded from alternation.",
+    "Modeled a near-triangulation as a connected graph with a spherical combinatorial embedding encoded by a rotation system on darts. Euler characteristic 2 enforces a spherical embedding, and the face-permutation cycle lengths are one arbitrary outer face together with triangular bounded faces.",
+    "Included the connected edgeless case explicitly, accounting for the one-vertex plane graph whose unique face has no darts and therefore is not represented by a face-permutation cycle."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`List.IsChain` is used internally to state that consecutive letters of the filtered word differ, but it does not itself perform the required two-letter filtering or distinct-letter restriction.",
+     "name": "AlternatesInWord",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no word-alternation predicate for graph word-representations."
+    },
+    {
+     "closest_existing_considered": "The equivalent semi-transitive-orientation characterization was considered, but no semi-transitive orientation API exists; the source's direct word definition is more faithful.",
+     "name": "WordRepresentable",
+     "why_needed": "No word-representable graph predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `SimpleGraph.Dart.symm` and its involutivity theorem, but not the packaged permutation used here.",
+     "name": "dartReverse",
+     "why_needed": "The rotation-system face permutation needs reversal of a graph dart as an `Equiv.Perm`."
+    },
+    {
+     "closest_existing_considered": "Mathlib's permutation cycle and partition APIs exist, but there is no graph-embedding face permutation.",
+     "name": "facePerm",
+     "why_needed": "Faces of a combinatorial embedding are the cycles obtained by reversing a dart and then applying the local rotation."
+    },
+    {
+     "closest_existing_considered": "`Equiv.Perm.SameCycle` supplies the orbit relation; the new predicate requires its cycles to be exactly the sets of darts issuing from individual vertices.",
+     "name": "IsRotationSystem",
+     "why_needed": "Mathlib has graph darts but no planar embedding or rotation-system API."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `SimpleGraph.Connected`, dart API, edge finsets, and permutation partitions were combined into a standard rotation-system characterization instead of using an unsupported geometric embedding placeholder.",
+     "name": "IsNearTriangulation",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no planar graph, plane embedding, or near-triangulation predicate."
+    }
+   ],
+   "per_slot": {
+    "word_representable_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "word_representable_2": "/-- Glen's theorem: a $K_4$-free near-triangulation is word-representable if and only if it is\n3-colourable. This is the known $K_4$-free counterpart mentioned by the Wikipedia list entry; the\nresult concerns near-triangulations, rather than all $K_4$-free planar graphs. -/\n@[category research solved, AMS 5]\ntheorem word_representable_2 {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hnear : IsNearTriangulation (G := G)) (hK4 : G.CliqueFree 4) :\n    WordRepresentable G ↔ G.Colorable 3 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Word-representable near-triangulations\n\nA finite graph is word-representable if its adjacency relation is encoded by alternation of\nletters in a word. This file states the known characterization of the $K_4$-free case of the\nopen problem about near-triangulations containing $K_4$.\n\n*References:*\n- [Wikipedia, Word-representable graph](https://en.wikipedia.org/wiki/Word-representable_graph)\n- M. E. Glen, *Colourability and word-representability of near-triangulations*, Pure Mathematics\n  and Applications 28 (2019), 70–76.\n-/\n\nnamespace WordRepresentable2\n\nopen SimpleGraph\n\n/-- Two distinct letters alternate in a word when consecutive letters in the word obtained by\nremoving every other letter are different. -/\ndef AlternatesIn {V : Type*} [DecidableEq V] (w : List V) (a b : V) : Prop :=\n  (w.filter fun x ↦ x = a ∨ x = b).IsChain (· ≠ ·)\n\n/-- A graph is word-representable if there is a word containing every vertex in which two\ndistinct vertices alternate exactly when they are adjacent. -/\ndef WordRepresentable {V : Type*} [DecidableEq V] (G : SimpleGraph V) : Prop :=\n  ∃ w : List V, (∀ v, v ∈ w) ∧\n    ∀ a b, a ≠ b → (AlternatesIn w a b ↔ G.Adj a b)\n\n/-- Reversal of the orientation of a dart, as a permutation of the darts. -/\ndef dartReversal {V : Type*} (G : SimpleGraph V) : Equiv.Perm G.Dart where\n  toFun := Dart.symm\n  invFun := Dart.symm\n  left_inv := Dart.symm_symm\n  right_inv := Dart.symm_symm\n\n/-- The face incident to a dart in the combinatorial embedding represented by the rotation\npermutation `rotation`. Faces are orbits of \"reverse the dart, then take the next dart around the\nvertex\". -/\ndef faceOrbit {V : Type*} {G : SimpleGraph V} (rotation : Equiv.Perm G.Dart)\n    (d : G.Dart) : Set G.Dart :=\n  {e | ∃ n : ℤ, ((rotation * dartReversal G) ^ n) d = e}\n\n/-- The set of faces of the combinatorial embedding represented by `rotation`. -/\ndef faceOrbits {V : Type*} {G : SimpleGraph V}\n    (rotation : Equiv.Perm G.Dart) : Set (Set G.Dart) :=\n  Set.range (faceOrbit rotation)\n\n/-- A finite simple graph is a near-triangulation if it has a connected plane embedding in which\nall faces except a designated outer face have degree three. The plane embedding is encoded by a\ncyclic ordering of the darts at each vertex. Euler characteristic two says that this rotation\nsystem embeds cellularly in the sphere. -/\ndef NearTriangulation {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] : Prop :=\n  G.Connected ∧ ∃ (rotation : Equiv.Perm G.Dart) (outer : Set G.Dart),\n    (∀ d, (rotation d).fst = d.fst) ∧\n    (∀ d e, d.fst = e.fst → ∃ n : ℤ, (rotation ^ n) d = e) ∧\n    outer ∈ faceOrbits rotation ∧\n    (Fintype.card V : ℤ) - (G.edgeFinset.card : ℤ) + (faceOrbits rotation).ncard = 2 ∧\n    ∀ face ∈ faceOrbits rotation, face ≠ outer → face.ncard = 3\n\n/-- **Glen's theorem (the known $K_4$-free near-triangulation characterization).**\n\nEvery finite $K_4$-free near-triangulation is word-representable if and only if it is\n$3$-colorable. This is the known counterpart cited by the open problem asking for a\ncharacterization of word-representable near-triangulations that contain $K_4$.\n-/\n@[category research solved, AMS 5]\ntheorem word_representable_2 :\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      G.CliqueFree 4 → NearTriangulation G → (WordRepresentable G ↔ G.Colorable 3) := by\n  sorry\n\nend WordRepresentable2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page parenthetical was resolved using the background article's precise statement of Glen's theorem: the scope is K4-free near-triangulations, not all K4-free planar graphs.",
+    "A word is a finite `List` of vertices and is required to contain every vertex, reflecting that the word's alphabet is the graph's vertex set. For distinct vertices, alternation means that after filtering to those two letters, every consecutive pair differs.",
+    "`G.CliqueFree 4` formalizes K4-freeness, and Mathlib's `G.Colorable 3` formalizes 3-colourability (colourability with at most three colours).",
+    "A plane near-triangulation is encoded by a rotation system on darts. The rotation preserves each dart's initial vertex and acts transitively on the outgoing darts at that vertex. Faces are orbits of reverse-then-rotate; connectedness and Euler characteristic two enforce a cellular sphere embedding; one face is designated outer and every other face has degree three.",
+    "The theorem is stated for finite simple graphs with decidable equality and adjacency, as needed by the finite combinatorial-map and coloring APIs. The open request to characterize near-triangulations containing K4 was dropped as directed because it does not itself determine a statable proposition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`List.IsChain` and `List.filter`; these are used to build the predicate but do not package the source notion.",
+     "name": "AlternatesIn",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no predicate for alternation of two letters in a finite word."
+    },
+    {
+     "closest_existing_considered": "The equivalent semi-transitive-orientation characterization was considered, but there is no existing semi-transitive orientation API and direct word alternation follows the source definition more closely.",
+     "name": "WordRepresentable",
+     "why_needed": "No word-representable graph predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Dart.symm`.",
+     "name": "dartReversal",
+     "why_needed": "The face permutation requires reversal as an `Equiv.Perm` of graph darts; Mathlib provides `SimpleGraph.Dart.symm` and its involutivity theorem but not this packaged permutation."
+    },
+    {
+     "closest_existing_considered": "Mathlib permutation powers and general group-action orbit APIs; no graph-face specialization exists.",
+     "name": "faceOrbit",
+     "why_needed": "Mathlib has darts but no planar embedding or face API. This defines one face boundary as an orbit of the combinatorial face permutation."
+    },
+    {
+     "closest_existing_considered": "`Set.range faceOrbit`; this definition is a problem-local wrapper because no combinatorial-map face collection exists.",
+     "name": "faceOrbits",
+     "why_needed": "The near-triangulation definition must count and quantify over all faces of a rotation system."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph connectivity, darts, edge finsets, and clique APIs. A shortcut such as maximal planar or an edge-count condition was rejected because it would not faithfully express that every bounded face is triangular.",
+     "name": "NearTriangulation",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no planarity, plane embedding, face, or near-triangulation predicate."
+    }
+   ],
+   "per_slot": {
+    "word_representable_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "word_representable_2": "/-- **Glen's theorem (the known $K_4$-free near-triangulation characterization).**\n\nEvery finite $K_4$-free near-triangulation is word-representable if and only if it is\n$3$-colorable. This is the known counterpart cited by the open problem asking for a\ncharacterization of word-representable near-triangulations that contain $K_4$.\n-/\n@[category research solved, AMS 5]\ntheorem word_representable_2 :\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      G.CliqueFree 4 → NearTriangulation G → (WordRepresentable G ↔ G.Colorable 3) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "word_representable_2": "c01"
+ },
+ "id": "wp-word-representable-2",
+ "main_attempt": "c01"
+}

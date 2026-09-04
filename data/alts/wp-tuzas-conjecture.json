@@ -1,0 +1,337 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tuza's conjecture\n\nTuza's conjecture (1981) concerns triangles in finite undirected graphs. For a graph $G$ let\n$\\nu(G)$ be the *triangle packing number*, the largest number of pairwise edge-disjoint\ntriangles in $G$, and let $\\tau(G)$ be the *triangle hitting number*, the smallest size of a\nset of edges meeting every triangle of $G$. Trivially $\\nu(G) \\le \\tau(G) \\le 3\\nu(G)$.\nTuza conjectured that $\\tau(G) \\le 2\\nu(G)$ for every graph $G$.\n\n*References:*\n- [Wikipedia: Tuza's conjecture](https://en.wikipedia.org/wiki/Tuza%27s_conjecture)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- Tuza, Zs. (1981). \"Conjecture.\" In *Finite and Infinite Sets, Proc. Colloq. Math. Soc. János\n  Bolyai*, Eger, Hungary, p. 888.\n-/\n\nopen Finset SimpleGraph\n\nnamespace TuzasConjecture\n\nvariable {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj]\n\n/--\nA finite set `T` of triangles of `G` (a triangle is a `3`-clique, given by its vertex set) is a\n*triangle packing* if its triangles are pairwise edge-disjoint, i.e. no edge of `G` lies in two\ndistinct triangles of `T`.\n-/\ndef IsTrianglePacking (T : Finset (Finset V)) : Prop :=\n  T ⊆ G.cliqueFinset 3 ∧\n    ∀ s ∈ T, ∀ t ∈ T, s ≠ t → ∀ e ∈ G.edgeFinset, e ∈ s.sym2 → e ∉ t.sym2\n\n/--\nThe *triangle packing number* $\\nu(G)$ of a finite graph $G$: the largest number of pairwise\nedge-disjoint triangles in $G$.\n-/\nnoncomputable def trianglePackingNumber : ℕ :=\n  sSup {n | ∃ T, IsTrianglePacking G T ∧ T.card = n}\n\n/--\nA set `E` of edges of `G` is a *triangle hitting set* if every triangle of `G` contains an edge\nof `E`.\n-/\ndef IsTriangleHittingSet (E : Finset (Sym2 V)) : Prop :=\n  E ⊆ G.edgeFinset ∧ ∀ t ∈ G.cliqueFinset 3, ∃ e ∈ E, e ∈ t.sym2\n\n/--\nThe *triangle hitting number* $\\tau(G)$ of a finite graph $G$: the smallest size of a set of edges\nof $G$ meeting every triangle of $G$.\n-/\nnoncomputable def triangleHittingNumber : ℕ :=\n  sInf {n | ∃ E, IsTriangleHittingSet G E ∧ E.card = n}\n\n/--\n**Tuza's conjecture.** Let $G$ be a finite simple undirected graph and let $\\nu(G)$ be the\nmaximum number of pairwise edge-disjoint triangles in $G$. Can all triangles of $G$ be hit by a\nset of at most $2\\nu(G)$ edges? That is, is there a set of at most $2\\nu(G)$ edges of $G$ that\ncontains an edge of every triangle of $G$?\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      ∃ E, IsTriangleHittingSet G E ∧ E.card ≤ 2 * trianglePackingNumber G := by\n  sorry\n\n/--\n**Tuza's conjecture**, in terms of the triangle hitting number: is $\\tau(G) \\le 2\\nu(G)$ for\nevery finite simple undirected graph $G$?\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture.variants.hittingNumber : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      triangleHittingNumber G ≤ 2 * trianglePackingNumber G := by\n  sorry\n\n/-- The empty set of triangles is a triangle packing. -/\n@[category API, AMS 5]\ntheorem isTrianglePacking_empty : IsTrianglePacking G ∅ := by\n  simp [IsTrianglePacking]\n\n/-- A triangle packing has at most as many elements as there are triangles in `G`. -/\n@[category API, AMS 5]\ntheorem IsTrianglePacking.card_le {T : Finset (Finset V)} (hT : IsTrianglePacking G T) :\n    T.card ≤ (G.cliqueFinset 3).card :=\n  card_le_card hT.1\n\n/-- The set of all edges of `G` is a triangle hitting set. -/\n@[category API, AMS 5]\ntheorem isTriangleHittingSet_edgeFinset : IsTriangleHittingSet G G.edgeFinset := by\n  refine ⟨Finset.Subset.refl _, fun t ht => ?_⟩\n  obtain ⟨a, b, c, hab, hac, hbc, rfl⟩ := is3Clique_iff.mp (mem_cliqueFinset_iff.mp ht)\n  exact ⟨s(a, b), mem_edgeFinset.mpr hab, by simp⟩\n\n/-- A triangle hitting set contains a distinct edge of each triangle of a triangle packing. -/\n@[category API, AMS 5]\ntheorem IsTrianglePacking.card_le_of_isTriangleHittingSet {T : Finset (Finset V)}\n    {E : Finset (Sym2 V)} (hT : IsTrianglePacking G T) (hE : IsTriangleHittingSet G E) :\n    T.card ≤ E.card := by\n  refine card_le_card_of_forall_subsingleton (fun t e => e ∈ t.sym2)\n    (fun t ht => hE.2 t (hT.1 ht)) ?_\n  intro e he s ⟨hs, hes⟩ t ⟨ht, het⟩\n  by_contra hst\n  exact hT.2 s hs t ht hst e (hE.1 he) hes het\n\n/-- The trivial lower bound $\\nu(G) \\le \\tau(G)$. -/\n@[category textbook, AMS 5]\ntheorem trianglePackingNumber_le_triangleHittingNumber :\n    trianglePackingNumber G ≤ triangleHittingNumber G := by\n  refine le_csInf ⟨_, _, isTriangleHittingSet_edgeFinset G, rfl⟩ ?_\n  rintro m ⟨E, hE, rfl⟩\n  refine csSup_le ⟨0, ∅, isTrianglePacking_empty G, rfl⟩ ?_\n  rintro n ⟨T, hT, rfl⟩\n  exact hT.card_le_of_isTriangleHittingSet G hE\n\n/-- The trivial upper bound $\\tau(G) \\le 3\\nu(G)$, which Tuza's conjecture proposes to improve. -/\n@[category textbook, AMS 5]\ntheorem triangleHittingNumber_le_three_mul_trianglePackingNumber :\n    triangleHittingNumber G ≤ 3 * trianglePackingNumber G := by\n  sorry\n\n/-- The edgeless graph has triangle packing number `0`. -/\n@[category test, AMS 5]\ntheorem trianglePackingNumber_bot : trianglePackingNumber (⊥ : SimpleGraph V) = 0 := by\n  refine Nat.le_zero.mp (csSup_le ⟨0, ∅, isTrianglePacking_empty _, rfl⟩ ?_)\n  rintro n ⟨T, hT, rfl⟩\n  have := hT.card_le\n  rwa [cliqueFinset_eq_empty_iff.mpr (cliqueFree_bot (by norm_num)), card_empty] at this\n\n/-- The edgeless graph has triangle hitting number `0`. -/\n@[category test, AMS 5]\ntheorem triangleHittingNumber_bot : triangleHittingNumber (⊥ : SimpleGraph V) = 0 :=\n  Nat.le_zero.mp <| Nat.sInf_le ⟨∅, ⟨empty_subset _, by simp⟩, rfl⟩\n\n/-- The triangle $K_3$ has triangle packing number `1`. -/\n@[category test, AMS 5]\ntheorem trianglePackingNumber_top_fin_three :\n    trianglePackingNumber (⊤ : SimpleGraph (Fin 3)) = 1 := by\n  have h : ∀ n ∈ {n | ∃ T, IsTrianglePacking (⊤ : SimpleGraph (Fin 3)) T ∧ T.card = n},\n      n ≤ 1 := by\n    rintro n ⟨T, hT, rfl⟩\n    exact hT.card_le.trans (by decide)\n  refine le_antisymm (csSup_le ⟨0, ∅, isTrianglePacking_empty _, rfl⟩ h) ?_\n  exact le_csSup ⟨1, h⟩ ⟨{Finset.univ}, by unfold IsTrianglePacking; decide, rfl⟩\n\n/-- The triangle $K_3$ has triangle hitting number `1`. -/\n@[category test, AMS 5]\ntheorem triangleHittingNumber_top_fin_three :\n    triangleHittingNumber (⊤ : SimpleGraph (Fin 3)) = 1 := by\n  refine le_antisymm (Nat.sInf_le ⟨{s(0, 1)}, by unfold IsTriangleHittingSet; decide, rfl⟩) ?_\n  refine le_csInf ⟨_, _, isTriangleHittingSet_edgeFinset _, rfl⟩ ?_\n  rintro n ⟨E, hE, rfl⟩\n  obtain ⟨e, he, -⟩ := hE.2 Finset.univ (by decide)\n  exact card_pos.mpr ⟨e, he⟩\n\nend TuzasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single slot and its notes (edge-disjoint reading, implicit universal quantification over finite graphs, non-strict bound, consistency of the triangle-free case) match the Wikipedia article and the cited papers.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list-page entry is a yes/no question, so the slot is stated as `answer(sorry) ↔ P` (repo convention), where P is: for every finite simple undirected graph G there is a set of at most 2·ν(G) edges of G meeting every triangle. A positive answer corresponds to Tuza's conjecture being true.",
+    "Graphs are finite: `{V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj]` (the decidability instances are only needed for `cliqueFinset`/`edgeFinset`). The Wikipedia article says 'any graph' but Tuza's conjecture is standardly about finite graphs, matching the decomposition notes.",
+    "Triangles are represented as 3-cliques given by their vertex sets (`G.cliqueFinset 3`), which is equivalent to triangle subgraphs in a simple graph.",
+    "'Disjoint' is read as pairwise EDGE-disjoint (per the decomposition table and the article): `IsTrianglePacking G T` requires `T ⊆ G.cliqueFinset 3` and that no edge `e ∈ G.edgeFinset` lies in two distinct triangles of `T` (`e ∈ s.sym2 → e ∉ t.sym2` for `s ≠ t`). Restricting to edges of G (non-diagonal) is essential because `Finset.sym2` contains diagonal pairs `s(v,v)`.",
+    "ν(G) = `trianglePackingNumber G` is `sSup {n | ∃ T, IsTrianglePacking G T ∧ T.card = n}`; this set is nonempty (∅ is a packing) and bounded by the number of triangles, so `sSup` is the genuine maximum. Tests: ν(⊥) = 0 and ν(K₃) = 1 are proved.",
+    "A hitting set `E : Finset (Sym2 V)` must satisfy `E ⊆ G.edgeFinset` (it is a set of edges of G) and every triangle `t` must contain some `e ∈ E`, expressed as `e ∈ t.sym2` (both endpoints in `t`; for a non-diagonal edge of a clique this is exactly 'e is an edge of the triangle t').",
+    "The main slot is stated literally as the existence of a hitting set of size ≤ 2ν(G) rather than via τ(G); an equivalent variant `tuzas_conjecture.variants.hittingNumber` states τ(G) ≤ 2ν(G) with τ = `triangleHittingNumber` defined via `sInf` (set nonempty since `G.edgeFinset` is a hitting set, so `sInf` is the true minimum).",
+    "The bound is non-strict (`≤ 2 * ν`), and the triangle-free case is consistent: ν = 0 and `E = ∅` is a hitting set of size 0.",
+    "Supporting declarations: the trivial bound ν ≤ τ is proved (category textbook) from the definitions; the trivial bound τ ≤ 3ν is stated (category textbook) with `sorry`; API lemmas and small tests (⊥ and K₃) validate the definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.EdgeDisjointTriangles` (Mathlib) is a property of a whole graph (all its triangles are edge-disjoint), not of a chosen family of triangles; `SimpleGraph.LocallyLinear` likewise. Neither yields a packing of a general graph.",
+     "name": "TuzasConjecture.IsTrianglePacking",
+     "why_needed": "Need the notion of a set of pairwise edge-disjoint triangles of a graph (as a set of 3-cliques), to define the packing number ν(G)."
+    },
+    {
+     "closest_existing_considered": "No packing-number primitive exists in Mathlib; `SimpleGraph.cliqueFinset 3` only gives the set of all triangles.",
+     "name": "TuzasConjecture.trianglePackingNumber",
+     "why_needed": "ν(G), the maximum number of pairwise edge-disjoint triangles; not in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.DeleteFar` / `SimpleGraph.FarFromTriangleFree` (Mathlib) talk about deleting edges to make the graph triangle-free, but are phrased with a real-valued threshold relative to |V|² and as a 'far from' predicate; they do not give a hitting set or its exact cardinality.",
+     "name": "TuzasConjecture.IsTriangleHittingSet",
+     "why_needed": "A set of edges of G meeting every triangle of G (the object the question asks for)."
+    },
+    {
+     "closest_existing_considered": "No triangle-hitting/edge-transversal number exists in Mathlib; `FarFromTriangleFree` is the closest but is density-based.",
+     "name": "TuzasConjecture.triangleHittingNumber",
+     "why_needed": "τ(G), the minimum size of a triangle hitting set, used for the equivalent variant τ(G) ≤ 2ν(G) stated in the Wikipedia article and the textbook bounds ν ≤ τ ≤ 3ν."
+    }
+   ],
+   "per_slot": {
+    "tuzas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ finite simple graph G, ∃ E, IsTriangleHittingSet G E ∧ E.card ≤ 2 * trianglePackingNumber G`, with bespoke definitions of triangle packings (pairwise edge-disjoint 3-cliques), the packing number ν, and triangle hitting sets (sets of edges of G meeting every triangle). Mathlib has no packing number / hitting number primitives (only `EdgeDisjointTriangles` as a whole-graph property and the density-based `FarFromTriangleFree`)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tuzas_conjecture": "/--\n**Tuza's conjecture.** Let $G$ be a finite simple undirected graph and let $\\nu(G)$ be the\nmaximum number of pairwise edge-disjoint triangles in $G$. Can all triangles of $G$ be hit by a\nset of at most $2\\nu(G)$ edges? That is, is there a set of at most $2\\nu(G)$ edges of $G$ that\ncontains an edge of every triangle of $G$?\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      ∃ E, IsTriangleHittingSet G E ∧ E.card ≤ 2 * trianglePackingNumber G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tuza's conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Tuza%27s_conjecture)\n-/\n\nnamespace TuzasConjecture\n\n/--\nIs it true that, in every finite simple undirected graph, all triangles can be hit by a set\nof at most twice as many edges as the maximum number of pairwise edge-disjoint triangles?\n\nHere `P` is a maximum family of pairwise edge-disjoint triangles, and `C` is the set of\nedges hitting every triangle.\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture :\n    answer(sorry) ↔\n      ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n        ∃ P : Finset (Finset V),\n          P ⊆ G.cliqueFinset 3 ∧\n          (P : Set (Finset V)).Pairwise\n            (fun s t ↦ (s ∩ t : Set V).Subsingleton) ∧\n          (∀ Q : Finset (Finset V),\n            Q ⊆ G.cliqueFinset 3 →\n            (Q : Set (Finset V)).Pairwise\n              (fun s t ↦ (s ∩ t : Set V).Subsingleton) →\n            Q.card ≤ P.card) ∧\n          ∃ C : Finset (Sym2 V),\n            C ⊆ G.edgeFinset ∧\n            C.card ≤ 2 * P.card ∧\n            ∀ t ∈ G.cliqueFinset 3, ∃ e ∈ C, e ∈ t.sym2 := by\n  sorry\n\nend TuzasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list-page question using the detailed Wikipedia article: the graph is universally quantified over finite simple undirected graphs, and “disjoint” means edge-disjoint rather than vertex-disjoint.",
+    "Represented triangles by Mathlib's `G.cliqueFinset 3`. Represented a triangle packing by a finset `P` of such triangles whose distinct members have subsingleton vertex intersection; for triangles, this is exactly pairwise edge-disjointness and matches Mathlib's own `EdgeDisjointTriangles` characterization.",
+    "Represented ν(G) without adding a numeric definition: `P` is required to dominate the cardinality of every other edge-disjoint triangle packing, so `P.card` is the maximum packing number.",
+    "Represented the hitting set by a finset `C` contained in `G.edgeFinset`; every triangle must contain some member of `C`, expressed through membership in the triangle vertex finset's symmetric square.",
+    "Used `answer(sorry) ↔ ...` because the source states the conjecture as a yes/no question. The positive proposition includes the non-strict bound `C.card ≤ 2 * P.card` and admits empty packing and hitting sets in the triangle-free case."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "tuzas_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tuzas_conjecture": "/--\nIs it true that, in every finite simple undirected graph, all triangles can be hit by a set\nof at most twice as many edges as the maximum number of pairwise edge-disjoint triangles?\n\nHere `P` is a maximum family of pairwise edge-disjoint triangles, and `C` is the set of\nedges hitting every triangle.\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture :\n    answer(sorry) ↔\n      ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n        ∃ P : Finset (Finset V),\n          P ⊆ G.cliqueFinset 3 ∧\n          (P : Set (Finset V)).Pairwise\n            (fun s t ↦ (s ∩ t : Set V).Subsingleton) ∧\n          (∀ Q : Finset (Finset V),\n            Q ⊆ G.cliqueFinset 3 →\n            (Q : Set (Finset V)).Pairwise\n              (fun s t ↦ (s ∩ t : Set V).Subsingleton) →\n            Q.card ≤ P.card) ∧\n          ∃ C : Finset (Sym2 V),\n            C ⊆ G.edgeFinset ∧\n            C.card ≤ 2 * P.card ∧\n            ∀ t ∈ G.cliqueFinset 3, ∃ e ∈ C, e ∈ t.sym2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tuza's conjecture\n\nFor a finite simple graph $G$, let $\\nu(G)$ be the *triangle packing number*, the largest\nnumber of pairwise edge-disjoint triangles of $G$, and let $\\tau(G)$ be the *triangle hitting\nnumber* (or *triangle transversal number*), the smallest size of a set of edges of $G$ that\ncontains at least one edge of every triangle of $G$. Tuza conjectured in 1981 that\n$\\tau(G) \\le 2\\nu(G)$ for every graph $G$.\n\n*References:*\n- [Wikipedia, Tuza's conjecture](https://en.wikipedia.org/wiki/Tuza%27s_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Tu90] Tuza, Zsolt, *A conjecture on triangles of graphs*, Graphs and Combinatorics 6 (1990),\n  373–380.\n-/\n\nnamespace TuzasConjecture\n\nopen Finset SimpleGraph\n\nvariable {V : Type*}\n\n/-- A *triangle packing* of a graph `G` is a family `P` of triangles (`3`-cliques) of `G`\nthat are pairwise edge-disjoint, i.e. any two distinct triangles of `P` share at most one\nvertex. -/\ndef IsTrianglePacking (G : SimpleGraph V) (P : Finset (Finset V)) : Prop :=\n  (∀ t ∈ P, G.IsNClique 3 t) ∧\n    (P : Set (Finset V)).Pairwise fun s t ↦ (s ∩ t : Set V).Subsingleton\n\n/-- The *triangle packing number* $\\nu(G)$ of a finite graph `G`: the largest number of\npairwise edge-disjoint triangles of `G`. -/\nnoncomputable def trianglePackingNumber [Fintype V] (G : SimpleGraph V) : ℕ :=\n  sSup {n | ∃ P : Finset (Finset V), IsTrianglePacking G P ∧ #P = n}\n\n/-- A *triangle hitting set* (or *triangle transversal*) of a graph `G` is a set `S` of edges\nof `G` such that every triangle of `G` has at least one of its edges in `S`. -/\ndef IsTriangleHittingSet (G : SimpleGraph V) (S : Finset (Sym2 V)) : Prop :=\n  (S : Set (Sym2 V)) ⊆ G.edgeSet ∧ ∀ t, G.IsNClique 3 t → ∃ e ∈ S, ∀ v ∈ e, v ∈ t\n\n/-- The *triangle hitting number* $\\tau(G)$ of a finite graph `G`: the smallest size of a set\nof edges of `G` that meets every triangle of `G`. -/\nnoncomputable def triangleHittingNumber [Fintype V] (G : SimpleGraph V) : ℕ :=\n  sInf {n | ∃ S : Finset (Sym2 V), IsTriangleHittingSet G S ∧ #S = n}\n\n@[inherit_doc] local notation \"ν(\" G \")\" => trianglePackingNumber G\n@[inherit_doc] local notation \"τ(\" G \")\" => triangleHittingNumber G\n\n/--\n**Tuza's conjecture** (1981). Let $G$ be a finite simple graph, let $\\nu(G)$ be the maximum\nnumber of pairwise edge-disjoint triangles of $G$, and let $\\tau(G)$ be the minimum number of\nedges of $G$ meeting every triangle of $G$. Can all triangles of $G$ always be hit by a set of\nat most $2\\nu(G)$ edges? That is, does $\\tau(G) \\le 2\\nu(G)$ hold for every graph $G$?\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] (G : SimpleGraph V), τ(G) ≤ 2 * ν(G) := by\n  sorry\n\n/-- The trivial lower bound $\\nu(G) \\le \\tau(G)$: a triangle hitting set must contain an edge\nof each triangle of a packing, and these edges are distinct. -/\n@[category textbook, AMS 5]\ntheorem trianglePackingNumber_le_triangleHittingNumber [Fintype V] (G : SimpleGraph V) :\n    ν(G) ≤ τ(G) := by\n  sorry\n\n/-- The trivial upper bound $\\tau(G) \\le 3\\nu(G)$: the edges of the triangles of a maximum\npacking meet every triangle of $G$. -/\n@[category textbook, AMS 5]\ntheorem triangleHittingNumber_le_three_mul [Fintype V] (G : SimpleGraph V) :\n    τ(G) ≤ 3 * ν(G) := by\n  sorry\n\n/-- The empty family is a triangle packing of every graph. -/\n@[category test, AMS 5]\ntheorem isTrianglePacking_empty (G : SimpleGraph V) : IsTrianglePacking G ∅ := by\n  simp [IsTrianglePacking]\n\n/-- The edge set of `G` is a triangle hitting set of `G`. -/\n@[category test, AMS 5]\ntheorem isTriangleHittingSet_edgeFinset [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    [DecidableRel G.Adj] : IsTriangleHittingSet G G.edgeFinset := by\n  refine ⟨G.coe_edgeFinset.subset, fun t ht ↦ ?_⟩\n  obtain ⟨a, b, c, hab, -, -, rfl⟩ := is3Clique_iff.1 ht\n  exact ⟨s(a, b), by simpa using hab, by simp⟩\n\n/-- The graph with no edges has triangle packing number `0`. -/\n@[category test, AMS 5]\ntheorem trianglePackingNumber_bot [Fintype V] : ν((⊥ : SimpleGraph V)) = 0 := by\n  have : {n | ∃ P : Finset (Finset V), IsTrianglePacking (⊥ : SimpleGraph V) P ∧ #P = n}\n      = {0} := by\n    ext n\n    simp only [Set.mem_setOf_eq, Set.mem_singleton_iff]\n    constructor\n    · rintro ⟨P, ⟨hP, -⟩, rfl⟩\n      rw [card_eq_zero, eq_empty_iff_forall_notMem]\n      exact fun t ht ↦ cliqueFree_bot (by norm_num) t (hP t ht)\n    · rintro rfl\n      exact ⟨∅, isTrianglePacking_empty _, rfl⟩\n  rw [trianglePackingNumber, this, csSup_singleton]\n\n/-- The graph with no edges has triangle hitting number `0`. -/\n@[category test, AMS 5]\ntheorem triangleHittingNumber_bot [Fintype V] : τ((⊥ : SimpleGraph V)) = 0 :=\n  Nat.sInf_eq_zero.2 <| Or.inl\n    ⟨∅, ⟨by simp, fun t ht ↦ (cliqueFree_bot (by norm_num) t ht).elim⟩, rfl⟩\n\nend TuzasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single-slot table matches the source; the notes (edge-disjoint, universally quantified finite graph, non-strict bound, ν = 0 case) agree with the Wikipedia article and the cited papers (Botler–Fernandes–Gutiérrez, Bonamy et al., Kahn–Park, Puleo).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Terse list entry expanded per the Wikipedia article and all cited papers: for every finite simple undirected graph G, τ(G) ≤ 2ν(G), with ν over pairwise EDGE-disjoint triangles (not vertex-disjoint) and τ the minimum triangle-hitting edge set.",
+    "Triangles are modelled as 3-cliques (`G.IsNClique 3 t`, Finsets of vertices); two distinct triangles are edge-disjoint iff their vertex sets share at most one vertex, encoded as `(s ∩ t : Set V).Subsingleton` (Mathlib's idiom in `EdgeDisjointTriangles`).",
+    "A hitting set is a Finset of `Sym2 V` required to lie in `G.edgeSet` and, for every triangle t, to contain some e all of whose endpoints lie in t (since e is a non-diagonal edge this is exactly 'e is one of the three edges of t'). Requiring S ⊆ edgeSet matches 'a set of edges' and does not change the minimum.",
+    "ν and τ are defined via `sSup`/`sInf` over ℕ; for finite V the packing-size set is nonempty (∅) and bounded, and the hitting-set-size set is nonempty (all edges), so these are genuine max/min. Definitions require `[Fintype V]` to prevent misuse on infinite graphs. Triangle-free graphs give ν = τ = 0 (tests `trianglePackingNumber_bot`, `triangleHittingNumber_bot`).",
+    "The list entry is phrased as a question ('can all triangles be hit…?'), so the repo's `answer(sorry) ↔ P` style is used; `answer(True)` corresponds to the conjecture being true.",
+    "Definitions are kept in the problem file (specific to this problem; only one output path permitted). Added two `textbook` statements for the trivial bounds ν ≤ τ ≤ 3ν from the article (with `sorry`) and four `test` lemmas exercising the definitions.",
+    "No `DecidableEq`/`DecidableRel` hypotheses are needed in the main statement because edge membership is via `G.edgeSet` (a Set) and intersection is taken in `Set V`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.EdgeDisjointTriangles (Mathlib.Combinatorics.SimpleGraph.Triangle.Basic); its `(s ∩ t : Set V).Subsingleton` idiom for edge-disjointness was reused.",
+     "name": "TuzasConjecture.IsTrianglePacking",
+     "why_needed": "No Mathlib/repo predicate for 'a family of pairwise edge-disjoint triangles of G'. Mathlib's `SimpleGraph.EdgeDisjointTriangles` is a property of the whole graph (all its triangles are edge-disjoint), not of a chosen subfamily."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.matchingNumber / edgeCoverNumber in FormalConjecturesForMathlib (same sSup/sInf-over-cardinalities idiom).",
+     "name": "TuzasConjecture.trianglePackingNumber",
+     "why_needed": "ν(G): maximum size of a triangle packing; no such number in Mathlib or FormalConjecturesForMathlib (matchingNumber, edgeCoverNumber, indepNum are different notions)."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.IsEdgeCover / IsEdgeDominating (FormalConjecturesForMathlib Domination.lean), inline formulation in FormalConjectures/ErdosProblems/621.lean, SimpleGraph.trianglesContaining.",
+     "name": "TuzasConjecture.IsTriangleHittingSet",
+     "why_needed": "No predicate for 'set of edges of G meeting every triangle'. Erdős 621 inlines this with vertex triples; a named predicate over 3-cliques is clearer and matches the packing definition."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.edgeCoverNumber (FormalConjecturesForMathlib), Erdős 621's IsLeast formulation.",
+     "name": "TuzasConjecture.triangleHittingNumber",
+     "why_needed": "τ(G): minimum size of a triangle hitting set; absent from Mathlib and the repo."
+    }
+   ],
+   "per_slot": {
+    "tuzas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ {V : Type*} [Fintype V] (G : SimpleGraph V), τ(G) ≤ 2 * ν(G)` where ν(G) = sSup of sizes of families of pairwise edge-disjoint 3-cliques (edge-disjoint = any two distinct triangles share at most one vertex, as in Mathlib's `EdgeDisjointTriangles`) and τ(G) = sInf of sizes of sets of edges of G containing an edge of every 3-clique. Graph universally quantified over finite simple graphs, bound non-strict; triangle-free case gives 0 ≤ 0 (tested for ⊥). answer(True) = 'yes'."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tuzas_conjecture": "/--\n**Tuza's conjecture** (1981). Let $G$ be a finite simple graph, let $\\nu(G)$ be the maximum\nnumber of pairwise edge-disjoint triangles of $G$, and let $\\tau(G)$ be the minimum number of\nedges of $G$ meeting every triangle of $G$. Can all triangles of $G$ always be hit by a set of\nat most $2\\nu(G)$ edges? That is, does $\\tau(G) \\le 2\\nu(G)$ hold for every graph $G$?\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] (G : SimpleGraph V), τ(G) ≤ 2 * ν(G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tuza's conjecture\n\nLet $G$ be a finite simple undirected graph. The *triangle packing number* $\\nu(G)$ is the\nlargest number of pairwise edge-disjoint triangles in $G$. The *triangle hitting number*\n$\\tau(G)$ is the smallest size of a set of edges of $G$ that contains at least one edge of every\ntriangle of $G$. Clearly $\\nu(G) \\le \\tau(G) \\le 3\\nu(G)$. Tuza's conjecture (1981) asserts that\n$\\tau(G) \\le 2\\nu(G)$ for every graph $G$.\n\n*References:*\n- [Wikipedia, Tuza's conjecture](https://en.wikipedia.org/wiki/Tuza%27s_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics#Graph_theory)\n-/\n\nnamespace TuzasConjecture\n\nopen SimpleGraph\n\nvariable {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj]\n\n/-- A *triangle packing* of `G` is a set `P` of triangles (`3`-cliques) of `G` that are pairwise\nedge-disjoint: no edge of `G` has both of its endpoints in two distinct triangles of `P`. -/\ndef IsTrianglePacking (P : Finset (Finset V)) : Prop :=\n  P ⊆ G.cliqueFinset 3 ∧\n    (P : Set (Finset V)).Pairwise fun s t => ∀ e ∈ G.edgeSet, e ∈ s.sym2 → e ∉ t.sym2\n\n/-- The *triangle packing number* $\\nu(G)$ of `G`: the largest number of pairwise edge-disjoint\ntriangles in `G`. -/\nnoncomputable def trianglePackingNumber : ℕ :=\n  sSup {n | ∃ P : Finset (Finset V), IsTrianglePacking G P ∧ P.card = n}\n\n/-- A *triangle hitting set* of `G` is a set `S` of edges of `G` such that every triangle\n(`3`-clique) of `G` has at least one of its edges in `S`. -/\ndef IsTriangleHittingSet (S : Finset (Sym2 V)) : Prop :=\n  S ⊆ G.edgeFinset ∧ ∀ t ∈ G.cliqueFinset 3, ∃ e ∈ S, e ∈ t.sym2\n\n/-- The *triangle hitting number* $\\tau(G)$ of `G`: the smallest size of a set of edges of `G`\ncontaining at least one edge of every triangle of `G`. -/\nnoncomputable def triangleHittingNumber : ℕ :=\n  sInf {n | ∃ S : Finset (Sym2 V), IsTriangleHittingSet G S ∧ S.card = n}\n\n/-- The empty set of triangles is a triangle packing. -/\n@[category API, AMS 5]\ntheorem isTrianglePacking_empty : IsTrianglePacking G ∅ := by\n  simp [IsTrianglePacking]\n\nvariable {G} in\n/-- A triangle packing consists of at most as many triangles as `G` has. -/\n@[category API, AMS 5]\ntheorem IsTrianglePacking.card_le {P : Finset (Finset V)} (hP : IsTrianglePacking G P) :\n    P.card ≤ (G.cliqueFinset 3).card :=\n  Finset.card_le_card hP.1\n\n/-- The sizes of the triangle packings of `G` are bounded above. -/\n@[category API, AMS 5]\ntheorem bddAbove_card_isTrianglePacking :\n    BddAbove {n | ∃ P : Finset (Finset V), IsTrianglePacking G P ∧ P.card = n} :=\n  ⟨(G.cliqueFinset 3).card, by rintro n ⟨P, hP, rfl⟩; exact hP.card_le⟩\n\n/-- The set of all edges of `G` is a triangle hitting set. -/\n@[category API, AMS 5]\ntheorem isTriangleHittingSet_edgeFinset : IsTriangleHittingSet G G.edgeFinset := by\n  refine ⟨Finset.Subset.refl _, fun t ht => ?_⟩\n  rw [mem_cliqueFinset_iff, is3Clique_iff] at ht\n  obtain ⟨a, b, c, hab, -, -, rfl⟩ := ht\n  exact ⟨s(a, b), by simpa using hab, by simp⟩\n\n/-- The empty graph has triangle packing number `0`. -/\n@[category test, AMS 5]\ntheorem trianglePackingNumber_bot : trianglePackingNumber (⊥ : SimpleGraph V) = 0 := by\n  have h : {n | ∃ P : Finset (Finset V),\n      IsTrianglePacking (⊥ : SimpleGraph V) P ∧ P.card = n} = {0} := by\n    ext n\n    simp only [Set.mem_setOf_eq, Set.mem_singleton_iff]\n    constructor\n    · rintro ⟨P, ⟨hP, -⟩, rfl⟩\n      rw [cliqueFinset_eq_empty_iff.2 (cliqueFree_bot (by norm_num)),\n        Finset.subset_empty] at hP\n      simp [hP]\n    · rintro rfl\n      exact ⟨∅, isTrianglePacking_empty _, rfl⟩\n  rw [trianglePackingNumber, h, csSup_singleton]\n\n/-- The empty graph has triangle hitting number `0`. -/\n@[category test, AMS 5]\ntheorem triangleHittingNumber_bot : triangleHittingNumber (⊥ : SimpleGraph V) = 0 := by\n  refine Nat.sInf_eq_zero.2 (Or.inl ⟨∅, ⟨Finset.empty_subset _, fun t ht => ?_⟩, rfl⟩)\n  rw [cliqueFinset_eq_empty_iff.2 (cliqueFree_bot (by norm_num))] at ht\n  exact absurd ht (Finset.notMem_empty t)\n\n/-- The only triangle of the complete graph `K₃` is its whole vertex set. -/\n@[category test, AMS 5]\ntheorem cliqueFinset_top_fin_three :\n    (⊤ : SimpleGraph (Fin 3)).cliqueFinset 3 = {Finset.univ} := by\n  ext t\n  simp only [mem_cliqueFinset_iff, Finset.mem_singleton]\n  constructor\n  · intro ht\n    exact Finset.eq_univ_of_card t (by simpa using ht.card_eq)\n  · rintro rfl\n    exact ⟨fun a _ b _ hab => hab, by simp⟩\n\n/-- The complete graph `K₃` has triangle packing number `1`. -/\n@[category test, AMS 5]\ntheorem trianglePackingNumber_top_fin_three :\n    trianglePackingNumber (⊤ : SimpleGraph (Fin 3)) = 1 := by\n  apply le_antisymm\n  · refine csSup_le ⟨0, ∅, isTrianglePacking_empty _, rfl⟩ ?_\n    rintro n ⟨P, hP, rfl⟩\n    simpa [cliqueFinset_top_fin_three] using hP.card_le\n  · refine le_csSup (bddAbove_card_isTrianglePacking _) ⟨{Finset.univ}, ⟨?_, ?_⟩, rfl⟩\n    · rw [cliqueFinset_top_fin_three]\n    · simp\n\n/-- The complete graph `K₃` has triangle hitting number `1`. -/\n@[category test, AMS 5]\ntheorem triangleHittingNumber_top_fin_three :\n    triangleHittingNumber (⊤ : SimpleGraph (Fin 3)) = 1 := by\n  apply le_antisymm\n  · refine Nat.sInf_le\n      ⟨{s(0, 1)}, ⟨Finset.singleton_subset_iff.2 (by simp), fun t ht => ?_⟩, rfl⟩\n    rw [cliqueFinset_top_fin_three, Finset.mem_singleton] at ht\n    exact ⟨s(0, 1), Finset.mem_singleton_self _, by simp [ht]⟩\n  · refine le_csInf ⟨_, _, isTriangleHittingSet_edgeFinset _, rfl⟩ ?_\n    rintro n ⟨S, ⟨-, hS⟩, rfl⟩\n    obtain ⟨e, he, -⟩ := hS Finset.univ (by simp [cliqueFinset_top_fin_three])\n    exact Finset.card_pos.2 ⟨e, he⟩\n\n/--\n**Tuza's conjecture.** If the maximum number of pairwise edge-disjoint triangles in a finite\nsimple graph $G$ is $\\nu(G)$, can all triangles of $G$ be hit by a set of at most $2\\nu(G)$\nedges? That is, is $\\tau(G) \\le 2\\nu(G)$ for every finite simple graph $G$?\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      triangleHittingNumber G ≤ 2 * trianglePackingNumber G := by\n  sorry\n\nend TuzasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single slot matches the statement; the notes (finite simple graphs, edge-disjoint, non-strict bound, triangle-free case consistent) are all reflected in the formalization.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple undirected graphs: `SimpleGraph V` with `[Fintype V]` (plus `[DecidableEq V]`, `[DecidableRel G.Adj]` only so that `cliqueFinset`/`edgeFinset` exist; classically every finite graph satisfies these). The Wikipedia list entry does not say 'finite' explicitly, but ν and τ are natural numbers and the article, Tuza's original statement and all cited papers concern finite graphs; the decomposition table also specifies finite graphs.",
+    "'Disjoint triangles' is formalized as pairwise EDGE-disjoint (as in the article and all cited papers): `IsTrianglePacking G P` requires `P ⊆ G.cliqueFinset 3` and, for distinct s t ∈ P, no edge e ∈ G.edgeSet with both endpoints in s and both in t (`e ∈ s.sym2 → e ∉ t.sym2`). For 3-cliques this is equivalent to Mathlib's `EdgeDisjointTriangles` condition `(s ∩ t : Set V).Subsingleton`; the edge-based form was chosen because it literally says 'share no edge'.",
+    "Triangles are 3-cliques (`G.cliqueFinset 3`, i.e. `G.IsNClique 3 t`); 'edge e hits triangle t' is `e ∈ t.sym2` (both endpoints of e in t), which for e ∈ G.edgeSet and t a 3-clique means e is one of the three edges of t. Hitting sets are required to be subsets of `G.edgeFinset` ('a set of edges'); without this a diagonal pair s(v,v) would spuriously 'hit' triangles.",
+    "ν(G) := sSup of packing sizes and τ(G) := sInf of hitting-set sizes. Both index sets are nonempty (∅ is a packing; `G.edgeFinset` is a hitting set, proved as `isTriangleHittingSet_edgeFinset`) and the packing sizes are bounded (`bddAbove_card_isTrianglePacking`), so sSup/sInf are the true max/min and no ℕ-default value is reachable.",
+    "The list entry is phrased as a question, so per CONTRIBUTING.md the statement uses `answer(sorry) ↔ P`; `answer(True)` asserts Tuza's conjecture holds for all finite graphs. The bound is non-strict (τ ≤ 2ν). The vertex type is universe-polymorphic (`Type*` inside the ∀), following `SidorenkoConjecture.lean`.",
+    "Boundary cases verified by proved tests: the empty graph has ν = τ = 0 (triangle-free case consistent with the conjecture), and K₃ has ν = τ = 1.",
+    "Module docstring lists both the Tuza's conjecture article and the List of unsolved problems page (with the #Graph_theory anchor) as references."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.EdgeDisjointTriangles (Mathlib.Combinatorics.SimpleGraph.Triangle.Basic) — a property of the whole graph (all its triangles are pairwise edge-disjoint), not of a sub-family; also SimpleGraph.cliqueFinset 3 / cliqueSet 3 (used as building block).",
+     "name": "TuzasConjecture.IsTrianglePacking",
+     "why_needed": "Predicate 'P is a set of pairwise edge-disjoint triangles of G'; Mathlib has no notion of a triangle packing (a chosen family of edge-disjoint triangles), only the global property that all triangles of G are edge-disjoint."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.cliqueNum / indepNum (different invariants); SimpleGraph.trianglesContaining in FormalConjecturesForMathlib/Combinatorics/SimpleGraph/Clique.lean (counts triangles through one edge, not a packing).",
+     "name": "TuzasConjecture.trianglePackingNumber",
+     "why_needed": "The triangle packing number ν(G) = maximum number of pairwise edge-disjoint triangles; no such invariant exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.DeleteFar (fun H ↦ H.CliqueFree 3) r and SimpleGraph.FarFromTriangleFree — these express a lower bound on the size of every edge set whose deletion makes G triangle-free, i.e. they bound τ from below by r·|V|², but do not give τ itself; SimpleGraph.IsDominating / dominationNumber (vertex-based, different concept).",
+     "name": "TuzasConjecture.IsTriangleHittingSet",
+     "why_needed": "Predicate 'S is a set of edges of G meeting every triangle'; not available in Mathlib."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.DeleteFar / FarFromTriangleFree (only lower bounds relative to |V|²); SimpleGraph.dominationNumber in FormalConjecturesForMathlib (vertex domination, different concept).",
+     "name": "TuzasConjecture.triangleHittingNumber",
+     "why_needed": "The triangle hitting (cover) number τ(G) = minimum size of a triangle hitting set; not available in Mathlib or the repo."
+    }
+   ],
+   "per_slot": {
+    "tuzas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj], triangleHittingNumber G ≤ 2 * trianglePackingNumber G`, where ν = trianglePackingNumber (max number of pairwise edge-disjoint 3-cliques) and τ = triangleHittingNumber (min size of a set of edges of G containing an edge of every 3-clique). Since τ is the minimum over a nonempty set, τ ≤ 2ν is exactly 'all triangles can be hit by a set of at most 2ν edges'. Mathlib has no triangle packing / triangle hitting-set invariants, so bespoke problem-local definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tuzas_conjecture": "/--\n**Tuza's conjecture.** If the maximum number of pairwise edge-disjoint triangles in a finite\nsimple graph $G$ is $\\nu(G)$, can all triangles of $G$ be hit by a set of at most $2\\nu(G)$\nedges? That is, is $\\tau(G) \\le 2\\nu(G)$ for every finite simple graph $G$?\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      triangleHittingNumber G ≤ 2 * trianglePackingNumber G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tuza's conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Tuza%27s_conjecture)\n-/\n\nnamespace TuzasConjecture\n\n/--\nFor every finite simple undirected graph, there is a set of edges meeting every triangle whose\nsize is at most twice the maximum number of pairwise edge-disjoint triangles.\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] :\n    ∃ P : Finset (Finset V),\n      P ⊆ G.cliqueFinset 3 ∧\n      (P : Set (Finset V)).Pairwise (fun t u ↦\n        Disjoint (t.sym2 ∩ G.edgeFinset) (u.sym2 ∩ G.edgeFinset)) ∧\n      (∀ Q : Finset (Finset V),\n        Q ⊆ G.cliqueFinset 3 →\n        (Q : Set (Finset V)).Pairwise (fun t u ↦\n          Disjoint (t.sym2 ∩ G.edgeFinset) (u.sym2 ∩ G.edgeFinset)) →\n        Q.card ≤ P.card) ∧\n      ∃ C : Finset (Sym2 V),\n        C ⊆ G.edgeFinset ∧\n        (∀ t ∈ G.cliqueFinset 3, ∃ e ∈ C, e ∈ t.sym2) ∧\n        C.card ≤ 2 * P.card := by\n  sorry\n\nend TuzasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list-page question as the positive universal conjecture for every finite simple undirected graph, following the dedicated Wikipedia article and cited papers.",
+    "Interpreted disjoint triangles as pairwise edge-disjoint, not vertex-disjoint. A triangle is a Mathlib 3-clique, and its edges are represented by the intersection of its symmetric vertex pairs with the graph's edge finset; this permits shared vertices but excludes shared graph edges.",
+    "Represented the triangle packing number without a bespoke numerical definition by existentially quantifying a valid packing P and requiring every valid packing Q to have Q.card ≤ P.card.",
+    "Represented a triangle-hitting set as a finset C of graph edges such that every 3-clique contains an edge of C, with the non-strict bound C.card ≤ 2 * P.card. This also gives the intended empty hitting set behavior when the graph is triangle-free."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "tuzas_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tuzas_conjecture": "/--\nFor every finite simple undirected graph, there is a set of edges meeting every triangle whose\nsize is at most twice the maximum number of pairwise edge-disjoint triangles.\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] :\n    ∃ P : Finset (Finset V),\n      P ⊆ G.cliqueFinset 3 ∧\n      (P : Set (Finset V)).Pairwise (fun t u ↦\n        Disjoint (t.sym2 ∩ G.edgeFinset) (u.sym2 ∩ G.edgeFinset)) ∧\n      (∀ Q : Finset (Finset V),\n        Q ⊆ G.cliqueFinset 3 →\n        (Q : Set (Finset V)).Pairwise (fun t u ↦\n          Disjoint (t.sym2 ∩ G.edgeFinset) (u.sym2 ∩ G.edgeFinset)) →\n        Q.card ≤ P.card) ∧\n      ∃ C : Finset (Sym2 V),\n        C ⊆ G.edgeFinset ∧\n        (∀ t ∈ G.cliqueFinset 3, ∃ e ∈ C, e ∈ t.sym2) ∧\n        C.card ≤ 2 * P.card := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tuza's conjecture\n\nLet $G$ be a finite simple graph. The *triangle packing number* $\\nu(G)$ is the largest number\nof pairwise edge-disjoint triangles in $G$. The *triangle hitting number* $\\tau(G)$ is the\nsmallest size of a set of edges of $G$ that contains at least one edge of every triangle of $G$.\nTuza's conjecture (1981) asserts that $\\tau(G) \\le 2\\nu(G)$ for every graph $G$.\n\n*References:*\n- [Wikipedia, Tuza's conjecture](https://en.wikipedia.org/wiki/Tuza%27s_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Tu90] Tuza, Zs., *A conjecture on triangles of graphs*. Graphs Combin. 6 (1990), 373--380.\n- [Ha99] Haxell, P. E., *Packing and covering triangles in graphs*. Discrete Math. 195 (1999),\n  251--254.\n-/\n\nopen Finset SimpleGraph\n\nnamespace TuzasConjecture\n\nvariable {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj]\n\n/-- A *triangle packing* of `G` is a set `P` of triangles of `G` (that is, `3`-cliques of `G`)\nthat are pairwise edge-disjoint. Two distinct triangles share an edge if and only if they share\ntwo vertices, so edge-disjointness is stated as: the intersection of any two distinct triangles\nin `P` has at most one vertex. This mirrors `SimpleGraph.EdgeDisjointTriangles`. -/\ndef IsTrianglePacking (P : Finset (Finset V)) : Prop :=\n  P ⊆ G.cliqueFinset 3 ∧ (P : Set (Finset V)).Pairwise fun s t ↦ (s ∩ t : Set V).Subsingleton\n\n/-- A *triangle hitting set* of `G` is a set `T` of edges of `G` that contains at least one edge\nof every triangle of `G`. An edge `e` of `G` is an edge of the triangle `t` exactly when both\nendpoints of `e` lie in `t`, i.e. `e ∈ t.sym2`. -/\ndef IsTriangleHittingSet (T : Finset (Sym2 V)) : Prop :=\n  T ⊆ G.edgeFinset ∧ ∀ t ∈ G.cliqueFinset 3, ∃ e ∈ T, e ∈ t.sym2\n\n/-- The *triangle packing number* $\\nu(G)$ of `G`: the largest size of a triangle packing of `G`.\n-/\nnoncomputable def trianglePackingNumber : ℕ :=\n  sSup {k | ∃ P, IsTrianglePacking G P ∧ P.card = k}\n\n/-- The *triangle hitting number* $\\tau(G)$ of `G`: the smallest size of a triangle hitting set\nof `G`. -/\nnoncomputable def triangleHittingNumber : ℕ :=\n  sInf {k | ∃ T, IsTriangleHittingSet G T ∧ T.card = k}\n\n@[inherit_doc] scoped notation \"ν(\" G \")\" => trianglePackingNumber G\n@[inherit_doc] scoped notation \"τ(\" G \")\" => triangleHittingNumber G\n\n/--\n**Tuza's conjecture** (Tuza, 1981).\n\nLet $G$ be a finite simple undirected graph. If the maximum number of pairwise edge-disjoint\ntriangles in $G$ is $\\nu(G)$, then all triangles of $G$ can be hit by a set of at most\n$2\\nu(G)$ edges of $G$. Equivalently, $\\tau(G) \\le 2\\nu(G)$ for every finite simple graph $G$.\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      τ(G) ≤ 2 * ν(G) := by\n  sorry\n\n/- ### Basic API -/\n\n/-- The empty set of triangles is a triangle packing. -/\n@[category API, AMS 5]\ntheorem isTrianglePacking_empty : IsTrianglePacking G ∅ := by\n  simp [IsTrianglePacking]\n\n/-- A triangle packing consists of triangles of `G`, so it has at most as many members as `G`\nhas triangles. In particular, the set of sizes of triangle packings is bounded. -/\n@[category API, AMS 5]\ntheorem IsTrianglePacking.card_le {P : Finset (Finset V)} (hP : IsTrianglePacking G P) :\n    P.card ≤ (G.cliqueFinset 3).card :=\n  card_le_card hP.1\n\n/-- The set of all edges of `G` is a triangle hitting set. -/\n@[category API, AMS 5]\ntheorem isTriangleHittingSet_edgeFinset : IsTriangleHittingSet G G.edgeFinset := by\n  refine ⟨subset_rfl, fun t ht ↦ ?_⟩\n  obtain ⟨a, b, c, hab, -, -, rfl⟩ := is3Clique_iff.1 (mem_cliqueFinset_iff.1 ht)\n  exact ⟨s(a, b), by simpa using hab, by simp⟩\n\n/-- A triangle-free graph has triangle packing number `0`. -/\n@[category API, AMS 5]\ntheorem trianglePackingNumber_of_cliqueFree (h : G.CliqueFree 3) : ν(G) = 0 := by\n  have : {k | ∃ P, IsTrianglePacking G P ∧ P.card = k} = {0} := by\n    ext k\n    simp only [Set.mem_setOf_eq, Set.mem_singleton_iff]\n    constructor\n    · rintro ⟨P, hP, rfl⟩\n      simpa [h.cliqueFinset, subset_empty] using hP.1\n    · rintro rfl\n      exact ⟨∅, isTrianglePacking_empty G, rfl⟩\n  rw [trianglePackingNumber, this, csSup_singleton]\n\n/-- A triangle-free graph has triangle hitting number `0`. -/\n@[category API, AMS 5]\ntheorem triangleHittingNumber_of_cliqueFree (h : G.CliqueFree 3) : τ(G) = 0 :=\n  Nat.sInf_eq_zero.2 <| .inl ⟨∅, ⟨empty_subset _, by simp [h.cliqueFinset]⟩, rfl⟩\n\n/-- The triangle `K_3` has triangle packing number `1`. -/\n@[category test, AMS 5]\ntheorem trianglePackingNumber_top_fin_three : ν((⊤ : SimpleGraph (Fin 3))) = 1 := by\n  have h3 : (⊤ : SimpleGraph (Fin 3)).cliqueFinset 3 = {univ} := by decide\n  refine IsGreatest.csSup_eq ⟨⟨{univ}, ⟨by simp [h3], by simp⟩, rfl⟩, ?_⟩\n  rintro k ⟨P, hP, rfl⟩\n  simpa [h3] using card_le_card hP.1\n\n/-- The triangle `K_3` has triangle hitting number `1`. -/\n@[category test, AMS 5]\ntheorem triangleHittingNumber_top_fin_three : τ((⊤ : SimpleGraph (Fin 3))) = 1 := by\n  have h3 : (⊤ : SimpleGraph (Fin 3)).cliqueFinset 3 = {univ} := by decide\n  refine IsLeast.csInf_eq ⟨⟨{s(0, 1)}, ⟨by simp, by simp [h3]⟩, rfl⟩, ?_⟩\n  rintro k ⟨T, hT, rfl⟩\n  obtain ⟨e, he, -⟩ := hT.2 univ (by simp [h3])\n  exact card_pos.2 ⟨e, he⟩\n\nend TuzasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single-slot table matches the source: one universally quantified finite-graph statement, 'disjoint' = edge-disjoint, non-strict bound 2ν, phrased as a yes/no question.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list entry is a yes/no question, so the repository's preferred form `answer(sorry) ↔ P` is used; `answer(True)` means τ(G) ≤ 2ν(G) for every finite simple graph, `answer(False)` means some graph violates it.",
+    "The graph is universally quantified as a finite simple undirected graph (`SimpleGraph V` with `[Fintype V]`), following the Wikipedia article ('every undirected graph G') and the cited papers (Kahn–Park: 'for a (finite) graph H'). Decidability instances (`DecidableEq V`, `DecidableRel G.Adj`) are quantified only so that `cliqueFinset`/`edgeFinset` are available; the Prop does not depend on which instances are chosen.",
+    "'Disjoint' is read as pairwise EDGE-disjoint (per the article and all cited papers), not vertex-disjoint. Edge-disjointness of two distinct triangles s, t is encoded as `(s ∩ t : Set V).Subsingleton` (they share at most one vertex), which is equivalent since two 3-cliques share an edge iff they share two vertices; this is exactly the phrasing of Mathlib's `SimpleGraph.EdgeDisjointTriangles`.",
+    "A triangle is a 3-clique, i.e. an element of `G.cliqueFinset 3` (a 3-element vertex set that is a clique). A triangle packing is a `Finset (Finset V)` of triangles; its size is its cardinality.",
+    "A hitting set is a `Finset (Sym2 V)` required to be a subset of `G.edgeFinset` (so it consists of genuine edges of G — without this, diagonal pairs `s(v,v)` could spuriously 'hit' triangles). An edge e hits triangle t iff `e ∈ t.sym2`, i.e. both endpoints of e lie in t; for a non-diagonal edge this is exactly 'e is one of the three edges of t'.",
+    "ν(G) is `sSup` of the set of packing sizes and τ(G) is `sInf` of the set of hitting-set sizes, in ℕ. Both sets are nonempty (empty packing; the full edge set is a hitting set) and the packing sizes are bounded by the number of triangles, so `sSup`/`sInf` are the true maximum/minimum; the file proves API lemmas establishing this (`isTrianglePacking_empty`, `IsTrianglePacking.card_le`, `isTriangleHittingSet_edgeFinset`).",
+    "The bound is non-strict (`≤`) with factor 2, matching 'at most 2ν'. The triangle-free case gives τ = ν = 0 (proved as API lemmas), consistent with the conjecture. Tests verify ν(K₃) = τ(K₃) = 1.",
+    "The universe of the vertex type is left polymorphic (`Type*`) inside the quantified statement, as in other Wikipedia files (e.g. SidorenkoConjecture)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.EdgeDisjointTriangles` (Mathlib), which says ALL triangles of G are pairwise edge-disjoint — a property of G, not of a chosen sub-family. The new definition reuses its exact pairwise-subsingleton-intersection formulation restricted to a Finset P ⊆ G.cliqueFinset 3.",
+     "name": "TuzasConjecture.IsTrianglePacking",
+     "why_needed": "Need the notion of a set of pairwise edge-disjoint triangles of G (a triangle packing) to define ν(G). Mathlib has no packing notion for triangles."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.trianglesContaining` (FormalConjecturesForMathlib) gives the triangles containing a given edge, and Erdos621 inlines τ₁ via ∀ x y z adjacent triples; neither provides a reusable predicate, so a direct definition via `G.cliqueFinset 3` and `t.sym2` was added.",
+     "name": "TuzasConjecture.IsTriangleHittingSet",
+     "why_needed": "Need 'a set of edges of G meeting every triangle' to define τ(G)."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.cliqueNum`/`indepNum` (Mathlib) as sSup-style templates; `numTrianglesAtVertex` (FormalConjecturesForMathlib) counts triangles but is unrelated to packing.",
+     "name": "TuzasConjecture.trianglePackingNumber (notation ν(G))",
+     "why_needed": "ν(G): maximum size of a triangle packing; no such quantity exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "The inline IsLeast formulation of τ₁ in FormalConjectures/ErdosProblems/621.lean (not a reusable definition).",
+     "name": "TuzasConjecture.triangleHittingNumber (notation τ(G))",
+     "why_needed": "τ(G): minimum size of a triangle hitting set; no such quantity exists in Mathlib or the repo."
+    }
+   ],
+   "per_slot": {
+    "tuzas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj], τ(G) ≤ 2 * ν(G)`, where ν(G) is the maximum size of a set of pairwise edge-disjoint triangles (3-cliques) of G and τ(G) is the minimum size of a set of edges of G containing an edge of every triangle. Mathlib has `SimpleGraph.cliqueFinset 3` for triangles and `SimpleGraph.EdgeDisjointTriangles` (a global property, not a packing) but no packing number / hitting number, so bespoke definitions were added in the problem file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tuzas_conjecture": "/--\n**Tuza's conjecture** (Tuza, 1981).\n\nLet $G$ be a finite simple undirected graph. If the maximum number of pairwise edge-disjoint\ntriangles in $G$ is $\\nu(G)$, then all triangles of $G$ can be hit by a set of at most\n$2\\nu(G)$ edges of $G$. Equivalently, $\\tau(G) \\le 2\\nu(G)$ for every finite simple graph $G$.\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      τ(G) ≤ 2 * ν(G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tuza's conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Tuza%27s_conjecture)\n-/\n\nnamespace TuzasConjecture\n\n/--\n**Tuza's conjecture.**\n\nIf $\\nu$ is the maximum size of a family of pairwise edge-disjoint triangles in a finite simple\nundirected graph $G$, can every triangle of $G$ be hit by a set of at most $2\\nu$ edges?\nHere triangles are represented by their three vertices, and edge-disjointness is expressed by two\ndistinct triangles sharing at most one vertex.\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj] (ν : ℕ),\n      (∃ P : Finset (Finset V),\n        P ⊆ G.cliqueFinset 3 ∧\n        (P : Set (Finset V)).Pairwise (fun s t ↦ (s ∩ t).card ≤ 1) ∧\n        P.card = ν ∧\n        ∀ Q : Finset (Finset V), Q ⊆ G.cliqueFinset 3 →\n          (Q : Set (Finset V)).Pairwise (fun s t ↦ (s ∩ t).card ≤ 1) → Q.card ≤ ν) →\n      ∃ H : Finset (Sym2 V),\n        H ⊆ G.edgeFinset ∧ H.card ≤ 2 * ν ∧\n        ∀ t ∈ G.cliqueFinset 3, ∃ e ∈ H, e ∈ t.sym2 := by\n  sorry\n\nend TuzasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list-page question, using the dedicated Wikipedia article and cited literature, as universally quantifying over finite simple undirected graphs.",
+    "Represented triangles by `G.cliqueFinset 3`, whose elements are three-vertex cliques.",
+    "Represented a triangle packing as a finset of triangles in which any two distinct triangles share at most one vertex; for triangles in a simple graph, this is equivalent to pairwise edge-disjointness.",
+    "Expressed that `ν` is the maximum packing size by requiring a valid packing of cardinality `ν` and requiring every valid packing to have cardinality at most `ν`. This avoids any default value for a maximum.",
+    "Represented a triangle-hitting set as a finset contained in `G.edgeFinset` that intersects `t.sym2`, the three edges of every triangle `t`.",
+    "Used `answer(sorry) ↔ ...` because the source states the conjecture as a yes/no question, following repository conventions."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "tuzas_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tuzas_conjecture": "/--\n**Tuza's conjecture.**\n\nIf $\\nu$ is the maximum size of a family of pairwise edge-disjoint triangles in a finite simple\nundirected graph $G$, can every triangle of $G$ be hit by a set of at most $2\\nu$ edges?\nHere triangles are represented by their three vertices, and edge-disjointness is expressed by two\ndistinct triangles sharing at most one vertex.\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj] (ν : ℕ),\n      (∃ P : Finset (Finset V),\n        P ⊆ G.cliqueFinset 3 ∧\n        (P : Set (Finset V)).Pairwise (fun s t ↦ (s ∩ t).card ≤ 1) ∧\n        P.card = ν ∧\n        ∀ Q : Finset (Finset V), Q ⊆ G.cliqueFinset 3 →\n          (Q : Set (Finset V)).Pairwise (fun s t ↦ (s ∩ t).card ≤ 1) → Q.card ≤ ν) →\n      ∃ H : Finset (Sym2 V),\n        H ⊆ G.edgeFinset ∧ H.card ≤ 2 * ν ∧\n        ∀ t ∈ G.cliqueFinset 3, ∃ e ∈ H, e ∈ t.sym2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tuza's conjecture\n\nTuza's conjecture concerns edge-disjoint triangle packings and sets of edges that meet every\ntriangle in a finite simple undirected graph.\n\n*References:*\n- [Wikipedia: Tuza's conjecture](https://en.wikipedia.org/wiki/Tuza%27s_conjecture)\n-/\n\nnamespace TuzasConjecture\n\n/--\nDoes every finite simple undirected graph have a set of edges that meets every triangle and has\nsize at most twice the maximum number of pairwise edge-disjoint triangles?\n\nHere `P` is a maximum-cardinality packing of triangles. Two triangles are edge-disjoint exactly\nwhen their vertex sets intersect in at most one vertex. The finset `H` is the triangle-hitting set.\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ (V : Type*) [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      ∃ P : Finset (Finset V),\n        P ⊆ G.cliqueFinset 3 ∧\n        (P : Set (Finset V)).Pairwise (fun s t ↦ (s ∩ t).card ≤ 1) ∧\n        (∀ Q : Finset (Finset V),\n          Q ⊆ G.cliqueFinset 3 →\n          (Q : Set (Finset V)).Pairwise (fun s t ↦ (s ∩ t).card ≤ 1) →\n          Q.card ≤ P.card) ∧\n        ∃ H : Finset (Sym2 V),\n          H ⊆ G.edgeFinset ∧\n          H.card ≤ 2 * P.card ∧\n          ∀ s ∈ G.cliqueFinset 3, ∃ e ∈ H, e ∈ s.sym2 := by\n  sorry\n\nend TuzasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list-page question using the cited Tuza's conjecture article and the decomposition notes: the graph is universally quantified over finite simple undirected graphs, and “disjoint” means edge-disjoint rather than vertex-disjoint.",
+    "Represented triangles by Mathlib's `G.cliqueFinset 3`, whose elements are 3-vertex cliques.",
+    "Represented an edge-disjoint packing by a finset of triangles in which every two distinct triangles intersect in at most one vertex. For triangles, this is equivalent to sharing no edge and still permits a shared vertex.",
+    "Represented ν(G) by an existentially chosen packing `P` whose cardinality is at least that of every other edge-disjoint triangle packing, avoiding a separate optimization-number definition.",
+    "Represented the hitting set as a finset `H` contained in `G.edgeFinset`; requiring an element of `H` to belong to each triangle's `sym2` says that an actual graph edge of `H` meets that triangle.",
+    "Used the non-strict natural-number bound `H.card ≤ 2 * P.card`; this also preserves the triangle-free ν(G)=0 boundary case."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "tuzas_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tuzas_conjecture": "/--\nDoes every finite simple undirected graph have a set of edges that meets every triangle and has\nsize at most twice the maximum number of pairwise edge-disjoint triangles?\n\nHere `P` is a maximum-cardinality packing of triangles. Two triangles are edge-disjoint exactly\nwhen their vertex sets intersect in at most one vertex. The finset `H` is the triangle-hitting set.\n-/\n@[category research open, AMS 5]\ntheorem tuzas_conjecture : answer(sorry) ↔\n    ∀ (V : Type*) [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      ∃ P : Finset (Finset V),\n        P ⊆ G.cliqueFinset 3 ∧\n        (P : Set (Finset V)).Pairwise (fun s t ↦ (s ∩ t).card ≤ 1) ∧\n        (∀ Q : Finset (Finset V),\n          Q ⊆ G.cliqueFinset 3 →\n          (Q : Set (Finset V)).Pairwise (fun s t ↦ (s ∩ t).card ≤ 1) →\n          Q.card ≤ P.card) ∧\n        ∃ H : Finset (Sym2 V),\n          H ⊆ G.edgeFinset ∧\n          H.card ≤ 2 * P.card ∧\n          ∀ s ∈ G.cliqueFinset 3, ∃ e ∈ H, e ∈ s.sym2 := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "tuzas_conjecture": "c01"
+ },
+ "id": "wp-tuzas-conjecture",
+ "main_attempt": "c01"
+}

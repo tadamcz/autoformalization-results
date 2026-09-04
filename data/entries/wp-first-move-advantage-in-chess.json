@@ -1,0 +1,2553 @@
+{
+ "area": "games and puzzles",
+ "article_title": "First-move advantage in chess",
+ "article_url": "https://en.wikipedia.org/wiki/first-move_advantage_in_chess",
+ "attempts": {
+  "bailed": 2,
+  "chosen": {
+   "first_move_advantage_in_chess": "c06"
+  },
+  "compiled": 6,
+  "list": [
+   {
+    "bailed": false,
+    "cid": "c01",
+    "compile_ok": true,
+    "confidence": 0.82,
+    "model": "epoch/claude-fable-5-1",
+    "model_name": "Claude Fable 5.1",
+    "slot_outcomes": {
+     "first_move_advantage_in_chess": "formalized_with_new_definitions"
+    }
+   },
+   {
+    "bailed": false,
+    "cid": "c02",
+    "compile_ok": true,
+    "confidence": 0.9,
+    "model": "epoch/gpt-5.6-sol",
+    "model_name": "GPT-5.6 Sol",
+    "slot_outcomes": {
+     "first_move_advantage_in_chess": "formalized_with_new_definitions"
+    }
+   },
+   {
+    "bailed": false,
+    "cid": "c03",
+    "compile_ok": true,
+    "confidence": 0.8,
+    "model": "epoch/claude-fable-5-1",
+    "model_name": "Claude Fable 5.1",
+    "slot_outcomes": {
+     "first_move_advantage_in_chess": "formalized_with_new_definitions"
+    }
+   },
+   {
+    "bailed": false,
+    "cid": "c04",
+    "compile_ok": true,
+    "confidence": 0.84,
+    "model": "epoch/gpt-5.6-sol",
+    "model_name": "GPT-5.6 Sol",
+    "slot_outcomes": {
+     "first_move_advantage_in_chess": "formalized_with_new_definitions"
+    }
+   },
+   {
+    "bailed": true,
+    "cid": "c05",
+    "compile_ok": false,
+    "confidence": null,
+    "model": "epoch/gpt-5.6-sol",
+    "model_name": "GPT-5.6 Sol",
+    "slot_outcomes": {
+     "first_move_advantage_in_chess": "missing_primitives"
+    }
+   },
+   {
+    "bailed": false,
+    "cid": "c06",
+    "compile_ok": true,
+    "confidence": 0.85,
+    "model": "epoch/claude-fable-5-1",
+    "model_name": "Claude Fable 5.1",
+    "slot_outcomes": {
+     "first_move_advantage_in_chess": "formalized_with_new_definitions"
+    }
+   },
+   {
+    "bailed": false,
+    "cid": "c07",
+    "compile_ok": true,
+    "confidence": 0.8,
+    "model": "epoch/claude-fable-5-1",
+    "model_name": "Claude Fable 5.1",
+    "slot_outcomes": {
+     "first_move_advantage_in_chess": "formalized_with_new_definitions"
+    }
+   },
+   {
+    "bailed": true,
+    "cid": "c08",
+    "compile_ok": false,
+    "confidence": null,
+    "model": "epoch/gpt-5.6-sol",
+    "model_name": "GPT-5.6 Sol",
+    "slot_outcomes": {
+     "first_move_advantage_in_chess": "missing_primitives"
+    }
+   }
+  ],
+  "main": "c06",
+  "total": 8
+ },
+ "blocks": [
+  {
+   "i": 0,
+   "kind": "header",
+   "line": 1,
+   "text": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\n"
+  },
+  {
+   "command": "import",
+   "command_arg": "FormalConjecturesUtil",
+   "i": 1,
+   "kind": "command",
+   "line": 17,
+   "modifiers": [],
+   "text": "import FormalConjecturesUtil\n\n"
+  },
+  {
+   "i": 2,
+   "kind": "module_doc",
+   "line": 19,
+   "text": "/-!\n# First-move advantage in chess\n\nWhat is the outcome of a perfectly played game of chess?\n\nChess is a finite two-player zero-sum game of perfect information, so by Zermelo's theorem\nexactly one of the following holds: White can force a win, Black can force a win, or both\nplayers can force at least a draw. Which one holds is not known. The consensus among players\nand theorists (Steinitz, Lasker, Capablanca, Fischer, Kasparov, ...) is that chess is a draw\nwith best play; a minority view (Adams, Berliner) is that White can force a win.\n\nNo model of chess exists in Mathlib, so this file formalises the FIDE Laws of Chess from\nscratch:\n\n* `Board`, `Position`, `Move`: the pieces on the 64 squares, the side to move, castling rights\n  and the en passant square; a move is given by its source and destination squares together\n  with an optional promotion piece (castling is the two-square king move, en passant is the\n  diagonal pawn move onto the en passant square).\n* `Position.IsLegal`: the legal moves (FIDE Article 3), including castling, en passant,\n  promotion and the rule that a move may not leave one's own king in check.\n* `GameState.result`: the game ends with checkmate (Art. 5.1.1), stalemate (Art. 5.2.1),\n  fivefold repetition (Art. 9.6.1) or the 75-move rule (Art. 9.6.2).\n* `GameState.CanClaimDraw`: the player to move may claim a draw by threefold repetition\n  (Art. 9.2) or by the 50-move rule (Art. 9.3), also with an intended move.\n* `CanForceWin c s`: player `c` has a strategy from the state `s` that wins against every\n  defence; a defender who can claim a draw is assumed to do so.\n* `perfectPlayOutcome`: the game-theoretic value of chess from the standard initial position.\n\nThe following rules are omitted because they cannot change the game-theoretic value: draw by\nagreement (Art. 9.1), resignation (Art. 5.1.2) and the dead position rule (Art. 5.2.2); from a\ndead position no play can end in checkmate, so every continuation is drawn anyway. Rules about\nclocks, arbiters and irregularities are not part of the mathematical game.\n\nThe 75-move rule makes the game finite: a game contains at most $96$ pawn moves and $30$\ncaptures, and at most $150$ consecutive half-moves without either, so every game ends after a\nbounded number of half-moves. Hence Zermelo's theorem applies and `perfectPlayOutcome` is a\ndraw if and only if neither player can force a win.\n\n*References:*\n- [Wikipedia: First-move advantage in chess](https://en.wikipedia.org/wiki/first-move_advantage_in_chess)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia: Solving chess](https://en.wikipedia.org/wiki/Solving_chess)\n- [FIDE Laws of Chess](https://handbook.fide.com/chapter/E012023)\n- C. E. Shannon, *Programming a Computer for Playing Chess*, Philosophical Magazine 41 (1950),\n  256–275.\n-/\n\n"
+  },
+  {
+   "command": "namespace",
+   "command_arg": "FirstMoveAdvantageInChess",
+   "i": 3,
+   "kind": "command",
+   "line": 66,
+   "modifiers": [],
+   "text": "namespace FirstMoveAdvantageInChess\n\n"
+  },
+  {
+   "i": 4,
+   "kind": "comment",
+   "line": 68,
+   "text": "/- ### Pieces and squares -/\n\n"
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "inductive Color\n  | white\n  | black\n  deriving DecidableEq, Fintype",
+   "code_line": 71,
+   "decl_kind": "inductive",
+   "docstring": "The two players. White moves first.",
+   "fq_name": "FirstMoveAdvantageInChess.Color",
+   "i": 5,
+   "justification": {
+    "closest_existing_considered": "Mathlib `SetTheory.PGame` (combinatorial games; no draws, no repetition/history-dependent rules, not suited to loopy games) and `CatchUp.Player`/`CatchUp.Outcome` in FormalConjectures/Paper/CatchUpConjecture.lean (problem-specific, not reusable).",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Color, PieceType, Piece, Square, Board, Wing, Move, Position",
+    "why_needed": "Basic data of a chess position and of a move; Mathlib has no chess or board-game vocabulary."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 70,
+   "modifiers": [],
+   "name": "Color",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The two players. White moves first. -/\ninductive Color\n  | white\n  | black\n  deriving DecidableEq, Fintype\n\n",
+   "used_by": [
+    6,
+    7,
+    8,
+    9,
+    10,
+    12,
+    36,
+    37,
+    39,
+    40,
+    44,
+    45,
+    46,
+    47,
+    61,
+    70
+   ],
+   "uses": []
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Color.other : Color → Color\n  | .white => .black\n  | .black => .white",
+   "code_line": 77,
+   "decl_kind": "def",
+   "docstring": "The opponent of a player.",
+   "fq_name": "FirstMoveAdvantageInChess.Color.other",
+   "i": 6,
+   "justification": {
+    "closest_existing_considered": "CatchUp.Player / CatchUp.Outcome in FormalConjectures/Paper/CatchUpConjecture.lean (problem-local, not reusable).",
+    "from_attempt": "c03",
+    "name": "Color, Color.other/forward/homeRank/pawnRank/passRank/promotionRank, PieceType, Piece, Wing (+ file helpers)",
+    "why_needed": "Basic chess vocabulary; no chess model exists in Mathlib or FormalConjecturesForMathlib."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 76,
+   "modifiers": [],
+   "name": "Color.other",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The opponent of a player. -/\ndef Color.other : Color → Color\n  | .white => .black\n  | .black => .white\n\n",
+   "used_by": [
+    37,
+    50,
+    52,
+    66,
+    70
+   ],
+   "uses": [
+    5
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Color.forward : Color → ℤ\n  | .white => 1\n  | .black => -1",
+   "code_line": 82,
+   "decl_kind": "def",
+   "docstring": "The rank increment of a forward pawn move of colour `c`.",
+   "fq_name": "FirstMoveAdvantageInChess.Color.forward",
+   "i": 7,
+   "justification": {
+    "closest_existing_considered": "CatchUp.Player / CatchUp.Outcome in FormalConjectures/Paper/CatchUpConjecture.lean (problem-local, not reusable).",
+    "from_attempt": "c03",
+    "name": "Color, Color.other/forward/homeRank/pawnRank/passRank/promotionRank, PieceType, Piece, Wing (+ file helpers)",
+    "why_needed": "Basic chess vocabulary; no chess model exists in Mathlib or FormalConjecturesForMathlib."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 81,
+   "modifiers": [],
+   "name": "Color.forward",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The rank increment of a forward pawn move of colour `c`. -/\ndef Color.forward : Color → ℤ\n  | .white => 1\n  | .black => -1\n\n",
+   "used_by": [
+    30,
+    51
+   ],
+   "uses": [
+    5
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Color.homeRank : Color → Fin 8\n  | .white => 0\n  | .black => 7",
+   "code_line": 87,
+   "decl_kind": "def",
+   "docstring": "The rank on which the pieces of colour `c` start. Ranks 1–8 are numbered `0`–`7`.",
+   "fq_name": "FirstMoveAdvantageInChess.Color.homeRank",
+   "i": 8,
+   "justification": {
+    "closest_existing_considered": "CatchUp.Player / CatchUp.Outcome in FormalConjectures/Paper/CatchUpConjecture.lean (problem-local, not reusable).",
+    "from_attempt": "c03",
+    "name": "Color, Color.other/forward/homeRank/pawnRank/passRank/promotionRank, PieceType, Piece, Wing (+ file helpers)",
+    "why_needed": "Basic chess vocabulary; no chess model exists in Mathlib or FormalConjecturesForMathlib."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 86,
+   "modifiers": [],
+   "name": "Color.homeRank",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The rank on which the pieces of colour `c` start. Ranks 1–8 are numbered `0`–`7`. -/\ndef Color.homeRank : Color → Fin 8\n  | .white => 0\n  | .black => 7\n\n",
+   "used_by": [
+    44,
+    45,
+    46
+   ],
+   "uses": [
+    5
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Color.pawnRank : Color → Fin 8\n  | .white => 1\n  | .black => 6",
+   "code_line": 92,
+   "decl_kind": "def",
+   "docstring": "The rank on which the pawns of colour `c` start.",
+   "fq_name": "FirstMoveAdvantageInChess.Color.pawnRank",
+   "i": 9,
+   "justification": {
+    "closest_existing_considered": "CatchUp.Player / CatchUp.Outcome in FormalConjectures/Paper/CatchUpConjecture.lean (problem-local, not reusable).",
+    "from_attempt": "c03",
+    "name": "Color, Color.other/forward/homeRank/pawnRank/passRank/promotionRank, PieceType, Piece, Wing (+ file helpers)",
+    "why_needed": "Basic chess vocabulary; no chess model exists in Mathlib or FormalConjecturesForMathlib."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 91,
+   "modifiers": [],
+   "name": "Color.pawnRank",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The rank on which the pawns of colour `c` start. -/\ndef Color.pawnRank : Color → Fin 8\n  | .white => 1\n  | .black => 6\n\n",
+   "used_by": [
+    51
+   ],
+   "uses": [
+    5
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Color.lastRank : Color → Fin 8\n  | .white => 7\n  | .black => 0",
+   "code_line": 97,
+   "decl_kind": "def",
+   "docstring": "The rank on which the pawns of colour `c` promote.",
+   "fq_name": "FirstMoveAdvantageInChess.Color.lastRank",
+   "i": 10,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 96,
+   "modifiers": [],
+   "name": "Color.lastRank",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The rank on which the pawns of colour `c` promote. -/\ndef Color.lastRank : Color → Fin 8\n  | .white => 7\n  | .black => 0\n\n",
+   "used_by": [
+    51
+   ],
+   "uses": [
+    5
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "inductive PieceType\n  | king\n  | queen\n  | rook\n  | bishop\n  | knight\n  | pawn\n  deriving DecidableEq, Fintype",
+   "code_line": 102,
+   "decl_kind": "inductive",
+   "docstring": "The six kinds of pieces.",
+   "fq_name": "FirstMoveAdvantageInChess.PieceType",
+   "i": 11,
+   "justification": {
+    "closest_existing_considered": "Mathlib `SetTheory.PGame` (combinatorial games; no draws, no repetition/history-dependent rules, not suited to loopy games) and `CatchUp.Player`/`CatchUp.Outcome` in FormalConjectures/Paper/CatchUpConjecture.lean (problem-specific, not reusable).",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Color, PieceType, Piece, Square, Board, Wing, Move, Position",
+    "why_needed": "Basic data of a chess position and of a move; Mathlib has no chess or board-game vocabulary."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 101,
+   "modifiers": [],
+   "name": "PieceType",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The six kinds of pieces. -/\ninductive PieceType\n  | king\n  | queen\n  | rook\n  | bishop\n  | knight\n  | pawn\n  deriving DecidableEq, Fintype\n\n",
+   "used_by": [
+    12,
+    28,
+    29,
+    48,
+    71
+   ],
+   "uses": []
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "structure Piece where\n  color : Color\n  type : PieceType\n  deriving DecidableEq, Fintype",
+   "code_line": 112,
+   "decl_kind": "structure",
+   "docstring": "A piece: a colour and a kind.",
+   "fq_name": "FirstMoveAdvantageInChess.Piece",
+   "i": 12,
+   "justification": {
+    "closest_existing_considered": "Mathlib `SetTheory.PGame` (combinatorial games; no draws, no repetition/history-dependent rules, not suited to loopy games) and `CatchUp.Player`/`CatchUp.Outcome` in FormalConjectures/Paper/CatchUpConjecture.lean (problem-specific, not reusable).",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Color, PieceType, Piece, Square, Board, Wing, Move, Position",
+    "why_needed": "Basic data of a chess position and of a move; Mathlib has no chess or board-game vocabulary."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 111,
+   "modifiers": [],
+   "name": "Piece",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- A piece: a colour and a kind. -/\nstructure Piece where\n  color : Color\n  type : PieceType\n  deriving DecidableEq, Fintype\n\n",
+   "used_by": [
+    30,
+    31,
+    33,
+    50
+   ],
+   "uses": [
+    5,
+    11
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "structure Square where\n  file : Fin 8\n  rank : Fin 8\n  deriving DecidableEq, Fintype",
+   "code_line": 119,
+   "decl_kind": "structure",
+   "docstring": "A square of the board. Files a–h and ranks 1–8 are both numbered `0`–`7`; for example\n`⟨4, 0⟩` is the square e1.",
+   "fq_name": "FirstMoveAdvantageInChess.Square",
+   "i": 13,
+   "justification": {
+    "closest_existing_considered": "Mathlib `SetTheory.PGame` (combinatorial games; no draws, no repetition/history-dependent rules, not suited to loopy games) and `CatchUp.Player`/`CatchUp.Outcome` in FormalConjectures/Paper/CatchUpConjecture.lean (problem-specific, not reusable).",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Color, PieceType, Piece, Square, Board, Wing, Move, Position",
+    "why_needed": "Basic data of a chess position and of a move; Mathlib has no chess or board-game vocabulary."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 117,
+   "modifiers": [],
+   "name": "Square",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- A square of the board. Files a–h and ranks 1–8 are both numbered `0`–`7`; for example\n`⟨4, 0⟩` is the square e1. -/\nstructure Square where\n  file : Fin 8\n  rank : Fin 8\n  deriving DecidableEq, Fintype\n\n",
+   "used_by": [
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    28,
+    29,
+    30,
+    31,
+    33,
+    35,
+    36,
+    38,
+    39,
+    44,
+    45,
+    46,
+    47,
+    48
+   ],
+   "uses": []
+  },
+  {
+   "command": "namespace",
+   "command_arg": "Square",
+   "i": 14,
+   "kind": "command",
+   "line": 124,
+   "modifiers": [],
+   "text": "namespace Square\n\n"
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def dx (s t : Square) : ℤ := (t.file : ℤ) - s.file",
+   "code_line": 127,
+   "decl_kind": "def",
+   "docstring": "The file difference from `s` to `t`.",
+   "fq_name": "FirstMoveAdvantageInChess.Square.dx",
+   "i": 15,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 126,
+   "modifiers": [],
+   "name": "dx",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The file difference from `s` to `t`. -/\ndef dx (s t : Square) : ℤ := (t.file : ℤ) - s.file\n\n",
+   "used_by": [
+    17,
+    18,
+    19,
+    21,
+    28,
+    30,
+    50,
+    51
+   ],
+   "uses": [
+    13
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def dy (s t : Square) : ℤ := (t.rank : ℤ) - s.rank",
+   "code_line": 130,
+   "decl_kind": "def",
+   "docstring": "The rank difference from `s` to `t`.",
+   "fq_name": "FirstMoveAdvantageInChess.Square.dy",
+   "i": 16,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 129,
+   "modifiers": [],
+   "name": "dy",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The rank difference from `s` to `t`. -/\ndef dy (s t : Square) : ℤ := (t.rank : ℤ) - s.rank\n\n",
+   "used_by": [
+    17,
+    18,
+    19,
+    21,
+    28,
+    30,
+    50,
+    51
+   ],
+   "uses": [
+    13
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def dist (s t : Square) : ℤ := max |s.dx t| |s.dy t|",
+   "code_line": 133,
+   "decl_kind": "def",
+   "docstring": "The Chebyshev (king-move) distance between two squares.",
+   "fq_name": "FirstMoveAdvantageInChess.Square.dist",
+   "i": 17,
+   "justification": {
+    "closest_existing_considered": "None in Mathlib (no board-geometry primitives).",
+    "from_attempt": "c01",
+    "name": "Square.df, Square.dr, Square.dist, Square.IsKingStep, Square.IsKnightStep, Square.IsOrthogonal, Square.IsDiagonal, Square.Between, Board.PathClear",
+    "why_needed": "Board geometry for piece movement and obstructed lines."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 132,
+   "modifiers": [],
+   "name": "dist",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The Chebyshev (king-move) distance between two squares. -/\ndef dist (s t : Square) : ℤ := max |s.dx t| |s.dy t|\n\n",
+   "used_by": [
+    21,
+    28
+   ],
+   "uses": [
+    13,
+    15,
+    16
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def OnRookLine (s t : Square) : Prop := s ≠ t ∧ (s.dx t = 0 ∨ s.dy t = 0)",
+   "code_line": 136,
+   "decl_kind": "def",
+   "docstring": "`s` and `t` are distinct squares on a common rank or file.",
+   "fq_name": "FirstMoveAdvantageInChess.Square.OnRookLine",
+   "i": 18,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 135,
+   "modifiers": [],
+   "name": "OnRookLine",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- `s` and `t` are distinct squares on a common rank or file. -/\ndef OnRookLine (s t : Square) : Prop := s ≠ t ∧ (s.dx t = 0 ∨ s.dy t = 0)\n\n",
+   "used_by": [
+    20,
+    22,
+    28
+   ],
+   "uses": [
+    13,
+    15,
+    16
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def OnBishopLine (s t : Square) : Prop := s ≠ t ∧ |s.dx t| = |s.dy t|",
+   "code_line": 139,
+   "decl_kind": "def",
+   "docstring": "`s` and `t` are distinct squares on a common diagonal.",
+   "fq_name": "FirstMoveAdvantageInChess.Square.OnBishopLine",
+   "i": 19,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 138,
+   "modifiers": [],
+   "name": "OnBishopLine",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- `s` and `t` are distinct squares on a common diagonal. -/\ndef OnBishopLine (s t : Square) : Prop := s ≠ t ∧ |s.dx t| = |s.dy t|\n\n",
+   "used_by": [
+    20,
+    23,
+    28
+   ],
+   "uses": [
+    13,
+    15,
+    16
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def OnLine (s t : Square) : Prop := s.OnRookLine t ∨ s.OnBishopLine t",
+   "code_line": 142,
+   "decl_kind": "def",
+   "docstring": "`s` and `t` are distinct squares on a common rank, file or diagonal.",
+   "fq_name": "FirstMoveAdvantageInChess.Square.OnLine",
+   "i": 20,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 141,
+   "modifiers": [],
+   "name": "OnLine",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- `s` and `t` are distinct squares on a common rank, file or diagonal. -/\ndef OnLine (s t : Square) : Prop := s.OnRookLine t ∨ s.OnBishopLine t\n\n",
+   "used_by": [
+    21,
+    24,
+    28
+   ],
+   "uses": [
+    13,
+    18,
+    19
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def StrictlyBetween (s t u : Square) : Prop :=\n  s.OnLine t ∧ s.OnLine u ∧ (s.dx t).sign = (s.dx u).sign ∧ (s.dy t).sign = (s.dy u).sign ∧\n    s.dist u < s.dist t",
+   "code_line": 145,
+   "decl_kind": "def",
+   "docstring": "`u` lies strictly between `s` and `t` on a common rank, file or diagonal.",
+   "fq_name": "FirstMoveAdvantageInChess.Square.StrictlyBetween",
+   "i": 21,
+   "justification": {
+    "closest_existing_considered": "None in Mathlib; `Finset.Ioo` on coordinates was considered but a direct definition via sign and Chebyshev distance is clearer.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Square.StrictlyBetween, Board.PathClear, Board.Attacks, Board.InCheck, PieceType.Pattern, Piece.AttackPattern",
+    "why_needed": "Geometry of piece movement, attacked squares and check (FIDE Art. 3.1–3.9)."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 144,
+   "modifiers": [],
+   "name": "StrictlyBetween",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- `u` lies strictly between `s` and `t` on a common rank, file or diagonal. -/\ndef StrictlyBetween (s t u : Square) : Prop :=\n  s.OnLine t ∧ s.OnLine u ∧ (s.dx t).sign = (s.dx u).sign ∧ (s.dy t).sign = (s.dy u).sign ∧\n    s.dist u < s.dist t\n\n",
+   "used_by": [
+    25,
+    35,
+    52
+   ],
+   "uses": [
+    13,
+    15,
+    16,
+    17,
+    20
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (s t : Square) : Decidable (s.OnRookLine t) := by unfold OnRookLine; infer_instance",
+   "code_line": 149,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 22,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 149,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (s t : Square) : Decidable (s.OnRookLine t) := by unfold OnRookLine; infer_instance\n",
+   "used_by": [],
+   "uses": [
+    13,
+    18
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (s t : Square) : Decidable (s.OnBishopLine t) := by unfold OnBishopLine; infer_instance",
+   "code_line": 150,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 23,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 150,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (s t : Square) : Decidable (s.OnBishopLine t) := by unfold OnBishopLine; infer_instance\n",
+   "used_by": [],
+   "uses": [
+    13,
+    19
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (s t : Square) : Decidable (s.OnLine t) := by unfold OnLine; infer_instance",
+   "code_line": 151,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 24,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 151,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (s t : Square) : Decidable (s.OnLine t) := by unfold OnLine; infer_instance\n",
+   "used_by": [],
+   "uses": [
+    13,
+    20
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (s t u : Square) : Decidable (s.StrictlyBetween t u) := by\n  unfold StrictlyBetween; infer_instance",
+   "code_line": 152,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 25,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 152,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (s t u : Square) : Decidable (s.StrictlyBetween t u) := by\n  unfold StrictlyBetween; infer_instance\n\n",
+   "used_by": [],
+   "uses": [
+    13,
+    21
+   ]
+  },
+  {
+   "command": "end",
+   "command_arg": "Square",
+   "i": 26,
+   "kind": "command",
+   "line": 155,
+   "modifiers": [],
+   "text": "end Square\n\n"
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def midpoint (a b : Fin 8) : Fin 8 := ⟨(a.val + b.val) / 2, by omega⟩",
+   "code_line": 159,
+   "decl_kind": "def",
+   "docstring": "The number halfway between `a` and `b`. It is the file of the rook's destination when\ncastling and the rank of the en passant square after a two-square pawn move.",
+   "fq_name": "FirstMoveAdvantageInChess.midpoint",
+   "i": 27,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 157,
+   "modifiers": [],
+   "name": "midpoint",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The number halfway between `a` and `b`. It is the file of the rook's destination when\ncastling and the rank of the en passant square after a two-square pawn move. -/\ndef midpoint (a b : Fin 8) : Fin 8 := ⟨(a.val + b.val) / 2, by omega⟩\n\n",
+   "used_by": [
+    50
+   ],
+   "uses": []
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def PieceType.Pattern : PieceType → Square → Square → Prop\n  | .king, s, t => s.dist t = 1\n  | .queen, s, t => s.OnLine t\n  | .rook, s, t => s.OnRookLine t\n  | .bishop, s, t => s.OnBishopLine t\n  | .knight, s, t => |s.dx t| * |s.dy t| = 2\n  | .pawn, _, _ => False",
+   "code_line": 163,
+   "decl_kind": "def",
+   "docstring": "The squares `t` that a piece of kind `pt` standing on `s` could move to on an otherwise\nempty board (FIDE Art. 3.2–3.6). Pawns are treated separately.",
+   "fq_name": "FirstMoveAdvantageInChess.PieceType.Pattern",
+   "i": 28,
+   "justification": {
+    "closest_existing_considered": "None in Mathlib; `Finset.Ioo` on coordinates was considered but a direct definition via sign and Chebyshev distance is clearer.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Square.StrictlyBetween, Board.PathClear, Board.Attacks, Board.InCheck, PieceType.Pattern, Piece.AttackPattern",
+    "why_needed": "Geometry of piece movement, attacked squares and check (FIDE Art. 3.1–3.9)."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 161,
+   "modifiers": [],
+   "name": "PieceType.Pattern",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The squares `t` that a piece of kind `pt` standing on `s` could move to on an otherwise\nempty board (FIDE Art. 3.2–3.6). Pawns are treated separately. -/\ndef PieceType.Pattern : PieceType → Square → Square → Prop\n  | .king, s, t => s.dist t = 1\n  | .queen, s, t => s.OnLine t\n  | .rook, s, t => s.OnRookLine t\n  | .bishop, s, t => s.OnBishopLine t\n  | .knight, s, t => |s.dx t| * |s.dy t| = 2\n  | .pawn, _, _ => False\n\n",
+   "used_by": [
+    29,
+    30,
+    53
+   ],
+   "uses": [
+    11,
+    13,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (pt : PieceType) (s t : Square) : Decidable (pt.Pattern s t) := by\n  cases pt <;> unfold PieceType.Pattern <;> infer_instance",
+   "code_line": 171,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 29,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 171,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (pt : PieceType) (s t : Square) : Decidable (pt.Pattern s t) := by\n  cases pt <;> unfold PieceType.Pattern <;> infer_instance\n\n",
+   "used_by": [],
+   "uses": [
+    11,
+    13,
+    28
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Piece.AttackPattern (pc : Piece) (s t : Square) : Prop :=\n  if pc.type = .pawn then s.dy t = pc.color.forward ∧ |s.dx t| = 1 else pc.type.Pattern s t",
+   "code_line": 176,
+   "decl_kind": "def",
+   "docstring": "The squares `t` on which the piece `pc` standing on `s` could capture, ignoring the other\npieces on the board. A pawn captures one square diagonally forward (Art. 3.7.3).",
+   "fq_name": "FirstMoveAdvantageInChess.Piece.AttackPattern",
+   "i": 30,
+   "justification": {
+    "closest_existing_considered": "None in Mathlib; `Finset.Ioo` on coordinates was considered but a direct definition via sign and Chebyshev distance is clearer.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Square.StrictlyBetween, Board.PathClear, Board.Attacks, Board.InCheck, PieceType.Pattern, Piece.AttackPattern",
+    "why_needed": "Geometry of piece movement, attacked squares and check (FIDE Art. 3.1–3.9)."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 174,
+   "modifiers": [],
+   "name": "Piece.AttackPattern",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The squares `t` on which the piece `pc` standing on `s` could capture, ignoring the other\npieces on the board. A pawn captures one square diagonally forward (Art. 3.7.3). -/\ndef Piece.AttackPattern (pc : Piece) (s t : Square) : Prop :=\n  if pc.type = .pawn then s.dy t = pc.color.forward ∧ |s.dx t| = 1 else pc.type.Pattern s t\n\n",
+   "used_by": [
+    31,
+    36
+   ],
+   "uses": [
+    7,
+    12,
+    13,
+    15,
+    16,
+    28
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (pc : Piece) (s t : Square) : Decidable (pc.AttackPattern s t) := by\n  unfold Piece.AttackPattern; infer_instance",
+   "code_line": 179,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 31,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 179,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (pc : Piece) (s t : Square) : Decidable (pc.AttackPattern s t) := by\n  unfold Piece.AttackPattern; infer_instance\n\n",
+   "used_by": [],
+   "uses": [
+    12,
+    13,
+    30
+   ]
+  },
+  {
+   "i": 32,
+   "kind": "comment",
+   "line": 182,
+   "text": "/- ### Boards -/\n\n"
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "abbrev Board := Square → Option Piece",
+   "code_line": 185,
+   "decl_kind": "abbrev",
+   "docstring": "A board assigns to every square the piece standing on it, if any.",
+   "fq_name": "FirstMoveAdvantageInChess.Board",
+   "i": 33,
+   "justification": {
+    "closest_existing_considered": "Mathlib `SetTheory.PGame` (combinatorial games; no draws, no repetition/history-dependent rules, not suited to loopy games) and `CatchUp.Player`/`CatchUp.Outcome` in FormalConjectures/Paper/CatchUpConjecture.lean (problem-specific, not reusable).",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Color, PieceType, Piece, Square, Board, Wing, Move, Position",
+    "why_needed": "Basic data of a chess position and of a move; Mathlib has no chess or board-game vocabulary."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 184,
+   "modifiers": [],
+   "name": "Board",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- A board assigns to every square the piece standing on it, if any. -/\nabbrev Board := Square → Option Piece\n\n",
+   "used_by": [
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    47,
+    50
+   ],
+   "uses": [
+    12,
+    13
+   ]
+  },
+  {
+   "command": "namespace",
+   "command_arg": "Board",
+   "i": 34,
+   "kind": "command",
+   "line": 187,
+   "modifiers": [],
+   "text": "namespace Board\n\n"
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def PathClear (b : Board) (s t : Square) : Prop := ∀ u, s.StrictlyBetween t u → b u = none",
+   "code_line": 190,
+   "decl_kind": "def",
+   "docstring": "No piece stands strictly between the squares `s` and `t`.",
+   "fq_name": "FirstMoveAdvantageInChess.Board.PathClear",
+   "i": 35,
+   "justification": {
+    "closest_existing_considered": "None in Mathlib; `Finset.Ioo` on coordinates was considered but a direct definition via sign and Chebyshev distance is clearer.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Square.StrictlyBetween, Board.PathClear, Board.Attacks, Board.InCheck, PieceType.Pattern, Piece.AttackPattern",
+    "why_needed": "Geometry of piece movement, attacked squares and check (FIDE Art. 3.1–3.9)."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 189,
+   "modifiers": [],
+   "name": "PathClear",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- No piece stands strictly between the squares `s` and `t`. -/\ndef PathClear (b : Board) (s t : Square) : Prop := ∀ u, s.StrictlyBetween t u → b u = none\n\n",
+   "used_by": [
+    36,
+    38,
+    51,
+    52,
+    53
+   ],
+   "uses": [
+    13,
+    21,
+    33
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Attacks (b : Board) (c : Color) (t : Square) : Prop :=\n  ∃ s pc, b s = some pc ∧ pc.color = c ∧ pc.AttackPattern s t ∧ b.PathClear s t",
+   "code_line": 194,
+   "decl_kind": "def",
+   "docstring": "Some piece of colour `c` attacks the square `t` (Art. 3.1): it could capture on `t`, even if\nit is pinned (Art. 3.1.3).",
+   "fq_name": "FirstMoveAdvantageInChess.Board.Attacks",
+   "i": 36,
+   "justification": {
+    "closest_existing_considered": "None in Mathlib; `Finset.Ioo` on coordinates was considered but a direct definition via sign and Chebyshev distance is clearer.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Square.StrictlyBetween, Board.PathClear, Board.Attacks, Board.InCheck, PieceType.Pattern, Piece.AttackPattern",
+    "why_needed": "Geometry of piece movement, attacked squares and check (FIDE Art. 3.1–3.9)."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 192,
+   "modifiers": [],
+   "name": "Attacks",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- Some piece of colour `c` attacks the square `t` (Art. 3.1): it could capture on `t`, even if\nit is pinned (Art. 3.1.3). -/\ndef Attacks (b : Board) (c : Color) (t : Square) : Prop :=\n  ∃ s pc, b s = some pc ∧ pc.color = c ∧ pc.AttackPattern s t ∧ b.PathClear s t\n\n",
+   "used_by": [
+    37,
+    39,
+    52
+   ],
+   "uses": [
+    5,
+    13,
+    30,
+    33,
+    35
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def InCheck (b : Board) (c : Color) : Prop :=\n  ∃ k, b k = some ⟨c, .king⟩ ∧ b.Attacks c.other k",
+   "code_line": 198,
+   "decl_kind": "def",
+   "docstring": "The king of colour `c` is attacked by the opponent (Art. 3.9.1).",
+   "fq_name": "FirstMoveAdvantageInChess.Board.InCheck",
+   "i": 37,
+   "justification": {
+    "closest_existing_considered": "None in Mathlib; `Finset.Ioo` on coordinates was considered but a direct definition via sign and Chebyshev distance is clearer.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Square.StrictlyBetween, Board.PathClear, Board.Attacks, Board.InCheck, PieceType.Pattern, Piece.AttackPattern",
+    "why_needed": "Geometry of piece movement, attacked squares and check (FIDE Art. 3.1–3.9)."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 197,
+   "modifiers": [],
+   "name": "InCheck",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The king of colour `c` is attacked by the opponent (Art. 3.9.1). -/\ndef InCheck (b : Board) (c : Color) : Prop :=\n  ∃ k, b k = some ⟨c, .king⟩ ∧ b.Attacks c.other k\n\n",
+   "used_by": [
+    40,
+    53,
+    66
+   ],
+   "uses": [
+    5,
+    6,
+    33,
+    36
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (b : Board) (s t : Square) : Decidable (b.PathClear s t) := by\n  unfold PathClear; infer_instance",
+   "code_line": 201,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 38,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 201,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (b : Board) (s t : Square) : Decidable (b.PathClear s t) := by\n  unfold PathClear; infer_instance\n",
+   "used_by": [],
+   "uses": [
+    13,
+    33,
+    35
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (b : Board) (c : Color) (t : Square) : Decidable (b.Attacks c t) := by\n  unfold Attacks; infer_instance",
+   "code_line": 203,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 39,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 203,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (b : Board) (c : Color) (t : Square) : Decidable (b.Attacks c t) := by\n  unfold Attacks; infer_instance\n",
+   "used_by": [],
+   "uses": [
+    5,
+    13,
+    33,
+    36
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (b : Board) (c : Color) : Decidable (b.InCheck c) := by unfold InCheck; infer_instance",
+   "code_line": 205,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 40,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 205,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (b : Board) (c : Color) : Decidable (b.InCheck c) := by unfold InCheck; infer_instance\n\n",
+   "used_by": [],
+   "uses": [
+    5,
+    33,
+    37
+   ]
+  },
+  {
+   "command": "end",
+   "command_arg": "Board",
+   "i": 41,
+   "kind": "command",
+   "line": 207,
+   "modifiers": [],
+   "text": "end Board\n\n"
+  },
+  {
+   "i": 42,
+   "kind": "comment",
+   "line": 209,
+   "text": "/- ### Positions and moves -/\n\n"
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "inductive Wing\n  | kingside\n  | queenside\n  deriving DecidableEq, Fintype",
+   "code_line": 212,
+   "decl_kind": "inductive",
+   "docstring": "The two wings on which a king may castle.",
+   "fq_name": "FirstMoveAdvantageInChess.Wing",
+   "i": 43,
+   "justification": {
+    "closest_existing_considered": "Mathlib `SetTheory.PGame` (combinatorial games; no draws, no repetition/history-dependent rules, not suited to loopy games) and `CatchUp.Player`/`CatchUp.Outcome` in FormalConjectures/Paper/CatchUpConjecture.lean (problem-specific, not reusable).",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Color, PieceType, Piece, Square, Board, Wing, Move, Position",
+    "why_needed": "Basic data of a chess position and of a move; Mathlib has no chess or board-game vocabulary."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 211,
+   "modifiers": [],
+   "name": "Wing",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The two wings on which a king may castle. -/\ninductive Wing\n  | kingside\n  | queenside\n  deriving DecidableEq, Fintype\n\n",
+   "used_by": [
+    45,
+    46,
+    47
+   ],
+   "uses": []
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Color.kingSquare (c : Color) : Square := ⟨4, c.homeRank⟩",
+   "code_line": 218,
+   "decl_kind": "def",
+   "docstring": "The initial square of the king of colour `c`.",
+   "fq_name": "FirstMoveAdvantageInChess.Color.kingSquare",
+   "i": 44,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 217,
+   "modifiers": [],
+   "name": "Color.kingSquare",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The initial square of the king of colour `c`. -/\ndef Color.kingSquare (c : Color) : Square := ⟨4, c.homeRank⟩\n\n",
+   "used_by": [
+    50,
+    52
+   ],
+   "uses": [
+    5,
+    8,
+    13
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Color.rookSquare (c : Color) : Wing → Square\n  | .kingside => ⟨7, c.homeRank⟩\n  | .queenside => ⟨0, c.homeRank⟩",
+   "code_line": 221,
+   "decl_kind": "def",
+   "docstring": "The initial square of the rook of colour `c` on wing `w`.",
+   "fq_name": "FirstMoveAdvantageInChess.Color.rookSquare",
+   "i": 45,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 220,
+   "modifiers": [],
+   "name": "Color.rookSquare",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The initial square of the rook of colour `c` on wing `w`. -/\ndef Color.rookSquare (c : Color) : Wing → Square\n  | .kingside => ⟨7, c.homeRank⟩\n  | .queenside => ⟨0, c.homeRank⟩\n\n",
+   "used_by": [
+    50,
+    52
+   ],
+   "uses": [
+    5,
+    8,
+    13,
+    43
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Color.castleSquare (c : Color) : Wing → Square\n  | .kingside => ⟨6, c.homeRank⟩\n  | .queenside => ⟨2, c.homeRank⟩",
+   "code_line": 226,
+   "decl_kind": "def",
+   "docstring": "The square on which the king of colour `c` lands when castling on wing `w`.",
+   "fq_name": "FirstMoveAdvantageInChess.Color.castleSquare",
+   "i": 46,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 225,
+   "modifiers": [],
+   "name": "Color.castleSquare",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The square on which the king of colour `c` lands when castling on wing `w`. -/\ndef Color.castleSquare (c : Color) : Wing → Square\n  | .kingside => ⟨6, c.homeRank⟩\n  | .queenside => ⟨2, c.homeRank⟩\n\n",
+   "used_by": [
+    52
+   ],
+   "uses": [
+    5,
+    8,
+    13,
+    43
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "structure Position where\n  /-- The pieces on the board. -/\n  board : Board\n  /-- The player who has the move. -/\n  toMove : Color\n  /-- `castling c w` holds when neither the king of colour `c` nor its rook on wing `w` has\n  moved yet, and this rook has not been captured (Art. 3.8.2.1). -/\n  castling : Color → Wing → Bool\n  /-- The square passed over by a pawn that has just advanced two squares, if any\n  (Art. 3.7.3.1). -/\n  enPassant : Option Square\n  deriving DecidableEq",
+   "code_line": 232,
+   "decl_kind": "structure",
+   "docstring": "A chess position: the pieces on the board, the side to move, the castling rights and the\nen passant square.",
+   "fq_name": "FirstMoveAdvantageInChess.Position",
+   "i": 47,
+   "justification": {
+    "closest_existing_considered": "Mathlib `SetTheory.PGame` (combinatorial games; no draws, no repetition/history-dependent rules, not suited to loopy games) and `CatchUp.Player`/`CatchUp.Outcome` in FormalConjectures/Paper/CatchUpConjecture.lean (problem-specific, not reusable).",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Color, PieceType, Piece, Square, Board, Wing, Move, Position",
+    "why_needed": "Basic data of a chess position and of a move; Mathlib has no chess or board-game vocabulary."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 230,
+   "modifiers": [],
+   "name": "Position",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- A chess position: the pieces on the board, the side to move, the castling rights and the\nen passant square. -/\nstructure Position where\n  /-- The pieces on the board. -/\n  board : Board\n  /-- The player who has the move. -/\n  toMove : Color\n  /-- `castling c w` holds when neither the king of colour `c` nor its rook on wing `w` has\n  moved yet, and this rook has not been captured (Art. 3.8.2.1). -/\n  castling : Color → Wing → Bool\n  /-- The square passed over by a pawn that has just advanced two squares, if any\n  (Art. 3.7.3.1). -/\n  enPassant : Option Square\n  deriving DecidableEq\n\n",
+   "used_by": [
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    62,
+    72
+   ],
+   "uses": [
+    5,
+    13,
+    33,
+    43
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "structure Move where\n  src : Square\n  dst : Square\n  promotion : Option PieceType\n  deriving DecidableEq, Fintype",
+   "code_line": 248,
+   "decl_kind": "structure",
+   "docstring": "A move: the square the moving piece leaves, the square it lands on, and the piece a pawn\npromotes to (for promotions only). Castling is recorded as the two-square move of the king, and\nan en passant capture as the diagonal move of the capturing pawn onto the en passant square.",
+   "fq_name": "FirstMoveAdvantageInChess.Move",
+   "i": 48,
+   "justification": {
+    "closest_existing_considered": "Mathlib `SetTheory.PGame` (combinatorial games; no draws, no repetition/history-dependent rules, not suited to loopy games) and `CatchUp.Player`/`CatchUp.Outcome` in FormalConjectures/Paper/CatchUpConjecture.lean (problem-specific, not reusable).",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Color, PieceType, Piece, Square, Board, Wing, Move, Position",
+    "why_needed": "Basic data of a chess position and of a move; Mathlib has no chess or board-game vocabulary."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 245,
+   "modifiers": [],
+   "name": "Move",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- A move: the square the moving piece leaves, the square it lands on, and the piece a pawn\npromotes to (for promotions only). Castling is recorded as the two-square move of the king, and\nan en passant capture as the diagonal move of the capturing pawn onto the en passant square. -/\nstructure Move where\n  src : Square\n  dst : Square\n  promotion : Option PieceType\n  deriving DecidableEq, Fintype\n\n",
+   "used_by": [
+    50,
+    51,
+    52,
+    53,
+    55,
+    56,
+    57,
+    64,
+    70
+   ],
+   "uses": [
+    11,
+    13
+   ]
+  },
+  {
+   "command": "namespace",
+   "command_arg": "Position",
+   "i": 49,
+   "kind": "command",
+   "line": 254,
+   "modifiers": [],
+   "text": "namespace Position\n\n"
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def play (p : Position) (m : Move) : Position :=\n  match p.board m.src with\n  | none => p\n  | some pc =>\n    let placed : Piece := match m.promotion with\n      | some q => ⟨pc.color, q⟩\n      | none => pc\n    let b₁ : Board := Function.update (Function.update p.board m.src none) m.dst (some placed)\n    let b₂ : Board :=\n      if pc.type = .pawn ∧ p.enPassant = some m.dst then\n        Function.update b₁ ⟨m.dst.file, m.src.rank⟩ none\n      else b₁\n    let b₃ : Board :=\n      if pc.type = .king ∧ |m.src.dx m.dst| = 2 then\n        Function.update\n          (Function.update b₂ ⟨if m.src.file < m.dst.file then 7 else 0, m.src.rank⟩ none)\n          ⟨midpoint m.src.file m.dst.file, m.src.rank⟩ (some ⟨pc.color, .rook⟩)\n      else b₂\n    { board := b₃\n      toMove := pc.color.other\n      castling := fun c w => p.castling c w &&\n        decide (m.src ≠ c.kingSquare ∧ m.src ≠ c.rookSquare w ∧ m.dst ≠ c.rookSquare w)\n      enPassant :=\n        if pc.type = .pawn ∧ |m.src.dy m.dst| = 2 then\n          some ⟨m.src.file, midpoint m.src.rank m.dst.rank⟩\n        else none }",
+   "code_line": 261,
+   "decl_kind": "def",
+   "docstring": "The position obtained by playing the move `m` (the result is only meaningful when\n`p.IsLegal m`). The moving piece leaves `m.src` and lands on `m.dst`, replaced by the promotion\npiece if any; an en passant capture removes the captured pawn; castling also moves the rook to\nthe square the king passed over. Castling rights are lost by moving the king, by moving a rook\nfrom its initial square and when a rook is captured on its initial square.",
+   "fq_name": "FirstMoveAdvantageInChess.Position.play",
+   "i": 50,
+   "justification": {
+    "closest_existing_considered": "None.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Position.play, Position.PawnMove, Position.Castles, Position.IsLegal, Position.Same",
+    "why_needed": "Effect of a move and legality of moves (Art. 3), and sameness of positions for the repetition rules (Art. 9.2.2)."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 256,
+   "modifiers": [],
+   "name": "play",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The position obtained by playing the move `m` (the result is only meaningful when\n`p.IsLegal m`). The moving piece leaves `m.src` and lands on `m.dst`, replaced by the promotion\npiece if any; an en passant capture removes the captured pawn; castling also moves the rook to\nthe square the king passed over. Castling rights are lost by moving the king, by moving a rook\nfrom its initial square and when a rook is captured on its initial square. -/\ndef play (p : Position) (m : Move) : Position :=\n  match p.board m.src with\n  | none => p\n  | some pc =>\n    let placed : Piece := match m.promotion with\n      | some q => ⟨pc.color, q⟩\n      | none => pc\n    let b₁ : Board := Function.update (Function.update p.board m.src none) m.dst (some placed)\n    let b₂ : Board :=\n      if pc.type = .pawn ∧ p.enPassant = some m.dst then\n        Function.update b₁ ⟨m.dst.file, m.src.rank⟩ none\n      else b₁\n    let b₃ : Board :=\n      if pc.type = .king ∧ |m.src.dx m.dst| = 2 then\n        Function.update\n          (Function.update b₂ ⟨if m.src.file < m.dst.file then 7 else 0, m.src.rank⟩ none)\n          ⟨midpoint m.src.file m.dst.file, m.src.rank⟩ (some ⟨pc.color, .rook⟩)\n      else b₂\n    { board := b₃\n      toMove := pc.color.other\n      castling := fun c w => p.castling c w &&\n        decide (m.src ≠ c.kingSquare ∧ m.src ≠ c.rookSquare w ∧ m.dst ≠ c.rookSquare w)\n      enPassant :=\n        if pc.type = .pawn ∧ |m.src.dy m.dst| = 2 then\n          some ⟨m.src.file, midpoint m.src.rank m.dst.rank⟩\n        else none }\n\n",
+   "used_by": [
+    53,
+    64,
+    67,
+    70,
+    77,
+    78
+   ],
+   "uses": [
+    6,
+    12,
+    15,
+    16,
+    27,
+    33,
+    44,
+    45,
+    47,
+    48,
+    64
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def PawnMove (p : Position) (m : Move) : Prop :=\n  ((m.src.dx m.dst = 0 ∧ p.board m.dst = none ∧\n      (m.src.dy m.dst = p.toMove.forward ∨\n        (m.src.dy m.dst = 2 * p.toMove.forward ∧ m.src.rank = p.toMove.pawnRank ∧\n          p.board.PathClear m.src m.dst))) ∨\n    (|m.src.dx m.dst| = 1 ∧ m.src.dy m.dst = p.toMove.forward ∧\n      (p.board m.dst ≠ none ∨ p.enPassant = some m.dst))) ∧\n  (m.promotion = none ↔ m.dst.rank ≠ p.toMove.lastRank) ∧\n  ∀ q, m.promotion = some q → q ≠ .king ∧ q ≠ .pawn",
+   "code_line": 292,
+   "decl_kind": "def",
+   "docstring": "The move `m` of a pawn of the side to move is a pawn move (Art. 3.7): one square forward to\nan empty square; two squares forward from the pawn's initial rank over an empty square to an\nempty square; or one square diagonally forward, capturing a piece there or capturing en passant.\nA pawn reaching the last rank must promote to a queen, rook, bishop or knight.",
+   "fq_name": "FirstMoveAdvantageInChess.Position.PawnMove",
+   "i": 51,
+   "justification": {
+    "closest_existing_considered": "None.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Position.play, Position.PawnMove, Position.Castles, Position.IsLegal, Position.Same",
+    "why_needed": "Effect of a move and legality of moves (Art. 3), and sameness of positions for the repetition rules (Art. 9.2.2)."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 288,
+   "modifiers": [],
+   "name": "PawnMove",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The move `m` of a pawn of the side to move is a pawn move (Art. 3.7): one square forward to\nan empty square; two squares forward from the pawn's initial rank over an empty square to an\nempty square; or one square diagonally forward, capturing a piece there or capturing en passant.\nA pawn reaching the last rank must promote to a queen, rook, bishop or knight. -/\ndef PawnMove (p : Position) (m : Move) : Prop :=\n  ((m.src.dx m.dst = 0 ∧ p.board m.dst = none ∧\n      (m.src.dy m.dst = p.toMove.forward ∨\n        (m.src.dy m.dst = 2 * p.toMove.forward ∧ m.src.rank = p.toMove.pawnRank ∧\n          p.board.PathClear m.src m.dst))) ∨\n    (|m.src.dx m.dst| = 1 ∧ m.src.dy m.dst = p.toMove.forward ∧\n      (p.board m.dst ≠ none ∨ p.enPassant = some m.dst))) ∧\n  (m.promotion = none ↔ m.dst.rank ≠ p.toMove.lastRank) ∧\n  ∀ q, m.promotion = some q → q ≠ .king ∧ q ≠ .pawn\n\n",
+   "used_by": [
+    53,
+    55
+   ],
+   "uses": [
+    7,
+    9,
+    10,
+    15,
+    16,
+    35,
+    47,
+    48
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Castles (p : Position) (m : Move) : Prop :=\n  ∃ w, m.src = p.toMove.kingSquare ∧ m.dst = p.toMove.castleSquare w ∧\n    p.castling p.toMove w = true ∧\n    p.board (p.toMove.rookSquare w) = some ⟨p.toMove, .rook⟩ ∧\n    p.board.PathClear m.src (p.toMove.rookSquare w) ∧\n    ∀ u, u = m.src ∨ m.src.StrictlyBetween m.dst u ∨ u = m.dst →\n      ¬ p.board.Attacks p.toMove.other u",
+   "code_line": 307,
+   "decl_kind": "def",
+   "docstring": "The move `m` is a castling move of the side to move (Art. 3.8.2): the king moves from its\ninitial square two squares towards a rook of the same colour on its initial square, neither of\nwhich has moved (the castling right is intact); all squares between the king and the rook are\nempty; and the king does not stand on, pass over or land on a square attacked by the opponent.",
+   "fq_name": "FirstMoveAdvantageInChess.Position.Castles",
+   "i": 52,
+   "justification": {
+    "closest_existing_considered": "None.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Position.play, Position.PawnMove, Position.Castles, Position.IsLegal, Position.Same",
+    "why_needed": "Effect of a move and legality of moves (Art. 3), and sameness of positions for the repetition rules (Art. 9.2.2)."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 302,
+   "modifiers": [],
+   "name": "Castles",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The move `m` is a castling move of the side to move (Art. 3.8.2): the king moves from its\ninitial square two squares towards a rook of the same colour on its initial square, neither of\nwhich has moved (the castling right is intact); all squares between the king and the rook are\nempty; and the king does not stand on, pass over or land on a square attacked by the opponent.\n-/\ndef Castles (p : Position) (m : Move) : Prop :=\n  ∃ w, m.src = p.toMove.kingSquare ∧ m.dst = p.toMove.castleSquare w ∧\n    p.castling p.toMove w = true ∧\n    p.board (p.toMove.rookSquare w) = some ⟨p.toMove, .rook⟩ ∧\n    p.board.PathClear m.src (p.toMove.rookSquare w) ∧\n    ∀ u, u = m.src ∨ m.src.StrictlyBetween m.dst u ∨ u = m.dst →\n      ¬ p.board.Attacks p.toMove.other u\n\n",
+   "used_by": [
+    53,
+    56
+   ],
+   "uses": [
+    6,
+    21,
+    35,
+    36,
+    44,
+    45,
+    46,
+    47,
+    48
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def IsLegal (p : Position) (m : Move) : Prop :=\n  ∃ pc, p.board m.src = some pc ∧ pc.color = p.toMove ∧\n    (∀ q, p.board m.dst = some q → q.color ≠ p.toMove) ∧\n    (if pc.type = .pawn then p.PawnMove m\n      else m.promotion = none ∧\n        ((pc.type.Pattern m.src m.dst ∧ p.board.PathClear m.src m.dst) ∨\n          (pc.type = .king ∧ p.Castles m))) ∧\n    ¬ (p.play m).board.InCheck p.toMove",
+   "code_line": 319,
+   "decl_kind": "def",
+   "docstring": "The move `m` is legal in the position `p` (Art. 3): it moves a piece of the side to move to\na square not occupied by a piece of the same colour, following the movement rules of the piece\n(with a clear path for queens, rooks and bishops), or it is a castling move or a pawn move;\nonly pawns promote; and the king of the side to move is not left in check (Art. 3.9.2).",
+   "fq_name": "FirstMoveAdvantageInChess.Position.IsLegal",
+   "i": 53,
+   "justification": {
+    "closest_existing_considered": "None.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Position.play, Position.PawnMove, Position.Castles, Position.IsLegal, Position.Same",
+    "why_needed": "Effect of a move and legality of moves (Art. 3), and sameness of positions for the repetition rules (Art. 9.2.2)."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 315,
+   "modifiers": [],
+   "name": "IsLegal",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The move `m` is legal in the position `p` (Art. 3): it moves a piece of the side to move to\na square not occupied by a piece of the same colour, following the movement rules of the piece\n(with a clear path for queens, rooks and bishops), or it is a castling move or a pawn move;\nonly pawns promote; and the king of the side to move is not left in check (Art. 3.9.2). -/\ndef IsLegal (p : Position) (m : Move) : Prop :=\n  ∃ pc, p.board m.src = some pc ∧ pc.color = p.toMove ∧\n    (∀ q, p.board m.dst = some q → q.color ≠ p.toMove) ∧\n    (if pc.type = .pawn then p.PawnMove m\n      else m.promotion = none ∧\n        ((pc.type.Pattern m.src m.dst ∧ p.board.PathClear m.src m.dst) ∨\n          (pc.type = .king ∧ p.Castles m))) ∧\n    ¬ (p.play m).board.InCheck p.toMove\n\n",
+   "used_by": [
+    54,
+    57,
+    66,
+    67,
+    70,
+    75
+   ],
+   "uses": [
+    28,
+    35,
+    37,
+    47,
+    48,
+    50,
+    51,
+    52,
+    64
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def Same (p q : Position) : Prop :=\n  p.board = q.board ∧ p.toMove = q.toMove ∧ p.castling = q.castling ∧\n    ∀ m, p.IsLegal m ↔ q.IsLegal m",
+   "code_line": 331,
+   "decl_kind": "def",
+   "docstring": "Two positions are the same in the sense of Art. 9.2.2: the same player has the move, the\nsame pieces occupy the same squares, the castling rights are the same, and the possible moves\nare the same (which accounts for en passant captures).",
+   "fq_name": "FirstMoveAdvantageInChess.Position.Same",
+   "i": 54,
+   "justification": {
+    "closest_existing_considered": "None.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Position.play, Position.PawnMove, Position.Castles, Position.IsLegal, Position.Same",
+    "why_needed": "Effect of a move and legality of moves (Art. 3), and sameness of positions for the repetition rules (Art. 9.2.2)."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 328,
+   "modifiers": [],
+   "name": "Same",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- Two positions are the same in the sense of Art. 9.2.2: the same player has the move, the\nsame pieces occupy the same squares, the castling rights are the same, and the possible moves\nare the same (which accounts for en passant captures). -/\ndef Same (p q : Position) : Prop :=\n  p.board = q.board ∧ p.toMove = q.toMove ∧ p.castling = q.castling ∧\n    ∀ m, p.IsLegal m ↔ q.IsLegal m\n\n",
+   "used_by": [
+    58,
+    65
+   ],
+   "uses": [
+    47,
+    53
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (p : Position) (m : Move) : Decidable (p.PawnMove m) := by unfold PawnMove; infer_instance",
+   "code_line": 335,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 55,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 335,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (p : Position) (m : Move) : Decidable (p.PawnMove m) := by unfold PawnMove; infer_instance\n",
+   "used_by": [],
+   "uses": [
+    47,
+    48,
+    51
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (p : Position) (m : Move) : Decidable (p.Castles m) := by unfold Castles; infer_instance",
+   "code_line": 336,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 56,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 336,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (p : Position) (m : Move) : Decidable (p.Castles m) := by unfold Castles; infer_instance\n",
+   "used_by": [],
+   "uses": [
+    47,
+    48,
+    52
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (p : Position) (m : Move) : Decidable (p.IsLegal m) := by unfold IsLegal; infer_instance",
+   "code_line": 337,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 57,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 337,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (p : Position) (m : Move) : Decidable (p.IsLegal m) := by unfold IsLegal; infer_instance\n",
+   "used_by": [],
+   "uses": [
+    47,
+    48,
+    53
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (p q : Position) : Decidable (p.Same q) := by unfold Same; infer_instance",
+   "code_line": 338,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 58,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 338,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (p q : Position) : Decidable (p.Same q) := by unfold Same; infer_instance\n\n",
+   "used_by": [],
+   "uses": [
+    47,
+    54
+   ]
+  },
+  {
+   "command": "end",
+   "command_arg": "Position",
+   "i": 59,
+   "kind": "command",
+   "line": 340,
+   "modifiers": [],
+   "text": "end Position\n\n"
+  },
+  {
+   "i": 60,
+   "kind": "comment",
+   "line": 342,
+   "text": "/- ### Games -/\n\n"
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "inductive Outcome\n  | win (c : Color)\n  | draw\n  deriving DecidableEq",
+   "code_line": 345,
+   "decl_kind": "inductive",
+   "docstring": "The possible results of a game.",
+   "fq_name": "FirstMoveAdvantageInChess.Outcome",
+   "i": 61,
+   "justification": {
+    "closest_existing_considered": "`CatchUp.Outcome` (problem-local); no generic notion in Mathlib.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Outcome, GameState, GameState.play, GameState.repetitions, GameState.result, GameState.CanClaimDraw",
+    "why_needed": "Game history (past positions and halfmove clock) is needed for the repetition and 50/75-move rules; `result` encodes checkmate/stalemate/fivefold/75-move, `CanClaimDraw` the claimable draws."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 344,
+   "modifiers": [],
+   "name": "Outcome",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The possible results of a game. -/\ninductive Outcome\n  | win (c : Color)\n  | draw\n  deriving DecidableEq\n\n",
+   "used_by": [
+    66,
+    74
+   ],
+   "uses": [
+    5
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "structure GameState where\n  /-- The current position. -/\n  pos : Position\n  /-- The positions that occurred earlier in the game, most recent first. -/\n  past : List Position\n  /-- The number of half-moves played since the last capture or pawn move. -/\n  halfmoveClock : ℕ",
+   "code_line": 352,
+   "decl_kind": "structure",
+   "docstring": "The state of a game: the current position, the positions that occurred earlier in the game,\nand the number of half-moves since the last capture or pawn move.",
+   "fq_name": "FirstMoveAdvantageInChess.GameState",
+   "i": 62,
+   "justification": {
+    "closest_existing_considered": "`CatchUp.Outcome` (problem-local); no generic notion in Mathlib.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Outcome, GameState, GameState.play, GameState.repetitions, GameState.result, GameState.CanClaimDraw",
+    "why_needed": "Game history (past positions and halfmove clock) is needed for the repetition and 50/75-move rules; `result` encodes checkmate/stalemate/fivefold/75-move, `CanClaimDraw` the claimable draws."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 350,
+   "modifiers": [],
+   "name": "GameState",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The state of a game: the current position, the positions that occurred earlier in the game,\nand the number of half-moves since the last capture or pawn move. -/\nstructure GameState where\n  /-- The current position. -/\n  pos : Position\n  /-- The positions that occurred earlier in the game, most recent first. -/\n  past : List Position\n  /-- The number of half-moves played since the last capture or pawn move. -/\n  halfmoveClock : ℕ\n\n",
+   "used_by": [
+    64,
+    65,
+    66,
+    67,
+    68,
+    70,
+    73,
+    78
+   ],
+   "uses": [
+    47
+   ]
+  },
+  {
+   "command": "namespace",
+   "command_arg": "GameState",
+   "i": 63,
+   "kind": "command",
+   "line": 360,
+   "modifiers": [],
+   "text": "namespace GameState\n\n"
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def play (s : GameState) (m : Move) : GameState where\n  pos := s.pos.play m\n  past := s.pos :: s.past\n  halfmoveClock :=\n    if (∃ pc, s.pos.board m.src = some pc ∧ pc.type = .pawn) ∨ s.pos.board m.dst ≠ none then\n      0\n    else s.halfmoveClock + 1",
+   "code_line": 363,
+   "decl_kind": "def",
+   "docstring": "The state after the move `m` is played.",
+   "fq_name": "FirstMoveAdvantageInChess.GameState.play",
+   "i": 64,
+   "justification": {
+    "closest_existing_considered": "`CatchUp.Outcome` (problem-local); no generic notion in Mathlib.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Outcome, GameState, GameState.play, GameState.repetitions, GameState.result, GameState.CanClaimDraw",
+    "why_needed": "Game history (past positions and halfmove clock) is needed for the repetition and 50/75-move rules; `result` encodes checkmate/stalemate/fivefold/75-move, `CanClaimDraw` the claimable draws."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 362,
+   "modifiers": [],
+   "name": "play",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The state after the move `m` is played. -/\ndef play (s : GameState) (m : Move) : GameState where\n  pos := s.pos.play m\n  past := s.pos :: s.past\n  halfmoveClock :=\n    if (∃ pc, s.pos.board m.src = some pc ∧ pc.type = .pawn) ∨ s.pos.board m.dst ≠ none then\n      0\n    else s.halfmoveClock + 1\n\n",
+   "used_by": [
+    50,
+    53,
+    67,
+    70,
+    77,
+    78
+   ],
+   "uses": [
+    48,
+    50,
+    62
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def repetitions (s : GameState) : ℕ := (s.past.countP fun q => decide (s.pos.Same q)) + 1",
+   "code_line": 372,
+   "decl_kind": "def",
+   "docstring": "The number of times the current position has appeared in the game (Art. 9.2.2).",
+   "fq_name": "FirstMoveAdvantageInChess.GameState.repetitions",
+   "i": 65,
+   "justification": {
+    "closest_existing_considered": "`CatchUp.Outcome` (problem-local); no generic notion in Mathlib.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Outcome, GameState, GameState.play, GameState.repetitions, GameState.result, GameState.CanClaimDraw",
+    "why_needed": "Game history (past positions and halfmove clock) is needed for the repetition and 50/75-move rules; `result` encodes checkmate/stalemate/fivefold/75-move, `CanClaimDraw` the claimable draws."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 371,
+   "modifiers": [],
+   "name": "repetitions",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The number of times the current position has appeared in the game (Art. 9.2.2). -/\ndef repetitions (s : GameState) : ℕ := (s.past.countP fun q => decide (s.pos.Same q)) + 1\n\n",
+   "used_by": [
+    66,
+    67
+   ],
+   "uses": [
+    54,
+    62
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def result (s : GameState) : Option Outcome :=\n  if ∀ m, ¬ s.pos.IsLegal m then\n    if s.pos.board.InCheck s.pos.toMove then some (.win s.pos.toMove.other) else some .draw\n  else if 5 ≤ s.repetitions ∨ 150 ≤ s.halfmoveClock then some .draw\n  else none",
+   "code_line": 378,
+   "decl_kind": "def",
+   "docstring": "The result of the game if it has ended in the state `s` (Art. 5 and 9.6). The side to move\nhas no legal move exactly when it is checkmated, if its king is in check, or stalemated, if not.\nOtherwise the game is drawn if the same position has appeared at least five times or if the\nlast 75 moves by each player were made without a capture or pawn move.",
+   "fq_name": "FirstMoveAdvantageInChess.GameState.result",
+   "i": 66,
+   "justification": {
+    "closest_existing_considered": "`CatchUp.Outcome` (problem-local); no generic notion in Mathlib.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Outcome, GameState, GameState.play, GameState.repetitions, GameState.result, GameState.CanClaimDraw",
+    "why_needed": "Game history (past positions and halfmove clock) is needed for the repetition and 50/75-move rules; `result` encodes checkmate/stalemate/fivefold/75-move, `CanClaimDraw` the claimable draws."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 374,
+   "modifiers": [],
+   "name": "result",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The result of the game if it has ended in the state `s` (Art. 5 and 9.6). The side to move\nhas no legal move exactly when it is checkmated, if its king is in check, or stalemated, if not.\nOtherwise the game is drawn if the same position has appeared at least five times or if the\nlast 75 moves by each player were made without a capture or pawn move. -/\ndef result (s : GameState) : Option Outcome :=\n  if ∀ m, ¬ s.pos.IsLegal m then\n    if s.pos.board.InCheck s.pos.toMove then some (.win s.pos.toMove.other) else some .draw\n  else if 5 ≤ s.repetitions ∨ 150 ≤ s.halfmoveClock then some .draw\n  else none\n\n",
+   "used_by": [
+    70,
+    76,
+    77,
+    78
+   ],
+   "uses": [
+    6,
+    37,
+    53,
+    61,
+    62,
+    65
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def CanClaimDraw (s : GameState) : Prop :=\n  3 ≤ s.repetitions ∨ 100 ≤ s.halfmoveClock ∨\n    ∃ m, s.pos.IsLegal m ∧ (3 ≤ (s.play m).repetitions ∨ 100 ≤ (s.play m).halfmoveClock)",
+   "code_line": 387,
+   "decl_kind": "def",
+   "docstring": "The player to move may claim a draw (Art. 9.2 and 9.3): the same position has appeared at\nleast three times, or the last 50 moves by each player were made without a capture or pawn move,\nor the player has a legal move after which one of these holds.",
+   "fq_name": "FirstMoveAdvantageInChess.GameState.CanClaimDraw",
+   "i": 67,
+   "justification": {
+    "closest_existing_considered": "`CatchUp.Outcome` (problem-local); no generic notion in Mathlib.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.Outcome, GameState, GameState.play, GameState.repetitions, GameState.result, GameState.CanClaimDraw",
+    "why_needed": "Game history (past positions and halfmove clock) is needed for the repetition and 50/75-move rules; `result` encodes checkmate/stalemate/fivefold/75-move, `CanClaimDraw` the claimable draws."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 384,
+   "modifiers": [],
+   "name": "CanClaimDraw",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The player to move may claim a draw (Art. 9.2 and 9.3): the same position has appeared at\nleast three times, or the last 50 moves by each player were made without a capture or pawn move,\nor the player has a legal move after which one of these holds. -/\ndef CanClaimDraw (s : GameState) : Prop :=\n  3 ≤ s.repetitions ∨ 100 ≤ s.halfmoveClock ∨\n    ∃ m, s.pos.IsLegal m ∧ (3 ≤ (s.play m).repetitions ∨ 100 ≤ (s.play m).halfmoveClock)\n\n",
+   "used_by": [
+    68,
+    70
+   ],
+   "uses": [
+    50,
+    53,
+    62,
+    64,
+    65
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "instance (s : GameState) : Decidable s.CanClaimDraw := by unfold CanClaimDraw; infer_instance",
+   "code_line": 391,
+   "decl_kind": "instance",
+   "docstring": null,
+   "fq_name": null,
+   "i": 68,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 391,
+   "modifiers": [],
+   "name": null,
+   "prefix": null,
+   "role": "definition",
+   "text": "instance (s : GameState) : Decidable s.CanClaimDraw := by unfold CanClaimDraw; infer_instance\n\n",
+   "used_by": [],
+   "uses": [
+    62,
+    67
+   ]
+  },
+  {
+   "command": "end",
+   "command_arg": "GameState",
+   "i": 69,
+   "kind": "command",
+   "line": 393,
+   "modifiers": [],
+   "text": "end GameState\n\n"
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "inductive CanForceWin (c : Color) : GameState → Prop\n  | won {s : GameState} : s.result = some (.win c) → CanForceWin c s\n  | move {s : GameState} (m : Move) : s.result = none → s.pos.toMove = c → s.pos.IsLegal m →\n      CanForceWin c (s.play m) → CanForceWin c s\n  | reply {s : GameState} : s.result = none → s.pos.toMove = c.other → ¬ s.CanClaimDraw →\n      (∀ m, s.pos.IsLegal m → CanForceWin c (s.play m)) → CanForceWin c s",
+   "code_line": 402,
+   "decl_kind": "inductive",
+   "docstring": "`CanForceWin c s` means that player `c` has a strategy that wins the game from the state `s`\nagainst every play of the opponent. As the least predicate closed under the three rules below,\nit holds exactly when `c` can force a win in finitely many moves: either the game has ended with\na win for `c`; or `c` is to move and some legal move leads to a state from which `c` can force a\nwin; or the opponent is to move, cannot claim a draw, and every legal reply leads to a state from\nwhich `c` can force a win. A player who can claim a draw is assumed to do so when it prevents a\nloss, and a player who is trying to win never claims a draw.",
+   "fq_name": "FirstMoveAdvantageInChess.CanForceWin",
+   "i": 70,
+   "justification": {
+    "closest_existing_considered": "`SetTheory.PGame` outcome classes (`PGame.LF`, `≤`, fuzzy) — not applicable to a game with draws and history-dependent termination.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.CanForceWin",
+    "why_needed": "Inductive 'player c has a winning strategy from state s' predicate; avoids proving termination of chess in Lean while capturing exactly forced wins in finitely many moves."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 395,
+   "modifiers": [],
+   "name": "CanForceWin",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- `CanForceWin c s` means that player `c` has a strategy that wins the game from the state `s`\nagainst every play of the opponent. As the least predicate closed under the three rules below,\nit holds exactly when `c` can force a win in finitely many moves: either the game has ended with\na win for `c`; or `c` is to move and some legal move leads to a state from which `c` can force a\nwin; or the opponent is to move, cannot claim a draw, and every legal reply leads to a state from\nwhich `c` can force a win. A player who can claim a draw is assumed to do so when it prevents a\nloss, and a player who is trying to win never claims a draw. -/\ninductive CanForceWin (c : Color) : GameState → Prop\n  | won {s : GameState} : s.result = some (.win c) → CanForceWin c s\n  | move {s : GameState} (m : Move) : s.result = none → s.pos.toMove = c → s.pos.IsLegal m →\n      CanForceWin c (s.play m) → CanForceWin c s\n  | reply {s : GameState} : s.result = none → s.pos.toMove = c.other → ¬ s.CanClaimDraw →\n      (∀ m, s.pos.IsLegal m → CanForceWin c (s.play m)) → CanForceWin c s\n\n",
+   "used_by": [
+    74
+   ],
+   "uses": [
+    5,
+    6,
+    48,
+    50,
+    53,
+    62,
+    64,
+    66,
+    67
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def backRank : Fin 8 → PieceType\n  | 0 => .rook\n  | 1 => .knight\n  | 2 => .bishop\n  | 3 => .queen\n  | 4 => .king\n  | 5 => .bishop\n  | 6 => .knight\n  | 7 => .rook",
+   "code_line": 410,
+   "decl_kind": "def",
+   "docstring": "The pieces on the first rank in the initial position, from the a-file to the h-file.",
+   "fq_name": "FirstMoveAdvantageInChess.backRank",
+   "i": 71,
+   "justification": {
+    "closest_existing_considered": "None.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.backRank, initialPosition, initialState, perfectPlayOutcome",
+    "why_needed": "Standard initial position (Art. 2.3) and the game-theoretic value asked for by the problem."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 409,
+   "modifiers": [],
+   "name": "backRank",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The pieces on the first rank in the initial position, from the a-file to the h-file. -/\ndef backRank : Fin 8 → PieceType\n  | 0 => .rook\n  | 1 => .knight\n  | 2 => .bishop\n  | 3 => .queen\n  | 4 => .king\n  | 5 => .bishop\n  | 6 => .knight\n  | 7 => .rook\n\n",
+   "used_by": [
+    72
+   ],
+   "uses": [
+    11
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def initialPosition : Position where\n  board s :=\n    if s.rank = 0 then some ⟨.white, backRank s.file⟩\n    else if s.rank = 1 then some ⟨.white, .pawn⟩\n    else if s.rank = 6 then some ⟨.black, .pawn⟩\n    else if s.rank = 7 then some ⟨.black, backRank s.file⟩\n    else none\n  toMove := .white\n  castling _ _ := true\n  enPassant := none",
+   "code_line": 422,
+   "decl_kind": "def",
+   "docstring": "The initial position (Art. 2.3): White has the move, both players have both castling rights,\nand there is no en passant square.",
+   "fq_name": "FirstMoveAdvantageInChess.initialPosition",
+   "i": 72,
+   "justification": {
+    "closest_existing_considered": "None.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.backRank, initialPosition, initialState, perfectPlayOutcome",
+    "why_needed": "Standard initial position (Art. 2.3) and the game-theoretic value asked for by the problem."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 420,
+   "modifiers": [],
+   "name": "initialPosition",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The initial position (Art. 2.3): White has the move, both players have both castling rights,\nand there is no en passant square. -/\ndef initialPosition : Position where\n  board s :=\n    if s.rank = 0 then some ⟨.white, backRank s.file⟩\n    else if s.rank = 1 then some ⟨.white, .pawn⟩\n    else if s.rank = 6 then some ⟨.black, .pawn⟩\n    else if s.rank = 7 then some ⟨.black, backRank s.file⟩\n    else none\n  toMove := .white\n  castling _ _ := true\n  enPassant := none\n\n",
+   "used_by": [
+    73,
+    75
+   ],
+   "uses": [
+    47,
+    71
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "def initialState : GameState where\n  pos := initialPosition\n  past := []\n  halfmoveClock := 0",
+   "code_line": 434,
+   "decl_kind": "def",
+   "docstring": "The state at the start of a game.",
+   "fq_name": "FirstMoveAdvantageInChess.initialState",
+   "i": 73,
+   "justification": {
+    "closest_existing_considered": "None.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.backRank, initialPosition, initialState, perfectPlayOutcome",
+    "why_needed": "Standard initial position (Art. 2.3) and the game-theoretic value asked for by the problem."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 433,
+   "modifiers": [],
+   "name": "initialState",
+   "prefix": null,
+   "role": "definition",
+   "text": "/-- The state at the start of a game. -/\ndef initialState : GameState where\n  pos := initialPosition\n  past := []\n  halfmoveClock := 0\n\n",
+   "used_by": [
+    74,
+    76,
+    77,
+    78
+   ],
+   "uses": [
+    62,
+    72
+   ]
+  },
+  {
+   "ams": [],
+   "attributes": [],
+   "category": null,
+   "claim": null,
+   "code": "noncomputable def perfectPlayOutcome : Outcome :=\n  if CanForceWin .white initialState then .win .white\n  else if CanForceWin .black initialState then .win .black\n  else .draw",
+   "code_line": 444,
+   "decl_kind": "def",
+   "docstring": "The outcome of chess under perfect play: White wins if White can force a win, Black wins if\nBlack can force a win, and otherwise the game is a draw. Since chess is a finite game, by\nZermelo's theorem exactly one of these three cases occurs, and in the last case both players\ncan force at least a draw.",
+   "fq_name": "FirstMoveAdvantageInChess.perfectPlayOutcome",
+   "i": 74,
+   "justification": {
+    "closest_existing_considered": "None.",
+    "from_attempt": "c06",
+    "name": "FirstMoveAdvantageInChess.backRank, initialPosition, initialState, perfectPlayOutcome",
+    "why_needed": "Standard initial position (Art. 2.3) and the game-theoretic value asked for by the problem."
+   },
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 439,
+   "modifiers": [
+    "noncomputable"
+   ],
+   "name": "perfectPlayOutcome",
+   "prefix": "open scoped Classical in",
+   "role": "definition",
+   "text": "open scoped Classical in\n/-- The outcome of chess under perfect play: White wins if White can force a win, Black wins if\nBlack can force a win, and otherwise the game is a draw. Since chess is a finite game, by\nZermelo's theorem exactly one of these three cases occurs, and in the last case both players\ncan force at least a draw. -/\nnoncomputable def perfectPlayOutcome : Outcome :=\n  if CanForceWin .white initialState then .win .white\n  else if CanForceWin .black initialState then .win .black\n  else .draw\n\n",
+   "used_by": [
+    79,
+    80
+   ],
+   "uses": [
+    61,
+    70,
+    73
+   ]
+  },
+  {
+   "ams": [
+    91
+   ],
+   "attributes": [
+    "@[category test, AMS 91]"
+   ],
+   "category": "test",
+   "claim": null,
+   "code": "@[category test, AMS 91]\ntheorem card_filter_isLegal_initialPosition :\n    (Finset.univ.filter initialPosition.IsLegal).card = 20 := by\n  native_decide",
+   "code_line": 450,
+   "decl_kind": "theorem",
+   "docstring": "White has exactly $20$ legal moves in the initial position.",
+   "fq_name": "FirstMoveAdvantageInChess.card_filter_isLegal_initialPosition",
+   "i": 75,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 449,
+   "modifiers": [],
+   "name": "card_filter_isLegal_initialPosition",
+   "prefix": null,
+   "role": "check",
+   "text": "/-- White has exactly $20$ legal moves in the initial position. -/\n@[category test, AMS 91]\ntheorem card_filter_isLegal_initialPosition :\n    (Finset.univ.filter initialPosition.IsLegal).card = 20 := by\n  native_decide\n\n",
+   "used_by": [],
+   "uses": [
+    53,
+    72
+   ]
+  },
+  {
+   "ams": [
+    91
+   ],
+   "attributes": [
+    "@[category test, AMS 91]"
+   ],
+   "category": "test",
+   "claim": null,
+   "code": "@[category test, AMS 91]\ntheorem result_initialState : initialState.result = none := by\n  native_decide",
+   "code_line": 456,
+   "decl_kind": "theorem",
+   "docstring": "The game has not ended in the initial state.",
+   "fq_name": "FirstMoveAdvantageInChess.result_initialState",
+   "i": 76,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 455,
+   "modifiers": [],
+   "name": "result_initialState",
+   "prefix": null,
+   "role": "check",
+   "text": "/-- The game has not ended in the initial state. -/\n@[category test, AMS 91]\ntheorem result_initialState : initialState.result = none := by\n  native_decide\n\n",
+   "used_by": [],
+   "uses": [
+    66,
+    73
+   ]
+  },
+  {
+   "ams": [
+    91
+   ],
+   "attributes": [
+    "@[category test, AMS 91]"
+   ],
+   "category": "test",
+   "claim": null,
+   "code": "@[category test, AMS 91]\ntheorem result_foolsMate :\n    ((((initialState.play ⟨⟨5, 1⟩, ⟨5, 2⟩, none⟩).play\n      ⟨⟨4, 6⟩, ⟨4, 4⟩, none⟩).play\n      ⟨⟨6, 1⟩, ⟨6, 3⟩, none⟩).play\n      ⟨⟨3, 7⟩, ⟨7, 3⟩, none⟩).result = some (.win .black) := by\n  native_decide",
+   "code_line": 461,
+   "decl_kind": "theorem",
+   "docstring": "Fool's mate: after 1. f3 e5 2. g4 Qh4# Black has won.",
+   "fq_name": "FirstMoveAdvantageInChess.result_foolsMate",
+   "i": 77,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 460,
+   "modifiers": [],
+   "name": "result_foolsMate",
+   "prefix": null,
+   "role": "check",
+   "text": "/-- Fool's mate: after 1. f3 e5 2. g4 Qh4# Black has won. -/\n@[category test, AMS 91]\ntheorem result_foolsMate :\n    ((((initialState.play ⟨⟨5, 1⟩, ⟨5, 2⟩, none⟩).play\n      ⟨⟨4, 6⟩, ⟨4, 4⟩, none⟩).play\n      ⟨⟨6, 1⟩, ⟨6, 3⟩, none⟩).play\n      ⟨⟨3, 7⟩, ⟨7, 3⟩, none⟩).result = some (.win .black) := by\n  native_decide\n\n",
+   "used_by": [],
+   "uses": [
+    50,
+    64,
+    66,
+    73
+   ]
+  },
+  {
+   "ams": [
+    91
+   ],
+   "attributes": [
+    "@[category test, AMS 91]"
+   ],
+   "category": "test",
+   "claim": null,
+   "code": "@[category test, AMS 91]\ntheorem result_knightShuffle :\n    ((fun s : GameState => (((s.play ⟨⟨6, 0⟩, ⟨5, 2⟩, none⟩).play\n      ⟨⟨6, 7⟩, ⟨5, 5⟩, none⟩).play\n      ⟨⟨5, 2⟩, ⟨6, 0⟩, none⟩).play\n      ⟨⟨5, 5⟩, ⟨6, 7⟩, none⟩)^[3] initialState).result = none ∧\n    ((fun s : GameState => (((s.play ⟨⟨6, 0⟩, ⟨5, 2⟩, none⟩).play\n      ⟨⟨6, 7⟩, ⟨5, 5⟩, none⟩).play\n      ⟨⟨5, 2⟩, ⟨6, 0⟩, none⟩).play\n      ⟨⟨5, 5⟩, ⟨6, 7⟩, none⟩)^[4] initialState).result = some .draw := by\n  native_decide",
+   "code_line": 471,
+   "decl_kind": "theorem",
+   "docstring": "After 1. Nf3 Nf6 2. Ng1 Ng8 has been played three times the game goes on, but the fourth\nrepetition makes the initial position appear for the fifth time and the game is drawn.",
+   "fq_name": "FirstMoveAdvantageInChess.result_knightShuffle",
+   "i": 78,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 469,
+   "modifiers": [],
+   "name": "result_knightShuffle",
+   "prefix": null,
+   "role": "check",
+   "text": "/-- After 1. Nf3 Nf6 2. Ng1 Ng8 has been played three times the game goes on, but the fourth\nrepetition makes the initial position appear for the fifth time and the game is drawn. -/\n@[category test, AMS 91]\ntheorem result_knightShuffle :\n    ((fun s : GameState => (((s.play ⟨⟨6, 0⟩, ⟨5, 2⟩, none⟩).play\n      ⟨⟨6, 7⟩, ⟨5, 5⟩, none⟩).play\n      ⟨⟨5, 2⟩, ⟨6, 0⟩, none⟩).play\n      ⟨⟨5, 5⟩, ⟨6, 7⟩, none⟩)^[3] initialState).result = none ∧\n    ((fun s : GameState => (((s.play ⟨⟨6, 0⟩, ⟨5, 2⟩, none⟩).play\n      ⟨⟨6, 7⟩, ⟨5, 5⟩, none⟩).play\n      ⟨⟨5, 2⟩, ⟨6, 0⟩, none⟩).play\n      ⟨⟨5, 5⟩, ⟨6, 7⟩, none⟩)^[4] initialState).result = some .draw := by\n  native_decide\n\n",
+   "used_by": [],
+   "uses": [
+    50,
+    62,
+    64,
+    66,
+    73
+   ]
+  },
+  {
+   "ams": [
+    91
+   ],
+   "attributes": [
+    "@[category research open, AMS 91]"
+   ],
+   "category": "research open",
+   "claim": 1,
+   "code": "@[category research open, AMS 91]\ntheorem first_move_advantage_in_chess : perfectPlayOutcome = answer(sorry) := by\n  sorry",
+   "code_line": 488,
+   "decl_kind": "theorem",
+   "docstring": "What is the outcome of a perfectly played game of chess, played from the standard initial\nposition under the FIDE Laws of Chess? The consensus answer is that chess is a draw with best\nplay, i.e. `perfectPlayOutcome = .draw`; the minority view is `perfectPlayOutcome = .win .white`.",
+   "fq_name": "FirstMoveAdvantageInChess.first_move_advantage_in_chess",
+   "i": 79,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 483,
+   "modifiers": [],
+   "name": "first_move_advantage_in_chess",
+   "prefix": null,
+   "role": "statement",
+   "text": "/--\nWhat is the outcome of a perfectly played game of chess, played from the standard initial\nposition under the FIDE Laws of Chess? The consensus answer is that chess is a draw with best\nplay, i.e. `perfectPlayOutcome = .draw`; the minority view is `perfectPlayOutcome = .win .white`.\n-/\n@[category research open, AMS 91]\ntheorem first_move_advantage_in_chess : perfectPlayOutcome = answer(sorry) := by\n  sorry\n\n",
+   "used_by": [],
+   "uses": [
+    74
+   ]
+  },
+  {
+   "ams": [
+    91
+   ],
+   "attributes": [
+    "@[category research open, AMS 91]"
+   ],
+   "category": "research open",
+   "claim": null,
+   "code": "@[category research open, AMS 91]\ntheorem first_move_advantage_in_chess.variants.draw : perfectPlayOutcome = .draw := by\n  sorry",
+   "code_line": 497,
+   "decl_kind": "theorem",
+   "docstring": "The consensus among players and theorists (Steinitz, Lasker, Capablanca, Fischer, Kasparov,\nWatson, Rowson, Short): with perfect play chess is a draw, i.e. neither White nor Black can\nforce a win from the standard initial position.",
+   "fq_name": "FirstMoveAdvantageInChess.first_move_advantage_in_chess.variants.draw",
+   "i": 80,
+   "justification": null,
+   "kind": "decl",
+   "leading_comment": null,
+   "line": 492,
+   "modifiers": [],
+   "name": "first_move_advantage_in_chess.variants.draw",
+   "prefix": null,
+   "role": "additional_statement",
+   "text": "/--\nThe consensus among players and theorists (Steinitz, Lasker, Capablanca, Fischer, Kasparov,\nWatson, Rowson, Short): with perfect play chess is a draw, i.e. neither White nor Black can\nforce a win from the standard initial position.\n-/\n@[category research open, AMS 91]\ntheorem first_move_advantage_in_chess.variants.draw : perfectPlayOutcome = .draw := by\n  sorry\n\n",
+   "used_by": [],
+   "uses": [
+    74
+   ]
+  },
+  {
+   "command": "end",
+   "command_arg": "FirstMoveAdvantageInChess",
+   "i": 81,
+   "kind": "command",
+   "line": 501,
+   "modifiers": [],
+   "text": "end FirstMoveAdvantageInChess\n"
+  }
+ ],
+ "checks": {
+  "clean": true,
+  "compiled": true,
+  "disallowed_warnings": [],
+  "other_warnings": [],
+  "probe": {
+   "attempts": 2,
+   "budget_minutes": 60,
+   "limit": "time",
+   "ran": true
+  },
+  "sorry_lines": [
+   489,
+   498
+  ]
+ },
+ "claims": [
+  {
+   "block": 79,
+   "category": "research open",
+   "decomposer_note": "This asks for the game-theoretic value of chess from the standard initial position under FIDE rules, which is exactly one of three outcomes (White can force a win / both sides can force at least a draw / Black can force a win); the article asserts the consensus candidate answer 'chess is a draw with best play' (Steinitz, Lasker, Capablanca, Fischer, Watson, Rowson, Short, Kasparov), so the Prop is 'the value of chess is a draw' (or `value = answer(sorry)` over the three-outcome type, with `draw` the conjectured answer), while the minority 'White wins' view (Adams, Berliner) is merely an alternative answer to the same question rather than a separate sub-question; subtlety: the value is only well defined once chess is made a finite game (e.g. via the automatic 75-move and fivefold-repetition rules) so that Zermelo-type determinacy applies, and no chess model exists in Mathlib so the rules must be formalized bespoke; the parenthetical '(See also first-move advantage in chess)' is a pointer to the article, not an additional question.",
+   "kind": "stated",
+   "location": {
+    "end": 56,
+    "location": "statement",
+    "match": "exact",
+    "ratio": 1.0,
+    "start": 0
+   },
+   "position": 1,
+   "reviewer_why": "c06 gives a complete bespoke FIDE model (piece movement, castling with all side conditions, en passant, promotion, check legality, checkmate/stalemate, fivefold repetition, 75-move rule, claimable threefold/50-move draws with FIDE Art. 9.2.2 position identity) and defines the value as White wins / Black wins / draw via a least-fixed-point CanForceWin predicate, stated as `perfectPlayOutcome = answer(sorry)`. Unlike c01/c03/c07 (classical, noncomputable models whose tests are sorried or trivial), c06's model is executable: its own native_decide tests pass, and I independently verified it in a scratch harness against the standard perft suite (perft 1 and 2 for the initial position, Kiwipete and positions 3–6: 20/400, 48/2039, 14/191, 6/264, 44/1486, 46/2079) plus targeted checks of en passant (incl. Art. 9.2.2 sameness), castling board/rights updates, promotion, stalemate, 75-move and 50-move thresholds. I added the consensus answer as `first_move_advantage_in_chess.variants.draw : perfectPlayOutcome = .draw` (as c01/c07 do). c02/c04 are faithful in spirit but style-poor (private defs, no docstrings, a namespace-wide classical Decidable instance) and not better validated.",
+   "slot": "first_move_advantage_in_chess",
+   "source_text": "What is the outcome of a perfectly played game of chess?",
+   "text_span": "What is the outcome of a perfectly played game of chess?",
+   "winner_attempt": "c06",
+   "winner_model": "Claude Fable 5.1"
+  }
+ ],
+ "context": "In chess, there is a consensus among players and theorists that the player who makes the first move (White) has an inherent advantage, albeit not one large enough to win with perfect play. This has been the consensus since at least 1889, when the first World Chess Champion, Wilhelm Steinitz, addressed the issue, although chess has not been solved.\nSince 1851, compiled statistics support this view; White consistently wins slightly more often than Black, usually achieving a winning percentage between 52 and 56 percent. White's advantage is less significant in blitz games and games between lower-level players, and becomes greater as the level of play rises; however, raising the level of play also increases the percentage of draws. As the standard of play rises, all the way up to top engine level, the number of decisive games approaches zero, and the proportion of White wins among those decisive games approaches 100%.\nSome players, including world champions such as José Raúl Capablanca, Emanuel Lasker, Bobby Fischer, and Vladimir Kramnik, have expressed fears of a \"draw death\" as chess becomes more deeply analyzed, and opening preparation becomes ever more important. To alleviate this danger, Capablanca, Fischer, and Kramnik proposed chess variants to revitalize the game, while Lasker suggested changing how draws and stalemates are scored. Several of these suggestions have been tested with engines: in particular, Larry Kaufman and Arno Nickel's extension of Lasker's idea – scorin",
+ "counts": {
+  "additional": 1,
+  "checks": 4,
+  "defs": 45,
+  "dropped": 0,
+  "known": 0,
+  "omitted": 0,
+  "open": 2
+ },
+ "decomposition_objections": [
+  {
+   "attempt": "c06",
+   "model": "Claude Fable 5.1",
+   "text": "None. The single slot matches the list entry; the parenthetical is a pointer to the article. I followed the suggested `value = answer(sorry)` form over the three-outcome type, with `.draw` as the consensus candidate answer and `.win .white` as the minority alternative, both recorded in the theorem docstring."
+  }
+ ],
+ "fc": {
+  "commit": "9cbe1d3c12998c786b7c2cd99ce28a21b6631f66",
+  "commit_date": "2026-08-21",
+  "lean_namespace": "FirstMoveAdvantageInChess",
+  "lean_toolchain": "leanprover/lean4:v4.27.0",
+  "mathlib_rev": "a3a10db0e9d66acbebf76c5e6a135066525ac900",
+  "path": "FormalConjectures/Wikipedia/FirstMoveAdvantageInChess.lean",
+  "slot_prefix": "first_move_advantage_in_chess"
+ },
+ "flags": [
+  "additional"
+ ],
+ "id": "wp-first-move-advantage-in-chess",
+ "lean": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# First-move advantage in chess\n\nWhat is the outcome of a perfectly played game of chess?\n\nChess is a finite two-player zero-sum game of perfect information, so by Zermelo's theorem\nexactly one of the following holds: White can force a win, Black can force a win, or both\nplayers can force at least a draw. Which one holds is not known. The consensus among players\nand theorists (Steinitz, Lasker, Capablanca, Fischer, Kasparov, ...) is that chess is a draw\nwith best play; a minority view (Adams, Berliner) is that White can force a win.\n\nNo model of chess exists in Mathlib, so this file formalises the FIDE Laws of Chess from\nscratch:\n\n* `Board`, `Position`, `Move`: the pieces on the 64 squares, the side to move, castling rights\n  and the en passant square; a move is given by its source and destination squares together\n  with an optional promotion piece (castling is the two-square king move, en passant is the\n  diagonal pawn move onto the en passant square).\n* `Position.IsLegal`: the legal moves (FIDE Article 3), including castling, en passant,\n  promotion and the rule that a move may not leave one's own king in check.\n* `GameState.result`: the game ends with checkmate (Art. 5.1.1), stalemate (Art. 5.2.1),\n  fivefold repetition (Art. 9.6.1) or the 75-move rule (Art. 9.6.2).\n* `GameState.CanClaimDraw`: the player to move may claim a draw by threefold repetition\n  (Art. 9.2) or by the 50-move rule (Art. 9.3), also with an intended move.\n* `CanForceWin c s`: player `c` has a strategy from the state `s` that wins against every\n  defence; a defender who can claim a draw is assumed to do so.\n* `perfectPlayOutcome`: the game-theoretic value of chess from the standard initial position.\n\nThe following rules are omitted because they cannot change the game-theoretic value: draw by\nagreement (Art. 9.1), resignation (Art. 5.1.2) and the dead position rule (Art. 5.2.2); from a\ndead position no play can end in checkmate, so every continuation is drawn anyway. Rules about\nclocks, arbiters and irregularities are not part of the mathematical game.\n\nThe 75-move rule makes the game finite: a game contains at most $96$ pawn moves and $30$\ncaptures, and at most $150$ consecutive half-moves without either, so every game ends after a\nbounded number of half-moves. Hence Zermelo's theorem applies and `perfectPlayOutcome` is a\ndraw if and only if neither player can force a win.\n\n*References:*\n- [Wikipedia: First-move advantage in chess](https://en.wikipedia.org/wiki/first-move_advantage_in_chess)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia: Solving chess](https://en.wikipedia.org/wiki/Solving_chess)\n- [FIDE Laws of Chess](https://handbook.fide.com/chapter/E012023)\n- C. E. Shannon, *Programming a Computer for Playing Chess*, Philosophical Magazine 41 (1950),\n  256–275.\n-/\n\nnamespace FirstMoveAdvantageInChess\n\n/- ### Pieces and squares -/\n\n/-- The two players. White moves first. -/\ninductive Color\n  | white\n  | black\n  deriving DecidableEq, Fintype\n\n/-- The opponent of a player. -/\ndef Color.other : Color → Color\n  | .white => .black\n  | .black => .white\n\n/-- The rank increment of a forward pawn move of colour `c`. -/\ndef Color.forward : Color → ℤ\n  | .white => 1\n  | .black => -1\n\n/-- The rank on which the pieces of colour `c` start. Ranks 1–8 are numbered `0`–`7`. -/\ndef Color.homeRank : Color → Fin 8\n  | .white => 0\n  | .black => 7\n\n/-- The rank on which the pawns of colour `c` start. -/\ndef Color.pawnRank : Color → Fin 8\n  | .white => 1\n  | .black => 6\n\n/-- The rank on which the pawns of colour `c` promote. -/\ndef Color.lastRank : Color → Fin 8\n  | .white => 7\n  | .black => 0\n\n/-- The six kinds of pieces. -/\ninductive PieceType\n  | king\n  | queen\n  | rook\n  | bishop\n  | knight\n  | pawn\n  deriving DecidableEq, Fintype\n\n/-- A piece: a colour and a kind. -/\nstructure Piece where\n  color : Color\n  type : PieceType\n  deriving DecidableEq, Fintype\n\n/-- A square of the board. Files a–h and ranks 1–8 are both numbered `0`–`7`; for example\n`⟨4, 0⟩` is the square e1. -/\nstructure Square where\n  file : Fin 8\n  rank : Fin 8\n  deriving DecidableEq, Fintype\n\nnamespace Square\n\n/-- The file difference from `s` to `t`. -/\ndef dx (s t : Square) : ℤ := (t.file : ℤ) - s.file\n\n/-- The rank difference from `s` to `t`. -/\ndef dy (s t : Square) : ℤ := (t.rank : ℤ) - s.rank\n\n/-- The Chebyshev (king-move) distance between two squares. -/\ndef dist (s t : Square) : ℤ := max |s.dx t| |s.dy t|\n\n/-- `s` and `t` are distinct squares on a common rank or file. -/\ndef OnRookLine (s t : Square) : Prop := s ≠ t ∧ (s.dx t = 0 ∨ s.dy t = 0)\n\n/-- `s` and `t` are distinct squares on a common diagonal. -/\ndef OnBishopLine (s t : Square) : Prop := s ≠ t ∧ |s.dx t| = |s.dy t|\n\n/-- `s` and `t` are distinct squares on a common rank, file or diagonal. -/\ndef OnLine (s t : Square) : Prop := s.OnRookLine t ∨ s.OnBishopLine t\n\n/-- `u` lies strictly between `s` and `t` on a common rank, file or diagonal. -/\ndef StrictlyBetween (s t u : Square) : Prop :=\n  s.OnLine t ∧ s.OnLine u ∧ (s.dx t).sign = (s.dx u).sign ∧ (s.dy t).sign = (s.dy u).sign ∧\n    s.dist u < s.dist t\n\ninstance (s t : Square) : Decidable (s.OnRookLine t) := by unfold OnRookLine; infer_instance\ninstance (s t : Square) : Decidable (s.OnBishopLine t) := by unfold OnBishopLine; infer_instance\ninstance (s t : Square) : Decidable (s.OnLine t) := by unfold OnLine; infer_instance\ninstance (s t u : Square) : Decidable (s.StrictlyBetween t u) := by\n  unfold StrictlyBetween; infer_instance\n\nend Square\n\n/-- The number halfway between `a` and `b`. It is the file of the rook's destination when\ncastling and the rank of the en passant square after a two-square pawn move. -/\ndef midpoint (a b : Fin 8) : Fin 8 := ⟨(a.val + b.val) / 2, by omega⟩\n\n/-- The squares `t` that a piece of kind `pt` standing on `s` could move to on an otherwise\nempty board (FIDE Art. 3.2–3.6). Pawns are treated separately. -/\ndef PieceType.Pattern : PieceType → Square → Square → Prop\n  | .king, s, t => s.dist t = 1\n  | .queen, s, t => s.OnLine t\n  | .rook, s, t => s.OnRookLine t\n  | .bishop, s, t => s.OnBishopLine t\n  | .knight, s, t => |s.dx t| * |s.dy t| = 2\n  | .pawn, _, _ => False\n\ninstance (pt : PieceType) (s t : Square) : Decidable (pt.Pattern s t) := by\n  cases pt <;> unfold PieceType.Pattern <;> infer_instance\n\n/-- The squares `t` on which the piece `pc` standing on `s` could capture, ignoring the other\npieces on the board. A pawn captures one square diagonally forward (Art. 3.7.3). -/\ndef Piece.AttackPattern (pc : Piece) (s t : Square) : Prop :=\n  if pc.type = .pawn then s.dy t = pc.color.forward ∧ |s.dx t| = 1 else pc.type.Pattern s t\n\ninstance (pc : Piece) (s t : Square) : Decidable (pc.AttackPattern s t) := by\n  unfold Piece.AttackPattern; infer_instance\n\n/- ### Boards -/\n\n/-- A board assigns to every square the piece standing on it, if any. -/\nabbrev Board := Square → Option Piece\n\nnamespace Board\n\n/-- No piece stands strictly between the squares `s` and `t`. -/\ndef PathClear (b : Board) (s t : Square) : Prop := ∀ u, s.StrictlyBetween t u → b u = none\n\n/-- Some piece of colour `c` attacks the square `t` (Art. 3.1): it could capture on `t`, even if\nit is pinned (Art. 3.1.3). -/\ndef Attacks (b : Board) (c : Color) (t : Square) : Prop :=\n  ∃ s pc, b s = some pc ∧ pc.color = c ∧ pc.AttackPattern s t ∧ b.PathClear s t\n\n/-- The king of colour `c` is attacked by the opponent (Art. 3.9.1). -/\ndef InCheck (b : Board) (c : Color) : Prop :=\n  ∃ k, b k = some ⟨c, .king⟩ ∧ b.Attacks c.other k\n\ninstance (b : Board) (s t : Square) : Decidable (b.PathClear s t) := by\n  unfold PathClear; infer_instance\ninstance (b : Board) (c : Color) (t : Square) : Decidable (b.Attacks c t) := by\n  unfold Attacks; infer_instance\ninstance (b : Board) (c : Color) : Decidable (b.InCheck c) := by unfold InCheck; infer_instance\n\nend Board\n\n/- ### Positions and moves -/\n\n/-- The two wings on which a king may castle. -/\ninductive Wing\n  | kingside\n  | queenside\n  deriving DecidableEq, Fintype\n\n/-- The initial square of the king of colour `c`. -/\ndef Color.kingSquare (c : Color) : Square := ⟨4, c.homeRank⟩\n\n/-- The initial square of the rook of colour `c` on wing `w`. -/\ndef Color.rookSquare (c : Color) : Wing → Square\n  | .kingside => ⟨7, c.homeRank⟩\n  | .queenside => ⟨0, c.homeRank⟩\n\n/-- The square on which the king of colour `c` lands when castling on wing `w`. -/\ndef Color.castleSquare (c : Color) : Wing → Square\n  | .kingside => ⟨6, c.homeRank⟩\n  | .queenside => ⟨2, c.homeRank⟩\n\n/-- A chess position: the pieces on the board, the side to move, the castling rights and the\nen passant square. -/\nstructure Position where\n  /-- The pieces on the board. -/\n  board : Board\n  /-- The player who has the move. -/\n  toMove : Color\n  /-- `castling c w` holds when neither the king of colour `c` nor its rook on wing `w` has\n  moved yet, and this rook has not been captured (Art. 3.8.2.1). -/\n  castling : Color → Wing → Bool\n  /-- The square passed over by a pawn that has just advanced two squares, if any\n  (Art. 3.7.3.1). -/\n  enPassant : Option Square\n  deriving DecidableEq\n\n/-- A move: the square the moving piece leaves, the square it lands on, and the piece a pawn\npromotes to (for promotions only). Castling is recorded as the two-square move of the king, and\nan en passant capture as the diagonal move of the capturing pawn onto the en passant square. -/\nstructure Move where\n  src : Square\n  dst : Square\n  promotion : Option PieceType\n  deriving DecidableEq, Fintype\n\nnamespace Position\n\n/-- The position obtained by playing the move `m` (the result is only meaningful when\n`p.IsLegal m`). The moving piece leaves `m.src` and lands on `m.dst`, replaced by the promotion\npiece if any; an en passant capture removes the captured pawn; castling also moves the rook to\nthe square the king passed over. Castling rights are lost by moving the king, by moving a rook\nfrom its initial square and when a rook is captured on its initial square. -/\ndef play (p : Position) (m : Move) : Position :=\n  match p.board m.src with\n  | none => p\n  | some pc =>\n    let placed : Piece := match m.promotion with\n      | some q => ⟨pc.color, q⟩\n      | none => pc\n    let b₁ : Board := Function.update (Function.update p.board m.src none) m.dst (some placed)\n    let b₂ : Board :=\n      if pc.type = .pawn ∧ p.enPassant = some m.dst then\n        Function.update b₁ ⟨m.dst.file, m.src.rank⟩ none\n      else b₁\n    let b₃ : Board :=\n      if pc.type = .king ∧ |m.src.dx m.dst| = 2 then\n        Function.update\n          (Function.update b₂ ⟨if m.src.file < m.dst.file then 7 else 0, m.src.rank⟩ none)\n          ⟨midpoint m.src.file m.dst.file, m.src.rank⟩ (some ⟨pc.color, .rook⟩)\n      else b₂\n    { board := b₃\n      toMove := pc.color.other\n      castling := fun c w => p.castling c w &&\n        decide (m.src ≠ c.kingSquare ∧ m.src ≠ c.rookSquare w ∧ m.dst ≠ c.rookSquare w)\n      enPassant :=\n        if pc.type = .pawn ∧ |m.src.dy m.dst| = 2 then\n          some ⟨m.src.file, midpoint m.src.rank m.dst.rank⟩\n        else none }\n\n/-- The move `m` of a pawn of the side to move is a pawn move (Art. 3.7): one square forward to\nan empty square; two squares forward from the pawn's initial rank over an empty square to an\nempty square; or one square diagonally forward, capturing a piece there or capturing en passant.\nA pawn reaching the last rank must promote to a queen, rook, bishop or knight. -/\ndef PawnMove (p : Position) (m : Move) : Prop :=\n  ((m.src.dx m.dst = 0 ∧ p.board m.dst = none ∧\n      (m.src.dy m.dst = p.toMove.forward ∨\n        (m.src.dy m.dst = 2 * p.toMove.forward ∧ m.src.rank = p.toMove.pawnRank ∧\n          p.board.PathClear m.src m.dst))) ∨\n    (|m.src.dx m.dst| = 1 ∧ m.src.dy m.dst = p.toMove.forward ∧\n      (p.board m.dst ≠ none ∨ p.enPassant = some m.dst))) ∧\n  (m.promotion = none ↔ m.dst.rank ≠ p.toMove.lastRank) ∧\n  ∀ q, m.promotion = some q → q ≠ .king ∧ q ≠ .pawn\n\n/-- The move `m` is a castling move of the side to move (Art. 3.8.2): the king moves from its\ninitial square two squares towards a rook of the same colour on its initial square, neither of\nwhich has moved (the castling right is intact); all squares between the king and the rook are\nempty; and the king does not stand on, pass over or land on a square attacked by the opponent.\n-/\ndef Castles (p : Position) (m : Move) : Prop :=\n  ∃ w, m.src = p.toMove.kingSquare ∧ m.dst = p.toMove.castleSquare w ∧\n    p.castling p.toMove w = true ∧\n    p.board (p.toMove.rookSquare w) = some ⟨p.toMove, .rook⟩ ∧\n    p.board.PathClear m.src (p.toMove.rookSquare w) ∧\n    ∀ u, u = m.src ∨ m.src.StrictlyBetween m.dst u ∨ u = m.dst →\n      ¬ p.board.Attacks p.toMove.other u\n\n/-- The move `m` is legal in the position `p` (Art. 3): it moves a piece of the side to move to\na square not occupied by a piece of the same colour, following the movement rules of the piece\n(with a clear path for queens, rooks and bishops), or it is a castling move or a pawn move;\nonly pawns promote; and the king of the side to move is not left in check (Art. 3.9.2). -/\ndef IsLegal (p : Position) (m : Move) : Prop :=\n  ∃ pc, p.board m.src = some pc ∧ pc.color = p.toMove ∧\n    (∀ q, p.board m.dst = some q → q.color ≠ p.toMove) ∧\n    (if pc.type = .pawn then p.PawnMove m\n      else m.promotion = none ∧\n        ((pc.type.Pattern m.src m.dst ∧ p.board.PathClear m.src m.dst) ∨\n          (pc.type = .king ∧ p.Castles m))) ∧\n    ¬ (p.play m).board.InCheck p.toMove\n\n/-- Two positions are the same in the sense of Art. 9.2.2: the same player has the move, the\nsame pieces occupy the same squares, the castling rights are the same, and the possible moves\nare the same (which accounts for en passant captures). -/\ndef Same (p q : Position) : Prop :=\n  p.board = q.board ∧ p.toMove = q.toMove ∧ p.castling = q.castling ∧\n    ∀ m, p.IsLegal m ↔ q.IsLegal m\n\ninstance (p : Position) (m : Move) : Decidable (p.PawnMove m) := by unfold PawnMove; infer_instance\ninstance (p : Position) (m : Move) : Decidable (p.Castles m) := by unfold Castles; infer_instance\ninstance (p : Position) (m : Move) : Decidable (p.IsLegal m) := by unfold IsLegal; infer_instance\ninstance (p q : Position) : Decidable (p.Same q) := by unfold Same; infer_instance\n\nend Position\n\n/- ### Games -/\n\n/-- The possible results of a game. -/\ninductive Outcome\n  | win (c : Color)\n  | draw\n  deriving DecidableEq\n\n/-- The state of a game: the current position, the positions that occurred earlier in the game,\nand the number of half-moves since the last capture or pawn move. -/\nstructure GameState where\n  /-- The current position. -/\n  pos : Position\n  /-- The positions that occurred earlier in the game, most recent first. -/\n  past : List Position\n  /-- The number of half-moves played since the last capture or pawn move. -/\n  halfmoveClock : ℕ\n\nnamespace GameState\n\n/-- The state after the move `m` is played. -/\ndef play (s : GameState) (m : Move) : GameState where\n  pos := s.pos.play m\n  past := s.pos :: s.past\n  halfmoveClock :=\n    if (∃ pc, s.pos.board m.src = some pc ∧ pc.type = .pawn) ∨ s.pos.board m.dst ≠ none then\n      0\n    else s.halfmoveClock + 1\n\n/-- The number of times the current position has appeared in the game (Art. 9.2.2). -/\ndef repetitions (s : GameState) : ℕ := (s.past.countP fun q => decide (s.pos.Same q)) + 1\n\n/-- The result of the game if it has ended in the state `s` (Art. 5 and 9.6). The side to move\nhas no legal move exactly when it is checkmated, if its king is in check, or stalemated, if not.\nOtherwise the game is drawn if the same position has appeared at least five times or if the\nlast 75 moves by each player were made without a capture or pawn move. -/\ndef result (s : GameState) : Option Outcome :=\n  if ∀ m, ¬ s.pos.IsLegal m then\n    if s.pos.board.InCheck s.pos.toMove then some (.win s.pos.toMove.other) else some .draw\n  else if 5 ≤ s.repetitions ∨ 150 ≤ s.halfmoveClock then some .draw\n  else none\n\n/-- The player to move may claim a draw (Art. 9.2 and 9.3): the same position has appeared at\nleast three times, or the last 50 moves by each player were made without a capture or pawn move,\nor the player has a legal move after which one of these holds. -/\ndef CanClaimDraw (s : GameState) : Prop :=\n  3 ≤ s.repetitions ∨ 100 ≤ s.halfmoveClock ∨\n    ∃ m, s.pos.IsLegal m ∧ (3 ≤ (s.play m).repetitions ∨ 100 ≤ (s.play m).halfmoveClock)\n\ninstance (s : GameState) : Decidable s.CanClaimDraw := by unfold CanClaimDraw; infer_instance\n\nend GameState\n\n/-- `CanForceWin c s` means that player `c` has a strategy that wins the game from the state `s`\nagainst every play of the opponent. As the least predicate closed under the three rules below,\nit holds exactly when `c` can force a win in finitely many moves: either the game has ended with\na win for `c`; or `c` is to move and some legal move leads to a state from which `c` can force a\nwin; or the opponent is to move, cannot claim a draw, and every legal reply leads to a state from\nwhich `c` can force a win. A player who can claim a draw is assumed to do so when it prevents a\nloss, and a player who is trying to win never claims a draw. -/\ninductive CanForceWin (c : Color) : GameState → Prop\n  | won {s : GameState} : s.result = some (.win c) → CanForceWin c s\n  | move {s : GameState} (m : Move) : s.result = none → s.pos.toMove = c → s.pos.IsLegal m →\n      CanForceWin c (s.play m) → CanForceWin c s\n  | reply {s : GameState} : s.result = none → s.pos.toMove = c.other → ¬ s.CanClaimDraw →\n      (∀ m, s.pos.IsLegal m → CanForceWin c (s.play m)) → CanForceWin c s\n\n/-- The pieces on the first rank in the initial position, from the a-file to the h-file. -/\ndef backRank : Fin 8 → PieceType\n  | 0 => .rook\n  | 1 => .knight\n  | 2 => .bishop\n  | 3 => .queen\n  | 4 => .king\n  | 5 => .bishop\n  | 6 => .knight\n  | 7 => .rook\n\n/-- The initial position (Art. 2.3): White has the move, both players have both castling rights,\nand there is no en passant square. -/\ndef initialPosition : Position where\n  board s :=\n    if s.rank = 0 then some ⟨.white, backRank s.file⟩\n    else if s.rank = 1 then some ⟨.white, .pawn⟩\n    else if s.rank = 6 then some ⟨.black, .pawn⟩\n    else if s.rank = 7 then some ⟨.black, backRank s.file⟩\n    else none\n  toMove := .white\n  castling _ _ := true\n  enPassant := none\n\n/-- The state at the start of a game. -/\ndef initialState : GameState where\n  pos := initialPosition\n  past := []\n  halfmoveClock := 0\n\nopen scoped Classical in\n/-- The outcome of chess under perfect play: White wins if White can force a win, Black wins if\nBlack can force a win, and otherwise the game is a draw. Since chess is a finite game, by\nZermelo's theorem exactly one of these three cases occurs, and in the last case both players\ncan force at least a draw. -/\nnoncomputable def perfectPlayOutcome : Outcome :=\n  if CanForceWin .white initialState then .win .white\n  else if CanForceWin .black initialState then .win .black\n  else .draw\n\n/-- White has exactly $20$ legal moves in the initial position. -/\n@[category test, AMS 91]\ntheorem card_filter_isLegal_initialPosition :\n    (Finset.univ.filter initialPosition.IsLegal).card = 20 := by\n  native_decide\n\n/-- The game has not ended in the initial state. -/\n@[category test, AMS 91]\ntheorem result_initialState : initialState.result = none := by\n  native_decide\n\n/-- Fool's mate: after 1. f3 e5 2. g4 Qh4# Black has won. -/\n@[category test, AMS 91]\ntheorem result_foolsMate :\n    ((((initialState.play ⟨⟨5, 1⟩, ⟨5, 2⟩, none⟩).play\n      ⟨⟨4, 6⟩, ⟨4, 4⟩, none⟩).play\n      ⟨⟨6, 1⟩, ⟨6, 3⟩, none⟩).play\n      ⟨⟨3, 7⟩, ⟨7, 3⟩, none⟩).result = some (.win .black) := by\n  native_decide\n\n/-- After 1. Nf3 Nf6 2. Ng1 Ng8 has been played three times the game goes on, but the fourth\nrepetition makes the initial position appear for the fifth time and the game is drawn. -/\n@[category test, AMS 91]\ntheorem result_knightShuffle :\n    ((fun s : GameState => (((s.play ⟨⟨6, 0⟩, ⟨5, 2⟩, none⟩).play\n      ⟨⟨6, 7⟩, ⟨5, 5⟩, none⟩).play\n      ⟨⟨5, 2⟩, ⟨6, 0⟩, none⟩).play\n      ⟨⟨5, 5⟩, ⟨6, 7⟩, none⟩)^[3] initialState).result = none ∧\n    ((fun s : GameState => (((s.play ⟨⟨6, 0⟩, ⟨5, 2⟩, none⟩).play\n      ⟨⟨6, 7⟩, ⟨5, 5⟩, none⟩).play\n      ⟨⟨5, 2⟩, ⟨6, 0⟩, none⟩).play\n      ⟨⟨5, 5⟩, ⟨6, 7⟩, none⟩)^[4] initialState).result = some .draw := by\n  native_decide\n\n/--\nWhat is the outcome of a perfectly played game of chess, played from the standard initial\nposition under the FIDE Laws of Chess? The consensus answer is that chess is a draw with best\nplay, i.e. `perfectPlayOutcome = .draw`; the minority view is `perfectPlayOutcome = .win .white`.\n-/\n@[category research open, AMS 91]\ntheorem first_move_advantage_in_chess : perfectPlayOutcome = answer(sorry) := by\n  sorry\n\n/--\nThe consensus among players and theorists (Steinitz, Lasker, Capablanca, Fischer, Kasparov,\nWatson, Rowson, Short): with perfect play chess is a draw, i.e. neither White nor Black can\nforce a win from the standard initial position.\n-/\n@[category research open, AMS 91]\ntheorem first_move_advantage_in_chess.variants.draw : perfectPlayOutcome = .draw := by\n  sorry\n\nend FirstMoveAdvantageInChess\n",
+ "list_url": "https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics#Combinatorial_games",
+ "modeling_decisions": [
+  {
+   "attempt": "c06",
+   "items": [
+    "Rule set: the FIDE Laws of Chess (handbook E01). The game ends automatically by checkmate, stalemate, fivefold repetition (Art. 9.6.1) or the 75-move rule (Art. 9.6.2, with checkmate taking precedence). In addition the player to move may claim a draw by threefold repetition (Art. 9.2) or the 50-move rule (Art. 9.3), including the 'intended move' variants; a defender who can claim a draw is assumed to do so (`CanForceWin.reply` requires `¬ CanClaimDraw`). Reviewers who read 'perfectly played chess' as the game with only the automatic rules should note that claims are included; this can in principle change the value of some positions (e.g. wins needing more than 50 moves without capture/pawn move).",
+    "Omitted rules, with justification in the module docstring: draw by agreement, resignation and the dead-position rule (Art. 5.2.2) cannot change the game-theoretic value (from a dead position every continuation is drawn anyway); clocks/arbiters are not part of the mathematical game.",
+    "Game value: `CanForceWin c s` is an inductive (least fixed point) predicate, so it holds exactly when `c` can force a win in finitely many moves. `perfectPlayOutcome` is `win white` if White can force a win, else `win black` if Black can, else `draw`. The 'else draw' branch relies on chess being a finite game (75-move rule plus at most 96 pawn moves and 30 captures) so that Zermelo determinacy makes 'neither side can force a win' equivalent to 'both sides can force at least a draw'; this fact is stated in the docstring, not proved in the file. Equivalent alternative phrasing: `¬ CanForceWin .white initialState ∧ ¬ CanForceWin .black initialState` for the draw answer.",
+    "Position identity for repetition (Art. 9.2.2): same board, same side to move, same castling rights, and the same set of legal moves (this implements 'the possible moves of all the pieces are the same', so an en passant square only matters if the en passant capture is actually legal, and a pinned pawn does not count).",
+    "Castling rights are tracked as Booleans; a right is lost when the king leaves its home square, when the rook leaves its home square, or when a piece moves onto that rook's home square (capture). Castling requires the right, the rook present, empty squares between, and the king not standing on, crossing or landing on an attacked square (attack evaluated on the current board, pinned pieces still attack, Art. 3.1.3).",
+    "Moves are encoded as (source, destination, optional promotion piece); castling is the two-square king move and en passant the diagonal pawn move onto the en passant square. `Position.play` is only meaningful for legal moves (garbage-in for illegal ones, e.g. an empty source square returns the position unchanged).",
+    "Capturing the enemy king is not explicitly forbidden by `IsLegal` because it never arises in a reachable position (the opponent's last move could not leave their king in check); similarly one king per side is not enforced but holds from the initial position.",
+    "The test theorems use `native_decide` (as several existing repo files do); they check 20 legal opening moves, no result in the initial state, Fool's mate, and fivefold repetition via a knight shuffle."
+   ],
+   "model": "Claude Fable 5.1"
+  }
+ ],
+ "outcome": {
+  "kind": "complete",
+  "parts_dropped": 0,
+  "statements_kept": 1,
+  "statements_total": 1
+ },
+ "record_title": "first-move advantage in chess",
+ "reference_url": "https://en.wikipedia.org/wiki/first-move_advantage_in_chess",
+ "references": [],
+ "reviewer_notes": "Original statement is a question, so the main theorem uses `answer(sorry)` over the three-outcome type; the consensus 'draw' answer is a `research open` variant. Modeling choices a reviewer should know: (1) the model includes the FIDE draw *claims* (threefold repetition, 50-move rule) as an option of the player to move — a defender who can claim is assumed to claim; this is the faithful reading of 'under FIDE rules' but could in principle differ from a model with only automatic 75-move/fivefold rules. All formalizing candidates made the same choice. (2) The dead-position rule (Art. 5.2.2), resignation and draw by agreement are omitted; none can change the game-theoretic value (wins occur only by checkmate, so a dead position is already valueless for both sides). (3) `Position.play` is garbage-in for illegal moves (documented); only legal moves are ever played by the value definition. (4) `perfectPlayOutcome` uses 'neither can force a win ⇒ draw'; the game is finite (75-move rule with at most 126 clock resets), so by Zermelo this coincides with 'both can hold a draw'. Omission reasons of c05/c08 (no chess primitives in Mathlib) are correct as facts but do not justify bailing out: the repository allows bespoke definitions, and c06 supplies a complete, validated model rather than a placeholder. Two lines in the module docstring exceed 100 characters (reference URLs), as is common in the repository. Compiles with only `declaration uses 'sorry'` warnings.",
+ "schema_version": 1,
+ "statement": "What is the outcome of a perfectly played game of chess? (See also first-move advantage in chess)",
+ "statement_segments": [
+  {
+   "ref": 1,
+   "text": "What is the outcome of a perfectly played game of chess?"
+  },
+  {
+   "ref": null,
+   "text": " (See also first-move advantage in chess)"
+  }
+ ],
+ "subarea": "combinatorial games",
+ "tags": [
+  "games and puzzles",
+  "combinatorial games"
+ ],
+ "title": "First-move advantage in chess",
+ "title_source": "module_doc",
+ "transcript_url": "https://epochai-public-eval-logs-manual.s3.amazonaws.com/eval-transcripts/autoformalization/autoformalize-full-r8zuxgce3jf7ppre/index.html#/tasks/2026-09-03T22-06-33-00-00_autoformalize_4wrvrFMDSTmrLHnx8e7zPg.eval/samples/sample/wp-first-move-advantage-in-chess/1/",
+ "uuid": "6GmoURYBkkoUdS9mktXMf5"
+}

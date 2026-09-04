@@ -1,0 +1,704 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Ropelength problems\n\nThe *ropelength* of a curve $L$ in $\\mathbb{R}^3$ is $\\operatorname{Len}(L)/\\tau(L)$, the\nquotient of its length by its *thickness* $\\tau(L)$, the radius of the largest embedded normal\ntube around $L$. Following Gonzalez–Maddocks and Cantarella–Kusner–Sullivan, the thickness is the\ninfimum of the circumradius $r(x, y, z)$ over all triples of distinct points of $L$. The\nropelength of a knot or link type is the infimum of the ropelengths of its representatives.\nCurves of positive thickness are $C^{1,1}$, so this infimum ranges over $C^{1,1}$ representatives;\nit is attained, and the minimizers are called *tight* or *ideal*.\n\nUnits: thickness is a radius, so a tight link has an embedded normal tube of unit radius and its\nropelength equals its length. With this convention the Hopf link has ropelength $8\\pi$. This is the\nconvention of Cantarella–Kusner–Sullivan and of the Wikipedia article.\n\n*References:*\n- [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [CKS02] J. Cantarella, R. B. Kusner, J. M. Sullivan, *On the minimum ropelength of knots and\n  links*, Invent. Math. 150 (2002), 257–286. [arXiv:math/0103224](https://arxiv.org/abs/math/0103224)\n- [CFKSW06] J. Cantarella, J. H. G. Fu, R. B. Kusner, J. M. Sullivan, N. C. Wrinkle, *Criticality\n  for the Gehring link problem*, Geom. Topol. 10 (2006), 2055–2116.\n  [arXiv:math/0402212](https://arxiv.org/abs/math/0402212)\n- [DEPZ19] Y. Diao, C. Ernst, A. Por, U. Ziegler, *The ropelengths of knots are almost linear in\n  terms of their crossing numbers*, J. Knot Theory Ramifications 28 (2019), 1950085.\n-/\n\nopen MeasureTheory Topology\n\nopen scoped EuclideanGeometry ENNReal unitInterval\n\nnamespace RopelengthProblems\n\n/-- A subset `K ⊆ ℝ³` is a *knot* if it is the image of a topological embedding of the circle. -/\ndef IsKnot (K : Set ℝ³) : Prop :=\n  ∃ γ : Circle → ℝ³, IsEmbedding γ ∧ Set.range γ = K\n\n/-- Two subsets `A`, `B` of `ℝ³` are *ambient isotopic* if there is a continuous family\n`H t : ℝ³ → ℝ³`, `t ∈ [0, 1]`, of homeomorphisms with `H 0 = id` and `H 1 '' A = B`.\nThe knot (or link) type of `A` is its ambient isotopy class. -/\ndef AmbientIsotopic (A B : Set ℝ³) : Prop :=\n  ∃ H : C(I × ℝ³, ℝ³), (∀ t, IsHomeomorph fun x => H (t, x)) ∧ (∀ x, H (0, x) = x) ∧\n    (fun x => H (1, x)) '' A = B\n\n/-- Every set is ambient isotopic to itself, via the constant isotopy. -/\n@[category API, AMS 57]\ntheorem ambientIsotopic_refl (A : Set ℝ³) : AmbientIsotopic A A :=\n  ⟨⟨fun p => p.2, continuous_snd⟩, fun _ => IsHomeomorph.id, fun _ => rfl, Set.image_id' A⟩\n\n/-- The standard unknot: the unit circle in the coordinate plane `x₂ = 0`. -/\ndef unknot : Set ℝ³ :=\n  {x | x 0 ^ 2 + x 1 ^ 2 = 1 ∧ x 2 = 0}\n\n/-- The standard **Borromean rings**: three mutually perpendicular ellipses, one in each\ncoordinate plane, with semi-axes `2` and `1`. The major axis of the ellipse in the plane\n`x₂ = 0` lies along the `x₀`-axis, that of the ellipse in the plane `x₀ = 0` along the `x₁`-axis,\nand that of the ellipse in the plane `x₁ = 0` along the `x₂`-axis. The three curves are pairwise\ndisjoint, and each passes through the disc spanned by the next one but not through the disc spanned\nby the previous one. This is the classical realization of the Borromean rings by three mutually\nperpendicular ellipses (or golden rectangles). -/\ndef borromeanRings : Set ℝ³ :=\n  {x | x 0 ^ 2 / 4 + x 1 ^ 2 = 1 ∧ x 2 = 0} ∪\n    {x | x 1 ^ 2 / 4 + x 2 ^ 2 = 1 ∧ x 0 = 0} ∪\n    {x | x 2 ^ 2 / 4 + x 0 ^ 2 = 1 ∧ x 1 = 0}\n\n/-- The *thickness* `τ(L)` of a set `L ⊆ ℝ³` (Gonzalez–Maddocks, [CKS02, §1]): the infimum of the\ncircumradius `r(x, y, z)` over all triples of distinct points `x, y, z ∈ L`, where collinear\ntriples have `r = ∞` and are therefore omitted. For a `C¹` link this is the radius of the largest\nembedded normal tube around `L`, and a link of positive thickness is `C^{1,1}` [CKS02, §1–2]. -/\nnoncomputable def thickness (L : Set ℝ³) : ℝ≥0∞ :=\n  ⨅ (s : Affine.Simplex ℝ ℝ³ 2) (_ : ∀ i, s.points i ∈ L), ENNReal.ofReal s.circumradius\n\n/-- The *ropelength* `Len(L) / τ(L)` of a set `L ⊆ ℝ³`, where the length `Len(L)` is the\none-dimensional Hausdorff measure of `L` (for a link, the total length of its components).\nIt is `∞` when `L` has thickness zero or infinite length. -/\nnoncomputable def ropelength (L : Set ℝ³) : ℝ≥0∞ :=\n  μH[1] L / thickness L\n\n/-- The ropelength of the knot or link type of `K`: the infimum of the ropelengths of all sets\nambient isotopic to `K`. By [CKS02, §2] the infimum is attained when the type is tame. -/\nnoncomputable def minRopelength (K : Set ℝ³) : ℝ≥0∞ :=\n  ⨅ (L : Set ℝ³) (_ : AmbientIsotopic K L), ropelength L\n\n/-- A knot or link type is *tame* if it has a representative of positive thickness. A curve of\npositive thickness is `C^{1,1}` and hence tame in the classical sense, and conversely a polygonal\nknot is ambient isotopic to a smooth one, which has positive thickness. -/\ndef IsTame (K : Set ℝ³) : Prop :=\n  ∃ L, AmbientIsotopic K L ∧ 0 < thickness L\n\n/-- The *crossings* of the projection of `L ⊆ ℝ³` along a direction `v`: the unordered pairs of\ndistinct points of `L` that project to the same point of a plane transverse to `v`. -/\ndef crossings (L : Set ℝ³) (v : ℝ³) : Set (Sym2 ℝ³) :=\n  {p | ∃ x ∈ L, ∃ y ∈ L, p = s(x, y) ∧ x ≠ y ∧ ∃ t : ℝ, y = x + t • v}\n\n/-- The *crossing number* `Cr(K)` of the knot or link type of `K`: the least number of crossings\nin a projection of a representative of the type, where the infimum runs over all representatives\nand all projection directions. A projection with finitely many crossings can be perturbed to a\nregular diagram with at most as many crossings, so for tame types this is the classical crossing\nnumber: the least number of crossings in a diagram of the type. -/\nnoncomputable def crossingNumber (K : Set ℝ³) : ℕ∞ :=\n  ⨅ (L : Set ℝ³) (_ : AmbientIsotopic K L) (v : ℝ³) (_ : v ≠ 0), (crossings L v).encard\n\n/-- The unknot has crossing number `0`: its standard representative projects injectively along\nthe `x₂`-axis. -/\n@[category test, AMS 57]\ntheorem crossingNumber_unknot : crossingNumber unknot = 0 := by\n  refine le_antisymm ?_ bot_le\n  refine (iInf₂_le unknot (ambientIsotopic_refl _)).trans ?_\n  refine (iInf₂_le (EuclideanSpace.single 2 1) (by simp)).trans ?_\n  suffices crossings unknot (EuclideanSpace.single 2 1) = ∅ by simp [this]\n  ext p\n  simp only [crossings, Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false, not_exists, not_and]\n  rintro x ⟨-, hx⟩ y ⟨-, hy⟩ rfl hxy t ht\n  apply hxy\n  have : t = 0 := by\n    have := congrArg (fun z : ℝ³ => z 2) ht\n    simpa [hx, hy] using this.symm\n  simp [ht, this]\n\n/-- For every knot $K$, $L(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$ [DEPZ19],\nand there are knot families with $L(K)$ proportional to $\\operatorname{Cr}(K)$. No knot family\nwith super-linear dependence of ropelength on crossing number has been observed, and it is\nconjectured that the tight upper bound is linear: there is a constant $c > 0$ such that\n$L(K) \\le c \\cdot \\operatorname{Cr}(K)$ for every nontrivial tame knot $K$. The unknot is excluded\nsince it has crossing number $0$ but positive ropelength. -/\n@[category research open, AMS 51 53 57]\ntheorem ropelength_problems.parts.i :\n    ∃ c : ℝ, 0 < c ∧ ∀ K : Set ℝ³, IsKnot K → IsTame K → ¬ AmbientIsotopic K unknot →\n      minRopelength K ≤ ENNReal.ofReal c * (crossingNumber K : ℝ≥0∞) := by\n  sorry\n\n/-- The ropelength of the Borromean rings is conjectured to be $58.006$ (to three decimal\nplaces): the guitar-shaped critical configuration of Cantarella, Fu, Kusner, Sullivan and Wrinkle\n[CFKSW06], built from parameterized arcs, has ropelength approximately $58.0060$ and is conjectured\nto be the ropelength minimizer. Ropelength is measured with unit-radius thickness, so that the Hopf\nlink has ropelength $8\\pi$. -/\n@[category research open, AMS 51 53 57]\ntheorem ropelength_problems.parts.ii :\n    ∃ r : ℝ, |r - 58.006| ≤ 0.0005 ∧ minRopelength borromeanRings = ENNReal.ofReal r := by\n  sorry\n\nend RopelengthProblems\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The two slots are statable; the dropped items (no closed form for ropelength of any nontrivial knot; unknown constant in the Cr^{3/4} lower bound) indeed have no faithful Prop.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Knots/links are modelled as subsets of ℝ³ (images of embeddings), and knot types as ambient isotopy classes of sets (unoriented types). Ropelength and crossing number are invariant under orientation reversal and mirror image, so this loses nothing.",
+    "Thickness follows Gonzalez–Maddocks/CKS (infimal circumradius over distinct triples) rather than Federer's reach or the normal injectivity radius; CKS prove these agree for C¹ links and that positive thickness forces C^{1,1}. Consequently the infimum over all (even wild) representatives equals the infimum over C^{1,1} representatives, as in the literature.",
+    "Length is taken to be the 1-dimensional Hausdorff measure of the set (Mathlib normalization gives μH[1](segment) = its length), which equals arc length for simple rectifiable curves and sums over link components; ropelength is ℝ≥0∞-valued so that thickness zero or infinite length gives ropelength ∞ (CKS: wild links have infinite ropelength). No real division-by-zero junk arises.",
+    "Crossing number is defined as an infimum over all representatives and all projection directions of the number of unordered double-point pairs of the projection (ℕ∞-valued). Regular diagrams are included (giving ≤ the classical crossing number), and any projection with finitely many double pairs can be perturbed, within the knot type, to a regular diagram with at most that many crossings (a k-fold point contributes C(k,2) pairs and perturbs to ≤ C(k,2) transverse crossings, tangential double points contribute 1 and can be removed), so the definition agrees with the classical crossing number for tame types. Test `crossingNumber_unknot` confirms Cr(unknot) = 0.",
+    "Slot (i): the unknot is excluded via ¬ AmbientIsotopic K unknot (Cr = 0 but ropelength > 0); the O-statement is stated as ∃ c > 0, ∀ nontrivial tame knot K, minRopelength K ≤ ofReal c * Cr(K). Since Cr ≥ 3 for nontrivial knots this is equivalent to allowing an additive constant. The tameness hypothesis (IsTame: some representative of positive thickness, equivalent to classical tameness) restricts to the knots the conjecture is about; for wild knots both sides would be ∞ anyway.",
+    "Slot (ii): the rounded figure 58.006 is read as 'equal to 58.006 to three decimal places', i.e. ∃ r, |r − 58.006| ≤ 0.0005 ∧ minRopelength borromeanRings = ENNReal.ofReal r. The CFKSW configuration has ropelength ≈ 58.0060, which lies in this interval (and also in the alternative reading [58.006, 58.007) suggested in the notes). Unit-radius thickness convention (Hopf link = 8π) as in CKS and Wikipedia.",
+    "The Borromean rings are represented by the concrete set of three mutually perpendicular ellipses x₀²/4 + x₁² = 1 (x₂ = 0), x₁²/4 + x₂² = 1 (x₀ = 0), x₂²/4 + x₀² = 1 (x₁ = 0): pairwise disjoint, each pair geometrically unlinked, each ellipse threading the disc of the next one — the classical ellipse/golden-rectangle realization (isotopic to the icosahedral golden-rectangle configuration by scaling the axes). A reviewer should check this reference configuration.",
+    "AMS tags 51 53 57 (geometry, differential geometry, manifolds/knot theory). Two auxiliary declarations were added: `ambientIsotopic_refl` (category API) and `crossingNumber_unknot` (category test), both proved."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Topology.IsEmbedding with Circle → ℝ² as used in FormalConjectures/Wikipedia/InscribedSquare.lean (Jordan curves); reused the same idiom in dimension 3.",
+     "name": "RopelengthProblems.IsKnot",
+     "why_needed": "A knot is the image of a topological embedding of the circle into ℝ³; no knot theory exists in Mathlib."
+    },
+    {
+     "closest_existing_considered": "ContinuousMap.Homotopy / HomotopyEquiv (no requirement that each time slice is a homeomorphism), IsHomeomorph (used as a building block).",
+     "name": "RopelengthProblems.AmbientIsotopic",
+     "why_needed": "Knot/link types are ambient isotopy classes; Mathlib has no notion of (ambient) isotopy. Defined as a continuous map H : C(I × ℝ³, ℝ³) with every H(t, ·) a homeomorphism (IsHomeomorph), H(0, ·) = id and H(1, ·) '' A = B."
+    },
+    {
+     "closest_existing_considered": "Metric.sphere (only gives a 2-sphere in ℝ³); Circle (a type, not a subset of ℝ³).",
+     "name": "RopelengthProblems.unknot",
+     "why_needed": "Reference representative of the trivial knot (unit circle in the plane x₂ = 0), needed to exclude the unknot in slot (i)."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib describes any specific link type.",
+     "name": "RopelengthProblems.borromeanRings",
+     "why_needed": "Reference representative of the Borromean rings link type: three mutually perpendicular ellipses with semi-axes 2 and 1, one in each coordinate plane, with the classical cyclic arrangement of major axes. Its ambient isotopy class is the Borromean rings."
+    },
+    {
+     "closest_existing_considered": "Affine.Simplex.circumradius (used as the building block); Mathlib has no reach or normal injectivity radius.",
+     "name": "RopelengthProblems.thickness",
+     "why_needed": "Thickness τ(L) as in Gonzalez–Maddocks and Cantarella–Kusner–Sullivan: the infimum over triples of distinct points of L of their circumradius (collinear triples contribute ∞ and are omitted), valued in ℝ≥0∞. Equals the normal injectivity radius / reach for C¹ links."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.Measure.hausdorffMeasure 1 (used); eVariationOn (parametrization-dependent, rejected in favour of a set-based definition consistent with the set-based thickness).",
+     "name": "RopelengthProblems.ropelength",
+     "why_needed": "Ropelength of a set L ⊆ ℝ³: μH[1] L / thickness L in ℝ≥0∞ (∞ for zero thickness or infinite length). Length is the one-dimensional Hausdorff measure, which equals arc length for simple rectifiable curves and sums over components of a link."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "RopelengthProblems.minRopelength",
+     "why_needed": "Ropelength of a knot/link type: infimum of ropelength over all sets ambient isotopic to a given one (attained for tame types by CKS)."
+    },
+    {
+     "closest_existing_considered": "No notion of tame/PL knots in Mathlib.",
+     "name": "RopelengthProblems.IsTame",
+     "why_needed": "The conjecture in slot (i) concerns tame knots; defined as having a representative of positive thickness, which is equivalent to the classical (polygonal/C¹) tameness and avoids polygon machinery."
+    },
+    {
+     "closest_existing_considered": "None (no knot diagrams in Mathlib).",
+     "name": "RopelengthProblems.crossings",
+     "why_needed": "Unordered pairs (Sym2 ℝ³) of distinct points of L on a common line parallel to v, i.e. the double points of the projection along v."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph crossing-number style notions do not exist for knots; nothing applicable in Mathlib.",
+     "name": "RopelengthProblems.crossingNumber",
+     "why_needed": "Crossing number as the ℕ∞-valued infimum over all representatives of the type and all directions v ≠ 0 of the number of crossings of the projection. For tame types this equals the classical minimal number of crossings over regular diagrams (a projection with n double pairs can be perturbed to a regular diagram with ≤ n crossings, and regular diagrams are included)."
+    }
+   ],
+   "per_slot": {
+    "ropelength_problems.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: there is a constant c > 0 such that every nontrivial tame knot type K satisfies minRopelength K ≤ c · Cr(K), i.e. L(K) = O(Cr(K)). Needed bespoke definitions of knots, ambient isotopy, thickness (Gonzalez–Maddocks/CKS infimal circumradius), ropelength (Hausdorff length / thickness), ropelength of a knot type, tameness and crossing number, none of which exist in Mathlib or FormalConjecturesForMathlib."
+    },
+    "ropelength_problems.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: the minimal ropelength of the Borromean rings link type (unit-radius thickness, total length over all components) is a real number r with |r − 58.006| ≤ 0.0005, i.e. it equals 58.006 to three decimal places. Uses the same bespoke ropelength definitions plus a concrete reference configuration of the Borromean rings (three mutually perpendicular ellipses)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "ropelength_problems.parts.i": "/-- For every knot $K$, $L(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$ [DEPZ19],\nand there are knot families with $L(K)$ proportional to $\\operatorname{Cr}(K)$. No knot family\nwith super-linear dependence of ropelength on crossing number has been observed, and it is\nconjectured that the tight upper bound is linear: there is a constant $c > 0$ such that\n$L(K) \\le c \\cdot \\operatorname{Cr}(K)$ for every nontrivial tame knot $K$. The unknot is excluded\nsince it has crossing number $0$ but positive ropelength. -/\n@[category research open, AMS 51 53 57]\ntheorem ropelength_problems.parts.i :\n    ∃ c : ℝ, 0 < c ∧ ∀ K : Set ℝ³, IsKnot K → IsTame K → ¬ AmbientIsotopic K unknot →\n      minRopelength K ≤ ENNReal.ofReal c * (crossingNumber K : ℝ≥0∞) := by\n  sorry",
+    "ropelength_problems.parts.ii": "/-- The ropelength of the Borromean rings is conjectured to be $58.006$ (to three decimal\nplaces): the guitar-shaped critical configuration of Cantarella, Fu, Kusner, Sullivan and Wrinkle\n[CFKSW06], built from parameterized arcs, has ropelength approximately $58.0060$ and is conjectured\nto be the ropelength minimizer. Ropelength is measured with unit-radius thickness, so that the Hopf\nlink has ropelength $8\\pi$. -/\n@[category research open, AMS 51 53 57]\ntheorem ropelength_problems.parts.ii :\n    ∃ r : ℝ, |r - 58.006| ≤ 0.0005 ∧ minRopelength borromeanRings = ENNReal.ofReal r := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Ropelength problems\n\n*References:*\n- [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n- [Cantarella, Kusner, and Sullivan, *On the minimum ropelength of knots and links*](https://arxiv.org/abs/math/0103224)\n-/\n\nnamespace RopelengthProblems\n\nopen MeasureTheory Set\nopen scoped ENNReal NNReal\n\n\n/-- Three-dimensional Euclidean space. -/\nabbrev Euclidean3 := EuclideanSpace ℝ (Fin 3)\n\n/-- An `n`-component link is an embedded disjoint union of `n` circles in Euclidean space. -/\nstructure Link (n : ℕ) where\n  toFun : Fin n × AddCircle (1 : ℝ) → Euclidean3\n  isEmbedding : Topology.IsEmbedding toFun\n\ninstance {n : ℕ} : FunLike (Link n) (Fin n × AddCircle (1 : ℝ)) Euclidean3 where\n  coe := Link.toFun\n  coe_injective' := fun L K h ↦ by\n    cases L with\n    | mk f hf =>\n      cases K with\n      | mk g hg =>\n        dsimp only [Link.toFun] at h\n        subst g\n        rfl\n\n/-- Two links have the same link type when an ambient isotopy carries one image to the other. -/\ndef AmbientIsotopic {n : ℕ} (L K : Link n) : Prop :=\n  ∃ H : ℝ → Euclidean3 ≃ₜ Euclidean3,\n    ContinuousOn (fun p : ℝ × Euclidean3 ↦ H p.1 p.2) (Icc 0 1 ×ˢ (univ : Set Euclidean3)) ∧\n    H 0 = Homeomorph.refl Euclidean3 ∧\n    H 1 '' range L = range K\n\n/-- The radius of the circle through three points, or infinity when there is no such circle. -/\nnoncomputable def circumradius (x y z : Euclidean3) : ℝ≥0∞ :=\n  sInf ({r : ℝ≥0∞ | ∃ c : Euclidean3, edist c x = r ∧ edist c y = r ∧ edist c z = r} :\n    Set ℝ≥0∞)\n\n/--\nThe thickness of a link is the infimum of the circumradii of triples of distinct points on it.\nThis is the three-point characterization of the radius of the largest embedded normal tube.\n-/\nnoncomputable def thickness {n : ℕ} (L : Link n) : ℝ≥0∞ :=\n  sInf ({r : ℝ≥0∞ | ∃ x ∈ range L, ∃ y ∈ range L, ∃ z ∈ range L,\n    x ≠ y ∧ y ≠ z ∧ z ≠ x ∧ r = circumradius x y z} : Set ℝ≥0∞)\n\n/-- The total length of a link, measured by one-dimensional Hausdorff measure. -/\nnoncomputable def length {n : ℕ} (L : Link n) : ℝ≥0∞ :=\n  Measure.hausdorffMeasure 1 (range L)\n\n/-- The ropelength of a link type is the infimum of length divided by thickness in that type. -/\nnoncomputable def ropelength {n : ℕ} (L : Link n) : ℝ≥0∞ :=\n  sInf ({r : ℝ≥0∞ | ∃ K : Link n, AmbientIsotopic L K ∧\n    r = length K / thickness K} : Set ℝ≥0∞)\n\n/-- Projection of three-dimensional Euclidean space onto its first two coordinates. -/\ndef planarProjection (x : Euclidean3) : EuclideanSpace ℝ (Fin 2) :=\n  WithLp.toLp 2 fun i ↦ x (Fin.castLE (by decide) i)\n\n/-- Ordered pairs of distinct points of a knot that have the same planar projection. -/\ndef doublePointPairs (K : Link 1) : Set\n    ((Fin 1 × AddCircle (1 : ℝ)) × (Fin 1 × AddCircle (1 : ℝ))) :=\n  {p | p.1 ≠ p.2 ∧ planarProjection (K p.1) = planarProjection (K p.2)}\n\n/--\nThe crossing number of a knot is the least number of double points in a finite planar projection\nof an ambient-isotopic representative. Ordered pairs are divided by two.\n-/\nnoncomputable def crossingNumber (K : Link 1) : ℕ :=\n  sInf ({m : ℕ | ∃ L : Link 1, AmbientIsotopic K L ∧\n    (doublePointPairs L).Finite ∧ m = (doublePointPairs L).ncard / 2} : Set ℕ)\n\n/--\nThere is a universal positive finite constant $c$ such that every nontrivial tame knot $K$\nsatisfies\n$$\n  \\operatorname{Ropelength}(K) \\le c\\,\\operatorname{Cr}(K).\n$$\nThus the conjectured tight upper bound for ropelength in terms of crossing number is linear.\nThe condition $0 < \\operatorname{Cr}(K)$ excludes the unknot.\n-/\n@[category research open, AMS 51 53 57]\ntheorem ropelength_problems.parts.i :\n    ∃ c : ℝ≥0, 0 < c ∧ ∀ K : Link 1, 0 < crossingNumber K →\n      ropelength K ≤ (c : ℝ≥0∞) * crossingNumber K := by\n  sorry\n\nend RopelengthProblems\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.92,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented an n-component link as a topological embedding of a disjoint union of n copies of the additive unit circle into three-dimensional Euclidean space.",
+    "Defined link type by ambient isotopy, represented as a continuous family of ambient homeomorphisms on the unit time interval; endpoint equality is imposed on unparameterized images, allowing component permutation and reparameterization.",
+    "Used one-dimensional Hausdorff measure of the embedded image for total link length. For a disjoint finite union of rectifiable embedded curves this is the sum of component lengths.",
+    "Used the Cantarella–Kusner–Sullivan three-point characterization of thickness: the infimum of circumradii over triples of distinct image points. Circumradius is the least common distance to an equidistant center; this is infinity for three distinct collinear points.",
+    "Defined ropelength as the infimum of total length divided by thickness over ambient-isotopic representatives. Although the structure permits arbitrary topological embeddings, representatives with positive three-point thickness have the required C^{1,1} geometric regularity; zero-thickness nondegenerate representatives do not lower the quotient.",
+    "Defined crossing number directly as the minimum finite number of projection double points among ambient-isotopic representatives. Ordered pairs of distinct preimages are divided by two. Fixing projection to the first two coordinates is harmless because representatives vary by ambient isotopy.",
+    "Quantified the linear-bound constant in ℝ≥0, so it is finite, and required it to be positive. Restricted to knots with positive crossing number, exactly the intended exclusion of the unknot; finite-projection representatives are tame.",
+    "Omitted the Borromean-rings slot rather than using the non-characterizing condition that every two-component sublink is trivial or introducing a semantically empty named link type."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's EuclideanSpace ℝ (Fin 3), which this abbreviation uses directly.",
+     "name": "Euclidean3",
+     "why_needed": "Provides the explicit ambient three-dimensional Euclidean space for links."
+    },
+    {
+     "closest_existing_considered": "Topology.IsEmbedding and AddCircle; Link bundles an embedding of a finite disjoint union of circles.",
+     "name": "Link",
+     "why_needed": "No embedded smooth/topological knot or link type exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib Homeomorph, ContinuousOn, and topology embeddings; these are used to define the relation explicitly.",
+     "name": "AmbientIsotopic",
+     "why_needed": "No ambient-isotopy relation for Euclidean links exists in Mathlib."
+    },
+    {
+     "closest_existing_considered": "EuclideanGeometry.Simplex.circumradius; replaced by an ENNReal infimum over equidistant centers to cover collinear triples.",
+     "name": "circumradius",
+     "why_needed": "Mathlib's simplex circumradius requires affine independence and therefore does not encode the source convention assigning infinity to collinear triples."
+    },
+    {
+     "closest_existing_considered": "Metric edist, ENNReal sInf, and the source's equivalent three-point global-radius-of-curvature definition.",
+     "name": "thickness",
+     "why_needed": "Knot/link thickness is absent from Mathlib and the repository."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.Measure.hausdorffMeasure 1, used directly in the definition.",
+     "name": "length",
+     "why_needed": "Names total geometric length of an embedded finite link image."
+    },
+    {
+     "closest_existing_considered": "ENNReal sInf applied to length/thickness over AmbientIsotopic representatives.",
+     "name": "ropelength",
+     "why_needed": "The ropelength invariant of a link type is absent from Mathlib and the repository."
+    },
+    {
+     "closest_existing_considered": "EuclideanSpace coordinate evaluation and Fin.castLE.",
+     "name": "planarProjection",
+     "why_needed": "Provides the fixed coordinate projection used in the direct crossing-number definition."
+    },
+    {
+     "closest_existing_considered": "Set of ordered parameter pairs and Set.ncard.",
+     "name": "doublePointPairs",
+     "why_needed": "Records the double-point preimages of a knot projection so crossings can be counted."
+    },
+    {
+     "closest_existing_considered": "Nat sInf and Set.ncard over finite projection double-point sets of ambient-isotopic representatives.",
+     "name": "crossingNumber",
+     "why_needed": "No topological knot crossing number exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "ropelength_problems.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "ropelength_problems.parts.ii": {
+     "outcome": "missing_primitives",
+     "why": "Mathlib and FormalConjecturesForMathlib have no knot/link-type or Borromean-rings primitive. The supplied sources identify the CFKSW value and describe a guitar-shaped parameterized-arc construction, but do not supply the actual parameterization needed to define a canonical representative. Defining Borromean rings only as a three-component link whose proper sublinks are trivial is not uniquely characterizing, while a name-only constructor or a predicate asserting the desired link type would be an uninterpreted placeholder. Therefore the minimum ropelength interval cannot be stated faithfully."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "ropelength_problems.parts.i": "/--\nThere is a universal positive finite constant $c$ such that every nontrivial tame knot $K$\nsatisfies\n$$\n  \\operatorname{Ropelength}(K) \\le c\\,\\operatorname{Cr}(K).\n$$\nThus the conjectured tight upper bound for ropelength in terms of crossing number is linear.\nThe condition $0 < \\operatorname{Cr}(K)$ excludes the unknot.\n-/\n@[category research open, AMS 51 53 57]\ntheorem ropelength_problems.parts.i :\n    ∃ c : ℝ≥0, 0 < c ∧ ∀ K : Link 1, 0 < crossingNumber K →\n      ropelength K ≤ (c : ℝ≥0∞) * crossingNumber K := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Ropelength problems\n\n*References:*\n- [Wikipedia: Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n- [Cantarella, Kusner and Sullivan, *On the minimum ropelength of knots and links*](https://arxiv.org/abs/math/0103224)\n-/\n\nnoncomputable section\n\nopen Topology\n\nnamespace RopelengthProblems\n\nabbrev E2 := EuclideanSpace ℝ (Fin 2)\nabbrev E3 := EuclideanSpace ℝ (Fin 3)\nabbrev ParameterDisk := Metric.closedBall (0 : ℂ) 1\nabbrev ParameterCircle := {z : ParameterDisk | ‖(z : ℂ)‖ = 1}\nabbrev Time := Set.Icc (0 : ℝ) 1\n\n/-- A geometric knot is a topological embedding of a circle in Euclidean three-space. -/\nstructure KnotEmbedding where\n  toFun : Circle → E3\n  isEmbedding : IsEmbedding toFun\n\ninstance : CoeFun KnotEmbedding fun _ ↦ Circle → E3 := ⟨KnotEmbedding.toFun⟩\n\n/-- Two geometric knots are ambient isotopic if a continuous path of homeomorphisms of\nthree-space, starting at the identity, carries the image of one knot onto the other. -/\ndef AmbientIsotopic (K L : KnotEmbedding) : Prop :=\n  ∃ H : Time → (E3 ≃ₜ E3),\n    Continuous (fun p : Time × E3 ↦ H p.1 p.2) ∧\n    H ⟨0, by norm_num⟩ = Homeomorph.refl E3 ∧\n    H ⟨1, by norm_num⟩ '' Set.range K = Set.range L\n\n/-- An embedded knot is the unknot if its image bounds a topologically embedded disk. -/\ndef IsUnknot (K : KnotEmbedding) : Prop :=\n  ∃ F : ParameterDisk → E3, IsEmbedding F ∧ F '' Set.range ((↑) : ParameterCircle → ParameterDisk) =\n    Set.range K\n\n/-- The denominator in the metric formula for the circumradius of three points. -/\ndef circumradiusDenominator (x y z : E3) : ℝ :=\n  Real.sqrt ((dist x y + dist y z + dist z x) *\n    (-dist x y + dist y z + dist z x) *\n    (dist x y - dist y z + dist z x) *\n    (dist x y + dist y z - dist z x))\n\n/-- The radius of the circle through three noncollinear points, expressed by Heron's formula. -/\ndef circumradius (x y z : E3) : ℝ :=\n  dist x y * dist y z * dist z x / circumradiusDenominator x y z\n\n/-- The thickness of a set in three-space is the infimum of the circumradii of triples of\ndistinct, noncollinear points in the set. -/\ndef thickness (S : Set E3) : ℝ :=\n  sInf {r : ℝ | ∃ x ∈ S, ∃ y ∈ S, ∃ z ∈ S,\n    x ≠ y ∧ y ≠ z ∧ z ≠ x ∧ 0 < circumradiusDenominator x y z ∧\n    r = circumradius x y z}\n\n/-- The length of a geometric knot is the one-dimensional Hausdorff measure of its image. -/\ndef knotLength (K : KnotEmbedding) : ℝ :=\n  (MeasureTheory.Measure.hausdorffMeasure 1 (Set.range K)).toReal\n\n/-- A representative is admissible for ropelength when it has positive thickness and finite\none-dimensional Hausdorff measure. These conditions force the usual `C¹,¹` regularity. -/\ndef IsRopeRepresentative (K : KnotEmbedding) : Prop :=\n  0 < thickness (Set.range K) ∧\n    MeasureTheory.Measure.hausdorffMeasure 1 (Set.range K) ≠ ⊤\n\n/-- A knot is tame if its ambient-isotopy class has an admissible ropelength representative. -/\ndef IsTame (K : KnotEmbedding) : Prop :=\n  ∃ L : KnotEmbedding, AmbientIsotopic K L ∧ IsRopeRepresentative L\n\n/-- The ropelength of a tame knot type is the infimum of length divided by thickness over its\nadmissible representatives. -/\ndef ropelength (K : KnotEmbedding) : ℝ :=\n  sInf {r : ℝ | ∃ L : KnotEmbedding, AmbientIsotopic K L ∧ IsRopeRepresentative L ∧\n    r = knotLength L / thickness (Set.range L)}\n\n/-- The ordered pairs of distinct parameters identified by a planar linear projection. -/\ndef projectedDoublePairs (K : KnotEmbedding) (P : E3 →L[ℝ] E2) : Set (Circle × Circle) :=\n  {p | p.1 ≠ p.2 ∧ P (K p.1) = P (K p.2)}\n\n\n/-- A projection is regular when its double-pair set is finite and its cardinality is stable under\nsmall surjective linear perturbations. This excludes tangencies and other projections at which\nReidemeister transitions change the crossing count. -/\ndef IsRegularProjection (K : KnotEmbedding) (P : E3 →L[ℝ] E2) : Prop :=\n  (projectedDoublePairs K P).encard ≠ ⊤ ∧\n    ∃ ε : ℝ, 0 < ε ∧ ∀ Q : E3 →L[ℝ] E2, dist Q P < ε → Function.Surjective Q →\n      (projectedDoublePairs K Q).encard = (projectedDoublePairs K P).encard\n\n/-- The crossing number of a knot type is the least number of double points in a finite planar\nlinear projection of an ambient-isotopic representative. Ordered preimage pairs are counted, so\ntheir cardinality is twice the number of crossings. -/\ndef crossingNumber (K : KnotEmbedding) : ℕ :=\n  sInf {n : ℕ | ∃ L : KnotEmbedding, ∃ P : E3 →L[ℝ] E2,\n    AmbientIsotopic K L ∧ IsRopeRepresentative L ∧ Function.Surjective P ∧\n    IsRegularProjection L P ∧ (projectedDoublePairs L P).encard = 2 * n}\n\n/-- It is conjectured that the tight asymptotic upper bound for ropelength in terms of crossing\nnumber is linear: there is a universal constant $c>0$ such that every nontrivial tame knot $K$\nsatisfies $\\operatorname{Rop}(K) \\le c\\,\\operatorname{Cr}(K)$. The unknot is excluded because its\ncrossing number is zero but its ropelength is positive. -/\n@[category research open, AMS 53 57]\ntheorem ropelength_problems.parts.i :\n    ∃ c : ℝ, 0 < c ∧ ∀ K : KnotEmbedding, IsTame K → ¬ IsUnknot K →\n      ropelength K ≤ c * crossingNumber K := by\n  sorry\n\nend RopelengthProblems\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A geometric knot is modeled as a topological embedding of Mathlib's `Circle` into Euclidean three-space; knot type is handled by an explicit ambient-isotopy relation given by a jointly continuous path of ambient homeomorphisms starting at the identity.",
+    "The unknot is characterized as an embedded circle whose image is the boundary of a topologically embedded disk. It is explicitly excluded, as required because its crossing number is zero.",
+    "Tameness is stated explicitly. A knot is called tame when its ambient-isotopy class contains a positive-thickness representative of finite one-dimensional Hausdorff measure.",
+    "Curve length is one-dimensional Hausdorff measure. Thickness is the Cantarella–Kusner–Sullivan/Gonzalez–Maddocks infimum of circumradii over triples of distinct noncollinear image points, using Heron's metric formula. The ropelength invariant is the infimum of length/thickness over ambient-isotopic finite-length, positive-thickness representatives; these hypotheses give the intended C^{1,1} geometric class and avoid the `ENNReal.toReal ∞ = 0` boundary case.",
+    "Crossing number is modeled as the least finite double-point count among surjective planar linear projections of admissible ambient-isotopic representatives. Ordered preimage pairs are counted and equated to twice the crossing count. Local stability under small surjective linear perturbations is required to exclude tangential projections at Reidemeister transitions and capture regular diagram crossings.",
+    "The source says the tight upper bound 'should be linear', interpreted per the decomposition notes as a single universal c > 0 satisfying ropelength(K) ≤ c * Cr(K) for every nontrivial tame knot, rather than merely a statement about one observed family.",
+    "Slot ii was not weakened to an arbitrary three-component Brunnian link: that would include isotopy classes other than the Borromean rings. It was therefore omitted rather than assigning 58.006 to a subtly broader class."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `Circle` and `Topology.IsEmbedding`, but no knot or link type.",
+     "name": "KnotEmbedding",
+     "why_needed": "Represents a geometric knot as an embedded circle in Euclidean three-space."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Homeomorph` and homotopy APIs, but no ambient-isotopy relation for knots.",
+     "name": "AmbientIsotopic",
+     "why_needed": "Identifies embeddings representing the same knot type via a continuous ambient deformation."
+    },
+    {
+     "closest_existing_considered": "No knot or unknot predicate exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsUnknot",
+     "why_needed": "Excludes the zero-crossing unknot using the embedded-disk characterization."
+    },
+    {
+     "closest_existing_considered": "No general three-point circumradius definition was found in Mathlib.",
+     "name": "circumradiusDenominator",
+     "why_needed": "Provides the Heron-formula denominator used for three-point circumradius and detects noncollinearity."
+    },
+    {
+     "closest_existing_considered": "Euclidean sphere and simplex APIs exist, but no directly applicable three-point circumradius function was found.",
+     "name": "circumradius",
+     "why_needed": "Defines the radius through three noncollinear points for the standard three-point thickness."
+    },
+    {
+     "closest_existing_considered": "Mathlib has metric infimum and Euclidean geometry primitives, but no reach, knot thickness, or normal injectivity radius definition.",
+     "name": "thickness",
+     "why_needed": "Defines knot thickness as the infimum of three-point circumradii, as in the primary ropelength source."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `MeasureTheory.Measure.hausdorffMeasure` supplies the underlying measure, but no knot-length wrapper exists.",
+     "name": "knotLength",
+     "why_needed": "Extracts the geometric length of the embedded image as one-dimensional Hausdorff measure."
+    },
+    {
+     "closest_existing_considered": "No ropelength-admissibility predicate exists.",
+     "name": "IsRopeRepresentative",
+     "why_needed": "Restricts representatives to positive thickness and finite Hausdorff length, ensuring the intended finite C^{1,1} setting and safe `toReal`."
+    },
+    {
+     "closest_existing_considered": "No tame-knot predicate exists.",
+     "name": "IsTame",
+     "why_needed": "Makes the decomposition's tame-knot restriction explicit through existence of an admissible isotopic representative."
+    },
+    {
+     "closest_existing_considered": "No ropelength invariant exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "ropelength",
+     "why_needed": "Defines the ropelength invariant as the infimum of length/thickness over an ambient-isotopy class."
+    },
+    {
+     "closest_existing_considered": "Mathlib has continuous linear maps but no knot projection or crossing API.",
+     "name": "projectedDoublePairs",
+     "why_needed": "Records ordered pairs of distinct knot parameters identified by a planar projection."
+    },
+    {
+     "closest_existing_considered": "No generic/regular knot-projection predicate or transversality API suitable for C^{1,1} knots was found.",
+     "name": "IsRegularProjection",
+     "why_needed": "Excludes singular projections whose crossing count changes under arbitrarily small perturbation."
+    },
+    {
+     "closest_existing_considered": "No knot crossing-number, knot diagram, or Reidemeister-equivalence API exists.",
+     "name": "crossingNumber",
+     "why_needed": "Defines the knot invariant appearing in the conjecture by minimizing regular planar projection crossings over the isotopy class."
+    }
+   ],
+   "per_slot": {
+    "ropelength_problems.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "ropelength_problems.parts.ii": {
+     "outcome": "missing_primitives",
+     "why": "Mathlib and FormalConjecturesForMathlib have no geometric-link type, link diagrams/Reidemeister equivalence, braid closures, Rolfsen link table, or named Borromean-rings (6^3_2) isotopy class. Although the candidate develops enough geometric machinery for knot ropelength, identifying a three-component embedding as specifically the Borromean rings would require a substantial additional link-diagram or explicit standard-representative development. The weaker condition that the link is Brunnian would not be faithful because it does not characterize the Borromean rings."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "ropelength_problems.parts.i": "/-- It is conjectured that the tight asymptotic upper bound for ropelength in terms of crossing\nnumber is linear: there is a universal constant $c>0$ such that every nontrivial tame knot $K$\nsatisfies $\\operatorname{Rop}(K) \\le c\\,\\operatorname{Cr}(K)$. The unknot is excluded because its\ncrossing number is zero but its ropelength is positive. -/\n@[category research open, AMS 53 57]\ntheorem ropelength_problems.parts.i :\n    ∃ c : ℝ, 0 < c ∧ ∀ K : KnotEmbedding, IsTame K → ¬ IsUnknot K →\n      ropelength K ≤ c * crossingNumber K := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Ropelength problems\n\nThe *ropelength* of a knot or link $L$ in $\\mathbb{R}^3$ is the quotient\n$\\operatorname{Len}(L) / \\tau(L)$ of its length by its *thickness*, the radius of the largest\nembedded normal tube around $L$. Following Gonzalez–Maddocks and Cantarella–Kusner–Sullivan, the\nthickness is the infimum, over all triples of distinct points of $L$, of the radius of the circle\nthrough the three points; it is positive exactly when $L$ is an embedded $C^{1,1}$ curve. The\nropelength of a knot (or link) *type* is the infimum of the ropelength over all curves of that type\n(a minimizer always exists for tame types). Thickness is measured as a radius, so the tight Hopf\nlink has ropelength $8\\pi$.\n\nThis file states two open problems about ropelength listed on Wikipedia:\n\n* the ropelength of a knot is conjectured to be bounded by a constant times its crossing number;\n* the minimal ropelength of the Borromean rings is conjectured to be $58.006$.\n\n*References:*\n* [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* J. Cantarella, R. B. Kusner, J. M. Sullivan, *On the minimum ropelength of knots and links*,\n  Invent. Math. 150 (2002), [arXiv:math/0103224](https://arxiv.org/abs/math/0103224)\n* J. Cantarella, J. H. G. Fu, R. B. Kusner, J. M. Sullivan, N. C. Wrinkle, *Criticality for the\n  Gehring link problem*, Geom. Topol. 10 (2006), [arXiv:math/0402212](https://arxiv.org/abs/math/0402212)\n* Y. Diao, C. Ernst, A. Por, U. Ziegler, *The ropelengths of knots are almost linear in terms of\n  their crossing numbers*, J. Knot Theory Ramifications 28 (2019),\n  [doi:10.1142/S0218216519500858](https://doi.org/10.1142/S0218216519500858)\n-/\n\nopen scoped EuclideanGeometry ENNReal NNReal\nopen MeasureTheory\n\nnamespace RopelengthProblems\n\n/-- A subset `K` of `ℝ³` is a *knot* if it is homeomorphic to a circle. -/\ndef IsKnot (K : Set ℝ³) : Prop :=\n  Nonempty (Circle ≃ₜ K)\n\n/-- Two subsets `A`, `B` of `ℝ³` are *ambient isotopic* if there is a continuous family\n`H t`, `t ∈ [0, 1]`, of homeomorphisms of `ℝ³` with `H 0 = id` and `H 1 '' A = B`.\nKnot and link types are the equivalence classes of this relation. -/\ndef IsAmbientIsotopic (A B : Set ℝ³) : Prop :=\n  ∃ H : unitInterval → ℝ³ ≃ₜ ℝ³, Continuous (fun p : unitInterval × ℝ³ => H p.1 p.2) ∧\n    H 0 = Homeomorph.refl ℝ³ ∧ H 1 '' A = B\n\n/-- Ambient isotopy is reflexive. -/\n@[category API, AMS 57]\ntheorem IsAmbientIsotopic.refl (A : Set ℝ³) : IsAmbientIsotopic A A :=\n  ⟨fun _ => Homeomorph.refl ℝ³, continuous_snd, rfl, Set.image_id A⟩\n\n/-- The round unit circle in the plane `x₂ = 0`, representing the trivial knot. -/\ndef unknot : Set ℝ³ :=\n  {p | p 0 ^ 2 + p 1 ^ 2 = 1 ∧ p 2 = 0}\n\n/-- A standard realization of the *Borromean rings*: three ellipses with semi-axes `1` and `2`,\nlying in the three coordinate planes, with the major axis of each ellipse along a different\ncoordinate axis (the ellipse in the plane `x₀ = 0` has its major axis along the `x₂`-axis, the one\nin `x₁ = 0` along the `x₀`-axis and the one in `x₂ = 0` along the `x₁`-axis). Replacing each\nellipse by the rectangle with the same axes, and rescaling the major axes to the golden ratio,\ngives the three mutually perpendicular golden rectangles inside a regular icosahedron. -/\ndef borromeanRings : Set ℝ³ :=\n  {p | p 0 = 0 ∧ p 1 ^ 2 + p 2 ^ 2 / 4 = 1} ∪\n    {p | p 1 = 0 ∧ p 2 ^ 2 + p 0 ^ 2 / 4 = 1} ∪\n    {p | p 2 = 0 ∧ p 0 ^ 2 + p 1 ^ 2 / 4 = 1}\n\nopen scoped Classical in\n/-- The radius of the circle through three points `x`, `y`, `z` of `ℝ³`, as an extended\nnonnegative real. It is `⊤` when the points are collinear (or not pairwise distinct). -/\nnoncomputable def circumradius (x y z : ℝ³) : ℝ≥0∞ :=\n  if h : AffineIndependent ℝ ![x, y, z] then\n    ENNReal.ofReal (Affine.Simplex.mk ![x, y, z] h).circumradius\n  else ⊤\n\n/-- Triples with a repeated point have infinite circumradius. -/\n@[category API, AMS 57]\ntheorem circumradius_self_left (x z : ℝ³) : circumradius x x z = ⊤ := by\n  rw [circumradius, dif_neg]\n  intro h\n  exact absurd (h.injective.ne (show (0 : Fin 3) ≠ 1 by decide)) (by simp)\n\n/-- The *thickness* of a subset `L` of `ℝ³` (Gonzalez–Maddocks, Cantarella–Kusner–Sullivan): the\ninfimum of the circumradii of all triples of distinct points of `L`. For a link `L` this is the\nradius of the largest embedded normal tube around `L`; it is positive exactly when `L` is an\nembedded $C^{1,1}$ curve. -/\nnoncomputable def thickness (L : Set ℝ³) : ℝ≥0∞ :=\n  ⨅ (x ∈ L) (y ∈ L) (z ∈ L) (_ : x ≠ y) (_ : x ≠ z) (_ : y ≠ z), circumradius x y z\n\n/-- The *ropelength* of a subset `L` of `ℝ³`: its length (the one-dimensional Hausdorff measure of\n`L`, which for a link is the sum of the lengths of its components) divided by its thickness.\nA knot or link of thickness `0` (one that is not $C^{1,1}$) has ropelength `⊤`. -/\nnoncomputable def ropelength (L : Set ℝ³) : ℝ≥0∞ :=\n  μH[1] L / thickness L\n\n/-- The ropelength of the knot (or link) type of `L`: the infimum of the ropelength over all\nsubsets of `ℝ³` ambient isotopic to `L`. It is finite exactly when the type of `L` is tame. -/\nnoncomputable def minRopelength (L : Set ℝ³) : ℝ≥0∞ :=\n  ⨅ (L' : Set ℝ³) (_ : IsAmbientIsotopic L L'), ropelength L'\n\n/-- Orthogonal projection of `ℝ³` onto the plane of the first two coordinates. -/\ndef proj (p : ℝ³) : ℝ × ℝ :=\n  (p 0, p 1)\n\n/-- The multiple points of the projection of `K` to the plane: the points of the plane lying under\nat least two distinct points of `K`. -/\ndef multiplePoints (K : Set ℝ³) : Set (ℝ × ℝ) :=\n  {q | ∃ x ∈ K, ∃ y ∈ K, x ≠ y ∧ proj x = q ∧ proj y = q}\n\n/-- `K` has a *regular projection with `n` crossings*: the projection of `K` to the plane has\nexactly `n` multiple points, and each of them lies under exactly two points of `K`. -/\ndef HasDiagramWithCrossings (K : Set ℝ³) (n : ℕ) : Prop :=\n  (multiplePoints K).encard = n ∧ ∀ q ∈ multiplePoints K, (K ∩ proj ⁻¹' {q}).encard = 2\n\n/-- The *crossing number* of the knot type of `K`: the least number of crossings in a regular\nprojection of a knot ambient isotopic to `K`. (Rotations are ambient isotopies, so projecting to a\nfixed plane suffices.) By convention it is `0` when no such projection exists. -/\nnoncomputable def crossingNumber (K : Set ℝ³) : ℕ :=\n  sInf {n | ∃ K', IsAmbientIsotopic K K' ∧ HasDiagramWithCrossings K' n}\n\n/--\n**Linear ropelength conjecture.**\nThe ropelength of a knot type is at most a constant times its crossing number: there is a constant\n$C$ such that every nontrivial tame knot type $K$ satisfies\n$$L(K) \\le C \\cdot \\operatorname{Cr}(K).$$\nThat is, $L(K) = O(\\operatorname{Cr}(K))$, sharpening the known bound\n$L(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$ of Diao–Ernst–Por–Ziegler.\nNo knot family with super-linear dependence of ropelength on crossing number has been observed,\nand the tight upper bound is conjectured to be linear.\n\nThe unknot is excluded since it has crossing number `0` and positive ropelength. Tame knot types\nare exactly those of finite ropelength, since a knot type contains a $C^{1,1}$ curve if and only if\nit is tame.\n-/\n@[category research open, AMS 53 57]\ntheorem ropelength_problems.parts.i :\n    ∃ C : ℝ≥0, ∀ K : Set ℝ³, IsKnot K → ¬ IsAmbientIsotopic K unknot → minRopelength K ≠ ⊤ →\n      minRopelength K ≤ C * crossingNumber K := by\n  sorry\n\n/--\n**Ropelength of the Borromean rings.**\nThe ropelength of the Borromean rings is conjectured to be $58.006$ (thickness measured as a\nradius), the ropelength of the critical configuration of Cantarella–Fu–Kusner–Sullivan–Wrinkle,\nwhich is built from arcs of circles and clasp curves in three perpendicular planes and is\nconjectured to be the ropelength minimizer. Since $58.006$ is a rounded value, the statement is\nthat the minimal ropelength rounds to $58.006$, i.e. lies in $[58.0055, 58.0065]$.\n-/\n@[category research open, AMS 53 57]\ntheorem ropelength_problems.parts.ii :\n    minRopelength borromeanRings ∈ Set.Icc 58.0055 58.0065 := by\n  sorry\n\nend RopelengthProblems\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.7,
+   "decomposition_objections": "None of substance. The note for slot (ii) suggests the interval [58.006, 58.007) as an example; I used the symmetric rounding interval [58.0055, 58.0065] since 58.006 is a rounded figure of the CFKSW value ≈ 58.0060 and a truncation interval could wrongly exclude the true value. The note for slot (i) suggests thickness over C^{1,1} embeddings; the Gonzalez–Maddocks/CKS three-point definition used here makes this automatic (positive thickness iff embedded C^{1,1}).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Thickness is defined à la Gonzalez–Maddocks / Cantarella–Kusner–Sullivan (the primary source, arXiv:math/0103224 §1): the infimum over triples of distinct points of the radius of the circle through them (⊤ if collinear), realized with Mathlib's `Affine.Simplex.circumradius`. This is the radius (not diameter) of the thick tube, matching the article's numbers (Hopf link 8π, Borromean 58.006). It is positive exactly for embedded C^{1,1} curves, so no separate regularity hypothesis is needed; non-C^{1,1} curves get ropelength ⊤ in ℝ≥0∞.",
+    "Length of a knot/link is its one-dimensional Hausdorff measure μH[1] (Mathlib normalization gives μH[1] = volume on ℝ), which equals arclength for embedded rectifiable curves and sums over components of a link.",
+    "Knots are subsets of ℝ³ homeomorphic to `Circle`; knot/link types are ambient isotopy classes: a jointly continuous family H : [0,1] → Homeomorph ℝ³ ℝ³ with H 0 = id and H 1 '' A = B. Types are thus unoriented and components unordered, which does not affect ropelength or crossing number. Inverse joint continuity is not required (automatic on ℝ³ by invariance of domain).",
+    "Ropelength of a type is the infimum (⨅ in ℝ≥0∞) over the isotopy class rather than a minimum; CKS prove the minimum is attained for tame types, so this is equivalent.",
+    "Tameness in slot (i) is expressed as `minRopelength K ≠ ⊤` (a type has a C^{1,1} representative iff it is tame, per CKS). Without it, wild nontrivial knots would have ropelength ⊤ and crossing number sInf ∅ = 0, falsifying the statement.",
+    "Crossing number is defined as the least n such that some representative has a projection to the x₀x₁-plane with exactly n multiple points, each lying under exactly two points of the knot (Set.encard = 2 excludes triple points). Projecting to a fixed plane suffices since rotations are ambient isotopies. Such generalized diagrams (possibly with cusps or tangential double points) yield the classical crossing number: a knot with such a projection is ambient isotopic to a PL knot with the same double points (straighten the planar graph, then shear heights), and non-transverse double points can be removed without adding crossings. sInf ∅ = 0 only for wild knots, excluded by the tameness hypothesis. Reviewers should check this equivalence.",
+    "Nontriviality is `¬ IsAmbientIsotopic K unknot` with `unknot` the round unit circle in the plane x₂ = 0, rather than `crossingNumber K ≠ 0`.",
+    "The constant is `C : ℝ≥0` with no positivity requirement (standard big-O); C = 0 cannot be a witness since nontrivial knots have positive ropelength, so this does not change the claim.",
+    "The Borromean rings are realized as three ellipses with semi-axes 1 and 2 in the three coordinate planes with the cyclic pattern (plane x₀=0: major axis x₂; plane x₁=0: major axis x₀; plane x₂=0: major axis x₁), which is the pattern of the three golden rectangles inside a regular icosahedron (vertices (0,±1,±φ) and cyclic permutations). Checked: components pairwise disjoint; each ring pierces the disk of the next cyclically (the non-cyclic pattern would give a split link). The Borromean rings are amphichiral, so the mirror pattern would also be correct.",
+    "The value 58.006 is a rounded figure (CFKSW's configuration has ropelength ≈ 58.0060); the conjecture is stated as `minRopelength borromeanRings ∈ Set.Icc 58.0055 58.0065` (rounds to 58.006), chosen over the decomposition note's example [58.006, 58.007) because a truncation interval could exclude the true value if it were, e.g., 58.00598. Stating 'the CFKSW configuration is a minimizer' was rejected as its explicit clasp-curve parametrization is not reproducible reliably.",
+    "Only knots (not links) are quantified in slot (i), matching the article's statement about knots."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Circle`, `Homeomorph`, `Topology.IsEmbedding` (used to build the definition); no knot-theory API exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "RopelengthProblems.IsKnot",
+     "why_needed": "Mathlib has no notion of a knot; a knot is a subset of ℝ³ homeomorphic to the circle."
+    },
+    {
+     "closest_existing_considered": "`Homeomorph`, `unitInterval`, `ContinuousMap.Homotopy` (homotopy of maps, not a family of homeomorphisms of the ambient space).",
+     "name": "RopelengthProblems.IsAmbientIsotopic",
+     "why_needed": "Knot/link types are ambient isotopy classes; Mathlib has no isotopy notion."
+    },
+    {
+     "closest_existing_considered": "`Metric.sphere` in ℝ² (not a subset of ℝ³).",
+     "name": "RopelengthProblems.unknot",
+     "why_needed": "Needed to exclude the trivial knot in slot (i)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or the repository.",
+     "name": "RopelengthProblems.borromeanRings",
+     "why_needed": "An explicit representative of the Borromean rings link type is needed for slot (ii)."
+    },
+    {
+     "closest_existing_considered": "`Affine.Simplex.circumradius` (used; requires affine independence so the collinear case must be handled), `EuclideanGeometry.Sphere`.",
+     "name": "RopelengthProblems.circumradius",
+     "why_needed": "Radius of the circle through three points, with ⊤ for collinear triples, as the building block of Gonzalez–Maddocks thickness."
+    },
+    {
+     "closest_existing_considered": "No notion of reach or normal injectivity radius in Mathlib.",
+     "name": "RopelengthProblems.thickness",
+     "why_needed": "Thickness of a curve (CKS definition) is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "`MeasureTheory.Measure.hausdorffMeasure` (used for length), `eVariationOn` (parametrization-dependent, not used).",
+     "name": "RopelengthProblems.ropelength",
+     "why_needed": "Length over thickness of a subset of ℝ³."
+    },
+    {
+     "closest_existing_considered": "`iInf` (used).",
+     "name": "RopelengthProblems.minRopelength",
+     "why_needed": "Ropelength of a knot/link type as infimum over the ambient isotopy class."
+    },
+    {
+     "closest_existing_considered": "`EuclideanSpace.proj`/`WithLp` coordinate projections; a plain pair is simpler.",
+     "name": "RopelengthProblems.proj",
+     "why_needed": "Projection to the plane for knot diagrams."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "RopelengthProblems.multiplePoints",
+     "why_needed": "Double points of a knot projection, used to define crossing number."
+    },
+    {
+     "closest_existing_considered": "`Set.encard` (used).",
+     "name": "RopelengthProblems.HasDiagramWithCrossings",
+     "why_needed": "A knot has a regular projection with n crossings (finitely many multiple points, each with exactly two preimages)."
+    },
+    {
+     "closest_existing_considered": "None; `sInf` on ℕ used.",
+     "name": "RopelengthProblems.crossingNumber",
+     "why_needed": "Crossing number of a knot type is not in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "ropelength_problems.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: there is a constant C : ℝ≥0 such that every knot type K (a subset of ℝ³ homeomorphic to a circle) that is nontrivial (not ambient isotopic to a round circle) and tame (finite minimal ropelength) satisfies minRopelength K ≤ C * crossingNumber K, i.e. L(K) = O(Cr(K)). Mathlib has no knot theory, so knots, ambient isotopy, thickness (Gonzalez–Maddocks/CKS circumradius infimum), ropelength (μH[1] / thickness), knot-type ropelength (infimum over the isotopy class) and crossing number (minimum number of double points over regular projections of representatives) are defined in the file."
+    },
+    "ropelength_problems.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: the minimal ropelength (radius units, total length over all components divided by thickness, infimum over the ambient isotopy class) of an explicit Borromean rings configuration (three mutually perpendicular ellipses with semi-axes 1 and 2, cyclically arranged as the golden rectangles of an icosahedron) lies in [58.0055, 58.0065], i.e. rounds to the conjectured value 58.006."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "ropelength_problems.parts.i": "/--\n**Linear ropelength conjecture.**\nThe ropelength of a knot type is at most a constant times its crossing number: there is a constant\n$C$ such that every nontrivial tame knot type $K$ satisfies\n$$L(K) \\le C \\cdot \\operatorname{Cr}(K).$$\nThat is, $L(K) = O(\\operatorname{Cr}(K))$, sharpening the known bound\n$L(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$ of Diao–Ernst–Por–Ziegler.\nNo knot family with super-linear dependence of ropelength on crossing number has been observed,\nand the tight upper bound is conjectured to be linear.\n\nThe unknot is excluded since it has crossing number `0` and positive ropelength. Tame knot types\nare exactly those of finite ropelength, since a knot type contains a $C^{1,1}$ curve if and only if\nit is tame.\n-/\n@[category research open, AMS 53 57]\ntheorem ropelength_problems.parts.i :\n    ∃ C : ℝ≥0, ∀ K : Set ℝ³, IsKnot K → ¬ IsAmbientIsotopic K unknot → minRopelength K ≠ ⊤ →\n      minRopelength K ≤ C * crossingNumber K := by\n  sorry",
+    "ropelength_problems.parts.ii": "/--\n**Ropelength of the Borromean rings.**\nThe ropelength of the Borromean rings is conjectured to be $58.006$ (thickness measured as a\nradius), the ropelength of the critical configuration of Cantarella–Fu–Kusner–Sullivan–Wrinkle,\nwhich is built from arcs of circles and clasp curves in three perpendicular planes and is\nconjectured to be the ropelength minimizer. Since $58.006$ is a rounded value, the statement is\nthat the minimal ropelength rounds to $58.006$, i.e. lies in $[58.0055, 58.0065]$.\n-/\n@[category research open, AMS 53 57]\ntheorem ropelength_problems.parts.ii :\n    minRopelength borromeanRings ∈ Set.Icc 58.0055 58.0065 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Ropelength problems\n\nThe *ropelength* of a curve $C$ in $\\mathbb{R}^3$ is $\\operatorname{Len}(C)/\\tau(C)$, the\nquotient of its length by its *thickness* $\\tau(C)$, the radius of the largest embedded normal\ntube around $C$. The ropelength of a knot or link type is the minimal ropelength over all\ncurves of that type.\n\nFollowing Cantarella, Kusner and Sullivan (after Gonzalez and Maddocks), the thickness of a\nset $L \\subseteq \\mathbb{R}^3$ is the infimum of the circumradius $r(x, y, z)$ over all\ntriples of distinct points of $L$, where $r(x, y, z) = \\infty$ for collinear triples. Every\ncurve of finite ropelength is $C^{1,1}$, so no regularity needs to be imposed on the curves\nover which the infimum is taken.\n\nThickness is measured as a *radius* (the Hopf link has ropelength $8\\pi$), as in\nCantarella–Kusner–Sullivan and in the Wikipedia article.\n\nThis file states two open problems from the Wikipedia article:\n\n* the ropelength of a nontrivial knot is bounded by a constant multiple of its crossing number;\n* the ropelength of the Borromean rings is $58.006$.\n\n*References:*\n* [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* J. Cantarella, R. B. Kusner, J. M. Sullivan, *On the minimum ropelength of knots and links*,\n  Invent. Math. 150 (2002), [arXiv:math/0103224](https://arxiv.org/abs/math/0103224)\n* J. Cantarella, J. H. G. Fu, R. B. Kusner, J. M. Sullivan, N. C. Wrinkle, *Criticality for the\n  Gehring link problem*, Geom. Topol. 10 (2006),\n  [arXiv:math/0402212](https://arxiv.org/abs/math/0402212)\n* Y. Diao, C. Ernst, A. Por, U. Ziegler, *The ropelengths of knots are almost linear in terms of\n  their crossing numbers*, J. Knot Theory Ramifications 28 (2019)\n* T. Ashton, J. Cantarella, M. Piatek, E. Rawdon, *Knot tightening by constrained gradient\n  descent*, Exp. Math. 20 (2011), [arXiv:1002.1723](https://arxiv.org/abs/1002.1723)\n-/\n\nopen MeasureTheory Topology\nopen scoped EuclideanGeometry ContDiff ENNReal NNReal\n\nnamespace RopelengthProblems\n\n/- ### Knots, links and ambient isotopy -/\n\n/-- Two subsets `A`, `B` of `ℝ³` are *ambient isotopic* if there is a continuous family\n`H t`, `t ∈ [0, 1]`, of homeomorphisms of `ℝ³` with `H 0 = id` and `H 1 '' A = B`.\nKnot and link types are ambient isotopy classes. -/\ndef AmbientIsotopic (A B : Set ℝ³) : Prop :=\n  ∃ H : unitInterval → (ℝ³ ≃ₜ ℝ³),\n    Continuous (fun p : unitInterval × ℝ³ => H p.1 p.2) ∧\n      H 0 = Homeomorph.refl ℝ³ ∧ H 1 '' A = B\n\n@[category API, AMS 57]\ntheorem AmbientIsotopic.refl (A : Set ℝ³) : AmbientIsotopic A A :=\n  ⟨fun _ => Homeomorph.refl ℝ³, continuous_snd, rfl, Set.image_id A⟩\n\n/-- A subset of `ℝ³` is a *knot* if it is the image of a topological embedding of the circle. -/\ndef IsKnot (K : Set ℝ³) : Prop :=\n  ∃ γ : Circle → ℝ³, IsEmbedding γ ∧ Set.range γ = K\n\n/-- The round unit circle in the plane `z = 0`, a representative of the unknot. -/\ndef unknot : Set ℝ³ :=\n  {p | p 0 ^ 2 + p 1 ^ 2 = 1 ∧ p 2 = 0}\n\n/-- The standard configuration of the Borromean rings: three ellipses with semi-axes `2` and `1`\nlying in the three coordinate planes, arranged cyclically so that the major axis of each is the\nminor axis direction of the next. Explicitly: the ellipse $x^2/4 + y^2 = 1$ in the plane $z = 0$,\nthe ellipse $y^2/4 + z^2 = 1$ in the plane $x = 0$ and the ellipse $z^2/4 + x^2 = 1$ in the plane\n$y = 0$. -/\ndef borromeanRings : Set ℝ³ :=\n  {p | p 2 = 0 ∧ p 0 ^ 2 / 4 + p 1 ^ 2 = 1} ∪ {p | p 0 = 0 ∧ p 1 ^ 2 / 4 + p 2 ^ 2 = 1} ∪\n    {p | p 1 = 0 ∧ p 2 ^ 2 / 4 + p 0 ^ 2 = 1}\n\n/- ### Thickness and ropelength -/\n\n/-- The *thickness* of a set `L ⊆ ℝ³` (Gonzalez–Maddocks, Cantarella–Kusner–Sullivan):\nthe infimum, over all triples of distinct points `x y z ∈ L`, of the radius of the circle\nthrough `x`, `y`, `z`. Collinear triples have circumradius `∞` and hence do not contribute to\nthe infimum, so it suffices to range over affinely independent triples.\n\nFor a `C^{1,1}` link this is the radius of the largest embedded normal tube around `L`, and a\ncurve of positive thickness is automatically `C^{1,1}`. -/\nnoncomputable def thickness (L : Set ℝ³) : ℝ≥0∞ :=\n  ⨅ (x ∈ L) (y ∈ L) (z ∈ L) (h : AffineIndependent ℝ ![x, y, z]),\n    ENNReal.ofReal (Affine.Simplex.circumradius (⟨![x, y, z], h⟩ : Affine.Simplex ℝ ℝ³ 2))\n\n/-- The *ropelength* of a set `L ⊆ ℝ³`: its length (one-dimensional Hausdorff measure) divided\nby its thickness. It is `∞` if `L` has zero thickness. -/\nnoncomputable def ropelength (L : Set ℝ³) : ℝ≥0∞ :=\n  μH[1] L / thickness L\n\n/-- The ropelength of the knot or link type of `L`: the infimum of the ropelength over all sets\nambient isotopic to `L`. For a tame link type this infimum is attained (Cantarella, Kusner,\nSullivan); for a wild one it is `∞`. -/\nnoncomputable def minRopelength (L : Set ℝ³) : ℝ≥0∞ :=\n  ⨅ (L' : Set ℝ³) (_ : AmbientIsotopic L L'), ropelength L'\n\n@[category API, AMS 57]\ntheorem minRopelength_le {L L' : Set ℝ³} (h : AmbientIsotopic L L') :\n    minRopelength L ≤ ropelength L' :=\n  iInf₂_le L' h\n\n/- ### Crossing number -/\n\n/-- Orthogonal projection of `ℝ³` onto the `xy`-plane. -/\ndef proj (x : ℝ³) : ℝ × ℝ :=\n  (x 0, x 1)\n\n/-- `γ : ℝ → ℝ³` is a *smooth knot parametrisation*: a smooth, `1`-periodic, regular curve\nwhich is injective on a period. Its image is a smooth (in particular tame) knot. -/\nstructure IsSmoothKnotParam (γ : ℝ → ℝ³) : Prop where\n  contDiff : ContDiff ℝ ∞ γ\n  periodic : Function.Periodic γ 1\n  injOn : Set.InjOn γ (Set.Ico 0 1)\n  deriv_ne_zero : ∀ t, deriv γ t ≠ 0\n\n/-- The *crossings* of the projection of `γ` to the `xy`-plane: the points of the plane with at\nleast two preimages on the curve. -/\ndef crossings (γ : ℝ → ℝ³) : Set (ℝ × ℝ) :=\n  {q | 2 ≤ (Set.range γ ∩ proj ⁻¹' {q}).encard}\n\n/-- The projection of `γ` to the `xy`-plane is *regular*: the projected curve is an immersion,\nit has only finitely many multiple points, every multiple point is a double point (exactly two\npreimages on the curve), and at every double point the two strands cross transversally. -/\nstructure IsRegularProjection (γ : ℝ → ℝ³) : Prop where\n  immersion : ∀ t, proj (deriv γ t) ≠ 0\n  finite : (crossings γ).Finite\n  encard_le_two : ∀ q, (Set.range γ ∩ proj ⁻¹' {q}).encard ≤ 2\n  transverse : ∀ s t, γ s ≠ γ t → proj (γ s) = proj (γ t) →\n    LinearIndependent ℝ ![proj (deriv γ s), proj (deriv γ t)]\n\n/-- The *crossing number* of the knot type of `K`: the minimal number of crossings in a knot\ndiagram of `K`, i.e. in a regular projection to the `xy`-plane of a smooth knot ambient isotopic\nto `K`. Every direction of projection is covered, since rotations are ambient isotopies. The\nvalue is `⊤` if `K` has no smooth representative (e.g. for a wild knot). -/\nnoncomputable def crossingNumber (K : Set ℝ³) : ℕ∞ :=\n  ⨅ (γ : ℝ → ℝ³) (_ : IsSmoothKnotParam γ) (_ : AmbientIsotopic K (Set.range γ))\n    (_ : IsRegularProjection γ), (crossings γ).encard\n\n@[category API, AMS 57]\ntheorem crossingNumber_le {K : Set ℝ³} {γ : ℝ → ℝ³} (hγ : IsSmoothKnotParam γ)\n    (hK : AmbientIsotopic K (Set.range γ)) (hp : IsRegularProjection γ) :\n    crossingNumber K ≤ (crossings γ).encard :=\n  iInf₂_le_of_le γ hγ <| iInf₂_le hK hp\n\n/- ### The problems -/\n\n/--\n**Linear ropelength bound.** For every knot $K$ the ropelength $L(K)$ satisfies\n$L(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$ (Diao, Ernst, Por, Ziegler), and\nthere are knot families with $L(K) = \\Theta(\\operatorname{Cr}(K))$. No knot family with\nsuper-linear dependence of ropelength on crossing number has been observed, and it is conjectured\nthat the tight upper bound is linear: there is a constant $c > 0$ such that\n$L(K) \\le c \\cdot \\operatorname{Cr}(K)$ for every nontrivial knot $K$.\n\nThe unknot has crossing number $0$ but positive ropelength ($2\\pi$), so it must be excluded.\nFor a wild knot both the crossing number and the ropelength are infinite.\n-/\n@[category research open, AMS 51 57]\ntheorem ropelength_problems.parts.i :\n    ∃ c : ℝ≥0, 0 < c ∧ ∀ K : Set ℝ³, IsKnot K → ¬ AmbientIsotopic K unknot →\n      minRopelength K ≤ c * (crossingNumber K : ℝ≥0∞) := by\n  sorry\n\n/--\n**Ropelength of the Borromean rings.** The ropelength of the Borromean rings is conjectured to be\n$58.006$ (Cantarella, Fu, Kusner, Sullivan, Wrinkle), the length of an explicit configuration\nbuilt from three planar \"guitar-shaped\" components made of parametrised arcs, in units where the\nthickness is the radius of the tube. Since $58.006$ is a rounded figure, the statement asserts\nthat the ropelength agrees with $58.006$ to three decimal places, i.e. lies in\n$[58.0055, 58.0065]$.\n-/\n@[category research open, AMS 51 57]\ntheorem ropelength_problems.parts.ii :\n    minRopelength borromeanRings ∈ Set.Icc (ENNReal.ofReal 58.0055) (ENNReal.ofReal 58.0065) := by\n  sorry\n\nend RopelengthProblems\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None of substance. The table's reading of slot (i) as ∃ c > 0 with the unknot excluded and tame knots intended matches the article; I implemented tameness implicitly via an ℕ∞-valued crossing number (⊤ for wild knots, which makes the inequality trivially true for them) rather than an explicit tameness predicate. For slot (ii) I chose the rounding-tolerance reading [58.0055, 58.0065] (agreement with 58.006 to three decimal places) rather than the truncation interval [58.006, 58.007) suggested as an example in the notes, since the CFKSW value is only known to be ≈ 58.0060 and a rounding tolerance is the standard reading of a rounded figure.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Knots and links are modelled as subsets of ℝ³ = EuclideanSpace ℝ (Fin 3) (following CKS, who work with curves as sets); a knot is the image of a topological embedding of `Circle`. Knot/link types are ambient isotopy classes: `AmbientIsotopic A B` is a continuous family `H : unitInterval → (ℝ³ ≃ₜ ℝ³)` (jointly continuous forward map) with `H 0 = id` and `H 1 '' A = B`.",
+    "Thickness follows Cantarella–Kusner–Sullivan / Gonzalez–Maddocks: the infimum over triples of distinct points of the circumradius, with collinear triples contributing ∞. Since collinear triples never lower the infimum, the Lean definition ranges over affinely independent triples and uses Mathlib's `Affine.Simplex.circumradius`. Thickness is the tube RADIUS (Hopf link has ropelength 8π), matching the article's convention and the 58.006 figure.",
+    "Length is the 1-dimensional Hausdorff measure μH[1] (equals arc length for rectifiable Jordan curves; Mathlib's normalization gives μH[1] = volume on ℝ). Ropelength of a set is μH[1] L / thickness L in ℝ≥0∞, which is ⊤ when thickness is 0; hence the infimum over the isotopy class (`minRopelength`) needs no explicit C^{1,1} restriction: CKS show positive thickness forces C^{1,1}, and wild types get ropelength ⊤.",
+    "Crossing number is defined via smooth representatives: `IsSmoothKnotParam γ` is a C^∞, 1-periodic, regular curve ℝ → ℝ³ injective on a period; the projection direction is fixed to the z-axis (`proj x = (x 0, x 1)`), which loses no generality since rotations are ambient isotopies; `IsRegularProjection` is the textbook notion (immersed projection, finitely many multiple points, each a double point with exactly two preimages, transverse strands); `crossingNumber K : ℕ∞` is the infimum of the number of double points, so it is ⊤ for wild knots (no smooth representative). Consequently slot (i) is trivially true for wild knots (RHS = c·⊤ = ⊤), which is why `0 < c` is included; this implements the notes' restriction to tame knots without a separate tameness predicate.",
+    "‘Nontrivial knot’ is formalised as not ambient isotopic to the round unit circle `unknot = {p | p 0 ^ 2 + p 1 ^ 2 = 1 ∧ p 2 = 0}`; the unknot has Cr = 0 but ropelength 2π so it must be excluded, as in the decomposition notes.",
+    "The constant is `c : ℝ≥0` with `0 < c`, multiplied in ℝ≥0∞ against the ℕ∞ → ℝ≥0∞ coercion of the crossing number. This is the O(Cr(K)) statement; additive constants are not allowed (unnecessary once the unknot is excluded, since Cr ≥ 3 for nontrivial knots).",
+    "The Borromean rings are the standard configuration of three mutually perpendicular ellipses with semi-axes 2 and 1, arranged cyclically (x²/4 + y² = 1 in z = 0; y²/4 + z² = 1 in x = 0; z²/4 + x² = 1 in y = 0); this is the mirror image of the golden-rectangle realisation from the icosahedron, and the Borromean rings are amphichiral. A reviewer should confirm the cyclic arrangement (the components are pairwise disjoint; the non-cyclic arrangement with equal axes would intersect).",
+    "The value 58.006 in the statement is a rounded figure (CFKSW's configuration has length ≈ 58.0060; Ridgerunner's numerical upper bound is 58.0070), so slot (ii) is stated as the ropelength lying in the closed interval [58.0055, 58.0065], i.e. agreeing with 58.006 to three decimal places. The endpoint convention (closed vs. half-open) is immaterial. The ordinary (CKS) ropelength is used, as in the Wikipedia article, not the Gehring ropelength for which CFKSW proved criticality.",
+    "Ropelength of a link is total length (μH[1] of the union) over the thickness of the whole set (triples may involve different components), exactly as in CKS."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "ContinuousMap.Homotopy / ContinuousMap.HomotopyEquiv (homotopy, not isotopy through homeomorphisms)",
+     "name": "RopelengthProblems.AmbientIsotopic",
+     "why_needed": "Knot and link types are ambient isotopy classes; Mathlib has homotopies (`ContinuousMap.Homotopy`) but no notion of isotopy through homeomorphisms."
+    },
+    {
+     "closest_existing_considered": "Topology.IsEmbedding with domain `Circle` (used as the building block)",
+     "name": "RopelengthProblems.IsKnot",
+     "why_needed": "A knot as a subset of ℝ³ homeomorphic to the circle; no knot theory in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Metric.sphere (a 2-sphere in ℝ³, not a circle); EuclideanGeometry.Sphere",
+     "name": "RopelengthProblems.unknot",
+     "why_needed": "Concrete representative of the trivial knot, needed to exclude it in slot (i)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or the repo",
+     "name": "RopelengthProblems.borromeanRings",
+     "why_needed": "Concrete representative of the Borromean rings link type for slot (ii)."
+    },
+    {
+     "closest_existing_considered": "Affine.Simplex.circumradius (used as the building block); Metric.infDist",
+     "name": "RopelengthProblems.thickness",
+     "why_needed": "The Gonzalez–Maddocks/CKS thickness (inf of circumradii over triples of points); Mathlib has neither thickness, reach nor normal injectivity radius."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.Measure.hausdorffMeasure 1 (used for length); eVariationOn (parametrised length, not set-based)",
+     "name": "RopelengthProblems.ropelength",
+     "why_needed": "Length over thickness of a set."
+    },
+    {
+     "closest_existing_considered": "None",
+     "name": "RopelengthProblems.minRopelength",
+     "why_needed": "The ropelength knot/link invariant: infimum over the ambient isotopy class."
+    },
+    {
+     "closest_existing_considered": "Submodule.orthogonalProjection / ContinuousLinearMap.proj (more indirect for coordinate access)",
+     "name": "RopelengthProblems.proj",
+     "why_needed": "Projection of ℝ³ onto the xy-plane used to define knot diagrams."
+    },
+    {
+     "closest_existing_considered": "ContDiff, Function.Periodic, Set.InjOn (used as building blocks); ContMDiff on `Circle` (harder to extract tangent vectors)",
+     "name": "RopelengthProblems.IsSmoothKnotParam",
+     "why_needed": "Smooth regular closed embedded curves ℝ → ℝ³, the representatives used to define crossing number."
+    },
+    {
+     "closest_existing_considered": "Set.encard (used)",
+     "name": "RopelengthProblems.crossings",
+     "why_needed": "Set of double points of the planar projection of a curve."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib",
+     "name": "RopelengthProblems.IsRegularProjection",
+     "why_needed": "Textbook regular projection (immersion, finitely many transverse double points), needed to define knot diagrams."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (Mathlib's Quandle file only mentions knots in prose)",
+     "name": "RopelengthProblems.crossingNumber",
+     "why_needed": "Crossing number of a knot type; absent from Mathlib."
+    }
+   ],
+   "per_slot": {
+    "ropelength_problems.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∃ c : ℝ≥0, 0 < c ∧ ∀ K : Set ℝ³, IsKnot K → ¬ AmbientIsotopic K unknot → minRopelength K ≤ c * crossingNumber K. Needed bespoke definitions of ambient isotopy, knots, thickness (CKS/Gonzalez–Maddocks circumradius infimum), ropelength (μH[1]/thickness), the ropelength invariant (inf over the isotopy class) and the crossing number (min crossings over regular projections of smooth representatives), none of which exist in Mathlib or FormalConjecturesForMathlib."
+    },
+    "ropelength_problems.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as minRopelength borromeanRings ∈ Set.Icc (ENNReal.ofReal 58.0055) (ENNReal.ofReal 58.0065), i.e. the minimum ropelength of the Borromean rings (radius units, total length of all components over thickness of the whole link) equals 58.006 to three decimal places. Uses the same bespoke ropelength definitions plus an explicit Borromean rings configuration (three cyclically arranged perpendicular ellipses with semi-axes 2 and 1)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "ropelength_problems.parts.i": "/--\n**Linear ropelength bound.** For every knot $K$ the ropelength $L(K)$ satisfies\n$L(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$ (Diao, Ernst, Por, Ziegler), and\nthere are knot families with $L(K) = \\Theta(\\operatorname{Cr}(K))$. No knot family with\nsuper-linear dependence of ropelength on crossing number has been observed, and it is conjectured\nthat the tight upper bound is linear: there is a constant $c > 0$ such that\n$L(K) \\le c \\cdot \\operatorname{Cr}(K)$ for every nontrivial knot $K$.\n\nThe unknot has crossing number $0$ but positive ropelength ($2\\pi$), so it must be excluded.\nFor a wild knot both the crossing number and the ropelength are infinite.\n-/\n@[category research open, AMS 51 57]\ntheorem ropelength_problems.parts.i :\n    ∃ c : ℝ≥0, 0 < c ∧ ∀ K : Set ℝ³, IsKnot K → ¬ AmbientIsotopic K unknot →\n      minRopelength K ≤ c * (crossingNumber K : ℝ≥0∞) := by\n  sorry",
+    "ropelength_problems.parts.ii": "/--\n**Ropelength of the Borromean rings.** The ropelength of the Borromean rings is conjectured to be\n$58.006$ (Cantarella, Fu, Kusner, Sullivan, Wrinkle), the length of an explicit configuration\nbuilt from three planar \"guitar-shaped\" components made of parametrised arcs, in units where the\nthickness is the radius of the tube. Since $58.006$ is a rounded figure, the statement asserts\nthat the ropelength agrees with $58.006$ to three decimal places, i.e. lies in\n$[58.0055, 58.0065]$.\n-/\n@[category research open, AMS 51 57]\ntheorem ropelength_problems.parts.ii :\n    minRopelength borromeanRings ∈ Set.Icc (ENNReal.ofReal 58.0055) (ENNReal.ofReal 58.0065) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Ropelength problems\n\nThe *ropelength* of a knot or link $L$ in $\\mathbb{R}^3$ is the quotient\n$\\operatorname{Len}(L) / \\tau(L)$ of its length by its *thickness* $\\tau(L)$, the radius of the\nlargest embedded normal tube around $L$. Following Gonzalez–Maddocks and\nCantarella–Kusner–Sullivan, the thickness is the infimum of the circumradii of all non-degenerate\ntriangles with vertices on $L$; it is positive exactly when $L$ is a $C^{1,1}$ embedded curve.\nThe ropelength of a knot or link *type* is the infimum of the ropelength over all curves of that\ntype. Minimisers exist and are called *tight* or *ideal* knots and links.\n\nRopelength is measured in units of the tube radius, so that the tight Hopf link (two round circles\nof radius $2$ through each other's centres) has ropelength $8\\pi$.\n\nThis file states two open problems about ropelength.\n\n* **Linear dependence on the crossing number.** For every nontrivial knot $K$,\n  $\\operatorname{Cr}(K)^{3/4} \\lesssim L(K) \\lesssim \\operatorname{Cr}(K)\\log^5\\operatorname{Cr}(K)$,\n  where $\\operatorname{Cr}(K)$ is the crossing number. No knot family with super-linear growth of\n  ropelength in the crossing number is known, and it is conjectured that the tight upper bound is\n  linear: $L(K) = O(\\operatorname{Cr}(K))$.\n* **The Borromean rings.** Cantarella, Fu, Kusner, Sullivan and Wrinkle constructed a\n  ropelength-critical configuration of the Borromean rings from parameterised arcs (each component\n  is planar and guitar-shaped) with ropelength $\\approx 58.0060$, and conjecture that it is tight.\n  So the minimum ropelength of the Borromean rings is conjectured to be $58.006$.\n\n*References:*\n* [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* J. Cantarella, R. B. Kusner, J. M. Sullivan,\n  [On the minimum ropelength of knots and links](https://arxiv.org/abs/math/0103224),\n  Invent. Math. 150 (2002), 257–286\n* J. Cantarella, J. H. G. Fu, R. B. Kusner, J. M. Sullivan, N. C. Wrinkle,\n  [Criticality for the Gehring link problem](https://arxiv.org/abs/math/0402212),\n  Geom. Topol. 10 (2006), 2055–2116\n* Y. Diao, C. Ernst, A. Por, U. Ziegler,\n  [The ropelengths of knots are almost linear in terms of their crossing numbers](https://doi.org/10.1142/S0218216519500858),\n  J. Knot Theory Ramifications 28 (2019)\n-/\n\nnamespace RopelengthProblems\n\nopen MeasureTheory Set\nopen scoped ContDiff ENNReal EuclideanGeometry MeasureTheory\n\n/- ### Links, ambient isotopy, thickness and ropelength -/\n\n/-- Two subsets `A` and `B` of `ℝ³` are *ambient isotopic* if there is a continuous family of\nhomeomorphisms `h_t : ℝ³ → ℝ³`, `t ∈ [0, 1]`, with `h_0 = id` and `h_1 '' A = B`.\nKnots and links are considered up to this equivalence. -/\ndef IsAmbientIsotopic (A B : Set ℝ³) : Prop :=\n  ∃ h : C(ℝ³, ℝ³),\n    Nonempty ((ContinuousMap.id ℝ³).HomotopyWith h fun f => IsHomeomorph f) ∧ h '' A = B\n\n/-- Ambient isotopy is reflexive: the constant family of identity maps is an ambient isotopy. -/\n@[category API, AMS 53 57]\ntheorem isAmbientIsotopic_refl (A : Set ℝ³) : IsAmbientIsotopic A A :=\n  ⟨ContinuousMap.id ℝ³, ⟨ContinuousMap.HomotopyWith.refl _ (Homeomorph.refl ℝ³).isHomeomorph⟩,\n    image_id A⟩\n\n/-- The *thickness* of a set `L ⊆ ℝ³` (typically a knot or link): the infimum of the circumradii\nof all non-degenerate triangles with vertices on `L`. For a link, this is the radius of the largest\nembedded normal tube around `L`; it is positive exactly when `L` is a `C^{1,1}` curve. -/\nnoncomputable def thickness (L : Set ℝ³) : ℝ≥0∞ :=\n  ⨅ (T : Affine.Triangle ℝ ℝ³) (_ : ∀ i, T.points i ∈ L), ENNReal.ofReal T.circumradius\n\n/-- The *ropelength* of a set `L ⊆ ℝ³` (typically a knot or link): its length, measured by the\none-dimensional Hausdorff measure (for a link, the total length of its components), divided by its\nthickness. A link of zero thickness has infinite ropelength. -/\nnoncomputable def ropelength (L : Set ℝ³) : ℝ≥0∞ :=\n  μH[1] L / thickness L\n\n/-- The minimum ropelength of the knot or link type of `L`: the infimum of the ropelength over all\nsets ambient isotopic to `L`. -/\nnoncomputable def minRopelength (L : Set ℝ³) : ℝ≥0∞ :=\n  ⨅ (L' : Set ℝ³) (_ : IsAmbientIsotopic L L'), ropelength L'\n\n/- ### Smooth knots, regular projections and the crossing number -/\n\n/-- `γ : ℝ → ℝ³` parametrises a *smooth knot*: it is `1`-periodic, smooth, has nowhere vanishing\nderivative, and is injective on a period. Its image `range γ` is a tame knot. -/\nstructure IsSmoothKnot (γ : ℝ → ℝ³) : Prop where\n  periodic : Function.Periodic γ 1\n  contDiff : ContDiff ℝ ∞ γ\n  deriv_ne_zero : ∀ t, deriv γ t ≠ 0\n  injOn : InjOn γ (Ico 0 1)\n\n/-- The round unit circle in the `xy`-plane, a representative of the unknot. -/\ndef unknot : Set ℝ³ := {x | x 2 = 0 ∧ x 0 ^ 2 + x 1 ^ 2 = 1}\n\n/-- Orthogonal projection of `ℝ³` onto the `xy`-plane, identified with `ℝ × ℝ`. -/\ndef proj (x : ℝ³) : ℝ × ℝ := (x 0, x 1)\n\n/-- The *crossings* of the `xy`-projection of a `1`-periodic closed curve `γ`: pairs of parameters\n`s < t` in `[0, 1)` whose points have the same projection. -/\ndef crossings (γ : ℝ → ℝ³) : Set (ℝ × ℝ) :=\n  {p | p.1 ∈ Ico 0 1 ∧ p.2 ∈ Ico 0 1 ∧ p.1 < p.2 ∧ proj (γ p.1) = proj (γ p.2)}\n\n/-- The `xy`-projection of the `1`-periodic closed curve `γ` is *regular*: the projected curve\nis an immersion, no point of the plane has three or more preimages, there are finitely many double\npoints, and at each double point the two strands cross transversally. -/\nstructure IsRegularProjection (γ : ℝ → ℝ³) : Prop where\n  proj_deriv_ne_zero : ∀ t, proj (deriv γ t) ≠ 0\n  finite_crossings : (crossings γ).Finite\n  no_triple_point : ∀ s ∈ Ico (0 : ℝ) 1, ∀ t ∈ Ico (0 : ℝ) 1, ∀ u ∈ Ico (0 : ℝ) 1,\n    s ≠ t → t ≠ u → s ≠ u → proj (γ s) = proj (γ t) → proj (γ t) ≠ proj (γ u)\n  transverse : ∀ s ∈ Ico (0 : ℝ) 1, ∀ t ∈ Ico (0 : ℝ) 1, s ≠ t → proj (γ s) = proj (γ t) →\n    LinearIndependent ℝ ![proj (deriv γ s), proj (deriv γ t)]\n\n/-- The *crossing number* of the knot type of `K`: the least number of crossings in a regular\nprojection of a smooth knot ambient isotopic to `K`. Since any direction of projection can be\nrealised by rotating the knot (an ambient isotopy), projecting to the `xy`-plane loses no\ngenerality. A wild knot type has no such projection, and gets the junk value `0`. -/\nnoncomputable def crossingNumber (K : Set ℝ³) : ℕ :=\n  sInf {n | ∃ γ : ℝ → ℝ³, IsSmoothKnot γ ∧ IsRegularProjection γ ∧\n    IsAmbientIsotopic (range γ) K ∧ (crossings γ).ncard = n}\n\n/- ### The problems -/\n\n/-- **Linear dependence of ropelength on the crossing number.**\nThere is a universal constant $c > 0$ such that every nontrivial knot $K$ satisfies\n$L(K) \\le c \\cdot \\operatorname{Cr}(K)$, where $L(K)$ is the minimum ropelength of the knot type of\n$K$ and $\\operatorname{Cr}(K)$ is its crossing number; that is, $L(K) = O(\\operatorname{Cr}(K))$.\nThis sharpens the proven bound $L(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$;\nno knot family with super-linear dependence of ropelength on the crossing number has been\nobserved. Tame knot types are represented by smooth knots `γ`, and the unknot, which has crossing\nnumber $0$ but positive ropelength, is excluded. -/\n@[category research open, AMS 53 57]\ntheorem ropelength_problems.parts.i :\n    ∃ c : ℝ, 0 < c ∧ ∀ γ : ℝ → ℝ³, IsSmoothKnot γ → ¬ IsAmbientIsotopic (range γ) unknot →\n      minRopelength (range γ) ≤ ENNReal.ofReal (c * crossingNumber (range γ)) := by\n  sorry\n\n/-- The `i`-th component of a standard configuration of the Borromean rings: an ellipse with\nsemi-axes `2` and `1` in a coordinate plane. Explicitly, the three components are\n* `i = 0`: `{z = 0, x² / 4 + y² = 1}` (in the `xy`-plane, major axis along the `x`-axis),\n* `i = 1`: `{x = 0, y² / 4 + z² = 1}` (in the `yz`-plane, major axis along the `y`-axis),\n* `i = 2`: `{y = 0, z² / 4 + x² = 1}` (in the `zx`-plane, major axis along the `z`-axis). -/\ndef borromeanComponent (i : Fin 3) : Set ℝ³ :=\n  {x | x (i + 2) = 0 ∧ x i ^ 2 / 4 + x (i + 1) ^ 2 = 1}\n\n/-- A standard configuration of the **Borromean rings**: three mutually perpendicular ellipses\nwith semi-axes `2` and `1`, one in each coordinate plane, with their major axes arranged\ncyclically, see `RopelengthProblems.borromeanComponent`. -/\ndef borromeanRings : Set ℝ³ := ⋃ i, borromeanComponent i\n\n/-- The three components of `borromeanRings` are pairwise disjoint, so it is a link. -/\n@[category test, AMS 53 57]\ntheorem pairwise_disjoint_borromeanComponent :\n    Pairwise fun i j => Disjoint (borromeanComponent i) (borromeanComponent j) := by\n  intro i j hij\n  rw [Set.disjoint_left]\n  rintro x ⟨hi, hi'⟩ ⟨hj, hj'⟩\n  fin_cases i <;> fin_cases j <;> simp only [Fin.isValue, Fin.reduceAdd, Fin.zero_eta,\n    Fin.mk_one, Fin.reduceFinMk, ne_eq, not_true_eq_false] at hij hi hi' hj hj' <;>\n    rw [hi] at hj' <;> rw [hj] at hi' <;> nlinarith\n\n/-- **Ropelength of the Borromean rings.**\nThe minimum ropelength of the Borromean rings, measured in units of the tube radius, is\nconjectured to be $58.006$ (that is, it rounds to $58.006$ at three decimal places). The\nconjectured minimiser is the ropelength-critical configuration of Cantarella, Fu, Kusner, Sullivan\nand Wrinkle, built from parameterised arcs into three planar guitar-shaped components, whose\nropelength is approximately $58.0060$. -/\n@[category research open, AMS 53 57]\ntheorem ropelength_problems.parts.ii :\n    minRopelength borromeanRings ∈ Ico (ENNReal.ofReal 58.0055) (ENNReal.ofReal 58.0065) := by\n  sorry\n\nend RopelengthProblems\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.75,
+   "decomposition_objections": "None. Both slots are statable. The dropped items are correctly dropped: the Buck–Simon 3/4-power constant is an unknown value rather than a conjecture, and 'no expression has been found' is not a proposition.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Knot/link types are modelled as subsets of ℝ³ (EuclideanSpace ℝ (Fin 3), via the repo's scoped notation ℝ³) up to ambient isotopy, where an ambient isotopy is a ContinuousMap.HomotopyWith from the identity through homeomorphisms (each slice IsHomeomorph) whose final map carries A onto B. Isotopy in ℝ³ (not S³); orientation preservation is automatic since the family starts at the identity.",
+    "Thickness follows Gonzalez–Maddocks / Cantarella–Kusner–Sullivan (the paper cited by the article): the infimum over all non-degenerate triangles (Affine.Triangle ℝ ℝ³) with vertices on L of the circumradius, valued in ℝ≥0∞. Collinear triples (which would give ∞) are simply excluded, which does not change the infimum. This equals the radius of the largest embedded normal tube and is positive iff L is C^{1,1} (CKS Lemmas 1–3).",
+    "Length of a set is its one-dimensional Hausdorff measure μH[1] (Mathlib normalisation: equals Lebesgue measure on ℝ, isometry invariant), which for a rectifiable simple curve or a disjoint union of such curves is the (total) arclength. Ropelength is μH[1] L / thickness L in ℝ≥0∞; ENNReal division gives ∞ for zero-thickness curves (length > 0 there), which is the intended convention. Units are tube radius (Hopf link has ropelength 8π), as in CKS/CFKSW.",
+    "The ropelength of a knot/link type is the ⨅ over all sets ambient isotopic to the given set of their ropelength (CKS definition); this automatically ranges over exactly the C^{1,1} embeddings of the type since all others have infinite ropelength.",
+    "Tame knots for slot (i) are represented by smooth knots: 1-periodic C^∞ maps ℝ → ℝ³ with nowhere-zero derivative, injective on [0,1). Wild knot types are thus excluded (for them crossingNumber would take the junk value sInf ∅ = 0 and the inequality would be false).",
+    "Nontriviality in slot (i) is '¬ IsAmbientIsotopic (range γ) unknot' with unknot the round unit circle in the xy-plane. The unknot must be excluded since Cr = 0 but ropelength > 0; no additive constant is used, matching the notes' preferred reading. c is a real constant with 0 < c and the bound is minRopelength ≤ ENNReal.ofReal (c * Cr).",
+    "Crossing number: sInf over smooth knots γ in the isotopy class whose xy-projection is regular (projected curve is an immersion, no triple points, finitely many double points, transverse double points, i.e. the classical Lickorish/Burde–Zieschang definition) of Set.ncard of the crossing set {(s,t) : 0 ≤ s < t < 1, proj(γ s) = proj(γ t)}. Only the projection to the xy-plane is used since any direction can be realised by rotating the knot (an ambient isotopy). The explicit finiteness clause is part of the classical definition and also protects against Set.ncard's junk value on infinite sets (it is in fact implied by the other clauses).",
+    "Slot (ii): the rounded figure 58.006 is formalised as membership of the minimum ropelength in Ico 58.0055 58.0065 (rounds to 58.006 at three decimal places); the notes' alternative [58.006, 58.007) reading would also contain the CFKSW value ≈ 58.0060, but the rounding reading is safer if the exact value is slightly below 58.006. Stating the CFKSW configuration itself as the minimiser was not feasible since that configuration involves non-elementary clasp curves.",
+    "Borromean rings are the standard configuration of three ellipses x²/4 + y² = 1 (z = 0), y²/4 + z² = 1 (x = 0), z²/4 + x² = 1 (y = 0) — three mutually perpendicular ellipses with cyclically arranged major axes, the ellipse version of the three-golden-rectangles realisation — indexed by Fin 3 in borromeanComponent; their pairwise disjointness is proved (test lemma). Since ropelength is invariant under mirror images and the link type is symmetric, the choice of cyclic orientation is immaterial.",
+    "Slot (i) is stated for knots only (not links), following the Wikipedia sentence and the decomposition table.",
+    "AMS tags 53 (differential geometry of curves) and 57 (knot theory) were used for all declarations; category research open for the two problem statements."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "ContinuousMap.Homotopy / ContinuousMap.HomotopyWith and IsHomeomorph (used as building blocks); Homeomorph alone lacks the isotopy-to-identity requirement.",
+     "name": "RopelengthProblems.IsAmbientIsotopic",
+     "why_needed": "Knot/link type equivalence (ambient isotopy of subsets of ℝ³) is not in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "Affine.Simplex.circumradius (used as building block); no notion of reach or tube radius exists in Mathlib.",
+     "name": "RopelengthProblems.thickness",
+     "why_needed": "Thickness (reach / normal injectivity radius) of a curve is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.Measure.hausdorffMeasure 1 for length (used); eVariationOn / Path.length were considered but require a parametrisation.",
+     "name": "RopelengthProblems.ropelength",
+     "why_needed": "Ropelength (length divided by thickness) is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "iInf over the bespoke IsAmbientIsotopic relation; nothing existing.",
+     "name": "RopelengthProblems.minRopelength",
+     "why_needed": "The ropelength of a knot/link type (infimum over the isotopy class) is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Manifold-based smooth embeddings of Circle (ContMDiff) were considered but are heavier; Function.Periodic, ContDiff, deriv, Set.InjOn are used as building blocks.",
+     "name": "RopelengthProblems.IsSmoothKnot",
+     "why_needed": "Smooth (tame) knot representatives, as periodic regular injective smooth curves, are not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Metric.sphere in ℝ² cannot be used directly as a subset of ℝ³; defined by equations instead.",
+     "name": "RopelengthProblems.unknot",
+     "why_needed": "A standard representative of the trivial knot, needed to state nontriviality."
+    },
+    {
+     "closest_existing_considered": "orthogonalProjection onto a submodule (returns a subtype, less convenient); EuclideanSpace.proj gives single coordinates.",
+     "name": "RopelengthProblems.proj",
+     "why_needed": "Orthogonal projection ℝ³ → ℝ × ℝ onto the xy-plane, used to define knot diagrams."
+    },
+    {
+     "closest_existing_considered": "Nothing existing.",
+     "name": "RopelengthProblems.crossings",
+     "why_needed": "The set of double points (crossings) of the projection of a closed curve is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Nothing existing; LinearIndependent is used for transversality.",
+     "name": "RopelengthProblems.IsRegularProjection",
+     "why_needed": "Regular knot projections (immersion, only finitely many transverse double points, no triple points) are not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Nothing existing (Mathlib has no knot theory).",
+     "name": "RopelengthProblems.crossingNumber",
+     "why_needed": "The crossing number of a knot is not in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "Nothing existing.",
+     "name": "RopelengthProblems.borromeanComponent",
+     "why_needed": "The three ellipses of the standard Borromean rings configuration."
+    },
+    {
+     "closest_existing_considered": "Nothing existing (Mathlib has no links).",
+     "name": "RopelengthProblems.borromeanRings",
+     "why_needed": "A concrete representative of the Borromean rings link type, needed to state slot (ii)."
+    }
+   ],
+   "per_slot": {
+    "ropelength_problems.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: ∃ c > 0, for every smooth knot γ (a 1-periodic smooth regular map ℝ → ℝ³ injective on a period, i.e. a tame knot representative) whose image is not ambient isotopic to the round unit circle, minRopelength (range γ) ≤ ENNReal.ofReal (c * crossingNumber (range γ)). minRopelength is the infimum of length/thickness over all sets ambient isotopic to the knot (positive thickness forces C^{1,1}, so this is the CKS ropelength of the knot type); crossingNumber is the least number of crossings over regular xy-projections of smooth knots in the isotopy class. No Mathlib/repo primitives exist for knots, thickness, or crossing number, so all were defined bespoke."
+    },
+    "ropelength_problems.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as minRopelength borromeanRings ∈ Ico (ofReal 58.0055) (ofReal 58.0065), i.e. the minimum ropelength of the Borromean rings (total length over components divided by thickness, radius units) rounds to 58.006 at three decimals, which is how the rounded Wikipedia figure (CFKSW value ≈ 58.0060) is read. borromeanRings is the standard configuration of three mutually perpendicular ellipses (semi-axes 2 and 1) with cyclically arranged major axes; their pairwise disjointness is proved as a test lemma."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "ropelength_problems.parts.i": "/-- **Linear dependence of ropelength on the crossing number.**\nThere is a universal constant $c > 0$ such that every nontrivial knot $K$ satisfies\n$L(K) \\le c \\cdot \\operatorname{Cr}(K)$, where $L(K)$ is the minimum ropelength of the knot type of\n$K$ and $\\operatorname{Cr}(K)$ is its crossing number; that is, $L(K) = O(\\operatorname{Cr}(K))$.\nThis sharpens the proven bound $L(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$;\nno knot family with super-linear dependence of ropelength on the crossing number has been\nobserved. Tame knot types are represented by smooth knots `γ`, and the unknot, which has crossing\nnumber $0$ but positive ropelength, is excluded. -/\n@[category research open, AMS 53 57]\ntheorem ropelength_problems.parts.i :\n    ∃ c : ℝ, 0 < c ∧ ∀ γ : ℝ → ℝ³, IsSmoothKnot γ → ¬ IsAmbientIsotopic (range γ) unknot →\n      minRopelength (range γ) ≤ ENNReal.ofReal (c * crossingNumber (range γ)) := by\n  sorry",
+    "ropelength_problems.parts.ii": "/-- **Ropelength of the Borromean rings.**\nThe minimum ropelength of the Borromean rings, measured in units of the tube radius, is\nconjectured to be $58.006$ (that is, it rounds to $58.006$ at three decimal places). The\nconjectured minimiser is the ropelength-critical configuration of Cantarella, Fu, Kusner, Sullivan\nand Wrinkle, built from parameterised arcs into three planar guitar-shaped components, whose\nropelength is approximately $58.0060$. -/\n@[category research open, AMS 53 57]\ntheorem ropelength_problems.parts.ii :\n    minRopelength borromeanRings ∈ Ico (ENNReal.ofReal 58.0055) (ENNReal.ofReal 58.0065) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Ropelength problems\n\nRopelength is length divided by the radius of the largest embedded normal tube. This file records\nconjectures about its growth with crossing number and its value for the Borromean rings.\n\n*References:*\n- [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n- [Cantarella, Kusner and Sullivan, *On the minimum ropelength of knots and links*](https://arxiv.org/abs/math/0103224)\n- [Ashton, Cantarella, Piatek and Rawdon, *Knot Tightening by Constrained Gradient Descent*](https://arxiv.org/abs/1002.1723)\n-/\n\nopen Set MeasureTheory Topology\nopen scoped ENNReal\n\nnamespace RopelengthProblems\n\nabbrev Point3 := EuclideanSpace ℝ (Fin 3)\nabbrev Point2 := EuclideanSpace ℝ (Fin 2)\n\n/-- Two subsets of space have the same link type if an ambient isotopy takes one to the other.\nJoint continuity is required both for the family of homeomorphisms and for its inverses. -/\ndef SameLinkType (K L : Set Point3) : Prop :=\n  ∃ F : Set.Icc (0 : ℝ) 1 → (Point3 ≃ₜ Point3),\n    F ⟨0, by simp⟩ = Homeomorph.refl Point3 ∧\n    Continuous (fun p : Set.Icc (0 : ℝ) 1 × Point3 ↦ F p.1 p.2) ∧\n    Continuous (fun p : Set.Icc (0 : ℝ) 1 × Point3 ↦ (F p.1).symm p.2) ∧\n    F ⟨1, by simp⟩ '' K = L\n\n/-- The carrier of a closed polygonal curve. The vertices are indexed cyclically by `Fin (n + 1)`.-/\ndef polygonCarrier {n : ℕ} (v : Fin (n + 1) → Point3) : Set Point3 :=\n  ⋃ i, segment ℝ (v i) (v (i + 1))\n\n/-- A polygonal knot is a simple cyclic polygon whose carrier is topologically embedded. -/\ndef IsPolygonalKnot {n : ℕ} (v : Fin (n + 1) → Point3) : Prop :=\n  Function.Injective v ∧\n  (∀ i j, i ≠ j →\n    Disjoint (openSegment ℝ (v i) (v (i + 1))) (openSegment ℝ (v j) (v (j + 1)))) ∧\n  ∃ f : Circle → Point3, IsEmbedding f ∧ range f = polygonCarrier v\n\n/-- A set is a tame knot if it has an embedded polygonal representative in its ambient isotopy\nclass. -/\ndef IsTameKnot (K : Set Point3) : Prop :=\n  ∃ (n : ℕ) (v : Fin (n + 1) → Point3), IsPolygonalKnot v ∧ SameLinkType K (polygonCarrier v)\n\n/-- The standard planar unknot. -/\ndef standardUnknot : Set Point3 :=\n  {p | p 2 = 0 ∧ p 0 ^ 2 + p 1 ^ 2 = 1}\n\n/-- A tame knot is nontrivial when it is not ambient-equivalent to the standard unknot. -/\ndef IsNontrivialKnot (K : Set Point3) : Prop :=\n  IsTameKnot K ∧ ¬ SameLinkType K standardUnknot\n\n/-- The two cyclic edges with initial vertices `i` and `j` have no common endpoint. -/\ndef nonAdjacentEdges {n : ℕ} (i j : Fin (n + 1)) : Prop :=\n  Disjoint ({i, i + 1} : Finset (Fin (n + 1))) {j, j + 1}\n\n/-- Two polygon edges cross in the interior after applying the planar projection `q`. -/\ndef projectedEdgesCross {n : ℕ} (v : Fin (n + 1) → Point3)\n    (q : Point3 →ₗ[ℝ] Point2) (i j : Fin (n + 1)) : Prop :=\n  ∃ a ∈ openSegment ℝ (v i) (v (i + 1)), ∃ b ∈ openSegment ℝ (v j) (v (j + 1)), q a = q b\n\n/-- A projection of a polygonal knot is regular if vertices project away from nonincident edge\ninteriors, every projected edge is nondegenerate, crossings are transverse, and no three edge\ninteriors meet at one projected point. -/\ndef IsRegularProjection {n : ℕ} (v : Fin (n + 1) → Point3)\n    (q : Point3 →ₗ[ℝ] Point2) : Prop :=\n  Function.Surjective q ∧\n  (∀ i, q (v (i + 1) - v i) ≠ 0) ∧\n  (∀ i j, i ≠ j → projectedEdgesCross v q i j →\n    ¬ ∃ r : ℝ, q (v (j + 1) - v j) = r • q (v (i + 1) - v i)) ∧\n  (∀ i j, nonAdjacentEdges i j →\n    q (v i) ∉ openSegment ℝ (q (v j)) (q (v (j + 1)))) ∧\n  (∀ i j k, i ≠ j → i ≠ k → j ≠ k →\n    ¬ ∃ a ∈ openSegment ℝ (v i) (v (i + 1)),\n      ∃ b ∈ openSegment ℝ (v j) (v (j + 1)),\n      ∃ c ∈ openSegment ℝ (v k) (v (k + 1)), q a = q b ∧ q a = q c)\n\n/-- The number of crossings in a regular polygonal projection. -/\nnoncomputable def projectionCrossingCount {n : ℕ} (v : Fin (n + 1) → Point3)\n    (q : Point3 →ₗ[ℝ] Point2) : ℕ := by\n  classical\n  exact ((Finset.univ ×ˢ Finset.univ).filter fun (ij : Fin (n + 1) × Fin (n + 1)) =>\n    nonAdjacentEdges ij.1 ij.2 ∧ ij.1 < ij.2 ∧ projectedEdgesCross v q ij.1 ij.2).card\n\n/-- The crossing number of a tame knot: the least number of crossings in a regular polygonal\ndiagram of its knot type. -/\nnoncomputable def crossingNumber (K : Set Point3) : ℕ :=\n  sInf {c | ∃ (n : ℕ) (v : Fin (n + 1) → Point3) (q : Point3 →ₗ[ℝ] Point2),\n    IsPolygonalKnot v ∧ SameLinkType K (polygonCarrier v) ∧ IsRegularProjection v q ∧\n      projectionCrossingCount v q = c}\n\n/-- The reach (radius thickness) of a subset of Euclidean space: the largest radius below which\nevery point has a unique nearest point in the subset. -/\nnoncomputable def thickness (K : Set Point3) : ℝ≥0∞ :=\n  sSup {r | ∀ x : Point3, Metric.infEDist x K < r →\n    ∃! y : Point3, y ∈ K ∧ edist x y = Metric.infEDist x K}\n\n/-- Ropelength of a positive-thickness curve, using one-dimensional Hausdorff measure for total\nlength and radius (rather than diameter) thickness. -/\nnoncomputable def ropelengthOf (K : Set Point3) : ℝ≥0∞ :=\n  μH[1] K / thickness K\n\n/-- Minimum ropelength in the ambient link type of `K`. Restricting to positive reach is the\nset-based version of taking the infimum over embedded `C^{1,1}` representatives. -/\nnoncomputable def ropelength (K : Set Point3) : ℝ≥0∞ :=\n  sInf {r | ∃ L : Set Point3, SameLinkType K L ∧ 0 < thickness L ∧ ropelengthOf L = r}\n\n/-- A standard three-ellipse representative of the Borromean rings. -/\ndef borromeanRings : Set Point3 :=\n  {p | p 0 = 0 ∧ p 1 ^ 2 + (p 2 / 2) ^ 2 = 1} ∪\n  {p | p 1 = 0 ∧ (p 0 / 2) ^ 2 + p 2 ^ 2 = 1} ∪\n  {p | p 2 = 0 ∧ p 0 ^ 2 + (p 1 / 2) ^ 2 = 1}\n\nnamespace ropelength_problems.parts\n\n/-- It is conjectured that the tight upper bound for ropelength is linear in crossing number:\nthere is a universal constant $c>0$ such that every nontrivial tame knot $K$ satisfies\n$\\operatorname{Rop}(K) \\le c\\,\\operatorname{Cr}(K)$. The unknot is excluded because its crossing\nnumber is zero while its ropelength is positive. -/\n@[category research open, AMS 57]\ntheorem i : ∃ c : ℝ, 0 < c ∧ ∀ K : Set Point3, IsNontrivialKnot K →\n    ropelength K ≤ ENNReal.ofReal c * crossingNumber K := by\n  sorry\n\n/-- In radius-thickness units, the minimum total ropelength of the three components of the\nBorromean rings is conjectured to round to $58.006$. Concretely, it is conjectured to lie in the\nhalf-open rounding interval $[58.006,58.007)$. -/\n@[category research open, AMS 57]\ntheorem ii : (58.006 : ℝ≥0∞) ≤ ropelength borromeanRings ∧\n    ropelength borromeanRings < 58.007 := by\n  sorry\n\nend ropelength_problems.parts\n\nend RopelengthProblems\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled knot/link type by an explicit ambient isotopy: a jointly continuous family of homeomorphisms starting at the identity, with jointly continuous inverses.",
+    "Modeled tame knots as subsets ambient-isotopic to the carrier of a simple cyclic polygon. This makes the quantification in part (i) range over nontrivial tame knot types and excludes the unknot topologically.",
+    "Defined classical crossing number as the minimum crossing count over regular planar linear projections of simple polygonal representatives in the same ambient-isotopy type. Regularity excludes degenerate edges, vertex-edge coincidences, tangencies, overlaps, and triple crossings.",
+    "Used Federer reach as radius thickness: the supremum of radii for which every point closer than that radius has a unique nearest point on the curve. Positive reach is the set-based formulation of the intended embedded C^{1,1} representatives.",
+    "Defined curve/link length by one-dimensional Hausdorff measure, so a disconnected link's length is the total length of all components, and defined knot/link ropelength as the infimum of length divided by radius thickness over positive-reach representatives in the ambient type.",
+    "Quantified the linear-bound constant in ℝ and coerced it with ENNReal.ofReal, preventing the vacuous choice c = ∞.",
+    "Represented the Borromean rings by the standard cyclic arrangement of three pairwise-disjoint perpendicular ellipses, with alternating major axes, and took the ropelength invariant of its ambient-isotopy type.",
+    "Interpreted the rounded value 58.006 using the decomposition table's suggested half-open interval [58.006, 58.007), rather than asserting exact equality to a rounded decimal."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's EuclideanSpace ℝ (Fin 3) and EuclideanSpace ℝ (Fin 2), which these abbreviate.",
+     "name": "Point3, Point2",
+     "why_needed": "Provide concise names for Euclidean 3-space and 2-space throughout the geometry definitions."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Homeomorph and IsEmbedding; a single arbitrary homeomorphism was rejected because it can identify mirror types rather than encode ambient isotopy.",
+     "name": "SameLinkType",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no ambient-isotopy relation for embedded knots or links."
+    },
+    {
+     "closest_existing_considered": "Mathlib's segment and openSegment; no closed polygonal-curve carrier was found.",
+     "name": "polygonCarrier",
+     "why_needed": "A concrete carrier is needed for polygonal representatives of tame knots and for diagram crossings."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Topology.IsEmbedding and segment primitives; no polygonal-knot predicate was found.",
+     "name": "IsPolygonalKnot",
+     "why_needed": "Ensures cyclic vertex data is a simple polygon with circle-embedded carrier rather than an arbitrary or multiply traversed edge union."
+    },
+    {
+     "closest_existing_considered": "No knot or tame-knot primitive was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsTameKnot",
+     "why_needed": "Part (i) specifically quantifies over tame knots."
+    },
+    {
+     "closest_existing_considered": "Mathlib has Circle and Euclidean sets but no unknot or nontrivial-knot predicate.",
+     "name": "standardUnknot, IsNontrivialKnot",
+     "why_needed": "The universal linear bound must exclude the unknot, whose crossing number is zero but ropelength is positive."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides Finset, segment/openSegment, and LinearMap, but no knot diagram, regular knot projection, or crossing-number API.",
+     "name": "nonAdjacentEdges, projectedEdgesCross, IsRegularProjection, projectionCrossingCount, crossingNumber",
+     "why_needed": "Part (i) requires the classical minimum diagram crossing number, including exclusion of nongeneric projections."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Metric.infEDist and edist support the Federer-reach definition, but no reach or knot-thickness definition was found.",
+     "name": "thickness",
+     "why_needed": "Ropelength requires radius thickness of an embedded curve or link."
+    },
+    {
+     "closest_existing_considered": "Mathlib's one-dimensional Hausdorff measure and complete-lattice infimum provide the ingredients, but no ropelength invariant exists.",
+     "name": "ropelengthOf, ropelength",
+     "why_needed": "Both slots require geometric ropelength and its infimum over a knot/link type."
+    },
+    {
+     "closest_existing_considered": "No Borromean-link primitive was found; the definition uses an explicit standard three-ellipse representative rather than insufficient pairwise linking conditions.",
+     "name": "borromeanRings",
+     "why_needed": "Part (ii) requires a concrete reference representative of the Borromean rings link type."
+    }
+   ],
+   "per_slot": {
+    "ropelength_problems.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "ropelength_problems.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "ropelength_problems.parts.i": "/-- It is conjectured that the tight upper bound for ropelength is linear in crossing number:\nthere is a universal constant $c>0$ such that every nontrivial tame knot $K$ satisfies\n$\\operatorname{Rop}(K) \\le c\\,\\operatorname{Cr}(K)$. The unknot is excluded because its crossing\nnumber is zero while its ropelength is positive. -/\n@[category research open, AMS 57]\ntheorem i : ∃ c : ℝ, 0 < c ∧ ∀ K : Set Point3, IsNontrivialKnot K →\n    ropelength K ≤ ENNReal.ofReal c * crossingNumber K := by\n  sorry",
+    "ropelength_problems.parts.ii": "/-- In radius-thickness units, the minimum total ropelength of the three components of the\nBorromean rings is conjectured to round to $58.006$. Concretely, it is conjectured to lie in the\nhalf-open rounding interval $[58.006,58.007)$. -/\n@[category research open, AMS 57]\ntheorem ii : (58.006 : ℝ≥0∞) ≤ ropelength borromeanRings ∧\n    ropelength borromeanRings < 58.007 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c08",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "For slot (i), the intended statement is the multiplicative uniform bound ∃ c > 0, ∀ nontrivial tame knots K, ropelength K ≤ c * crossingNumber K; the nontrivial restriction is needed because the unknot has crossing number zero and positive ropelength.",
+    "For slot (ii), the decimal 58.006 is rounded, so a faithful eventual formalization should use the stated unit-radius convention and a rounding interval such as 58.006 ≤ ropelength BorromeanRings ∧ ropelength BorromeanRings < 58.007, unless the exact parameterized CFKSW candidate configuration and its minimizer claim are formalized instead.",
+    "No candidate file was created because every slot was omitted under the full bail-out rule."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "ropelength_problems.parts.i": {
+     "outcome": "missing_primitives",
+     "why": "Mathlib and FormalConjecturesForMathlib have no geometric knot type (or tame-knot predicate), ambient isotopy relation, knot crossing number, or ropelength/thickness invariant. Mathlib's IsEmbedding, EuclideanSpace, and eVariationOn are insufficient: faithfully stating this slot requires taking the infimum of length/thickness over C^{1,1} representatives of one ambient-isotopy class and comparing it with the minimum number of crossings in regular planar diagrams. Introducing arbitrary functions called ropelength and crossingNumber would be a placeholder, while defining this missing reusable knot-theory and geometric-measure-theory foundation in the conjecture file cannot be done faithfully without substantial new library development."
+    },
+    "ropelength_problems.parts.ii": {
+     "outcome": "missing_primitives",
+     "why": "Mathlib and FormalConjecturesForMathlib have no link type, ambient isotopy relation, canonical Borromean-rings link type, or link ropelength/thickness invariant. A faithful statement needs total component length divided by thickness, minimized over C^{1,1} embeddings ambient-isotopic to the Borromean rings. Naming an unconstrained object 'Borromean rings' or using only the property that every two-component sublink is trivial would not identify the Borromean link type faithfully."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  }
+ ],
+ "chosen": {
+  "ropelength_problems.parts.i": "c05",
+  "ropelength_problems.parts.ii": "c05"
+ },
+ "id": "wp-ropelength-problems",
+ "main_attempt": "c05"
+}

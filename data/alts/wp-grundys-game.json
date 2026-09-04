@@ -1,0 +1,289 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Grundy's game\n\nGrundy's game is a two-player impartial game. The starting position is a single heap of objects.\nA move splits one heap into two heaps of *different* sizes. Heaps of size at most two cannot be\nsplit, and under normal play the last player able to move wins.\n\nBy the Sprague–Grundy theorem every heap of size $n$ is equivalent to a nim heap of size $G(n)$,\nwhere $G(0) = G(1) = G(2) = 0$ and\n$$G(n) = \\operatorname{mex}\\{G(a) \\oplus G(b) : a + b = n,\\ 1 \\le a < b\\},$$\nwith $\\oplus$ the bitwise XOR (nim-sum) and $\\operatorname{mex}$ the least natural number not in\nthe set. The sequence $(G(n))_{n \\ge 0}$ is the *nim-sequence* of Grundy's game\n([OEIS A002188](https://oeis.org/A002188)):\n$$0, 0, 0, 1, 0, 2, 1, 0, 2, 1, 0, 2, 1, 3, 2, 1, 3, 2, 4, 3, 0, \\ldots$$\n\nBerlekamp, Conway and Guy conjectured that this sequence is eventually periodic. The question\nremains open, even though Flammenkamp has computed the first $2^{35}$ values.\n\n*References:*\n* [Wikipedia, Grundy's game](https://en.wikipedia.org/wiki/Grundy%27s_game)\n* [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* [OEIS A002188](https://oeis.org/A002188)\n-/\n\nnamespace GrundysGame\n\n/--\nThe nim-value $G(n)$ of a single heap of size `n` in Grundy's game.\n\nA move splits the heap into two heaps of sizes `a` and `b` with `1 ≤ a < b` and `a + b = n`.\nThe resulting position has nim-value `nimValue a ^^^ nimValue b` (bitwise XOR, the nim-sum), and\n`nimValue n` is the least natural number that is not the nim-value of any such position (the\nminimal excludant). The set of excluded values is finite, so its complement is nonempty and the\n`sInf` is a genuine minimum. For `n ≤ 2` there are no moves and `nimValue n = 0`.\n\nThis is the sequence [OEIS A002188](https://oeis.org/A002188).\n-/\nnoncomputable def nimValue (n : ℕ) : ℕ :=\n  sInf {m | ∀ a b, 1 ≤ a → a < b → a + b = n → nimValue a ^^^ nimValue b ≠ m}\ntermination_by n\ndecreasing_by all_goals omega\n\n@[category test, AMS 91]\ntheorem nimValue_zero : nimValue 0 = 0 := by\n  rw [nimValue, Nat.sInf_eq_zero]\n  exact Or.inl fun a b _ _ _ => by omega\n\n@[category test, AMS 91]\ntheorem nimValue_one : nimValue 1 = 0 := by\n  rw [nimValue, Nat.sInf_eq_zero]\n  exact Or.inl fun a b _ _ _ => by omega\n\n@[category test, AMS 91]\ntheorem nimValue_two : nimValue 2 = 0 := by\n  rw [nimValue, Nat.sInf_eq_zero]\n  exact Or.inl fun a b _ _ _ => by omega\n\n@[category test, AMS 91]\ntheorem nimValue_three : nimValue 3 = 1 := by\n  rw [nimValue]\n  refine IsLeast.csInf_eq ⟨fun a b h₁ h₂ h₃ => ?_, fun m hm => ?_⟩\n  · obtain ⟨rfl, rfl⟩ : a = 1 ∧ b = 2 := by omega\n    simp [nimValue_one, nimValue_two]\n  · by_contra h\n    obtain rfl : m = 0 := by omega\n    exact hm 1 2 le_rfl (by norm_num) rfl (by simp [nimValue_one, nimValue_two])\n\n@[category test, AMS 91]\ntheorem nimValue_four : nimValue 4 = 0 := by\n  rw [nimValue, Nat.sInf_eq_zero]\n  refine Or.inl fun a b h₁ h₂ h₃ => ?_\n  obtain ⟨rfl, rfl⟩ : a = 1 ∧ b = 3 := by omega\n  simp [nimValue_one, nimValue_three]\n\n@[category test, AMS 91]\ntheorem nimValue_five : nimValue 5 = 2 := by\n  rw [nimValue]\n  refine IsLeast.csInf_eq ⟨fun a b h₁ h₂ h₃ => ?_, fun m hm => ?_⟩\n  · obtain ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ : (a = 1 ∧ b = 4) ∨ (a = 2 ∧ b = 3) := by omega\n    · simp [nimValue_one, nimValue_four]\n    · simp [nimValue_two, nimValue_three]\n  · by_contra h\n    obtain rfl | rfl : m = 0 ∨ m = 1 := by omega\n    · exact hm 1 4 le_rfl (by norm_num) rfl (by simp [nimValue_one, nimValue_four])\n    · exact hm 2 3 (by norm_num) (by norm_num) rfl (by simp [nimValue_two, nimValue_three])\n\n/--\n**Grundy's game.** Is the nim-sequence $(G(n))_{n \\ge 0}$ of Grundy's game eventually periodic?\nThat is, do there exist a period $p > 0$ and a threshold $N$ such that $G(n + p) = G(n)$ for all\n$n \\ge N$?\n\nBerlekamp, Conway and Guy conjectured that the answer is yes.\n-/\n@[category research open, AMS 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, nimValue (n + p) = nimValue n := by\n  sorry\n\nend GrundysGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single slot matches the source list entry, and the notes' specification of the nim-sequence (G(0)=G(1)=G(2)=0, mex/XOR recursion over splits with 1 ≤ a < b) and of eventual periodicity agree with the Wikipedia article and OEIS A002188.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The 'nim-sequence of Grundy's game' is taken, as in the decomposition notes and the Wikipedia article's table, to be the sequence n ↦ G(n) of Sprague–Grundy values of a single heap of size n (OEIS A002188), defined directly by the mex/XOR recursion rather than via Mathlib's `PGame.grundyValue`. By the Sprague–Grundy theorem these agree; the ℕ-valued recursion is the standard definition of a nim-sequence for heap games.",
+    "Moves are splits into two heaps of sizes a, b with 1 ≤ a < b and a + b = n (unequal, nonempty parts); heaps of size ≤ 2 have no moves, giving G(0)=G(1)=G(2)=0. The sequence is indexed from n = 0 as in OEIS; this does not affect eventual periodicity.",
+    "Mex is implemented as `sInf` (on ℕ) of the complement of the finite option set; since the complement is nonempty, the Nat `sInf ∅ = 0` default is never reached.",
+    "'Eventually periodic' is formalized explicitly as ∃ p > 0, ∃ N, ∀ n ≥ N, G(n + p) = G(n), with p and N existentially quantified and unspecified, exactly as in the decomposition notes (equivalent to the `∀ᶠ n in atTop` idiom used elsewhere in the repository).",
+    "The question is stated in the repository's `answer(sorry) ↔ P` style; `answer(True)` corresponds to the Berlekamp–Conway–Guy conjecture that the sequence is eventually periodic.",
+    "AMS tag 91 (game theory; combinatorial games are 91A46) was chosen, following the other combinatorial-game files in the repository."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `SetTheory.PGame.grundyValue : PGame → Nimber` together with `Nimber`/`Ordinal.mex` (would require building Grundy's game as a `PGame` and yields a Nimber-valued, essentially untestable sequence; the decomposition notes specify the concrete ℕ recursion with XOR, which is what was formalized). Also `Nat.find`/`Nat.sInf` (used: `sInf` on ℕ implements mex).",
+     "name": "GrundysGame.nimValue",
+     "why_needed": "The nim-sequence of Grundy's game (OEIS A002188) is not in Mathlib or FormalConjecturesForMathlib. It is defined by well-founded recursion as `sInf {m | ∀ a b, 1 ≤ a → a < b → a + b = n → nimValue a ^^^ nimValue b ≠ m}`, i.e. the minimal excludant of the nim-sums of the options of a heap of size n. The set is the complement of a finite set, hence nonempty, so `sInf` (Nat) is a genuine minimum and the `sInf ∅ = 0` default is never used. Tests `nimValue_zero` … `nimValue_five` verify the values 0,0,0,1,0,2 against OEIS."
+    }
+   ],
+   "per_slot": {
+    "grundys_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, nimValue (n + p) = nimValue n`, where `nimValue` is the Sprague–Grundy function of a single heap in Grundy's game, defined by the recursion G(n) = mex{G(a) XOR G(b) : 1 ≤ a < b, a + b = n} (so G(0)=G(1)=G(2)=0), i.e. OEIS A002188. Mathlib has no ℕ-valued mex or nim-sequence primitive, so the definition is bespoke; unit tests check the first six values against OEIS."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "grundys_game": "/--\n**Grundy's game.** Is the nim-sequence $(G(n))_{n \\ge 0}$ of Grundy's game eventually periodic?\nThat is, do there exist a period $p > 0$ and a threshold $N$ such that $G(n + p) = G(n)$ for all\n$n \\ge N$?\n\nBerlekamp, Conway and Guy conjectured that the answer is yes.\n-/\n@[category research open, AMS 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, nimValue (n + p) = nimValue n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Grundy's game\n\n*References:*\n\n- [Wikipedia, Grundy's game](https://en.wikipedia.org/wiki/Grundy%27s_game)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace GrundysGame\n\n/--\nIs the nim-sequence of Grundy's game eventually periodic? More precisely, let `G n` be the\nSprague--Grundy value of a heap of size $n$. Thus $G(0)=G(1)=G(2)=0$, and for $n\\geq 3$,\n$G(n)$ is the least natural number not of the form $G(a)\\mathbin{\\mathrm{XOR}}G(b)$, where\n$a+b=n$ and $1\\leq a<b$. Does there exist a positive period $p$ and a threshold $N$ such\nthat $G(n+p)=G(n)$ for every $n\\geq N$?\n-/\n@[category research open, AMS 5 91]\ntheorem grundys_game :\n    answer(sorry) ↔\n      ∃ G : ℕ → ℕ,\n        G 0 = 0 ∧ G 1 = 0 ∧ G 2 = 0 ∧\n        (∀ n ≥ 3,\n          IsLeast\n            {k : ℕ | ∀ a b : ℕ, 1 ≤ a → a < b → a + b = n → k ≠ G a ^^^ G b}\n            (G n)) ∧\n        ∃ p > 0, ∃ N, ∀ n ≥ N, G (n + p) = G n := by\n  sorry\n\nend GrundysGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Because the source is an unresolved yes/no question, the theorem uses `answer(sorry) ↔` rather than asserting the conjectured positive answer.",
+    "The nim-sequence is represented existentially as a function `G : ℕ → ℕ`, with the three base values stated explicitly and its later values uniquely characterized by the recurrence.",
+    "The mex operation is expressed without a bespoke definition: `IsLeast` is applied to the set of natural numbers unavailable as `G a ^^^ G b` for valid unequal positive splits `a + b = n`.",
+    "Eventual periodicity is interpreted as an unspecified positive period and unspecified threshold: `∃ p > 0, ∃ N, ∀ n ≥ N, G (n + p) = G n`, following the background article and decomposition notes."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "grundys_game": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "grundys_game": "/--\nIs the nim-sequence of Grundy's game eventually periodic? More precisely, let `G n` be the\nSprague--Grundy value of a heap of size $n$. Thus $G(0)=G(1)=G(2)=0$, and for $n\\geq 3$,\n$G(n)$ is the least natural number not of the form $G(a)\\mathbin{\\mathrm{XOR}}G(b)$, where\n$a+b=n$ and $1\\leq a<b$. Does there exist a positive period $p$ and a threshold $N$ such\nthat $G(n+p)=G(n)$ for every $n\\geq N$?\n-/\n@[category research open, AMS 5 91]\ntheorem grundys_game :\n    answer(sorry) ↔\n      ∃ G : ℕ → ℕ,\n        G 0 = 0 ∧ G 1 = 0 ∧ G 2 = 0 ∧\n        (∀ n ≥ 3,\n          IsLeast\n            {k : ℕ | ∀ a b : ℕ, 1 ≤ a → a < b → a + b = n → k ≠ G a ^^^ G b}\n            (G n)) ∧\n        ∃ p > 0, ∃ N, ∀ n ≥ N, G (n + p) = G n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Grundy's game\n\n*References:*\n- [Wikipedia, Grundy's game](https://en.wikipedia.org/wiki/Grundy%27s_game)\n- [OEIS A002188](https://oeis.org/A002188)\n-/\n\nnamespace GrundysGame\n\n/--\nThe nim-value of a heap of size `n` in Grundy's game. A move splits the heap into two\nnonempty heaps of different sizes. Its value is the minimum excluded XOR of the values\nof the resulting heaps.\n-/\nnoncomputable def grundyValue (n : ℕ) : ℕ :=\n  sInf {k : ℕ | ∀ a b : ℕ, 1 ≤ a → a < b → a + b = n →\n    k ≠ grundyValue a ^^^ grundyValue b}\ntermination_by n\ndecreasing_by all_goals omega\n\n/--\nIs the nim-sequence of Grundy's game eventually periodic? Here $G(0)=G(1)=G(2)=0$ and\n$$G(n)=\\operatorname{mex}\\{G(a)\\mathbin{\\mathsf{xor}}G(b):a+b=n,\\ 1\\leq a<b\\}.$$\nMore precisely, is there a positive period $p$ and a threshold $N$ such that\n$G(n+p)=G(n)$ for every $n\\geq N$?\n-/\n@[category research open, AMS 5 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, grundyValue (n + p) = grundyValue n := by\n  sorry\n\nend GrundysGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Because the source is phrased as an unresolved yes/no question, the theorem uses `answer(sorry) ↔ P`, where `P` is the positive eventual-periodicity proposition conjectured by Berlekamp–Conway–Guy.",
+    "The terse list entry was expanded using the supplied Grundy's game article and decomposition: `grundyValue` is the single-heap Sprague–Grundy sequence obtained from unequal positive splits `a + b = n` with `1 ≤ a < b`, combining subheap values with natural-number bitwise XOR.",
+    "Minimum excluded value is represented as the infimum of the natural numbers unequal to every reachable XOR value. For heap sizes 0, 1, and 2 there are no legal splits, so this gives value 0.",
+    "Eventual periodicity is stated with an existential positive period and an independently existential threshold: `∃ p > 0, ∃ N, ∀ n ≥ N, G (n + p) = G n`. No period or threshold is fixed."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `SetTheory.PGame.grundyValue` was considered, but it returns a `Nimber` for a constructed pregame and does not directly provide the natural mex sequence for this heap-splitting rule. Searches of Mathlib and FormalConjecturesForMathlib found no finite-natural mex or Grundy's-game sequence definition.",
+     "name": "GrundysGame.grundyValue",
+     "why_needed": "The conjecture concerns the specific natural-valued nim-sequence of single heaps in Grundy's game, defined by a finite natural mex recursion; a direct sequence definition is needed to state the eventual-periodicity proposition faithfully."
+    }
+   ],
+   "per_slot": {
+    "grundys_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "grundys_game": "/--\nIs the nim-sequence of Grundy's game eventually periodic? Here $G(0)=G(1)=G(2)=0$ and\n$$G(n)=\\operatorname{mex}\\{G(a)\\mathbin{\\mathsf{xor}}G(b):a+b=n,\\ 1\\leq a<b\\}.$$\nMore precisely, is there a positive period $p$ and a threshold $N$ such that\n$G(n+p)=G(n)$ for every $n\\geq N$?\n-/\n@[category research open, AMS 5 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, grundyValue (n + p) = grundyValue n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Grundy's game\n\nGrundy's game is a two-player impartial game played with heaps of objects. A move consists of\nsplitting a single heap into two heaps of *different* sizes. Under the normal play convention,\nthe last player able to move wins. Heaps of size at most $2$ cannot be split.\n\nBy the Sprague–Grundy theorem, a heap of size $n$ is equivalent to a nim heap of size\n$\\mathcal{G}(n)$, where $\\mathcal{G}$ is the *nim-sequence* of the game (OEIS A002188):\n$$\\mathcal{G}(n) = \\operatorname{mex}\\{\\mathcal{G}(a) \\oplus \\mathcal{G}(b) : a + b = n,\\\n1 \\le a < b\\},$$\nwith $\\oplus$ the bitwise XOR (nim-sum). Berlekamp, Conway and Guy conjectured that this\nsequence is eventually periodic. This is open.\n\n*References:*\n* [Wikipedia, Grundy's game](https://en.wikipedia.org/wiki/Grundy%27s_game)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* [OEIS A002188](https://oeis.org/A002188)\n-/\n\nnamespace GrundysGame\n\n/--\nThe nim-value (Sprague–Grundy value) $\\mathcal{G}(n)$ of a single heap of size $n$ in Grundy's\ngame. The moves from a heap of size $n$ are the splits into heaps of sizes $a$ and $b$ with\n$a + b = n$ and $1 \\le a < b$. By the Sprague–Grundy theorem the resulting position has\nnim-value $\\mathcal{G}(a) \\oplus \\mathcal{G}(b)$, where $\\oplus$ is the bitwise XOR, and\n$\\mathcal{G}(n)$ is the least natural number that is not the nim-value of any move\n(the minimal excluded value, or mex). In particular $\\mathcal{G}(0) = \\mathcal{G}(1) =\n\\mathcal{G}(2) = 0$, since heaps of size at most $2$ have no moves. This is OEIS A002188.\n-/\nnoncomputable def grundy (n : ℕ) : ℕ :=\n  sInf {m | ∀ a b, 0 < a → a < b → a + b = n → grundy a ^^^ grundy b ≠ m}\ntermination_by n\ndecreasing_by all_goals omega\n\n@[category API, AMS 5 91]\ntheorem grundy_eq (n : ℕ) :\n    grundy n = sInf {m | ∀ a b, 0 < a → a < b → a + b = n → grundy a ^^^ grundy b ≠ m} := by\n  rw [grundy]\n\n@[category test, AMS 5 91]\ntheorem grundy_zero : grundy 0 = 0 := by\n  rw [grundy_eq]\n  exact Nat.sInf_eq_zero.mpr (.inl fun a b _ _ _ => by omega)\n\n@[category test, AMS 5 91]\ntheorem grundy_one : grundy 1 = 0 := by\n  rw [grundy_eq]\n  exact Nat.sInf_eq_zero.mpr (.inl fun a b _ _ _ => by omega)\n\n@[category test, AMS 5 91]\ntheorem grundy_two : grundy 2 = 0 := by\n  rw [grundy_eq]\n  exact Nat.sInf_eq_zero.mpr (.inl fun a b _ _ _ => by omega)\n\n@[category test, AMS 5 91]\ntheorem grundy_three : grundy 3 = 1 := by\n  rw [grundy_eq]\n  have : {m | ∀ a b, 0 < a → a < b → a + b = 3 → grundy a ^^^ grundy b ≠ m} = {m | m ≠ 0} := by\n    ext m\n    constructor\n    · intro h\n      simpa [grundy_one, grundy_two, eq_comm] using h 1 2 (by omega) (by omega) (by omega)\n    · intro h a b ha hab habn\n      obtain ⟨rfl, rfl⟩ : a = 1 ∧ b = 2 := by omega\n      simpa [grundy_one, grundy_two, eq_comm] using h\n  rw [this]\n  refine le_antisymm (Nat.sInf_le (by simp)) ?_\n  rw [Nat.one_le_iff_ne_zero, Ne, Nat.sInf_eq_zero, Set.eq_empty_iff_forall_notMem]\n  rintro (h | h)\n  · exact h rfl\n  · exact h 1 one_ne_zero\n\n/--\n**Grundy's game conjecture** (Berlekamp, Conway, Guy).\nIs the nim-sequence $\\mathcal{G}$ of Grundy's game eventually periodic? That is, do there exist\na period $p > 0$ and a threshold $N$ such that $\\mathcal{G}(n + p) = \\mathcal{G}(n)$ for all\n$n \\ge N$? The conjectured answer is yes.\n-/\n@[category research open, AMS 5 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, grundy (n + p) = grundy n := by\n  sorry\n\nend GrundysGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single slot and its notes (recursion for G, XOR, mex, and the ∃ p > 0, ∃ N, ∀ n ≥ N reading of 'eventually periodic') match the Wikipedia article and OEIS A002188.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The nim-sequence is formalized directly as a well-founded recursion on ℕ: `grundy n = sInf {m | ∀ a b, 0 < a → a < b → a + b = n → grundy a ^^^ grundy b ≠ m}`. This is the mex (least natural number not attained) of the nim-values of all moves from a single heap of size n, mirroring Mathlib's `grundyValue G = sInf (range ...)ᶜ` pattern. The set is always nonempty (finitely many moves), so `sInf` is the genuine mex and never hits the `sInf ∅ = 0` default; for n ≤ 2 there are no moves, giving G(0)=G(1)=G(2)=0 as required.",
+    "The nim-value of a two-heap position is taken as the XOR (`^^^`, i.e. `Nat.xor`) of the single-heap values, per the Sprague–Grundy theorem; this is how the nim-sequence (OEIS A002188) is defined and how the decomposition notes specify it. I chose not to build Grundy's game as a Mathlib `PGame` and use `SetTheory.PGame.grundyValue` (Nimber-valued), since that would add a Nimber→ℕ conversion and considerable machinery without improving faithfulness.",
+    "'Eventually periodic' is inlined as `∃ p > 0, ∃ N, ∀ n ≥ N, grundy (n + p) = grundy n`, exactly as in the decomposition notes; Mathlib has no 'eventually periodic' predicate (`Function.Periodic` is the exact version), and `OeisA100475.IsUltimatelyPeriodic` is local to another problem file.",
+    "The question form uses the repository's preferred `answer(sorry) ↔ P` style, so `answer(True)` asserts the conjectured positive answer (Berlekamp–Conway–Guy).",
+    "AMS tags `5 91` (Combinatorics; Game theory — combinatorial games are MSC 91A46). The computable scratch check of the same recursion reproduced OEIS A002188 for n = 0..20 (0,0,0,1,0,2,1,0,2,1,0,2,1,3,2,1,3,2,4,3,0); the file includes test lemmas for G(0), G(1), G(2), G(3) and an unfolding API lemma `grundy_eq`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `SetTheory.PGame.grundyValue` (Nimber-valued Grundy value of an arbitrary `PGame`) together with `SetTheory.PGame.nim`; using it would require encoding Grundy's game as a `PGame` and converting Nimbers to ℕ, which is heavier and less transparent than the standard ℕ-valued recursion that defines OEIS A002188. Bitwise XOR uses the existing `^^^` (`Nat.xor`); mex uses the existing `sInf` on ℕ.",
+     "name": "GrundysGame.grundy",
+     "why_needed": "The nim-sequence (Sprague–Grundy function) of Grundy's game, G(n) = mex{G(a) XOR G(b) : a + b = n, 1 ≤ a < b}, does not exist in Mathlib or FormalConjecturesForMathlib. It is problem-specific, so it is kept in the problem file (per STATEMENTS.md)."
+    }
+   ],
+   "per_slot": {
+    "grundys_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, grundy (n + p) = grundy n`, where `grundy : ℕ → ℕ` is the nim-sequence of Grundy's game defined by the standard Sprague–Grundy recursion G(n) = mex{G(a) XOR G(b) : a + b = n, 1 ≤ a < b} (so G(0)=G(1)=G(2)=0), exactly as in the decomposition notes and OEIS A002188. `answer(True)` = the sequence is eventually periodic (conjectured answer). Period p and threshold N are existentially quantified and unspecified."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "grundys_game": "/--\n**Grundy's game conjecture** (Berlekamp, Conway, Guy).\nIs the nim-sequence $\\mathcal{G}$ of Grundy's game eventually periodic? That is, do there exist\na period $p > 0$ and a threshold $N$ such that $\\mathcal{G}(n + p) = \\mathcal{G}(n)$ for all\n$n \\ge N$? The conjectured answer is yes.\n-/\n@[category research open, AMS 5 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, grundy (n + p) = grundy n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Grundy's game\n\n*References:*\n- [Wikipedia, Grundy's game](https://en.wikipedia.org/wiki/Grundy%27s_game)\n- [OEIS A002188](https://oeis.org/A002188)\n-/\n\nnamespace GrundysGame\n\n/--\nThe nim-value of a heap of size `n` in Grundy's game. It is the minimum excluded value among\n`grundyValue a XOR grundyValue b` over all unequal positive splits `a + b = n` with `a < b`.\nIn particular, heaps of sizes zero, one, and two have nim-value zero.\n-/\nnoncomputable def grundyValue (n : ℕ) : ℕ :=\n  sInf {k : ℕ | ∀ a b : ℕ, 1 ≤ a → a < b → a + b = n →\n    k ≠ Nat.xor (grundyValue a) (grundyValue b)}\ntermination_by n\ndecreasing_by all_goals omega\n\n/--\nIs the nim-sequence of Grundy's game eventually periodic? More precisely, the conjectured\npositive answer says that there are a period $p > 0$ and a threshold $N$ such that the\nSprague–Grundy value satisfies $G(n+p)=G(n)$ for every $n \\ge N$.\n-/\n@[category research open, AMS 91]\ntheorem grundys_game :\n    ∃ p > 0, ∃ N, ∀ n ≥ N, grundyValue (n + p) = grundyValue n := by\n  sorry\n\nend GrundysGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list-page question using the linked Grundy's game article and the decomposition notes: the nim-sequence is the single-heap Sprague–Grundy sequence with legal moves to two unequal positive heaps.",
+    "Stated the conjectured positive answer directly: there exist an unspecified positive period p and an unspecified threshold N such that G(n + p) = G(n) for every n ≥ N.",
+    "Represented mex as the natural-number infimum of the complement of the legal option values. For heap sizes 0, 1, and 2 there are no legal positive unequal splits, so this definition gives value 0.",
+    "Used one representative a < b for each unordered split, since XOR is symmetric and Grundy's game does not order the two resulting heaps."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib provides Nat.xor, natural-number sInf, and Function.Periodic, but no mex operation or Grundy's-game Sprague–Grundy sequence. The definition therefore uses Nat.xor and sInf directly in a well-founded recurrence.",
+     "name": "GrundysGame.grundyValue",
+     "why_needed": "The conjecture refers to the specific nim-sequence of Grundy's game, but no definition of that game or sequence was found in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "grundys_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "grundys_game": "/--\nIs the nim-sequence of Grundy's game eventually periodic? More precisely, the conjectured\npositive answer says that there are a period $p > 0$ and a threshold $N$ such that the\nSprague–Grundy value satisfies $G(n+p)=G(n)$ for every $n \\ge N$.\n-/\n@[category research open, AMS 91]\ntheorem grundys_game :\n    ∃ p > 0, ∃ N, ∀ n ≥ N, grundyValue (n + p) = grundyValue n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Grundy's game\n\n*References:*\n- [Wikipedia, Grundy's game](https://en.wikipedia.org/wiki/Grundy%27s_game)\n- [OEIS A002188](https://oeis.org/A002188)\n-/\n\nnamespace GrundysGame\n\n/--\nThe nim-sequence of Grundy's game. Its value at `n` is the minimum excluded value of\n`grundySequence a ^^^ grundySequence b` over all unequal positive splits `a + b = n`.\n-/\nnoncomputable def grundySequence : ℕ → ℕ := fun n ↦\n  Nat.strongRec (fun n G ↦\n    sInf (Set.range (fun a : {a : Fin n // 1 ≤ (a : ℕ) ∧ (a : ℕ) < n - a} ↦\n      G a a.1.isLt ^^^ G (n - a) (by omega)))ᶜ) n\n\n/--\nIs the nim-sequence of Grundy's game eventually periodic? Precisely, is there a positive\nperiod $p$ and a threshold $N$ such that $G(n+p)=G(n)$ for every $n\\geq N$?\n-/\n@[category research open, AMS 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, grundySequence (n + p) = grundySequence n := by\n  sorry\n\nend GrundysGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list-page question using the supplied Grundy's game article and OEIS recurrence: the nim-sequence is indexed by all natural heap sizes, including G(0)=G(1)=G(2)=0.",
+    "Represented each unequal positive split uniquely by its smaller part a satisfying 1 ≤ a < n - a; the larger part is n - a. The option value is the bitwise XOR of the two recursively computed nim-values.",
+    "Represented mex as the infimum in ℕ of the complement of the range of option values. The option range is finite; for heap sizes 0, 1, and 2 it is empty, yielding mex ∅ = 0.",
+    "Formalized the yes/no wording with answer(sorry), as required by repository convention, rather than asserting the conjectured positive answer.",
+    "Expanded eventual periodicity directly as existence of an unspecified positive period p and threshold N such that G(n+p)=G(n) for all n≥N."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's PGame.grundyValue is a general Nimber-valued Grundy function on pre-games. Using it would require a bespoke encoding of Grundy's game plus a bridge from finite ordinal nimbers to the explicit natural sequence; the direct well-founded recurrence is substantially closer to the source statement.",
+     "name": "GrundysGame.grundySequence",
+     "why_needed": "The conjecture concerns the specific natural-valued nim-sequence of Grundy's heap-splitting game, for which no existing repository definition was found."
+    }
+   ],
+   "per_slot": {
+    "grundys_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "grundys_game": "/--\nIs the nim-sequence of Grundy's game eventually periodic? Precisely, is there a positive\nperiod $p$ and a threshold $N$ such that $G(n+p)=G(n)$ for every $n\\geq N$?\n-/\n@[category research open, AMS 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, grundySequence (n + p) = grundySequence n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Grundy's game\n\nGrundy's game is a two-player impartial game. The starting position is a single heap of\nobjects, and the players take turns splitting a single heap into two heaps of *different* sizes.\nUnder normal play, the last player able to move wins. Heaps of size at most two can not be split.\n\nBy the Sprague–Grundy theorem, a single heap of size $n$ is equivalent to a nim heap of size\n$G(n)$, where the *nim-sequence* $G$ is given by $G(0) = G(1) = G(2) = 0$ and\n$$G(n) = \\operatorname{mex}\\{G(a) \\oplus G(b) : a + b = n,\\ 1 \\le a < b\\},$$\nwith $\\oplus$ the bitwise XOR (nim-sum) and $\\operatorname{mex}$ the least natural number not in\nthe set. This is OEIS sequence A002188.\n\nBerlekamp, Conway and Guy conjectured that this sequence is eventually periodic. Despite the\ncomputation of the first $2^{35}$ values by Achim Flammenkamp, the question remains open.\n\n*References:*\n- [Grundy's game (Wikipedia)](https://en.wikipedia.org/wiki/Grundy%27s_game)\n- [List of unsolved problems in mathematics (Wikipedia)](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [A002188 (OEIS)](https://oeis.org/A002188)\n-/\n\nnamespace GrundysGame\n\n/--\nThe nim-value (Sprague–Grundy value) $G(n)$ of a single heap of size $n$ in Grundy's game.\n\nA move splits the heap into two heaps of sizes $a$ and $b$ with $a + b = n$ and $1 \\le a < b$;\nthe resulting position has nim-value $G(a) \\oplus G(b)$ (bitwise XOR). Then $G(n)$ is the minimum\nexcluded value of the nim-values of all positions reachable in one move, i.e. the least natural\nnumber $v$ that is not of the form $G(a) \\oplus G(b)$ for such a split. In particular\n$G(0) = G(1) = G(2) = 0$, as heaps of size at most two admit no move.\n-/\nnoncomputable def nimValue (n : ℕ) : ℕ :=\n  sInf {v : ℕ | ∀ a b, 0 < a → a < b → a + b = n → nimValue a ^^^ nimValue b ≠ v}\ntermination_by n\ndecreasing_by all_goals omega\n\n/-- `nimValue n = v` as soon as `v` is not the nim-value of any option of a heap of size `n`,\nwhile every `w < v` is. -/\n@[category API, AMS 5 91]\ntheorem nimValue_eq_of {n v : ℕ}\n    (hv : ∀ a b, 0 < a → a < b → a + b = n → nimValue a ^^^ nimValue b ≠ v)\n    (hlt : ∀ w < v, ∃ a b, 0 < a ∧ a < b ∧ a + b = n ∧ nimValue a ^^^ nimValue b = w) :\n    nimValue n = v := by\n  rw [nimValue]\n  refine le_antisymm (Nat.sInf_le hv) (le_csInf ⟨v, hv⟩ fun w hw => not_lt.1 fun h => ?_)\n  obtain ⟨a, b, ha, hab, habn, hw'⟩ := hlt w h\n  exact hw a b ha hab habn hw'\n\n@[category test, AMS 5 91]\ntheorem nimValue_zero : nimValue 0 = 0 :=\n  nimValue_eq_of (fun _ _ _ _ _ => by omega) (fun _ hw => by omega)\n\n@[category test, AMS 5 91]\ntheorem nimValue_one : nimValue 1 = 0 :=\n  nimValue_eq_of (fun _ _ _ _ _ => by omega) (fun _ hw => by omega)\n\n@[category test, AMS 5 91]\ntheorem nimValue_two : nimValue 2 = 0 :=\n  nimValue_eq_of (fun _ _ _ _ _ => by omega) (fun _ hw => by omega)\n\n@[category test, AMS 5 91]\ntheorem nimValue_three : nimValue 3 = 1 := by\n  refine nimValue_eq_of (fun a b ha hab habn => ?_) (fun w hw => ?_)\n  · obtain ⟨rfl, rfl⟩ : a = 1 ∧ b = 2 := by omega\n    simp [nimValue_one, nimValue_two]\n  · obtain rfl : w = 0 := by omega\n    exact ⟨1, 2, by omega, by omega, rfl, by simp [nimValue_one, nimValue_two]⟩\n\n@[category test, AMS 5 91]\ntheorem nimValue_four : nimValue 4 = 0 := by\n  refine nimValue_eq_of (fun a b ha hab habn => ?_) (fun w hw => by omega)\n  obtain ⟨rfl, rfl⟩ : a = 1 ∧ b = 3 := by omega\n  simp [nimValue_one, nimValue_three]\n\n@[category test, AMS 5 91]\ntheorem nimValue_five : nimValue 5 = 2 := by\n  refine nimValue_eq_of (fun a b ha hab habn => ?_) (fun w hw => ?_)\n  · obtain ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ : (a = 1 ∧ b = 4) ∨ (a = 2 ∧ b = 3) := by omega\n    · simp [nimValue_one, nimValue_four]\n    · simp [nimValue_two, nimValue_three]\n  · obtain rfl | rfl : w = 0 ∨ w = 1 := by omega\n    · exact ⟨1, 4, by omega, by omega, rfl, by simp [nimValue_one, nimValue_four]⟩\n    · exact ⟨2, 3, by omega, by omega, rfl, by simp [nimValue_two, nimValue_three]⟩\n\n/--\n**Grundy's game.** Is the nim-sequence of Grundy's game eventually periodic?\n\nThat is, do there exist a period $p > 0$ and a threshold $N$ such that $G(n + p) = G(n)$ for all\n$n \\ge N$, where $G(n)$ is the nim-value of a single heap of size $n$ in Grundy's game?\nBerlekamp, Conway and Guy conjectured that the answer is yes.\n-/\n@[category research open, AMS 5 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, nimValue (n + p) = nimValue n := by\n  sorry\n\nend GrundysGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single slot with the mex recurrence G(n) = mex{G(a) XOR G(b) : a + b = n, 1 ≤ a < b} and the existential period/threshold reading of 'eventually periodic' matches the Wikipedia article and OEIS A002188.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The nim-sequence is modelled directly by the standard recurrence (Wikipedia/OEIS A002188): `nimValue n = sInf {v | ∀ a b, 0 < a → a < b → a + b = n → nimValue a ^^^ nimValue b ≠ v}`, i.e. mex{G(a) XOR G(b) : a + b = n, 1 ≤ a < b}. Equal splits are excluded by `a < b` and trivial splits by `0 < a`; using ordered pairs a < b gives the same value set as unordered splits. This is chosen over building Grundy's game as a `SetTheory.PGame` and using Mathlib's `grundyValue`, because that Mathlib module is deprecated (moved to the external CGT repo) and the concrete recurrence is the form given in the decomposition table and the source.",
+    "`^^^` on ℕ is `Nat.xor` (checked by `rfl`), i.e. the nim-sum, as required by the Sprague–Grundy theorem for disjunctive sums.",
+    "`Nat.sInf` is used for mex. The excluded-value set is always nonempty (finitely many options), so `sInf` is the true least element; for n ≤ 2 the set is all of ℕ, giving G(0)=G(1)=G(2)=0 automatically, matching the source. The values G(0..5)=0,0,0,1,0,2 are proved as `category test` lemmas, and a computable mirror of the recurrence was checked against the first 21 OEIS terms.",
+    "'Eventually periodic' is stated inline as `∃ p > 0, ∃ N, ∀ n ≥ N, nimValue (n + p) = nimValue n` (period and threshold existential and unspecified), following the precedent of the repository's OEIS eventual-periodicity files rather than introducing a new predicate. `answer(True)` corresponds to the conjectured 'yes' (Berlekamp–Conway–Guy).",
+    "The sequence is indexed from heap size 0 (OEIS offset 0); eventual periodicity is insensitive to the starting index.",
+    "AMS tags `5 91` (combinatorics; game theory) were chosen for a combinatorial game problem.",
+    "Module docstring reports Flammenkamp's computation as the first $2^{35}$ values; the background article text renders this as '235', which is the superscript stripped from 2^35."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SetTheory.PGame.grundyValue` (Mathlib/SetTheory/Game/Nim.lean) together with a hand-built `PGame` for Grundy's game; rejected because the module is deprecated (`deprecated_module`, moved to the external combinatorial-games repo), it is `Nimber`-valued, and it would still require defining the game itself. `Function.Periodic` was considered for eventual periodicity but only expresses full periodicity.",
+     "name": "GrundysGame.nimValue",
+     "why_needed": "The nim-sequence (Sprague–Grundy function of a single heap) of Grundy's game is not in Mathlib or FormalConjecturesForMathlib. It is defined problem-locally by well-founded recursion as the mex of the XORs of the nim-values of the two heaps of every unequal split. A small API lemma `nimValue_eq_of` (sufficient condition for the mex value) supports the test lemmas `nimValue_zero` … `nimValue_five`."
+    }
+   ],
+   "per_slot": {
+    "grundys_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, nimValue (n + p) = nimValue n`, where `nimValue` is the Sprague–Grundy function of a single heap in Grundy's game defined by the mex recurrence from the decomposition notes. Mathlib has no Grundy's-game or ℕ-valued mex/nim-sequence primitive (its `SetTheory.PGame.grundyValue` lives in a deprecated module, is Nimber-valued, and would still require building the game as a PGame), so a bespoke problem-local definition was needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "grundys_game": "/--\n**Grundy's game.** Is the nim-sequence of Grundy's game eventually periodic?\n\nThat is, do there exist a period $p > 0$ and a threshold $N$ such that $G(n + p) = G(n)$ for all\n$n \\ge N$, where $G(n)$ is the nim-value of a single heap of size $n$ in Grundy's game?\nBerlekamp, Conway and Guy conjectured that the answer is yes.\n-/\n@[category research open, AMS 5 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, nimValue (n + p) = nimValue n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Grundy's game\n\nGrundy's game starts with a single heap of objects. A move splits one heap into two heaps of\ndifferent sizes. Under normal play, the last player able to move wins. By the Sprague–Grundy\ntheorem, a heap of size $n$ is equivalent to a nim heap of size $G(n)$, where the nim-sequence\n$G$ is given by $G(0) = G(1) = G(2) = 0$ and\n$$G(n) = \\operatorname{mex}\\{G(a) \\oplus G(b) : a + b = n,\\ 1 \\le a < b\\},$$\nwith $\\oplus$ the bitwise XOR and $\\operatorname{mex}$ the least natural number not in the set.\nThis is [OEIS A002188](https://oeis.org/A002188), which starts\n$0, 0, 0, 1, 0, 2, 1, 0, 2, 1, 0, 2, 1, 3, 2, 1, 3, 2, 4, 3, 0, \\dots$\n\nWhether this sequence is eventually periodic is an open problem. Berlekamp, Conway and Guy\nconjectured that it is, but the question remains unresolved despite the computation of the first\n$2^{35}$ values by Achim Flammenkamp.\n\n*References:*\n* [Wikipedia](https://en.wikipedia.org/wiki/Grundy%27s_game)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* [OEIS A002188](https://oeis.org/A002188)\n-/\n\nnamespace GrundysGame\n\n/-- Among the `s.card + 1` numbers `0, …, s.card`, at least one is not in `s`. -/\n@[category API, AMS 5]\ntheorem exists_notMem_range_filter (s : Finset ℕ) :\n    ((Finset.range (s.card + 1)).filter (· ∉ s)).Nonempty := by\n  obtain ⟨e, he, hes⟩ := Finset.exists_mem_notMem_of_card_lt_card\n    (s := s) (t := Finset.range (s.card + 1)) (by simp)\n  exact ⟨e, Finset.mem_filter.2 ⟨he, hes⟩⟩\n\n/-- The minimal excluded value of a finite set of natural numbers, i.e. the least natural number\nnot in the set. -/\ndef mex (s : Finset ℕ) : ℕ :=\n  ((Finset.range (s.card + 1)).filter (· ∉ s)).min' (exists_notMem_range_filter s)\n\n@[category API, AMS 91]\ntheorem mex_notMem (s : Finset ℕ) : mex s ∉ s :=\n  (Finset.mem_filter.1 (Finset.min'_mem _ (exists_notMem_range_filter s))).2\n\n@[category API, AMS 91]\ntheorem mem_of_lt_mex {s : Finset ℕ} {m : ℕ} (hm : m < mex s) : m ∈ s := by\n  by_contra h\n  have hmex : mex s < s.card + 1 := Finset.mem_range.1\n    (Finset.mem_filter.1 (Finset.min'_mem _ (exists_notMem_range_filter s))).1\n  exact absurd (Finset.min'_le _ m (Finset.mem_filter.2 ⟨Finset.mem_range.2 (by omega), h⟩))\n    (not_le.2 hm)\n\n/-- `mex s` is the least natural number not in `s`. -/\n@[category API, AMS 91]\ntheorem mex_eq_sInf (s : Finset ℕ) : mex s = sInf {m | m ∉ s} := by\n  apply le_antisymm\n  · exact not_lt.1 fun hlt => Nat.sInf_mem (s := {m | m ∉ s}) ⟨mex s, mex_notMem s⟩\n      (mem_of_lt_mex hlt)\n  · exact Nat.sInf_le (mex_notMem s)\n\n@[category test, AMS 91]\ntheorem mex_empty : mex ∅ = 0 := by\n  decide\n\n@[category test, AMS 91]\ntheorem mex_example : mex {0, 1, 3} = 2 := by\n  decide\n\n/-- The nim-sequence of Grundy's game: `nimValue n` is the Sprague–Grundy value of a single heap\nof size `n`. A heap of size `n` can be split into heaps of sizes `a` and `b` with\n`a + b = n` and `1 ≤ a < b`, and the resulting position has Sprague–Grundy value\n`nimValue a ^^^ nimValue b` (bitwise XOR). Hence\n$G(n) = \\operatorname{mex}\\{G(a) \\oplus G(b) : a + b = n,\\ 1 \\le a < b\\}$; in particular\n$G(0) = G(1) = G(2) = 0$. This is [OEIS A002188](https://oeis.org/A002188). -/\ndef nimValue (n : ℕ) : ℕ :=\n  mex <| ((Finset.univ : Finset (Fin n × Fin n)).filter\n    fun ab => 0 < ab.1.val ∧ ab.1.val < ab.2.val ∧ ab.1.val + ab.2.val = n).image\n    fun ab => nimValue ab.1 ^^^ nimValue ab.2\ntermination_by n\ndecreasing_by all_goals simp\n\n/-- The first twelve terms of the nim-sequence agree with OEIS A002188. -/\n@[category test, AMS 91]\ntheorem nimValue_first_terms :\n    ∀ n < 12, nimValue n = [0, 0, 0, 1, 0, 2, 1, 0, 2, 1, 0, 2].getD n 0 := by\n  decide +kernel\n\n/--\n**Grundy's game.** Is the nim-sequence of Grundy's game eventually periodic? That is, do there\nexist a period $p > 0$ and a threshold $N$ such that $G(n + p) = G(n)$ for all $n \\ge N$, where\n$G(n)$ is the Sprague–Grundy value of a single heap of size $n$ in Grundy's game?\n\nBerlekamp, Conway and Guy conjectured that the answer is yes.\n-/\n@[category research open, AMS 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, nimValue (n + p) = nimValue n := by\n  sorry\n\nend GrundysGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single-slot decomposition matches the source: one yes/no question whose conjectured answer is 'yes'.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The nim-sequence is defined directly by the Sprague–Grundy recurrence G(n) = mex{G(a) XOR G(b) : a + b = n, 1 ≤ a < b} (as in the decomposition notes and OEIS A002188), rather than by building Grundy's game as a Mathlib `PGame` and taking `grundyValue`. Mathlib's game/nim module is deprecated (moved to the CGT repo) and Nimber-valued, so the direct recurrence is simpler and matches the source's own description of the nim-sequence.",
+    "The recurrence is implemented over pairs `(a, b) : Fin n × Fin n` with `0 < a ∧ a < b ∧ a + b = n` (so the recursive calls are visibly on smaller arguments); for n ≤ 2 the set is empty and mex ∅ = 0, giving G(0)=G(1)=G(2)=0 without a separate base case. XOR is `^^^` on ℕ (`Nat.xor`).",
+    "`mex` is defined computably as the minimum of `{0, …, s.card} \\ s` so that tests can be checked by `decide`; API lemmas `mex_notMem`, `mem_of_lt_mex` and `mex_eq_sInf` (mex s = sInf {m | m ∉ s}) prove it is the usual least-excluded value. A test `nimValue_first_terms` checks the first twelve terms against the OEIS/Wikipedia table via `decide +kernel` (a kernel-reduced check of G(13)=3 was also done in scratch, which distinguishes XOR from OR, but is omitted from the file for compile-time reasons).",
+    "'Eventually periodic' is inlined as `∃ p > 0, ∃ N, ∀ n ≥ N, nimValue (n + p) = nimValue n` (strictly positive period, arbitrary threshold), matching the decomposition notes; no existing repo-wide eventual-periodicity predicate exists (only a file-local one in an OEIS file).",
+    "The sequence is indexed from heap size 0 (OEIS offset 0), which does not affect eventual periodicity.",
+    "AMS tag 91 (game theory; combinatorial games are 91A46) is used for the conjecture and nim-sequence lemmas; the purely finset-theoretic helper `exists_notMem_range_filter` is tagged AMS 5."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`sInf {m | m ∉ s}` via `Nat.instInfSet` (noncomputable, so tests could not be decided; we instead prove `mex_eq_sInf` relating the two), and Mathlib's `Ordinal.mex`/nimber machinery.",
+     "name": "GrundysGame.mex",
+     "why_needed": "The minimal excluded value of a finite set of naturals is needed for the Sprague–Grundy recurrence; Mathlib has no mex for `Finset ℕ` (only ordinal/nimber-level notions in the deprecated game modules)."
+    },
+    {
+     "closest_existing_considered": "`SetTheory.PGame.grundyValue` in `Mathlib.SetTheory.Game.Nim` (deprecated module, Nimber-valued, and would still require defining Grundy's game as a PGame).",
+     "name": "GrundysGame.nimValue",
+     "why_needed": "The nim-sequence (Sprague–Grundy function of a single heap) of Grundy's game, OEIS A002188, does not exist in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "grundys_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, nimValue (n + p) = nimValue n`, where `nimValue` is the nim-sequence of Grundy's game defined by the mex/XOR recurrence from the decomposition notes (OEIS A002188). `answer(True)` is the positive answer (eventually periodic), which is the Berlekamp–Conway–Guy conjecture; period and threshold are existentially quantified and unspecified, exactly as in the notes. Bespoke definitions `mex` and `nimValue` were needed (no mex-of-finset or Grundy's-game primitives exist; Mathlib's `SetTheory.PGame.grundyValue` lives in a deprecated module, is Nimber-valued and would require building the game as a PGame)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "grundys_game": "/--\n**Grundy's game.** Is the nim-sequence of Grundy's game eventually periodic? That is, do there\nexist a period $p > 0$ and a threshold $N$ such that $G(n + p) = G(n)$ for all $n \\ge N$, where\n$G(n)$ is the Sprague–Grundy value of a single heap of size $n$ in Grundy's game?\n\nBerlekamp, Conway and Guy conjectured that the answer is yes.\n-/\n@[category research open, AMS 91]\ntheorem grundys_game :\n    answer(sorry) ↔ ∃ p > 0, ∃ N, ∀ n ≥ N, nimValue (n + p) = nimValue n := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "grundys_game": "c07"
+ },
+ "id": "wp-grundys-game",
+ "main_attempt": "c07"
+}

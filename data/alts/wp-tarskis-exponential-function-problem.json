@@ -1,0 +1,506 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tarski's exponential function problem\n\n*Reference:*\n[Wikipedia](https://en.wikipedia.org/wiki/Tarski%27s_exponential_function_problem)\n-/\n\nnamespace TarskisExponentialFunctionProblem\n\nopen FirstOrder\n\n/-- The function symbols $+$, $\\times$, $-$, $0$, $1$, and $\\exp$ for the language of\nordered exponential rings. -/\ninductive RealExpFunc : ℕ → Type\n  | add : RealExpFunc 2\n  | mul : RealExpFunc 2\n  | neg : RealExpFunc 1\n  | zero : RealExpFunc 0\n  | one : RealExpFunc 0\n  | exp : RealExpFunc 1\n  deriving DecidableEq\n\n/-- The strict-order relation symbol $<$. -/\ninductive RealExpRel : ℕ → Type\n  | lt : RealExpRel 2\n  deriving DecidableEq\n\n/-- The first-order language of ordered rings extended by a unary exponential symbol. -/\ndef realExpLanguage : FirstOrder.Language where\n  Functions := RealExpFunc\n  Relations := RealExpRel\n\ninstance : Fintype realExpLanguage.Symbols :=\n  ⟨⟨Multiset.ofList\n    [Sum.inl ⟨2, .add⟩, Sum.inl ⟨2, .mul⟩, Sum.inl ⟨1, .neg⟩,\n      Sum.inl ⟨0, .zero⟩, Sum.inl ⟨0, .one⟩, Sum.inl ⟨1, .exp⟩,\n      Sum.inr ⟨2, .lt⟩], by\n    dsimp [FirstOrder.Language.Symbols, realExpLanguage]\n    decide⟩, by\n      rintro (⟨_, f⟩ | ⟨_, r⟩)\n      · cases f <;> decide\n      · cases r; decide⟩\n\nnoncomputable instance : Encodable realExpLanguage.Symbols :=\n  Fintype.toEncodable _\n\nnoncomputable instance : Encodable (Σ n, realExpLanguage.Functions n) :=\n  Encodable.ofInj (fun f => (Sum.inl f : realExpLanguage.Symbols)) Sum.inl_injective\n\nnoncomputable instance : Encodable (Σ n, realExpLanguage.Relations n) :=\n  Encodable.ofInj (fun r => (Sum.inr r : realExpLanguage.Symbols)) Sum.inr_injective\n\n/-- The interpretation of `realExpLanguage` on $\\mathbb R$, with the unary symbol `exp`\ninterpreted as `Real.exp`. -/\nnoncomputable def realExpStructure : realExpLanguage.Structure ℝ where\n  funMap\n    | .add => fun x => x 0 + x 1\n    | .mul => fun x => x 0 * x 1\n    | .neg => fun x => -x 0\n    | .zero => fun _ => 0\n    | .one => fun _ => 1\n    | .exp => fun x => Real.exp (x 0)\n  RelMap\n    | .lt => fun x => x 0 < x 1\n\n/-- An injective Gödel coding of sentences in `realExpLanguage` by natural numbers. -/\nnoncomputable def sentenceCode (φ : realExpLanguage.Sentence) : ℕ :=\n  Encodable.encode (FirstOrder.Language.BoundedFormula.listEncode φ)\n\n/--\nTarski's exponential function problem asks whether the complete first-order theory of\n$\\mathbb R_{\\exp} = (\\mathbb R,+,\\times,-,<,0,1,\\exp)$ is decidable. Equivalently, is the set\nof Gödel codes of sentences true in this structure a computable set?\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔\n      letI := realExpStructure\n      ComputablePred fun n : ℕ =>\n        ∃ φ : realExpLanguage.Sentence, sentenceCode φ = n ∧ ℝ ⊨ φ := by\n  sorry\n\nend TarskisExponentialFunctionProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “the theory of the real numbers with the exponential function” as the complete first-order theory of the structure (ℝ, +, ×, −, <, 0, 1, exp), with the exponential symbol interpreted by `Real.exp`, as specified by the background article.",
+    "Expressed decidability as `ComputablePred` for the set of natural-number Gödel codes of true sentences. Natural numbers not coding a sentence are outside this set.",
+    "Used Mathlib's injective `BoundedFormula.listEncode` as the basis of the sentence coding. This avoids conflating effective decidability with Lean's much weaker `DecidablePred` and works around Mathlib's documented lack of a `Primcodable` instance for first-order formulas.",
+    "Included multiplication in the ordered-ring signature. This follows the standard ordered-ring language and the article's description of the ordered real field; the displayed source notation's dash between `+` and `<` is read in context as including multiplication, while unary negation is also included.",
+    "Used strict order `<` rather than Mathlib's existing order language based on `≤`, matching the source language exactly. These presentations are effectively interdefinable, but the direct choice avoids relying on that equivalence."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.ring` supplies the ring symbols but has no exponential symbol.",
+     "name": "RealExpFunc",
+     "why_needed": "Provides the exact arity-indexed function symbols +, ×, unary −, 0, 1, and exp."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.order` uses a non-strict `≤` symbol rather than `<`.",
+     "name": "RealExpRel",
+     "why_needed": "Provides the binary strict-order symbol required by the source."
+    },
+    {
+     "closest_existing_considered": "Sums of `Language.ring` and `Language.order` were considered, but no existing Mathlib language has both `Real.exp` and strict order.",
+     "name": "realExpLanguage",
+     "why_needed": "Combines the exact ordered-ring and exponential signature into one first-order language."
+    },
+    {
+     "closest_existing_considered": "Mathlib has separate compatible ring and order structures, but no structure for the real exponential field in this exact language.",
+     "name": "realExpStructure",
+     "why_needed": "Interprets the bespoke signature on ℝ, in particular interpreting the unary symbol as `Real.exp`."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `BoundedFormula.listEncode` is used internally, but Mathlib explicitly leaves `Primcodable` instances for terms and formulas as a TODO; a direct `ComputablePred` on sentences is therefore unavailable.",
+     "name": "sentenceCode",
+     "why_needed": "Supplies a fixed injective natural-number Gödel code for sentences so their truth set can be passed to `ComputablePred`."
+    }
+   ],
+   "per_slot": {
+    "tarskis_exponential_function_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tarskis_exponential_function_problem": "/--\nTarski's exponential function problem asks whether the complete first-order theory of\n$\\mathbb R_{\\exp} = (\\mathbb R,+,\\times,-,<,0,1,\\exp)$ is decidable. Equivalently, is the set\nof Gödel codes of sentences true in this structure a computable set?\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔\n      letI := realExpStructure\n      ComputablePred fun n : ℕ =>\n        ∃ φ : realExpLanguage.Sentence, sentenceCode φ = n ∧ ℝ ⊨ φ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tarski's exponential function problem\n\nTarski proved that the first-order theory of the ordered field of real numbers, in the\nlanguage of ordered rings $L_{\\mathrm{or}} = (+, \\cdot, -, <, 0, 1)$, is decidable. He then\nasked whether this remains true when a unary function symbol $\\exp$, interpreted as the real\nexponential function, is added to the language, giving the structure\n$\\mathbb{R}_{\\exp} = (\\mathbb{R}, +, \\cdot, -, <, 0, 1, \\exp)$.\n\n*References:*\n- [Wikipedia, Tarski's exponential function problem](https://en.wikipedia.org/wiki/Tarski%27s_exponential_function_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- A. Macintyre, A. Wilkie, *On the decidability of the real exponential field*, in:\n  Kreiseliana: about and around Georg Kreisel, A K Peters (1996), 441–467.\n-/\n\nnamespace TarskisExponentialFunctionProblem\n\nopen FirstOrder FirstOrder.Language\n\n/-- The function symbols of the language of ordered rings with exponentiation:\naddition `+`, multiplication `·`, negation `-`, the exponential `exp` and the constants `0` and\n`1`. -/\ninductive Func : ℕ → Type\n  | add : Func 2\n  | mul : Func 2\n  | neg : Func 1\n  | exp : Func 1\n  | zero : Func 0\n  | one : Func 0\n  deriving DecidableEq\n\n/-- The relation symbols of the language of ordered rings with exponentiation:\nthe single binary relation `<`. -/\ninductive Rel : ℕ → Type\n  | lt : Rel 2\n  deriving DecidableEq\n\n/-- The language `L_exp = (+, ·, -, <, 0, 1, exp)` of ordered rings with a unary function\nsymbol `exp`. -/\ndef expLanguage : Language := ⟨Func, Rel⟩\n\n/-- The real numbers as an `expLanguage`-structure `ℝ_exp = (ℝ, +, ·, -, <, 0, 1, exp)`: every\nsymbol has its usual interpretation and `exp` is interpreted as `Real.exp`. -/\nnoncomputable instance : expLanguage.Structure ℝ where\n  funMap := fun {n} f =>\n    match n, f with\n    | _, .add => fun x => x 0 + x 1\n    | _, .mul => fun x => x 0 * x 1\n    | _, .neg => fun x => -x 0\n    | _, .exp => fun x => Real.exp (x 0)\n    | _, .zero => fun _ => 0\n    | _, .one => fun _ => 1\n  RelMap := fun {n} r =>\n    match n, r with\n    | _, .lt => fun x => x 0 < x 1\n\n/-- An explicit coding of the (finitely many) function symbols of `expLanguage` by natural\nnumbers. -/\ninstance : Encodable (Σ n, expLanguage.Functions n) :=\n  Encodable.ofLeftInjection\n    (fun f => match f with\n      | ⟨_, .add⟩ => 0\n      | ⟨_, .mul⟩ => 1\n      | ⟨_, .neg⟩ => 2\n      | ⟨_, .exp⟩ => 3\n      | ⟨_, .zero⟩ => 4\n      | ⟨_, .one⟩ => 5)\n    (fun k => match k with\n      | 0 => some ⟨2, .add⟩\n      | 1 => some ⟨2, .mul⟩\n      | 2 => some ⟨1, .neg⟩\n      | 3 => some ⟨1, .exp⟩\n      | 4 => some ⟨0, .zero⟩\n      | 5 => some ⟨0, .one⟩\n      | _ => none)\n    (by rintro ⟨_, f⟩; cases f <;> rfl)\n\n/-- An explicit coding of the single relation symbol of `expLanguage` by a natural number. -/\ninstance : Encodable (Σ n, expLanguage.Relations n) :=\n  Encodable.ofLeftInjection (fun _ => 0)\n    (fun k => match k with\n      | 0 => some ⟨2, .lt⟩\n      | _ => none)\n    (by rintro ⟨_, r⟩; cases r; rfl)\n\n/-- A first-order theory `T` in a language with encodable symbols is *decidable* if there is a\ncomputable function on the Gödel numbers of sentences that, given the code of a sentence `φ`,\nreturns `true` if and only if `φ ∈ T`.\n\nSentences are coded by Mathlib's list encoding `FirstOrder.Language.BoundedFormula.listEncode`,\ncomposed with the standard `Encodable` coding of lists into `ℕ`. -/\ndef IsDecidableTheory {L : Language} [Encodable (Σ n, L.Functions n)]\n    [Encodable (Σ n, L.Relations n)] (T : L.Theory) : Prop :=\n  ∃ f : ℕ → Bool, Computable f ∧\n    ∀ φ : L.Sentence, (f (Encodable.encode (BoundedFormula.listEncode φ)) = true ↔ φ ∈ T)\n\n/--\n**Tarski's exponential function problem.**\n\nIs the theory of the real numbers with the exponential function decidable? That is, is the\ncomplete first-order theory\n$\\operatorname{Th}(\\mathbb{R}_{\\exp})$ of the structure\n$\\mathbb{R}_{\\exp} = (\\mathbb{R}, +, \\cdot, -, <, 0, 1, \\exp)$ decidable, i.e. is there an\neffective procedure which, given any sentence $\\varphi$ of the language\n$(+, \\cdot, -, <, 0, 1, \\exp)$, determines whether $\\mathbb{R}_{\\exp} \\models \\varphi$?\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ IsDecidableTheory (expLanguage.completeTheory ℝ) := by\n  sorry\n\n/-- The symbol `exp` is interpreted in `ℝ_exp` as `Real.exp`. -/\n@[category test, AMS 3]\ntheorem funMap_exp (x : Fin 1 → ℝ) :\n    Structure.funMap (L := expLanguage) (Func.exp : expLanguage.Functions 1) x = Real.exp (x 0) :=\n  rfl\n\n/-- The symbol `<` is interpreted in `ℝ_exp` as the usual strict order. -/\n@[category test, AMS 3]\ntheorem relMap_lt (x : Fin 2 → ℝ) :\n    Structure.RelMap (L := expLanguage) (Rel.lt : expLanguage.Relations 2) x ↔ x 0 < x 1 :=\n  Iff.rfl\n\n/-- The `expLanguage`-sentence `∀ x, 0 < exp x`. -/\ndef expPos : expLanguage.Sentence :=\n  ∀' Relations.boundedFormula₂ (Rel.lt : expLanguage.Relations 2)\n    (Constants.term (Func.zero : expLanguage.Constants))\n    (Functions.apply₁ (Func.exp : expLanguage.Functions 1) &0)\n\n/-- The sentence `∀ x, 0 < exp x` is true in `ℝ_exp`. -/\n@[category test, AMS 3]\ntheorem realize_expPos : ℝ ⊨ expPos := fun x => Real.exp_pos x\n\nend TarskisExponentialFunctionProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The single-slot decomposition is correct: the list entry poses exactly one yes/no question. (Minor note: the notes' language list (+, −, <, 0, 1), copied from the article, omits multiplication; I included · as the phrase 'language of ordered rings' and the standard formulation of ℝ_exp require. This does not change the decidability question.)",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list entry is terse; following the article, 'the theory of the real numbers with the exponential function' is read as the complete first-order theory Th(ℝ_exp) of ℝ_exp = (ℝ, +, ·, −, <, 0, 1, exp), formalized as `expLanguage.completeTheory ℝ` (Mathlib's `completeTheory` = {φ | ℝ ⊨ φ}).",
+    "Multiplication is included in the language. The background article's display of L_or reads (+, −, <, 0, 1) (dropping ·), but it calls it 'the language of ordered rings', and the standard formulation (Macintyre–Wilkie, Kuhlmann) of ℝ_exp includes ·. Decidability is unaffected either way, since · is first-order definable from +, <, exp on ℝ by an explicit computable translation.",
+    "The strict order `<` is used as the relation symbol, matching the article literally (Mathlib's `Language.order` uses `≤`; the two are inter-definable in a linear order).",
+    "'Decidable' is formalized as: there exists a Mathlib-`Computable` (total recursive) function `f : ℕ → Bool` with `f ⌜φ⌝ = true ↔ φ ∈ Th(ℝ_exp)` for every sentence φ, where ⌜φ⌝ is the Gödel number obtained from Mathlib's `BoundedFormula.listEncode` and the standard `Encodable` coding of lists/sums/sigmas into ℕ, with explicit fixed codes for the 7 symbols. This matches the article's 'given any sentence φ there is an effective procedure for determining whether ℝ ⊨ φ'. Behaviour of `f` off the set of codes is unconstrained; this is equivalent to computability of the set of codes of true sentences because the set of valid codes is itself computable under this numbering. All encoding combinators involved are primitive recursive, so the notion is invariant under any other reasonable Gödel numbering.",
+    "The direction of the iff: `answer(True)` asserts Th(ℝ_exp) is decidable; `answer(False)` asserts it is undecidable.",
+    "Three `@[category test]` lemmas (`funMap_exp`, `relMap_lt`, `realize_expPos`) check the bespoke structure; no additional variants (Tarski's theorem for ℝ without exp, the Schanuel-conditional result, weak Schanuel) are stated, as the decomposition table treats them as background.",
+    "`deriving DecidableEq` on the symbol types mirrors Mathlib's convention for `ringFunc`/`orderRel`; it is not needed for the statement.",
+    "`IsDecidableTheory` is generic and reusable; it lives in the problem file only because the task allows a single output file. A reviewer may prefer to move it to FormalConjecturesForMathlib."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.ring.sum Language.order` plus an extra one-symbol language; rejected because Mathlib's order language uses `≤` rather than `<`, `Language.sum` would still require bespoke Encodable instances for its symbols, and the exp symbol has to be added by hand anyway, so the composite was less transparent than a direct definition.",
+     "name": "TarskisExponentialFunctionProblem.Func / Rel / expLanguage",
+     "why_needed": "The language (+, ·, −, <, 0, 1, exp) of ordered rings with a unary exponential symbol is not in Mathlib or the repo. Defined from scratch (as Mathlib does for `Language.ring`, `Language.order`, `Language.graph`) so that `<` is literally the relation symbol used in the source."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Ring.compatibleRingOfRing ℝ` and `FirstOrder.Language.orderStructure` (both are `def`s for the ring/order languages only, no exponential).",
+     "name": "instance : expLanguage.Structure ℝ",
+     "why_needed": "The structure ℝ_exp = (ℝ, +, ·, −, <, 0, 1, exp) with `exp` interpreted as `Real.exp` does not exist in Mathlib."
+    },
+    {
+     "closest_existing_considered": "`Encodable.ofCountable`, `Fintype.toEncodable` (noncomputable, non-canonical), Mathlib's `deriving Encodable` handler (not applicable to indexed families `ℕ → Type`).",
+     "name": "instance : Encodable (Σ n, expLanguage.Functions n), instance : Encodable (Σ n, expLanguage.Relations n)",
+     "why_needed": "Mathlib's list encodings of terms/formulas require encodable symbol types; explicit codes (0..5 and 0) are given via `Encodable.ofLeftInjection` so the Gödel numbering is fully explicit and does not depend on `Classical.choice` (as `Encodable.ofCountable`/`Fintype.toEncodable` would)."
+    },
+    {
+     "closest_existing_considered": "`ComputablePred` (needs `Primcodable L.Sentence`, absent from Mathlib; building it requires proving the decoder primitive recursive), `FirstOrder.Language.BoundedFormula.encoding` (an `Encoding` into a list alphabet, not a numbering), `Computability.TM2Computable` (Turing-machine level, needs a `FinEncoding` of sentences, absent).",
+     "name": "TarskisExponentialFunctionProblem.IsDecidableTheory",
+     "why_needed": "Mathlib has no notion of a decidable first-order theory, no `Primcodable`/`Encodable` instance for `L.Sentence` (only an `Encoding` into lists and `Countable`), so `ComputablePred` cannot be applied to sentences directly. `IsDecidableTheory T := ∃ f : ℕ → Bool, Computable f ∧ ∀ φ : L.Sentence, (f (encode (BoundedFormula.listEncode φ)) = true ↔ φ ∈ T)` expresses exactly 'there is an effective procedure which, given any sentence φ, determines whether φ ∈ T'. This is a generic reusable definition; in a real PR it would belong in FormalConjecturesForMathlib (the task restricted output to a single file)."
+    },
+    {
+     "closest_existing_considered": "none (test-only auxiliary).",
+     "name": "TarskisExponentialFunctionProblem.expPos",
+     "why_needed": "A concrete sentence `∀ x, 0 < exp x` used only for a `@[category test]` lemma checking that the structure interprets `<`, `0`, `exp` as intended (proved by `fun x => Real.exp_pos x`)."
+    }
+   ],
+   "per_slot": {
+    "tarskis_exponential_function_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ IsDecidableTheory (expLanguage.completeTheory ℝ)`, where `expLanguage` is the language (+, ·, −, <, 0, 1, exp), ℝ carries the structure with `exp ↦ Real.exp` and the usual interpretations, `completeTheory` is Mathlib's Th(ℝ_exp) = {φ | ℝ ⊨ φ}, and `IsDecidableTheory T` says there is a Mathlib-`Computable` function ℕ → Bool that, on the Gödel code of any sentence φ (Mathlib's `BoundedFormula.listEncode` composed with the standard `Encodable` coding of lists, with explicit fixed codes for the finitely many symbols), returns true iff φ ∈ T. Mathlib has no notion of a decidable first-order theory, no `Encodable`/`Primcodable` instance for sentences, and no ℝ_exp structure, so these were defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tarskis_exponential_function_problem": "/--\n**Tarski's exponential function problem.**\n\nIs the theory of the real numbers with the exponential function decidable? That is, is the\ncomplete first-order theory\n$\\operatorname{Th}(\\mathbb{R}_{\\exp})$ of the structure\n$\\mathbb{R}_{\\exp} = (\\mathbb{R}, +, \\cdot, -, <, 0, 1, \\exp)$ decidable, i.e. is there an\neffective procedure which, given any sentence $\\varphi$ of the language\n$(+, \\cdot, -, <, 0, 1, \\exp)$, determines whether $\\mathbb{R}_{\\exp} \\models \\varphi$?\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ IsDecidableTheory (expLanguage.completeTheory ℝ) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tarski's exponential function problem\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Tarski%27s_exponential_function_problem)\n-/\n\nnamespace TarskisExponentialFunctionProblem\n\n/-- Terms in the language of rings extended by a unary exponential function.\nVariables are represented by de Bruijn indices. -/\ninductive ExpTerm\n  | var (i : ℕ)\n  | zero\n  | one\n  | add (t u : ExpTerm)\n  | mul (t u : ExpTerm)\n  | neg (t : ExpTerm)\n  | exp (t : ExpTerm)\n  deriving DecidableEq, Encodable\n\nnamespace ExpTerm\n\n/-- The interpretation of an exponential-ring term in the real numbers. -/\nnoncomputable def realize (v : ℕ → ℝ) : ExpTerm → ℝ\n  | .var i => v i\n  | .zero => 0\n  | .one => 1\n  | .add t u => realize v t + realize v u\n  | .mul t u => realize v t * realize v u\n  | .neg t => -realize v t\n  | .exp t => Real.exp (realize v t)\n\n/-- `BoundedBy n t` means that every variable in `t` has de Bruijn index less than `n`. -/\ndef BoundedBy (n : ℕ) : ExpTerm → Prop\n  | .var i => i < n\n  | .zero | .one => True\n  | .add t u | .mul t u => BoundedBy n t ∧ BoundedBy n u\n  | .neg t | .exp t => BoundedBy n t\n\nend ExpTerm\n\n/-- First-order formulas in the language of ordered rings extended by a unary exponential\nfunction. Equality is logical equality and `lt` is the strict-order relation. -/\ninductive ExpFormula\n  | falsum\n  | equal (t u : ExpTerm)\n  | lt (t u : ExpTerm)\n  | imp (φ ψ : ExpFormula)\n  | all (φ : ExpFormula)\n  deriving DecidableEq, Encodable\n\nnamespace ExpFormula\n\n/-- Extend a de Bruijn valuation by assigning `x` to the newly bound variable. -/\ndef consValue (x : ℝ) (v : ℕ → ℝ) : ℕ → ℝ\n  | 0 => x\n  | n + 1 => v n\n\n/-- The usual first-order interpretation of an exponential ordered-ring formula in `ℝ`. -/\ndef Realize (v : ℕ → ℝ) : ExpFormula → Prop\n  | .falsum => False\n  | .equal t u => t.realize v = u.realize v\n  | .lt t u => t.realize v < u.realize v\n  | .imp φ ψ => Realize v φ → Realize v ψ\n  | .all φ => ∀ x : ℝ, Realize (consValue x v) φ\n\n/-- `ClosedAt n φ` means that every free variable in `φ` is among the `n` variables\nbound outside it. -/\ndef ClosedAt (n : ℕ) : ExpFormula → Prop\n  | .falsum => True\n  | .equal t u | .lt t u => t.BoundedBy n ∧ u.BoundedBy n\n  | .imp φ ψ => ClosedAt n φ ∧ ClosedAt n ψ\n  | .all φ => ClosedAt (n + 1) φ\n\n/-- A sentence is a formula with no free variables. -/\ndef IsSentence (φ : ExpFormula) : Prop :=\n  ClosedAt 0 φ\n\nend ExpFormula\n\n/--\nTarski's exponential function problem asks whether the complete first-order theory of\n$\\mathbb{R}$ in the language $(0,1,+,\\cdot,-,<,\\exp)$ is decidable. Equivalently, does\nthere exist a computable Boolean procedure on codes of formulas which, on every closed formula,\nreturns true exactly when that sentence holds in $\\mathbb{R}$ with `exp` interpreted as\n`Real.exp`?\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ ComputablePred fun code : ℕ ↦\n      ∃ φ : ExpFormula, φ.IsSentence ∧ Encodable.encode φ = code ∧ φ.Realize default := by\n  sorry\n\nend TarskisExponentialFunctionProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page question is read, following the background article, as asking whether the complete first-order theory of the real exponential ordered field is recursive: the theorem uses `answer(sorry) ↔ ComputablePred ...`, so `True` is the positive answer.",
+    "The concrete signature contains `0`, `1`, addition, multiplication, negation, strict order, equality, and one unary exponential operation interpreted as `Real.exp`. Implication, falsity, and universal quantification form a functionally complete first-order logical basis.",
+    "Formulas use natural-number de Bruijn indices. `ExpFormula.IsSentence` enforces closure, and quantification extends a valuation at index zero. The arbitrary `default` valuation in the theorem therefore has no semantic effect on admitted sentences.",
+    "The recursive set is stated as the exact set of natural numbers produced by Lean's structurally derived `Encodable` instance for closed formulas true in the real structure; malformed codes and codes of open formulas are outside the set.",
+    "A bespoke concrete syntax was used only after checking Mathlib's `FirstOrder.Language`, `completeTheory`, and `ModelTheory.Encoding`. Mathlib's encoding module explicitly lists `Primcodable` instances for terms and formulas as a TODO, so its semantic `completeTheory` cannot faithfully be passed directly to `ComputablePred` without an ineffective or newly developed coding layer."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Term` for `Language.ring.sum Language.order`; Mathlib.ModelTheory.Encoding supplies only `Encodable`/countability results and explicitly leaves `Primcodable` syntax as TODO.",
+     "name": "ExpTerm",
+     "why_needed": "Provides a concrete, structurally encodable term syntax for the finite exponential ordered-ring language, because Mathlib first-order terms lack the primitive-recursive coding infrastructure needed by `ComputablePred`."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Term.realize` under a custom Mathlib `Language.Structure`; using it would still leave the effective sentence-coding gap.",
+     "name": "ExpTerm.realize",
+     "why_needed": "Interprets the bespoke terms in `ℝ`, with the unary symbol interpreted specifically as `Real.exp`."
+    },
+    {
+     "closest_existing_considered": "Intrinsic scoping in `FirstOrder.Language.BoundedFormula`; that syntax lacks the needed effective coding primitive.",
+     "name": "ExpTerm.BoundedBy",
+     "why_needed": "Checks de Bruijn-variable scope so formulas can be restricted to genuine sentences."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula` and `FirstOrder.Language.Sentence`, which have semantics but no `Primcodable` instance.",
+     "name": "ExpFormula",
+     "why_needed": "Provides structurally encoded first-order formulas over the exact concrete signature."
+    },
+    {
+     "closest_existing_considered": "Mathlib's internal valuation handling in `BoundedFormula.Realize`, unavailable for the bespoke effective syntax.",
+     "name": "ExpFormula.consValue",
+     "why_needed": "Implements valuation extension for de Bruijn semantics under a quantifier."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.Realize` and `Sentence.Realize`; these operate on Mathlib syntax whose effective coding is missing.",
+     "name": "ExpFormula.Realize",
+     "why_needed": "Defines truth of the concrete formulas in the real exponential ordered field."
+    },
+    {
+     "closest_existing_considered": "The index of Mathlib's intrinsically scoped `BoundedFormula`; unavailable on the bespoke unscoped syntax.",
+     "name": "ExpFormula.ClosedAt",
+     "why_needed": "Recursively characterizes formulas whose variables are bound at a given quantifier depth."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Sentence`, which cannot directly support the required `ComputablePred` statement.",
+     "name": "ExpFormula.IsSentence",
+     "why_needed": "Selects formulas with no free variables, so the recursive predicate is exactly a theory of sentences."
+    }
+   ],
+   "per_slot": {
+    "tarskis_exponential_function_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tarskis_exponential_function_problem": "/--\nTarski's exponential function problem asks whether the complete first-order theory of\n$\\mathbb{R}$ in the language $(0,1,+,\\cdot,-,<,\\exp)$ is decidable. Equivalently, does\nthere exist a computable Boolean procedure on codes of formulas which, on every closed formula,\nreturns true exactly when that sentence holds in $\\mathbb{R}$ with `exp` interpreted as\n`Real.exp`?\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ ComputablePred fun code : ℕ ↦\n      ∃ φ : ExpFormula, φ.IsSentence ∧ Encodable.encode φ = code ∧ φ.Realize default := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tarski's exponential function problem\n\nTarski proved that the first-order theory of the ordered field of real numbers\n$\\mathbb{R} = (\\mathbb{R}, +, -, \\cdot, <, 0, 1)$ is decidable. He then asked whether this\nremains true when a unary function symbol $\\exp$, interpreted as the real exponential function,\nis added to the language, giving the structure $\\mathbb{R}_{\\exp}$.\n\n*References:*\n- [Wikipedia, Tarski's exponential function problem](https://en.wikipedia.org/wiki/Tarski%27s_exponential_function_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- A. Macintyre, A. Wilkie, *On the decidability of the real exponential field*, in:\n  Kreiseliana: about and around Georg Kreisel, A K Peters (1996), 441–467.\n- [S. Kuhlmann, Model theory of the real exponential function, Encyclopedia of\n  Mathematics](https://encyclopediaofmath.org/index.php?title=Model_theory_of_the_real_exponential_function)\n-/\n\nopen FirstOrder FirstOrder.Language\n\nnamespace TarskisExponentialFunctionProblem\n\n/-\n## Decidable theories\n\nA first-order theory `T` in a language `L` is *decidable* if the set of (Gödel codes of) sentences\nin `T` is a computable (recursive) set of natural numbers. To make sense of this we need a\n(computable) Gödel numbering of `L`-sentences. Mathlib provides the injective list encoding\n`FirstOrder.Language.BoundedFormula.listEncode` of formulas as lists of symbols; combined with\nMathlib's `Encodable` instances for lists, sums, sigma types and terms, this gives an `Encodable`\ninstance on sentences whenever the function and relation symbols of `L` are encodable.\n-/\n\nsection DecidableTheory\n\nvariable {L : Language} {α : Type*} [Encodable α] [Encodable (Σ n, L.Functions n)]\n  [Encodable (Σ n, L.Relations n)]\n\n/-- Gödel numbering of bounded formulas, derived from Mathlib's encoding of formulas as lists of\nsymbols (`FirstOrder.Language.BoundedFormula.encoding`). -/\ninstance instEncodableSigmaBoundedFormula : Encodable (Σ n, L.BoundedFormula α n) :=\n  Encodable.ofLeftInjection\n    (α := List ((Σ k, L.Term (α ⊕ Fin k)) ⊕ ((Σ n, L.Relations n) ⊕ ℕ)))\n    BoundedFormula.encoding.encode BoundedFormula.encoding.decode\n    BoundedFormula.encoding.decode_encode\n\n/-- Gödel numbering of bounded formulas with a fixed number of free variables (in particular of\nformulas and of sentences). -/\ninstance instEncodableBoundedFormula (n : ℕ) : Encodable (L.BoundedFormula α n) :=\n  Encodable.ofLeftInjection (fun φ => (⟨n, φ⟩ : Σ n, L.BoundedFormula α n))\n    (fun ⟨m, ψ⟩ => if h : m = n then some (h ▸ ψ) else none)\n    (fun φ => by simp)\n\n/-- A theory `T` of a language `L` with encodable symbols is *decidable* if the set of Gödel codes\nof the sentences in `T` is a computable (recursive) subset of `ℕ`, i.e. there is an algorithm\nthat, given an `L`-sentence `φ`, decides whether `φ ∈ T`. -/\ndef IsDecidableTheory (T : L.Theory) : Prop :=\n  ComputablePred (· ∈ Encodable.encode '' T)\n\n/-- The empty theory is decidable. -/\n@[category test, AMS 3]\ntheorem isDecidableTheory_empty : IsDecidableTheory (∅ : L.Theory) := by\n  simpa [IsDecidableTheory] using (Computable.const false).computablePred\n\nend DecidableTheory\n\n/-\n## The real exponential field `ℝ_exp`\n\nThe language of ordered rings with an additional unary function symbol `exp`, and its standard\ninterpretation on the real numbers, where `exp` is interpreted as `Real.exp`.\n-/\n\n/-- The function symbols of the language of `ℝ_exp`: `+`, `·`, `-`, `exp`, `0`, `1`. -/\ninductive ExpFunc : ℕ → Type\n  /-- Binary addition `+`. -/\n  | add : ExpFunc 2\n  /-- Binary multiplication `·`. -/\n  | mul : ExpFunc 2\n  /-- Unary negation `-`. -/\n  | neg : ExpFunc 1\n  /-- The unary exponential function symbol `exp`. -/\n  | exp : ExpFunc 1\n  /-- The constant `0`. -/\n  | zero : ExpFunc 0\n  /-- The constant `1`. -/\n  | one : ExpFunc 0\n\n/-- The relation symbols of the language of `ℝ_exp`: the binary order relation `<`. -/\ninductive ExpRel : ℕ → Type\n  /-- The strict order relation `<`. -/\n  | lt : ExpRel 2\n\n/-- The language `L_exp = (+, ·, -, exp, 0, 1, <)` of ordered rings expanded by a unary\nfunction symbol `exp`. -/\ndef expLanguage : Language := ⟨ExpFunc, ExpRel⟩\n\n/-- The structure `ℝ_exp`: the real numbers as an `expLanguage`-structure, with the usual\ninterpretation of the ordered ring symbols and `exp` interpreted as the real exponential function\n`Real.exp`. -/\nnoncomputable instance : expLanguage.Structure ℝ where\n  funMap {n} f x :=\n    match n, f with\n    | _, .add => x 0 + x 1\n    | _, .mul => x 0 * x 1\n    | _, .neg => - x 0\n    | _, .exp => Real.exp (x 0)\n    | _, .zero => 0\n    | _, .one => 1\n  RelMap {n} r x :=\n    match n, r with\n    | _, .lt => x 0 < x 1\n\n/-- The (finitely many) function symbols of `expLanguage` are encodable. -/\ninstance : Encodable (Σ n, expLanguage.Functions n) :=\n  Encodable.ofLeftInjection\n    (fun f => match f with\n      | ⟨_, .add⟩ => (0 : ℕ)\n      | ⟨_, .mul⟩ => 1\n      | ⟨_, .neg⟩ => 2\n      | ⟨_, .exp⟩ => 3\n      | ⟨_, .zero⟩ => 4\n      | ⟨_, .one⟩ => 5)\n    (fun n => match n with\n      | 0 => some ⟨2, .add⟩\n      | 1 => some ⟨2, .mul⟩\n      | 2 => some ⟨1, .neg⟩\n      | 3 => some ⟨1, .exp⟩\n      | 4 => some ⟨0, .zero⟩\n      | 5 => some ⟨0, .one⟩\n      | _ => none)\n    (by rintro ⟨_, f⟩; cases f <;> rfl)\n\n/-- The (single) relation symbol of `expLanguage` is encodable. -/\ninstance : Encodable (Σ n, expLanguage.Relations n) :=\n  Encodable.ofLeftInjection (fun _ => ()) (fun _ => some ⟨2, .lt⟩)\n    (by rintro ⟨_, r⟩; cases r; rfl)\n\n/-- The symbol `exp` is interpreted in `ℝ_exp` as the real exponential function. -/\n@[category test, AMS 3]\ntheorem funMap_exp (x : ℝ) :\n    Structure.funMap (L := expLanguage) (ExpFunc.exp : expLanguage.Functions 1) ![x] =\n      Real.exp x :=\n  rfl\n\n/-- The symbol `<` is interpreted in `ℝ_exp` as the usual strict order on `ℝ`. -/\n@[category test, AMS 3]\ntheorem relMap_lt (x y : ℝ) :\n    Structure.RelMap (L := expLanguage) (ExpRel.lt : expLanguage.Relations 2) ![x, y] ↔ x < y :=\n  Iff.rfl\n\n/-- The sentence `∀ x, 0 < exp x` holds in `ℝ_exp`. -/\n@[category test, AMS 3]\ntheorem realize_zero_lt_exp :\n    ℝ ⊨ (∀' Relations.boundedFormula₂ (ExpRel.lt : expLanguage.Relations 2)\n      (Constants.term (ExpFunc.zero : expLanguage.Constants))\n      (Functions.apply₁ (ExpFunc.exp : expLanguage.Functions 1) &0) : expLanguage.Sentence) := by\n  simp only [Sentence.Realize, Formula.Realize, BoundedFormula.realize_all,\n    BoundedFormula.realize_rel₂, Term.realize_constants, Term.realize_functions_apply₁]\n  intro x\n  exact Real.exp_pos _\n\n/--\n**Tarski's exponential function problem.** Is the (complete first-order) theory\n$\\operatorname{Th}(\\mathbb{R}_{\\exp})$ of the real numbers with the exponential function\ndecidable? Here $\\mathbb{R}_{\\exp} = (\\mathbb{R}, +, \\cdot, -, <, 0, 1, \\exp)$ is the ordered\nfield of real numbers with a unary function symbol interpreted as the real exponential function,\nand decidability means that the set of (Gödel codes of) sentences true in $\\mathbb{R}_{\\exp}$\nis a computable set, i.e. there is an effective procedure which, given a sentence $\\varphi$ of\nthe language, determines whether $\\mathbb{R}_{\\exp} \\models \\varphi$.\n\nMacintyre and Wilkie (1996) showed that a positive answer follows from (the real version of)\nSchanuel's conjecture, and that it is equivalent to their \"weak Schanuel's conjecture\".\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ IsDecidableTheory (expLanguage.completeTheory ℝ) := by\n  sorry\n\nend TarskisExponentialFunctionProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None of substance. The note's description of the language as '(+, −, <, 0, 1)' copies an omission from the Wikipedia article: the language of ordered rings (and the actual ℝ_exp of Tarski / Macintyre–Wilkie) includes multiplication, which the formalisation includes.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Multiplication is included in the language. The Wikipedia article writes L_or = (+, −, <, 0, 1), but it calls this 'the language of ordered rings' and refers to 'the real field'; Tarski's theorem and Macintyre–Wilkie's ℝ_exp = (ℝ, +, ·, −, <, 0, 1, exp) both use multiplication, so the omission of · in the article is a typo. (Multiplication is in any case first-order definable from +, <, exp on ℝ via exp(log x + log y), so the two theories are inter-decidable.)",
+    "The order symbol is the strict order `<` as in the article, not Mathlib's `Language.order` (which uses ≤); constants 0 and 1 and unary negation are included as in the article.",
+    "Decidability of a theory is formalised as `ComputablePred (· ∈ Encodable.encode '' T)`: the set of Gödel codes of sentences of T is a recursive set of naturals (Mathlib's `ComputablePred` over `ℕ`). The Gödel numbering is derived from Mathlib's `FirstOrder.Language.BoundedFormula.encoding` (list encoding of formulas), Mathlib's `Encodable` instances for lists/sums/sigma types/terms, and explicit finite codings of the 6 function symbols and 1 relation symbol; this numbering is (informally) computable with computable inverse, as required for the notion to be meaningful. Mathlib does not yet have `Primcodable` instances for formulas (it is a stated TODO), so `ComputablePred` could not be applied directly to sentences.",
+    "A bespoke flat language (`ExpFunc`, `ExpRel`, `expLanguage`) is used instead of `Language.ring.sum (...)` built from Mathlib's `Language.ring`, because the sum construction would still need a bespoke language for `exp` and `<`, would rely on the non-instance `compatibleRingOfRing`, and would make the interpretation on ℝ much harder to read and check.",
+    "The `expLanguage.Structure ℝ` instance is `noncomputable` because `Real.exp` is noncomputable; this is unavoidable and does not affect the statement.",
+    "The generic helper definitions (`Encodable` instances for bounded formulas and `IsDecidableTheory`) are reusable and would normally go in `FormalConjecturesForMathlib/ModelTheory/`; they are placed in the problem file only because the sandbox permits writing a single file. Three `category test` lemmas check the interpretation of `exp` and `<` and that `ℝ ⊨ ∀ x, 0 < exp x`; one checks `IsDecidableTheory ∅`.",
+    "The Schanuel-conditional result, the weak-Schanuel equivalence and the reduction to exponential-polynomial solvability are mentioned only in the docstring, per the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.encoding` (a `Computability.Encoding`, not `Encodable`), the `Countable (Σ n, L.BoundedFormula α n)` instance, `Encodable.ofCountable` (rejected: noncomputable/arbitrary injection, which would make decidability meaningless).",
+     "name": "TarskisExponentialFunctionProblem.instEncodableSigmaBoundedFormula",
+     "why_needed": "An `Encodable` (Gödel numbering) instance on `Σ n, L.BoundedFormula α n` is needed to talk about codes of sentences; Mathlib only provides `Countable` (noncomputable, arbitrary) for formulas. Built via `Encodable.ofLeftInjection` from Mathlib's `BoundedFormula.encoding` so that the numbering is the standard syntactic one."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Encodable (L.Term α)` instance (terms only) and `Countable (L.Formula α)`.",
+     "name": "TarskisExponentialFunctionProblem.instEncodableBoundedFormula",
+     "why_needed": "Restricts the sigma-type encoding to `L.BoundedFormula α n` for fixed `n`, giving `Encodable L.Sentence`."
+    },
+    {
+     "closest_existing_considered": "`ComputablePred` applied directly to `L.Sentence` (rejected: needs a `Primcodable L.Sentence` instance, which Mathlib lacks and lists as a TODO); `Theory.IsComplete`/`IsSatisfiable` (different notions).",
+     "name": "TarskisExponentialFunctionProblem.IsDecidableTheory",
+     "why_needed": "Mathlib has no notion of a decidable first-order theory. Defined as `ComputablePred (· ∈ Encodable.encode '' T)`: the set of Gödel codes of sentences of `T` is a recursive subset of ℕ."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.ring.sum Language.order` extended by a further sum with a one-symbol language (rejected as much less readable and needing the non-instance `compatibleRingOfRing`).",
+     "name": "TarskisExponentialFunctionProblem.ExpFunc / ExpRel / expLanguage",
+     "why_needed": "The first-order language (+, ·, −, exp, 0, 1, <) of ℝ_exp. Mathlib has `Language.ring` and `Language.order` (with ≤) but no language with a unary `exp` symbol or with a strict order."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Ring.compatibleRingOfRing ℝ` and `Language.orderStructure` (cover only the ring / ≤ parts, no exp).",
+     "name": "TarskisExponentialFunctionProblem.instStructureExpLanguageReal (noncomputable instance : expLanguage.Structure ℝ)",
+     "why_needed": "The structure ℝ_exp: the standard interpretation of the ordered-ring symbols on ℝ with `exp ↦ Real.exp`."
+    },
+    {
+     "closest_existing_considered": "`Fintype.toEncodable` (rejected: noncomputable / arbitrary enumeration), `deriving Encodable` (not available for indexed inductive families).",
+     "name": "TarskisExponentialFunctionProblem.instEncodableSigmaFunctionsExpLanguage / instEncodableSigmaRelationsExpLanguage",
+     "why_needed": "Explicit computable codings of the six function symbols and the single relation symbol of `expLanguage`, needed as inputs to the sentence encoding."
+    }
+   ],
+   "per_slot": {
+    "tarskis_exponential_function_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ IsDecidableTheory (expLanguage.completeTheory ℝ)`, where `expLanguage` is the language of ordered rings (+, ·, −, <, 0, 1) plus a unary symbol `exp`, `ℝ` carries the standard `expLanguage.Structure` with `exp` interpreted as `Real.exp`, `completeTheory` is Mathlib's Th(ℝ_exp), and `IsDecidableTheory T` says the set of Gödel codes of sentences in `T` is a computable (recursive) subset of ℕ (`ComputablePred`), with codes given by Mathlib's syntactic list encoding of formulas. Mathlib has no notion of a decidable theory, no `Encodable` instance for formulas/sentences, and no language of ordered rings with exp, so these had to be defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tarskis_exponential_function_problem": "/--\n**Tarski's exponential function problem.** Is the (complete first-order) theory\n$\\operatorname{Th}(\\mathbb{R}_{\\exp})$ of the real numbers with the exponential function\ndecidable? Here $\\mathbb{R}_{\\exp} = (\\mathbb{R}, +, \\cdot, -, <, 0, 1, \\exp)$ is the ordered\nfield of real numbers with a unary function symbol interpreted as the real exponential function,\nand decidability means that the set of (Gödel codes of) sentences true in $\\mathbb{R}_{\\exp}$\nis a computable set, i.e. there is an effective procedure which, given a sentence $\\varphi$ of\nthe language, determines whether $\\mathbb{R}_{\\exp} \\models \\varphi$.\n\nMacintyre and Wilkie (1996) showed that a positive answer follows from (the real version of)\nSchanuel's conjecture, and that it is equivalent to their \"weak Schanuel's conjecture\".\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ IsDecidableTheory (expLanguage.completeTheory ℝ) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tarski's exponential function problem\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Tarski%27s_exponential_function_problem)\n-/\n\nnamespace TarskisExponentialFunctionProblem\n\nopen FirstOrder\n\n/-- Function symbols for the language of ordered rings with exponentiation. -/\ninductive RealExpFunction : ℕ → Type\n  | add : RealExpFunction 2\n  | mul : RealExpFunction 2\n  | neg : RealExpFunction 1\n  | zero : RealExpFunction 0\n  | one : RealExpFunction 0\n  | exp : RealExpFunction 1\n  deriving DecidableEq\n\n/-- The strict-order symbol for the language of ordered rings with exponentiation. -/\ninductive RealExpRelation : ℕ → Type\n  | lt : RealExpRelation 2\n  deriving DecidableEq\n\n/-- The first-order language of ordered rings extended by a unary exponential symbol. -/\ndef realExpLanguage : Language where\n  Functions := RealExpFunction\n  Relations := RealExpRelation\n\ninstance : Encodable (Σ n, RealExpFunction n) where\n  encode\n    | ⟨_, .add⟩ => 0\n    | ⟨_, .mul⟩ => 1\n    | ⟨_, .neg⟩ => 2\n    | ⟨_, .zero⟩ => 3\n    | ⟨_, .one⟩ => 4\n    | ⟨_, .exp⟩ => 5\n  decode\n    | 0 => some ⟨2, .add⟩\n    | 1 => some ⟨2, .mul⟩\n    | 2 => some ⟨1, .neg⟩\n    | 3 => some ⟨0, .zero⟩\n    | 4 => some ⟨0, .one⟩\n    | 5 => some ⟨1, .exp⟩\n    | _ => none\n  encodek := by\n    rintro ⟨n, f⟩\n    cases f <;> rfl\n\ninstance : Encodable (Σ n, RealExpRelation n) where\n  encode\n    | ⟨_, .lt⟩ => 0\n  decode\n    | 0 => some ⟨2, .lt⟩\n    | _ => none\n  encodek := by\n    rintro ⟨n, r⟩\n    cases r\n    rfl\n\ninstance : Encodable (Σ n, realExpLanguage.Functions n) := by\n  change Encodable (Σ n, RealExpFunction n)\n  infer_instance\n\ninstance : Encodable (Σ n, realExpLanguage.Relations n) := by\n  change Encodable (Σ n, RealExpRelation n)\n  infer_instance\n\n/-- The interpretation of `realExpLanguage` on the real numbers, with the unary symbol\ninterpreted as `Real.exp`. -/\nnoncomputable def realExpStructure : realExpLanguage.Structure ℝ where\n  funMap\n    | .add => fun x => x 0 + x 1\n    | .mul => fun x => x 0 * x 1\n    | .neg => fun x => -x 0\n    | .zero => fun _ => 0\n    | .one => fun _ => 1\n    | .exp => fun x => Real.exp (x 0)\n  RelMap\n    | .lt => fun x => x 0 < x 1\n\n/-- The natural-number code of a sentence obtained from Mathlib's concrete first-order syntax\nencoding. -/\ndef sentenceCode (φ : realExpLanguage.Sentence) : ℕ :=\n  Encodable.encode (show\n    List ((Σ k, realExpLanguage.Term (Empty ⊕ Fin k)) ⊕\n      ((Σ n, realExpLanguage.Relations n) ⊕ ℕ)) from\n    (Language.BoundedFormula.encoding (L := realExpLanguage) (α := Empty)).encode ⟨0, φ⟩)\n\n/-- The predicate on natural-number codes whose canonical sentence is true in the ordered real\nfield with exponentiation. Invalid and noncanonical codes do not satisfy this predicate. -/\ndef IsRealExpTheoryCode (n : ℕ) : Prop :=\n  ∃ φ : realExpLanguage.Sentence,\n    sentenceCode φ = n ∧ @Language.Sentence.Realize realExpLanguage ℝ realExpStructure φ\n\n/--\nTarski's exponential function problem asks whether the complete first-order theory of the ordered\nreal field $(\\mathbb{R}, +, \\times, -, <, 0, 1, \\exp)$ is decidable; equivalently, whether the set\nof codes of first-order sentences true in this structure is computable.\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ ComputablePred IsRealExpTheoryCode := by\n  sorry\n\nend TarskisExponentialFunctionProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “the theory of the real numbers with the exponential function” as the complete first-order theory of the ordered real field expanded by a unary symbol interpreted as `Real.exp`, following the background article.",
+    "Used the standard ordered-ring signature with addition, multiplication, negation, zero, one, and strict order. Multiplication is included because the source describes the ordered real field/ordered-ring language; the terse rendered symbol list omits the usual multiplication glyph.",
+    "Formalized decidability as `ComputablePred` on natural-number Gödel codes, rather than Lean's proposition-level `Decidable`. Codes are produced by Mathlib's concrete injective encoding of first-order bounded formulas followed by the standard natural-number encoding of its list alphabet; noncanonical and invalid natural numbers are excluded.",
+    "Used `answer(sorry) ↔ ComputablePred IsRealExpTheoryCode`, so a positive answer is exactly the existence of an effective decision procedure for truth in the real exponential structure."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `FirstOrder.Language.ring` has the ring symbols but no exponential symbol, and its sigma type of function symbols lacks the `Encodable` instance needed here.",
+     "name": "RealExpFunction",
+     "why_needed": "Provides the finite arity-indexed function symbols of the exact ordered-ring language expanded by exponentiation."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FirstOrder.Language.order` uses a non-strict `≤` symbol and its sigma relation-symbol type lacks the needed `Encodable` instance.",
+     "name": "RealExpRelation",
+     "why_needed": "Provides the strict binary order symbol specified by the source."
+    },
+    {
+     "closest_existing_considered": "Considered sums of `Language.ring`, `Language.order`, and a unary language, but that would use `≤` rather than `<` and still require bespoke coding instances.",
+     "name": "realExpLanguage",
+     "why_needed": "Combines the ordered-ring operations, strict order, and unary exponential into the precise first-order signature."
+    },
+    {
+     "closest_existing_considered": "Mathlib has separate compatible ring and order structures, but no structure for the real exponential field.",
+     "name": "realExpStructure",
+     "why_needed": "Fixes the intended interpretation on `ℝ`, especially interpreting the added unary symbol as `Real.exp`."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.encoding` is used internally; `Countable.toEncodable` was rejected because its arbitrary classical coding would not faithfully support a computability statement.",
+     "name": "sentenceCode",
+     "why_needed": "Supplies an explicit effective natural-number coding because Mathlib currently has a concrete formula `Encoding` but no `Encodable` or `Primcodable` instance for first-order formulas/sentences."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Language.completeTheory` is a set of sentences, but `ComputablePred` requires a primitively codable domain and Mathlib sentences have no `Primcodable` instance.",
+     "name": "IsRealExpTheoryCode",
+     "why_needed": "Defines the set of canonical sentence codes belonging to the complete theory of the fixed real exponential structure."
+    }
+   ],
+   "per_slot": {
+    "tarskis_exponential_function_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tarskis_exponential_function_problem": "/--\nTarski's exponential function problem asks whether the complete first-order theory of the ordered\nreal field $(\\mathbb{R}, +, \\times, -, <, 0, 1, \\exp)$ is decidable; equivalently, whether the set\nof codes of first-order sentences true in this structure is computable.\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ ComputablePred IsRealExpTheoryCode := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tarski's exponential function problem\n\nTarski proved that the first-order theory of the ordered field of real numbers, in the\nlanguage of ordered rings $L_{\\text{or}} = (+, \\cdot, -, <, 0, 1)$, is decidable. He then asked\nwhether this remains true when a unary function symbol $\\exp$, interpreted as the real\nexponential function, is added to the language. The resulting structure is denoted\n$\\mathbb{R}_{\\exp}$, and the question is whether its complete theory\n$\\operatorname{Th}(\\mathbb{R}_{\\exp})$ is decidable, i.e. whether there is an effective\nprocedure that, given any sentence $\\varphi$ of the language, determines whether\n$\\mathbb{R}_{\\exp} \\models \\varphi$.\n\nMacintyre and Wilkie showed that Schanuel's conjecture (in fact, a real version of it) implies\na positive answer, and that a positive answer is equivalent to their \"weak Schanuel conjecture\".\nThe problem remains open.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Tarski%27s_exponential_function_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- A. Macintyre, A. J. Wilkie, *On the decidability of the real exponential field*,\n  in: Kreiseliana: about and around Georg Kreisel, A K Peters (1996), 441–467.\n- [S. Kuhlmann, *Model theory of the real exponential function*, Encyclopedia of Mathematics](https://encyclopediaofmath.org/index.php?title=Model_theory_of_the_real_exponential_function)\n-/\n\nnamespace TarskisExponentialFunctionProblem\n\nopen FirstOrder FirstOrder.Language\n\n/-- The function symbols of the language of ordered rings extended by exponentiation, indexed\nby arity: the binary operations `+` and `·`, the unary operations `-` and `exp`, and the\nconstants `0` and `1`. -/\ninductive ExpFunc : ℕ → Type\n  | add : ExpFunc 2\n  | mul : ExpFunc 2\n  | neg : ExpFunc 1\n  | exp : ExpFunc 1\n  | zero : ExpFunc 0\n  | one : ExpFunc 0\n  deriving DecidableEq\n\n/-- The relation symbols of the language of ordered rings extended by exponentiation, indexed\nby arity: the single binary relation `<`. -/\ninductive ExpRel : ℕ → Type\n  | lt : ExpRel 2\n  deriving DecidableEq\n\n/-- The first-order language $L_{\\text{or}} \\cup \\{\\exp\\} = (+, \\cdot, -, <, 0, 1, \\exp)$\nof ordered rings with a unary function symbol for exponentiation. -/\ndef expLanguage : Language := ⟨ExpFunc, ExpRel⟩\n\n/-- An explicit enumeration of the six function symbols of `expLanguage`. -/\ndef funcSymbolEquiv : (Σ n, expLanguage.Functions n) ≃ Fin 6 where\n  toFun\n    | ⟨_, .add⟩ => 0\n    | ⟨_, .mul⟩ => 1\n    | ⟨_, .neg⟩ => 2\n    | ⟨_, .exp⟩ => 3\n    | ⟨_, .zero⟩ => 4\n    | ⟨_, .one⟩ => 5\n  invFun :=\n    ![⟨2, .add⟩, ⟨2, .mul⟩, ⟨1, .neg⟩, ⟨1, .exp⟩, ⟨0, .zero⟩, ⟨0, .one⟩]\n  left_inv := by rintro ⟨_, f⟩; cases f <;> rfl\n  right_inv := by decide\n\n/-- `expLanguage` has exactly one relation symbol. -/\ndef relSymbolEquiv : (Σ n, expLanguage.Relations n) ≃ Unit where\n  toFun _ := ()\n  invFun _ := ⟨2, .lt⟩\n  left_inv := by rintro ⟨_, r⟩; cases r; rfl\n  right_inv _ := rfl\n\ninstance : Encodable (Σ n, expLanguage.Functions n) := Encodable.ofEquiv _ funcSymbolEquiv\n\ninstance : Encodable (Σ n, expLanguage.Relations n) := Encodable.ofEquiv _ relSymbolEquiv\n\n/-- The structure $\\mathbb{R}_{\\exp}$: the real numbers, where `+`, `·`, `-`, `<`, `0`, `1` have\ntheir usual interpretations and `exp` is interpreted as the exponential function `Real.exp`. -/\nnoncomputable instance realExpStructure : expLanguage.Structure ℝ where\n  funMap {n} f x := match n, f with\n    | _, .add => x 0 + x 1\n    | _, .mul => x 0 * x 1\n    | _, .neg => -x 0\n    | _, .exp => Real.exp (x 0)\n    | _, .zero => 0\n    | _, .one => 1\n  RelMap {n} r x := match n, r with\n    | _, .lt => x 0 < x 1\n\n@[category API, AMS 3]\ntheorem funMap_add (x : Fin 2 → ℝ) :\n    Structure.funMap (L := expLanguage) ExpFunc.add x = x 0 + x 1 :=\n  rfl\n\n@[category API, AMS 3]\ntheorem funMap_mul (x : Fin 2 → ℝ) :\n    Structure.funMap (L := expLanguage) ExpFunc.mul x = x 0 * x 1 :=\n  rfl\n\n@[category API, AMS 3]\ntheorem funMap_neg (x : Fin 1 → ℝ) : Structure.funMap (L := expLanguage) ExpFunc.neg x = -x 0 :=\n  rfl\n\n@[category API, AMS 3]\ntheorem funMap_exp (x : Fin 1 → ℝ) :\n    Structure.funMap (L := expLanguage) ExpFunc.exp x = Real.exp (x 0) :=\n  rfl\n\n@[category API, AMS 3]\ntheorem funMap_zero (x : Fin 0 → ℝ) : Structure.funMap (L := expLanguage) ExpFunc.zero x = 0 :=\n  rfl\n\n@[category API, AMS 3]\ntheorem funMap_one (x : Fin 0 → ℝ) : Structure.funMap (L := expLanguage) ExpFunc.one x = 1 :=\n  rfl\n\n@[category API, AMS 3]\ntheorem relMap_lt (x : Fin 2 → ℝ) :\n    Structure.RelMap (L := expLanguage) ExpRel.lt x ↔ x 0 < x 1 :=\n  Iff.rfl\n\n/-- A theory `T` in a language `L` with (effectively) encodable symbols is *decidable* if the set\nof natural-number codes of the sentences belonging to `T` is a computable (recursive) set.\nSentences are coded via Mathlib's `FirstOrder.Language.BoundedFormula.listEncode`, which writes a\nsentence as a list of symbols, followed by the standard encoding of lists into `ℕ`.\n\nFor this coding the set of codes of well-formed sentences is itself computable, so this is the\nsame as asking for an effective procedure which, given any `L`-sentence `φ`, decides whether\n`φ ∈ T`. -/\ndef IsDecidable {L : Language} [Encodable (Σ n, L.Functions n)] [Encodable (Σ n, L.Relations n)]\n    (T : L.Theory) : Prop :=\n  ComputablePred fun n : ℕ => ∃ φ ∈ T, Encodable.encode φ.listEncode = n\n\n/-- **Tarski's exponential function problem.** Is the theory of the real numbers with the\nexponential function decidable?\n\nThat is, is the complete first-order theory $\\operatorname{Th}(\\mathbb{R}_{\\exp})$ of the\nstructure $\\mathbb{R}_{\\exp} = (\\mathbb{R}, +, \\cdot, -, <, 0, 1, \\exp)$ decidable, i.e. is there\nan effective procedure that, given any sentence $\\varphi$ of the language\n$(+, \\cdot, -, <, 0, 1, \\exp)$, determines whether $\\mathbb{R}_{\\exp} \\models \\varphi$? -/\n@[category research open, AMS 3 12]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ IsDecidable (expLanguage.completeTheory ℝ) := by\n  sorry\n\n/-- The sentence `∀ x, 0 < exp x` of `expLanguage`. -/\ndef expPosSentence : expLanguage.Sentence :=\n  ∀' Relations.boundedFormula₂ ExpRel.lt (Constants.term ExpFunc.zero)\n    (Functions.apply₁ ExpFunc.exp (&0))\n\n/-- The sentence `∀ x, 0 < exp x` belongs to $\\operatorname{Th}(\\mathbb{R}_{\\exp})$. -/\n@[category test, AMS 3]\ntheorem expPosSentence_mem_completeTheory : expPosSentence ∈ expLanguage.completeTheory ℝ := by\n  show ℝ ⊨ expPosSentence\n  simp only [expPosSentence, Sentence.Realize, Formula.Realize, BoundedFormula.realize_all,\n    BoundedFormula.realize_rel₂, Term.realize_constants, Term.realize_functions_apply₁]\n  exact fun x => Real.exp_pos _\n\nend TarskisExponentialFunctionProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition is correct: the list entry poses one yes/no question, and the Schanuel-conditional result, weak-Schanuel equivalence and exponential-polynomial reduction are background theorems rather than additional questions.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Language: the Wikipedia article writes L_or = (+, −, <, 0, 1), omitting multiplication; the standard language of ordered rings (and Tarski's theorem on real closed fields, as well as Macintyre–Wilkie's ℝ_exp) includes `·`, so the file uses (+, ·, −, <, 0, 1, exp). Note that multiplication is definable in (ℝ, +, <, exp) anyway, so the decidability question is equivalent under either reading; strict `<` is used as in the article (interdefinable with ≤).",
+    "Decidability is formalized as: the set of natural-number codes of sentences in Th(ℝ_exp) is a computable set (`ComputablePred` on ℕ). Codes are `Encodable.encode φ.listEncode`, using Mathlib's `FirstOrder.Language.BoundedFormula.listEncode` and Mathlib's standard `Encodable` instances for lists, sums, sigma types and terms, plus explicit finite enumerations of the six function symbols and one relation symbol. I verified the resulting code function is computable Lean code (it `#eval`s), so this is a genuine effective Gödel numbering; the set of codes of well-formed sentences is computable for it, so 'codes of true sentences is computable' agrees with 'there is an algorithm deciding truth of any given sentence'.",
+    "The predicate uses `∃ φ ∈ T, code φ = n` (non-codes are excluded) rather than `∀ φ, code φ = n → φ ∈ T`; the two are equivalent since the code set of well-formed sentences is computable, but the reviewer may check this convention.",
+    "The structure ℝ_exp is declared as a global (noncomputable) `instance realExpStructure : expLanguage.Structure ℝ` inside the namespace, so `expLanguage.completeTheory ℝ` picks it up implicitly; `Real.exp` interprets `exp`, and 0, 1, +, ·, −, < have their usual meaning (checked by `rfl` API lemmas).",
+    "AMS tags: 3 (mathematical logic; model theory/decidability) and 12 (field theory; 12L05 decidability and field theory).",
+    "The generic definition `IsDecidable` would normally belong in `FormalConjecturesForMathlib/`, but the task restricts output to the single problem file, so it lives in the problem namespace."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.ring`, `FirstOrder.Language.order`, `Language.sum` (combining these would still need a bespoke exp-language and gives ≤ instead of <).",
+     "name": "TarskisExponentialFunctionProblem.ExpFunc / ExpRel / expLanguage",
+     "why_needed": "Mathlib has `Language.ring` (no order, no exp) and `Language.order` (uses ≤, no ring operations) but no language of ordered rings, and no way to add a unary `exp` symbol without building a bespoke language; a single arity-indexed inductive family for (+, ·, −, exp, 0, 1) and (<) is the most transparent faithful representation of L_or ∪ {exp}."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Ring.compatibleRingOfRing` and `FirstOrder.Language.orderStructure` (only for Mathlib's ring/order languages, no exp).",
+     "name": "TarskisExponentialFunctionProblem.realExpStructure",
+     "why_needed": "The structure ℝ_exp: an `expLanguage.Structure ℝ` instance interpreting the symbols by the usual real operations and `Real.exp`."
+    },
+    {
+     "closest_existing_considered": "`Encodable.ofCountable` (noncomputable), `deriving Encodable` (not applicable to indexed families).",
+     "name": "TarskisExponentialFunctionProblem.funcSymbolEquiv / relSymbolEquiv and the two `Encodable (Σ n, expLanguage.Functions n)` / `Encodable (Σ n, expLanguage.Relations n)` instances",
+     "why_needed": "Mathlib's `Encodable (L.Term α)` instance (and hence any effective coding of formulas) requires encodable symbol types; explicit finite enumerations keep the Gödel numbering computable rather than using choice-based `Encodable.ofCountable`."
+    },
+    {
+     "closest_existing_considered": "`ComputablePred` on `L.Sentence` (blocked by missing `Primcodable`), `FirstOrder.Language.BoundedFormula.encoding`, `Theory.IsComplete` (not about decidability).",
+     "name": "TarskisExponentialFunctionProblem.IsDecidable",
+     "why_needed": "Mathlib has no notion of a decidable first-order theory and no `Primcodable`/`Encodable` instance for `BoundedFormula` (listed as a TODO in Mathlib/ModelTheory/Encoding.lean), so `ComputablePred` cannot be applied to sentences directly; the definition transports to ℕ via Mathlib's `BoundedFormula.listEncode` and the standard list encoding."
+    },
+    {
+     "closest_existing_considered": "none",
+     "name": "TarskisExponentialFunctionProblem.expPosSentence",
+     "why_needed": "Test sentence `∀ x, 0 < exp x` used in a `@[category test]` lemma checking the language/structure definitions against `Real.exp_pos`."
+    }
+   ],
+   "per_slot": {
+    "tarskis_exponential_function_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ IsDecidable (expLanguage.completeTheory ℝ)`, where `expLanguage` is the first-order language (+, ·, −, <, 0, 1, exp), ℝ carries the structure interpreting `exp` as `Real.exp`, `completeTheory` is Mathlib's Th(ℝ_exp), and `IsDecidable T` says the set of natural-number codes (Mathlib's `BoundedFormula.listEncode` followed by the standard list encoding into ℕ) of sentences in T is a `ComputablePred`. `answer(True)` = the theory is decidable. Mathlib lacks a decidability notion for theories and lacks `Encodable`/`Primcodable` instances for formulas, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tarskis_exponential_function_problem": "/-- **Tarski's exponential function problem.** Is the theory of the real numbers with the\nexponential function decidable?\n\nThat is, is the complete first-order theory $\\operatorname{Th}(\\mathbb{R}_{\\exp})$ of the\nstructure $\\mathbb{R}_{\\exp} = (\\mathbb{R}, +, \\cdot, -, <, 0, 1, \\exp)$ decidable, i.e. is there\nan effective procedure that, given any sentence $\\varphi$ of the language\n$(+, \\cdot, -, <, 0, 1, \\exp)$, determines whether $\\mathbb{R}_{\\exp} \\models \\varphi$? -/\n@[category research open, AMS 3 12]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ IsDecidable (expLanguage.completeTheory ℝ) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tarski's exponential function problem\n\nTarski proved that the first-order theory of the ordered field of real numbers\n$(\\mathbb{R}, +, \\cdot, -, <, 0, 1)$ is decidable: there is an effective procedure\nwhich, given any sentence $\\varphi$ in the language of ordered rings, determines whether\n$\\mathbb{R} \\models \\varphi$. He then asked whether this remains true when the language is\nextended by a unary function symbol $\\exp$ interpreted as the real exponential function,\ngiving the structure $\\mathbb{R}_{\\exp} = (\\mathbb{R}, +, \\cdot, -, <, 0, 1, \\exp)$.\n\nMacintyre and Wilkie showed that Schanuel's conjecture (in fact, a real version of it) implies\nthat $\\operatorname{Th}(\\mathbb{R}_{\\exp})$ is decidable, and that decidability of\n$\\operatorname{Th}(\\mathbb{R}_{\\exp})$ is equivalent to their \"weak Schanuel's conjecture\".\nUnconditionally, the problem is open.\n\nWe formalise decidability of a theory in the classical way: a Gödel numbering assigns to\neach sentence a natural number, and the theory is decidable if the set of Gödel numbers of\nits sentences is a computable set of natural numbers. The Gödel numbering used here is\nMathlib's `FirstOrder.Language.BoundedFormula.encoding` (an injective encoding of formulas as\nlists of symbols) composed with the standard `Encodable` encoding of lists.\n\n*References:*\n- [Wikipedia, Tarski's exponential function problem](https://en.wikipedia.org/wiki/Tarski%27s_exponential_function_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- A. Macintyre, A. J. Wilkie, *On the decidability of the real exponential field*, in:\n  Kreiseliana: about and around Georg Kreisel, A K Peters (1996), 441–467.\n-/\n\nnamespace TarskisExponentialFunctionProblem\n\nopen FirstOrder FirstOrder.Language\n\n/-- The function symbols of the language of the real exponential field:\nthe constants `0`, `1`, the unary operations `-`, `exp` and the binary operations `+`, `*`. -/\ninductive ExpFunc : ℕ → Type\n  | zero : ExpFunc 0\n  | one : ExpFunc 0\n  | neg : ExpFunc 1\n  | exp : ExpFunc 1\n  | add : ExpFunc 2\n  | mul : ExpFunc 2\n  deriving DecidableEq\n\n/-- The relation symbols of the language of the real exponential field: the binary relation `<`. -/\ninductive ExpRel : ℕ → Type\n  | lt : ExpRel 2\n  deriving DecidableEq\n\n/-- The language of ordered rings `(+, ·, -, <, 0, 1)` extended by a unary function symbol\n`exp`. -/\ndef expLanguage : Language := ⟨ExpFunc, ExpRel⟩\n\n/-- An explicit enumeration of the six function symbols of `expLanguage`. -/\ndef expFuncEquivFin : (Σ n, expLanguage.Functions n) ≃ Fin 6 where\n  toFun\n    | ⟨_, .zero⟩ => 0\n    | ⟨_, .one⟩ => 1\n    | ⟨_, .neg⟩ => 2\n    | ⟨_, .exp⟩ => 3\n    | ⟨_, .add⟩ => 4\n    | ⟨_, .mul⟩ => 5\n  invFun\n    | 0 => ⟨0, .zero⟩\n    | 1 => ⟨0, .one⟩\n    | 2 => ⟨1, .neg⟩\n    | 3 => ⟨1, .exp⟩\n    | 4 => ⟨2, .add⟩\n    | 5 => ⟨2, .mul⟩\n  left_inv := by\n    rintro ⟨_, f⟩\n    cases f <;> rfl\n  right_inv := by\n    intro i\n    fin_cases i <;> rfl\n\ninstance : Encodable (Σ n, expLanguage.Functions n) :=\n  Encodable.ofEquiv (Fin 6) expFuncEquivFin\n\n/-- An explicit enumeration of the single relation symbol of `expLanguage`. -/\ndef expRelEquivFin : (Σ n, expLanguage.Relations n) ≃ Fin 1 where\n  toFun _ := 0\n  invFun _ := ⟨2, .lt⟩\n  left_inv := by\n    rintro ⟨_, r⟩\n    cases r\n    rfl\n  right_inv := by\n    intro i\n    fin_cases i\n    rfl\n\ninstance : Encodable (Σ n, expLanguage.Relations n) :=\n  Encodable.ofEquiv (Fin 1) expRelEquivFin\n\n/-- The real exponential field `ℝ_exp`: the real numbers as an `expLanguage`-structure, with\n`0`, `1`, `-`, `+`, `*`, `<` interpreted as usual and `exp` interpreted as `Real.exp`. -/\nnoncomputable instance : expLanguage.Structure ℝ where\n  funMap {n} f := match n, f with\n    | _, .zero => fun _ => 0\n    | _, .one => fun _ => 1\n    | _, .neg => fun x => -x 0\n    | _, .exp => fun x => Real.exp (x 0)\n    | _, .add => fun x => x 0 + x 1\n    | _, .mul => fun x => x 0 * x 1\n  RelMap {n} r := match n, r with\n    | _, .lt => fun x => x 0 < x 1\n\n/-- The Gödel number of a sentence of a language whose function and relation symbols are\nencodable: the sentence is first encoded as a list of symbols using\n`FirstOrder.Language.BoundedFormula.listEncode`, and this list is then encoded as a natural\nnumber. -/\ndef Sentence.godelNumber {L : Language} [Encodable (Σ n, L.Functions n)]\n    [Encodable (Σ n, L.Relations n)] (φ : L.Sentence) : ℕ :=\n  Encodable.encode (BoundedFormula.listEncode φ)\n\n/-- A theory `T` (in a language with encodable symbols) is *decidable* if the set of Gödel\nnumbers of the sentences in `T` is a computable set of natural numbers. -/\ndef Theory.IsDecidable {L : Language} [Encodable (Σ n, L.Functions n)]\n    [Encodable (Σ n, L.Relations n)] (T : L.Theory) : Prop :=\n  ComputablePred (· ∈ Sentence.godelNumber '' T)\n\n/--\n**Tarski's exponential function problem.**\nIs the theory of the real numbers with the exponential function decidable?\n\nThat is, is the complete first-order theory $\\operatorname{Th}(\\mathbb{R}_{\\exp})$ of the\nstructure $\\mathbb{R}_{\\exp} = (\\mathbb{R}, +, \\cdot, -, <, 0, 1, \\exp)$ decidable, in the\nsense that the set of Gödel numbers of the sentences true in $\\mathbb{R}_{\\exp}$ is a computable\nset?\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ Theory.IsDecidable (expLanguage.completeTheory ℝ) := by\n  sorry\n\n/-- The Gödel numbering of sentences is injective. -/\n@[category API, AMS 3]\ntheorem Sentence.godelNumber_injective {L : Language} [Encodable (Σ n, L.Functions n)]\n    [Encodable (Σ n, L.Relations n)] :\n    Function.Injective (Sentence.godelNumber (L := L)) := by\n  intro φ ψ h\n  have := BoundedFormula.listEncode_sigma_injective (α := Empty)\n    (Encodable.encode_injective h : (⟨0, φ⟩ : Σ n, L.BoundedFormula Empty n).2.listEncode =\n      (⟨0, ψ⟩ : Σ n, L.BoundedFormula Empty n).2.listEncode)\n  simpa using this\n\n/-- The empty theory is decidable. -/\n@[category test, AMS 3]\ntheorem Theory.isDecidable_empty {L : Language} [Encodable (Σ n, L.Functions n)]\n    [Encodable (Σ n, L.Relations n)] : Theory.IsDecidable (∅ : L.Theory) := by\n  simp only [Theory.IsDecidable, Set.image_empty, Set.mem_empty_iff_false]\n  exact ⟨inferInstance, Computable.const false⟩\n\n/-- In `ℝ_exp`, the symbol `exp` is interpreted as the real exponential function. -/\n@[category test, AMS 3]\ntheorem funMap_exp (x : ℝ) :\n    Structure.funMap (L := expLanguage) ExpFunc.exp ![x] = Real.exp x :=\n  rfl\n\n/-- In `ℝ_exp`, the symbol `<` is interpreted as the usual strict order. -/\n@[category test, AMS 3]\ntheorem relMap_lt (x y : ℝ) :\n    Structure.RelMap (L := expLanguage) ExpRel.lt ![x, y] ↔ x < y :=\n  Iff.rfl\n\n/-- The sentence `∀ x, 0 < exp x` holds in `ℝ_exp`. -/\n@[category test, AMS 3]\ntheorem realize_exp_pos :\n    ℝ ⊨ (∀' Relations.boundedFormula₂ (ExpRel.lt : expLanguage.Relations 2)\n      (Constants.term (ExpFunc.zero : expLanguage.Constants))\n      (Functions.apply₁ (ExpFunc.exp : expLanguage.Functions 1) &0) : expLanguage.Sentence) := by\n  simp only [Sentence.Realize, Formula.Realize, BoundedFormula.realize_all,\n    BoundedFormula.realize_rel₂, Term.realize_constants, Term.realize_functions_apply₁]\n  intro x\n  exact Real.exp_pos _\n\nend TarskisExponentialFunctionProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition matches the statement; the only remark is that the table's note repeats Wikipedia's tuple (+, −, <, 0, 1) for the language of ordered rings, which omits multiplication — I included `·` as explained in modeling_decisions (the decidability question is unaffected either way).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The Wikipedia article writes the language of ordered rings as L_or = (+, −, <, 0, 1), omitting multiplication. I included the binary symbol `·` (the language really is that of ordered rings and Tarski's theorem / Macintyre–Wilkie's ℝ_exp = (ℝ, +, ·, −, <, 0, 1, exp) include it). Mathematically this does not change the decidability question since multiplication is first-order definable from +, < and exp on ℝ, but a reviewer should confirm the choice.",
+    "The order symbol is the strict relation `<` as in the article (Mathlib's `Language.order` uses `≤`; the two are interdefinable, so the decidability question is unaffected).",
+    "A bespoke language `expLanguage` (indexed inductives `ExpFunc`, `ExpRel`, following Mathlib's `ringFunc`/`Language.ring` idiom) is used rather than `Language.ring.sum Language.order.sum ...`, so that the symbols and the noncomputable `Structure ℝ` instance (`exp ↦ Real.exp`) are fully explicit and readable.",
+    "Decidability of a theory is formalised as: the set of Gödel numbers of its sentences is a computable set of naturals (`ComputablePred (· ∈ Sentence.godelNumber '' T)`). This is the textbook definition and is equivalent to the article's 'effective procedure that, given any sentence φ, determines whether ℝ ⊨ φ' because the Gödel numbering has computable encoding and decoding. The numbering is Mathlib's structural `BoundedFormula.listEncode` composed with the standard `Encodable.encode` on lists; I checked (via `#synth`) that the instance chain is the explicit `List.encodable`/`Sum.encodable`/`Sigma.encodable`/`Fin.encodable`/structural `Term` instance and involves no choice-based `Encodable.ofCountable`. `Encodable` instances for the (finite) symbol sets are given by explicit equivalences with `Fin 6` and `Fin 1`.",
+    "`ComputablePred` (rather than a `Computable` function on `L.Sentence`) is used because Mathlib has no `Primcodable` instance for formulas (listed as a TODO in Mathlib.ModelTheory.Encoding); coding sentences into ℕ avoids proving primitive-recursiveness of decoding.",
+    "`Sentence.godelNumber` and `Theory.IsDecidable` are stated generically for any language with encodable symbol types. In a real PR they would belong in `FormalConjecturesForMathlib/`; they are kept in the problem file here because the task allows writing only the candidate file. They live in the `TarskisExponentialFunctionProblem` namespace (so `Theory.IsDecidable T` is used without dot notation).",
+    "Only the single yes/no question is stated; the Schanuel-conditional decidability, the weak-Schanuel equivalence and the reduction to exponential-polynomial solvability are mentioned only as background in the module docstring, as the decomposition table prescribes."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.ring` (no order, no exp) and `Language.ring.sum Language.order` (uses ≤, still no exp); a triple `Language.sum` was rejected as less readable and lacking encodability instances.",
+     "name": "TarskisExponentialFunctionProblem.ExpFunc / ExpRel / expLanguage",
+     "why_needed": "Mathlib has no first-order language for the real exponential field (ordered ring symbols plus a unary `exp`). The indexed inductives of function/relation symbols follow Mathlib's `ringFunc`/`Language.ring` pattern."
+    },
+    {
+     "closest_existing_considered": "`Fintype.toEncodable` / `Encodable.ofCountable` (rejected: noncomputable, choice-based, not an explicit numbering).",
+     "name": "TarskisExponentialFunctionProblem.expFuncEquivFin / expRelEquivFin and the `Encodable (Σ n, expLanguage.Functions n)`, `Encodable (Σ n, expLanguage.Relations n)` instances",
+     "why_needed": "Mathlib's `Encodable (L.Term α)` instance (and hence the encoding of formulas) requires an `Encodable` instance on the sigma type of function symbols; these give explicit enumerations of the finite symbol sets."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Ring.compatibleRingOfRing ℝ` and `Language.order.orderStructure` cover only the ring/order fragments and are defs, not instances.",
+     "name": "instance : expLanguage.Structure ℝ (noncomputable)",
+     "why_needed": "The structure ℝ_exp itself: standard interpretation of 0, 1, −, +, ·, < and `exp ↦ Real.exp`."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.encoding` (an `Encoding` into lists, not into ℕ); `Encodable.ofCountable` on `L.Sentence` (rejected: arbitrary non-effective injection).",
+     "name": "TarskisExponentialFunctionProblem.Sentence.godelNumber",
+     "why_needed": "A Gödel numbering ℕ of sentences is needed to talk about computability; Mathlib only provides `BoundedFormula.listEncode`/`BoundedFormula.encoding` (into lists) and `Countable`, not an `Encodable`/`Primcodable` instance on formulas."
+    },
+    {
+     "closest_existing_considered": "`ComputablePred` directly on `L.Sentence` (impossible: no `Primcodable L.Sentence`); `Theory.IsComplete`/`IsSatisfiable` (different notions).",
+     "name": "TarskisExponentialFunctionProblem.Theory.IsDecidable",
+     "why_needed": "Mathlib has no notion of a decidable first-order theory. Defined as `ComputablePred (· ∈ Sentence.godelNumber '' T)`, the textbook definition."
+    }
+   ],
+   "per_slot": {
+    "tarskis_exponential_function_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ Theory.IsDecidable (expLanguage.completeTheory ℝ)`: whether the complete first-order theory of ℝ in the language (+, ·, −, <, 0, 1, exp), with exp interpreted as Real.exp, is decidable, i.e. the set of Gödel numbers of its true sentences is a `ComputablePred` on ℕ. Mathlib has the first-order syntax/semantics, `completeTheory` and `ComputablePred`, but no language of the real exponential field, no `Encodable`/`Primcodable` instance for formulas (only an `Encoding` into lists) and no notion of a decidable theory, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tarskis_exponential_function_problem": "/--\n**Tarski's exponential function problem.**\nIs the theory of the real numbers with the exponential function decidable?\n\nThat is, is the complete first-order theory $\\operatorname{Th}(\\mathbb{R}_{\\exp})$ of the\nstructure $\\mathbb{R}_{\\exp} = (\\mathbb{R}, +, \\cdot, -, <, 0, 1, \\exp)$ decidable, in the\nsense that the set of Gödel numbers of the sentences true in $\\mathbb{R}_{\\exp}$ is a computable\nset?\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ Theory.IsDecidable (expLanguage.completeTheory ℝ) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tarski's exponential function problem\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Tarski%27s_exponential_function_problem)\n-/\n\nnamespace TarskisExponentialFunctionProblem\n\nopen FirstOrder\n\n/-- Function symbols for the language of ordered rings extended by exponentiation. -/\ninductive RealExpFunctionSymbol : ℕ → Type\n  | zero : RealExpFunctionSymbol 0\n  | one : RealExpFunctionSymbol 0\n  | neg : RealExpFunctionSymbol 1\n  | exp : RealExpFunctionSymbol 1\n  | add : RealExpFunctionSymbol 2\n  | mul : RealExpFunctionSymbol 2\n  deriving DecidableEq\n\n/-- The strict-order relation symbol for the language of ordered exponential rings. -/\ninductive RealExpRelationSymbol : ℕ → Type\n  | lt : RealExpRelationSymbol 2\n  deriving DecidableEq\n\n/-- The first-order language of ordered rings extended by a unary exponential function symbol. -/\ndef realExpLanguage : FirstOrder.Language where\n  Functions := RealExpFunctionSymbol\n  Relations := RealExpRelationSymbol\n\n/-- The structure on `ℝ` in which the ring and order symbols have their usual meanings and the\nextra unary symbol is interpreted as `Real.exp`. -/\nnoncomputable def realExpStructure : realExpLanguage.Structure ℝ where\n  funMap\n    | .zero => fun _ => 0\n    | .one => fun _ => 1\n    | .neg => fun x => -x 0\n    | .exp => fun x => Real.exp (x 0)\n    | .add => fun x => x 0 + x 1\n    | .mul => fun x => x 0 * x 1\n  RelMap\n    | .lt => fun x => x 0 < x 1\n\n/-- Constructor codes for the function symbols of `realExpLanguage`. -/\ndef functionSymbolCode {n : ℕ} : RealExpFunctionSymbol n → ℕ\n  | .zero => 0\n  | .one => 1\n  | .neg => 2\n  | .exp => 3\n  | .add => 4\n  | .mul => 5\n\n/-- Constructor code for the relation symbol of `realExpLanguage`. -/\ndef relationSymbolCode {n : ℕ} : RealExpRelationSymbol n → ℕ\n  | .lt => 0\n\n/-- A structural Gödel code for terms, using constructor tags and `Nat.pair`. -/\nnoncomputable def termCode {α : Type} [Encodable α] (t : realExpLanguage.Term α) : ℕ :=\n  t.rec (fun x => Nat.pair 0 (Encodable.encode x))\n    (fun f _ codes => Nat.pair (functionSymbolCode f + 1)\n      (Encodable.encode (List.ofFn codes)))\n\n/-- A structural Gödel code for bounded formulas, using distinct constructor tags. -/\nnoncomputable def formulaCode : {n : ℕ} → realExpLanguage.BoundedFormula Empty n → ℕ\n  | _, .falsum => Nat.pair 0 0\n  | _, .equal t₁ t₂ => Nat.pair 1 (Nat.pair (termCode t₁) (termCode t₂))\n  | _, .rel r ts => Nat.pair 2 (Nat.pair (relationSymbolCode r)\n      (Encodable.encode (List.ofFn fun i => termCode (ts i))))\n  | _, .imp φ ψ => Nat.pair 3 (Nat.pair (formulaCode φ) (formulaCode ψ))\n  | _, .all φ => Nat.pair 4 (formulaCode φ)\n\n/-- The induced Gödel code for sentences in `realExpLanguage`. -/\nnoncomputable def sentenceCode (φ : realExpLanguage.Sentence) : ℕ :=\n  formulaCode φ\n\n/-- The set of codes of first-order sentences true in the ordered exponential real field. -/\nnoncomputable def trueSentenceCode (n : ℕ) : Prop :=\n  letI : realExpLanguage.Structure ℝ := realExpStructure\n  ∃ φ : realExpLanguage.Sentence, sentenceCode φ = n ∧\n    FirstOrder.Language.Sentence.Realize ℝ φ\n\n/--\nTarski's exponential function problem asks whether the complete first-order theory of the ordered\nreal field extended by a unary function symbol interpreted as `Real.exp` is decidable. Equivalently,\nis the set of Gödel codes of sentences true in this structure a computable (recursive) set?\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ ComputablePred trueSentenceCode := by\n  sorry\n\nend TarskisExponentialFunctionProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “theory ... decidable” as recursion/computability of the complete first-order truth set, not as Lean's proposition-level `Decidable` typeclass.",
+    "Used the first-order language with symbols `0`, `1`, `+`, multiplication, unary negation, strict order `<`, and a unary exponential symbol interpreted by `Real.exp`. Multiplication is included because the source describes the language as that of ordered rings, despite the terse displayed symbol list omitting it.",
+    "Used a fixed structural Gödel numbering built from distinct constructor tags, `Nat.pair`, and canonical encodings of finite vectors and variables. `trueSentenceCode n` holds only when `n` is the code of a sentence true in the intended real structure, so invalid natural-number codes are outside the truth set.",
+    "Stated the yes/no question as `answer(sorry) ↔ ComputablePred trueSentenceCode`, so a positive answer is exactly computability of the complete theory.",
+    "Did not formalize Schanuel-conditional results, weak Schanuel equivalences, or exponential-polynomial reductions because they are background rather than slots in the source statement."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.ringFunc` supplies ring symbols but not the exponential symbol; sums of existing languages still lack an effective sentence coding.",
+     "name": "RealExpFunctionSymbol",
+     "why_needed": "Provides the arity-indexed ring and exponential function symbols for the exact target language."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.order` uses a non-strict `≤` symbol rather than the source's `<` symbol.",
+     "name": "RealExpRelationSymbol",
+     "why_needed": "Provides the strict binary order symbol used by the source language."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.ring` and `FirstOrder.Language.order`; neither includes exponentiation.",
+     "name": "realExpLanguage",
+     "why_needed": "Packages the ordered-ring and unary exponential symbols into the target first-order language."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Ring.compatibleRingOfRing` and `FirstOrder.Language.orderStructure`; neither interprets an exponential symbol.",
+     "name": "realExpStructure",
+     "why_needed": "Fixes the intended interpretations on `ℝ`, especially that the extra unary symbol is `Real.exp`."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FirstOrder.Language.Term.encoding`; its alphabet contains terms and has no `Primcodable` instance.",
+     "name": "functionSymbolCode",
+     "why_needed": "Assigns distinct constructor codes to the language's finitely many function symbols as part of a concrete Gödel numbering."
+    },
+    {
+     "closest_existing_considered": "Mathlib's bounded-formula encoding, whose alphabet is not `Primcodable`.",
+     "name": "relationSymbolCode",
+     "why_needed": "Codes the strict-order relation symbol in the concrete Gödel numbering."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Term.encoding`; Mathlib documents a TODO for the needed `Primcodable` syntax instances.",
+     "name": "termCode",
+     "why_needed": "Defines a fixed structural natural-number code for terms, avoiding an arbitrary noncomputable enumeration."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.encoding`; it does not yield the `Primcodable` formula type needed by `ComputablePred`.",
+     "name": "formulaCode",
+     "why_needed": "Defines a fixed structural natural-number code for bounded formulas with distinct constructor tags."
+    },
+    {
+     "closest_existing_considered": "No `Encodable` or `Primcodable` instance exists in Mathlib even for ring-language sentences.",
+     "name": "sentenceCode",
+     "why_needed": "Specializes the structural formula code to closed first-order sentences."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.completeTheory` gives the semantic set of sentences, but Mathlib has no effective coding allowing `ComputablePred` to be applied to it.",
+     "name": "trueSentenceCode",
+     "why_needed": "Defines the subset of natural-number Gödel codes corresponding exactly to sentences true in the ordered exponential real field."
+    }
+   ],
+   "per_slot": {
+    "tarskis_exponential_function_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Mathlib provides first-order syntax and semantics but explicitly lacks Primcodable instances for terms and formulas. The file therefore defines the ordered exponential real-field language, its intended structure, and a concrete structural Gödel coding, then states computability of the set of codes of true sentences."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "tarskis_exponential_function_problem": "/--\nTarski's exponential function problem asks whether the complete first-order theory of the ordered\nreal field extended by a unary function symbol interpreted as `Real.exp` is decidable. Equivalently,\nis the set of Gödel codes of sentences true in this structure a computable (recursive) set?\n-/\n@[category research open, AMS 3]\ntheorem tarskis_exponential_function_problem :\n    answer(sorry) ↔ ComputablePred trueSentenceCode := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "tarskis_exponential_function_problem": "c07"
+ },
+ "id": "wp-tarskis-exponential-function-problem",
+ "main_attempt": "c07"
+}

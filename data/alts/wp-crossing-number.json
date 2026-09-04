@@ -1,0 +1,406 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rectilinear crossing number and halving lines\n\nLet $S$ be a set of $n$ points in the plane in general position (no three collinear).\nThe straight-line drawing of the complete graph $K_n$ on $S$ has a *crossing* for each\nunordered pair of edges whose relative interiors meet. The *rectilinear crossing number*\n$\\overline{cr}(n)$ is the minimum number of crossings over all such $S$.\n\nA *halving line* of $S$ is a line through two points of $S$ that equally bisects the\nremaining points, i.e. has the same number of points of $S$ strictly on each side.\n\nThe conjecture states that every $n$-point set in general position that minimizes the\nnumber of crossings also maximizes the number of halving lines.\n(The converse is known to fail: some sets maximizing the number of halving lines have a\nquadrilateral as convex hull, whereas all sets minimizing the number of crossings have a\ntriangular convex hull.)\n\n*References:*\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n* [Rectilinear Crossing Number project](http://www.ist.tugraz.at/staff/aichholzer/research/rp/triangulations/crossing/)\n-/\n\nopen EuclideanGeometry Finset\n\nnamespace CrossingNumber\n\n/-- The number of crossings of the straight-line drawing of the complete graph on the vertex\nset `S`: the number of unordered pairs of distinct edges (segments between two points of `S`)\nwhose relative interiors meet. -/\nnoncomputable def rectilinearCrossings (S : Finset ℝ²) : ℕ :=\n  {E : Sym2 (Sym2 ℝ²) | ¬ E.IsDiag ∧\n    ∃ a ∈ S, ∃ b ∈ S, ∃ c ∈ S, ∃ d ∈ S, a ≠ b ∧ c ≠ d ∧\n      E = s(s(a, b), s(c, d)) ∧ (openSegment ℝ a b ∩ openSegment ℝ c d).Nonempty}.ncard\n\nopen scoped Classical in\n/-- The affine subspace `L` (a line) *equally bisects* the finite point set `S` if, for every\npoint `c ∈ S` not on `L`, the points of `S` strictly on the same side of `L` as `c` are as\nmany as the points of `S` strictly on the opposite side. -/\ndef Bisects (L : AffineSubspace ℝ ℝ²) (S : Finset ℝ²) : Prop :=\n  ∀ c ∈ S, c ∉ L → #{p ∈ S | L.SSameSide c p} = #{p ∈ S | L.SOppSide c p}\n\n/-- The halving lines of `S`: the lines through two points of `S` that equally bisect the\nremaining points of `S`. -/\ndef halvingLines (S : Finset ℝ²) : Set (AffineSubspace ℝ ℝ²) :=\n  {L | ∃ a ∈ S, ∃ b ∈ S, a ≠ b ∧ L = line[ℝ, a, b] ∧ Bisects L S}\n\n/-- The number of halving lines of `S`. -/\nnoncomputable def numHalvingLines (S : Finset ℝ²) : ℕ :=\n  (halvingLines S).ncard\n\n@[category test, AMS 5 52]\ntheorem rectilinearCrossings_empty : rectilinearCrossings ∅ = 0 := by\n  simp [rectilinearCrossings]\n\n@[category test, AMS 5 52]\ntheorem numHalvingLines_empty : numHalvingLines ∅ = 0 := by\n  simp [numHalvingLines, halvingLines]\n\n/-- Two distinct points have exactly one halving line: the line through them. -/\n@[category test, AMS 5 52]\ntheorem numHalvingLines_pair (a b : ℝ²) (hab : a ≠ b) : numHalvingLines {a, b} = 1 := by\n  unfold numHalvingLines\n  rw [Set.ncard_eq_one]\n  refine ⟨line[ℝ, a, b], ?_⟩\n  ext L\n  simp only [halvingLines, Set.mem_setOf_eq, Set.mem_singleton_iff, mem_insert, mem_singleton]\n  constructor\n  · rintro ⟨x, hx, y, hy, hxy, rfl, -⟩\n    rcases hx with rfl | rfl <;> rcases hy with rfl | rfl\n    · exact absurd rfl hxy\n    · rfl\n    · exact Set.pair_comm _ _ ▸ rfl\n    · exact absurd rfl hxy\n  · rintro rfl\n    refine ⟨a, by simp, b, by simp, hab, rfl, ?_⟩\n    intro c hc hcL\n    simp only [mem_insert, mem_singleton] at hc\n    rcases hc with rfl | rfl\n    · exact absurd (left_mem_affineSpan_pair ℝ c b) hcL\n    · exact absurd (right_mem_affineSpan_pair ℝ a c) hcL\n\n/-- The point set `S` is in general position (no three points collinear) and minimizes the\nrectilinear crossing number: no point set of the same size in general position has fewer\ncrossings. -/\ndef MinimizesCrossings (S : Finset ℝ²) : Prop :=\n  NonTrilinear (S : Set ℝ²) ∧\n    ∀ T : Finset ℝ², #T = #S → NonTrilinear (T : Set ℝ²) →\n      rectilinearCrossings S ≤ rectilinearCrossings T\n\n/-- The point set `S` is in general position (no three points collinear) and maximizes the\nnumber of halving lines: no point set of the same size in general position has more halving\nlines. -/\ndef MaximizesHalvingLines (S : Finset ℝ²) : Prop :=\n  NonTrilinear (S : Set ℝ²) ∧\n    ∀ T : Finset ℝ², #T = #S → NonTrilinear (T : Set ℝ²) →\n      numHalvingLines T ≤ numHalvingLines S\n\n/--\nFor each arrangement of points in which the rectilinear crossing number is minimized,\nis the number of halving lines maximized?\n\nThat is: for every $n$ and every set $S$ of $n$ points in the plane in general position\nsuch that the straight-line drawing of $K_n$ on $S$ has the minimum number of crossings\namong all such $n$-point sets, does $S$ have the maximum number of halving lines among all\nsuch $n$-point sets?\n\nFor odd $n$ no line through two points of $S$ can equally bisect the remaining $n - 2$\npoints, so both sides of the comparison are $0$ and the question is only of interest for\neven $n$.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number : answer(sorry) ↔\n    ∀ S : Finset ℝ², MinimizesCrossings S → MaximizesHalvingLines S := by\n  sorry\n\nend CrossingNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot table matches the source; I followed its notes (implicit quantifier over all n, implicit general-position hypothesis, odd n trivially true, converse remark treated as background only).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Point sets are `Finset ℝ²` (ℝ² = EuclideanSpace ℝ (Fin 2), the repo's scoped notation) in general position, expressed with the repo's `EuclideanGeometry.NonTrilinear` (no three collinear). General position is required both for S and for the comparison sets T, since the rectilinear crossing number of K_n is a minimum over straight-line drawings, which for K_n forces no three collinear vertices.",
+    "'The rectilinear crossing number is minimized' is rendered as: S is in general position and `rectilinearCrossings S ≤ rectilinearCrossings T` for every general-position T with `#T = #S` (equivalently cr(S) = cr̄(n)). This avoids sInf/sSup defaults; 'number of halving lines is maximized' is rendered symmetrically with ≥. The implicit quantifier over n is realised by quantifying over all finite S and comparing with sets of the same cardinality.",
+    "Crossings are counted literally as unordered pairs of distinct edges (`Sym2 (Sym2 ℝ²)` with `¬ E.IsDiag`) spanned by points of S whose relative interiors `openSegment ℝ a b`, `openSegment ℝ c d` intersect; the count is `Set.ncard`. Using open segments means edges sharing an endpoint do not cross (in general position), and concurrent crossings are counted per pair of edges, matching the standard definition. I deliberately did not use the equivalent 'number of convex quadrilaterals' characterisation, to stay with the source's definition.",
+    "A halving line is a line `line[ℝ, a, b]` through two distinct points of S that `Bisects` S: for every c ∈ S off the line, #{p ∈ S | SSameSide c p} = #{p ∈ S | SOppSide c p} (Mathlib's strict same/opposite side predicates; c is counted on its own side via `sSameSide_self_iff`). The ∀ c formulation makes the two-point case (no remaining points) correctly a halving line and is equivalent to any fixed-witness formulation when remaining points exist. Halving lines are counted as a set of affine subspaces (`Set.ncard`), literally 'number of halving lines'; in general position this equals the number of qualifying pairs.",
+    "The statement is phrased as a yes/no question in the source, so it uses `answer(sorry) ↔ ...`; `answer(True)` is the positive answer that the article records as the conjecture.",
+    "All n are quantified (no restriction to even n). For odd n no line can equally bisect n−2 points, so both counts are 0 and the implication is trivially true; this is documented in the theorem docstring and makes the statement logically equivalent to the even-n restriction used by some sources.",
+    "The article's remark that the converse fails (halving-line maximizers with quadrilateral convex hull) is recorded only in the module docstring as background, not as a declaration, per the decomposition notes.",
+    "Three `@[category test]` lemmas with proofs check the bespoke definitions on boundary inputs: empty set has 0 crossings and 0 halving lines; two distinct points have exactly one halving line."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `openSegment`, `Sym2` (used as building blocks); FormalConjecturesForMathlib `EuclideanGeometry.ConvexIndep`/`HasConvexNGon` (could give the equivalent convex-quadrilateral count, but that is a theorem, not the source's definition); no crossing-number notion exists.",
+     "name": "CrossingNumber.rectilinearCrossings",
+     "why_needed": "Number of crossings in the straight-line drawing of K_n on a finite point set: unordered pairs of distinct edges whose open segments meet. Neither Mathlib nor FormalConjecturesForMathlib has crossing numbers or straight-line drawings."
+    },
+    {
+     "closest_existing_considered": "Mathlib `AffineSubspace.SSameSide` / `AffineSubspace.SOppSide` (used as building blocks).",
+     "name": "CrossingNumber.Bisects",
+     "why_needed": "A line equally bisects a finite point set: equally many points strictly on each side. Mathlib has side predicates but no 'bisects a finite set' notion."
+    },
+    {
+     "closest_existing_considered": "Mathlib `affineSpan` / `line[ℝ, a, b]` notation (used as building block).",
+     "name": "CrossingNumber.halvingLines",
+     "why_needed": "The set of halving lines of S: lines through two points of S that bisect S. No existing notion of halving lines / k-sets in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "`Set.ncard` applied to `halvingLines` (this is just that).",
+     "name": "CrossingNumber.numHalvingLines",
+     "why_needed": "Cardinality of `halvingLines S`, the quantity the conjecture compares."
+    },
+    {
+     "closest_existing_considered": "`sInf` over a set of naturals (as in ErdosProblems/107's `f`); avoided in favour of a direct ∀ comparison.",
+     "name": "CrossingNumber.MinimizesCrossings",
+     "why_needed": "Packages 'S is in general position and achieves the rectilinear crossing number cr̄(n) for n = #S' without sInf defaults."
+    },
+    {
+     "closest_existing_considered": "`sSup` over a set of naturals; avoided in favour of a direct ∀ comparison.",
+     "name": "CrossingNumber.MaximizesHalvingLines",
+     "why_needed": "Packages 'S is in general position and has the maximum number of halving lines among n-point sets, n = #S'."
+    }
+   ],
+   "per_slot": {
+    "crossing_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ S : Finset ℝ², MinimizesCrossings S → MaximizesHalvingLines S`, where both predicates carry the (implicit in the source) general-position hypothesis `NonTrilinear` and compare S against all general-position point sets of the same cardinality. Crossings and halving lines are defined literally from the article's text (pairs of edges whose relative interiors meet; lines through two points of S with equally many points of S strictly on each side). No Mathlib/repo primitive exists for rectilinear crossings or halving lines, so bespoke definitions were added."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number": "/--\nFor each arrangement of points in which the rectilinear crossing number is minimized,\nis the number of halving lines maximized?\n\nThat is: for every $n$ and every set $S$ of $n$ points in the plane in general position\nsuch that the straight-line drawing of $K_n$ on $S$ has the minimum number of crossings\namong all such $n$-point sets, does $S$ have the maximum number of halving lines among all\nsuch $n$-point sets?\n\nFor odd $n$ no line through two points of $S$ can equally bisect the remaining $n - 2$\npoints, so both sides of the comparison are $0$ and the question is only of interest for\neven $n$.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number : answer(sorry) ↔\n    ∀ S : Finset ℝ², MinimizesCrossings S → MaximizesHalvingLines S := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rectilinear crossing number and halving lines\n\n*Reference:* [Wikipedia: Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n-/\n\nnamespace CrossingNumber\n\nopen EuclideanGeometry\n\nnoncomputable section\n\n/-- The number of crossings in the straight-line drawing of the complete graph on `P`.\nFor points with no three collinear, each crossing corresponds to a unique four-point subset in\nconvex position. -/\ndef rectilinearCrossingCount (P : Finset ℝ²) : ℕ := by\n  classical\n  exact (P.powersetCard 4 |>.filter fun (Q : Finset ℝ²) ↦ ConvexIndep (Q : Set ℝ²)).card\n\n/-- A two-point subset `L` of `P` determines a halving line if the two open half-planes bounded by\nthat line contain the same number of points of `P`. -/\ndef IsHalvingLine (P L : Finset ℝ²) : Prop :=\n  ∃ a ∈ L, ∃ b ∈ L, a ≠ b ∧\n    (P.filter fun x ↦ 0 < triangle_area a b x).card =\n      (P.filter fun x ↦ triangle_area a b x < 0).card\n\n/-- The number of halving lines determined by pairs of points of `P`. -/\ndef halvingLineCount (P : Finset ℝ²) : ℕ := by\n  classical\n  exact (P.powersetCard 2 |>.filter (IsHalvingLine P)).card\n\n/--\nFor every $n$ and every $n$-point set $P$ in the plane with no three points collinear, if the\nstraight-line drawing of $K_n$ on $P$ has the minimum number of crossings among all such\n$n$-point sets, then $P$ has the maximum number of halving lines among all such sets. A halving\nline passes through two points of $P$ and has equally many of the remaining points in each open\nhalf-plane.\n-/\n@[category research open, AMS 52]\ntheorem crossing_number : answer(sorry) ↔\n    ∀ (n : ℕ) (P : Finset ℝ²), P.card = n → NonTrilinear (P : Set ℝ²) →\n      (∀ Q : Finset ℝ², Q.card = n → NonTrilinear (Q : Set ℝ²) →\n        rectilinearCrossingCount P ≤ rectilinearCrossingCount Q) →\n      ∀ Q : Finset ℝ², Q.card = n → NonTrilinear (Q : Set ℝ²) →\n        halvingLineCount Q ≤ halvingLineCount P := by\n  sorry\n\nend\n\nend CrossingNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled an arrangement as a finite set `P : Finset ℝ²`, so points are intrinsically distinct; quantified over every natural number `n`, including odd `n`.",
+    "Interpreted the implicit general-position condition as exactly no three points collinear, using `EuclideanGeometry.NonTrilinear`; did not use the repository's stronger `InGeneralPosition`, which additionally forbids four concyclic points.",
+    "Counted crossings in the straight-line drawing of `K_n` by convex-independent four-point subsets. Under the no-three-collinear hypothesis, each such subset determines exactly one crossing pair of edges, matching the article's convention of counting separately for each pair of crossing edges even if several edges cross at one location.",
+    "Represented a halving line by an unordered two-point `Finset`. The signs of `EuclideanGeometry.triangle_area` identify its two open half-planes; equality of the two filtered cardinalities expresses equal bisection of all remaining points.",
+    "Expressed minimum and maximum relationally over all general-position point sets of the same cardinality, rather than introducing extrema with default values. Thus the hypothesis says the given arrangement attains the minimum crossing count, and the conclusion says it attains the maximum halving-line count.",
+    "Used `answer(sorry) ↔` around the positive universal proposition because the source poses a yes/no question and the article identifies the positive answer as the conjecture. For odd `n`, no two-point line can split the odd number `n - 2` of remaining points equally, so the resulting maximum count is literally zero."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`EuclideanGeometry.ConvexIndep`, used inside the definition to characterize exactly the crossing four-subsets.",
+     "name": "CrossingNumber.rectilinearCrossingCount",
+     "why_needed": "A configuration-level count of crossings in the straight-line complete graph is needed, and no existing Mathlib or FormalConjecturesForMathlib definition provides rectilinear crossing counts."
+    },
+    {
+     "closest_existing_considered": "`EuclideanGeometry.triangle_area`, whose sign distinguishes the two open half-planes bounded by an oriented line.",
+     "name": "CrossingNumber.IsHalvingLine",
+     "why_needed": "The statement requires the predicate that a line through a pair of configuration points equally bisects the remaining points; no halving-line primitive was found."
+    },
+    {
+     "closest_existing_considered": "`Finset.powersetCard 2` for enumerating unordered pairs, filtered by the bespoke `IsHalvingLine` predicate.",
+     "name": "CrossingNumber.halvingLineCount",
+     "why_needed": "The conjecture compares the number of halving lines, and no existing count was found."
+    }
+   ],
+   "per_slot": {
+    "crossing_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number": "/--\nFor every $n$ and every $n$-point set $P$ in the plane with no three points collinear, if the\nstraight-line drawing of $K_n$ on $P$ has the minimum number of crossings among all such\n$n$-point sets, then $P$ has the maximum number of halving lines among all such sets. A halving\nline passes through two points of $P$ and has equally many of the remaining points in each open\nhalf-plane.\n-/\n@[category research open, AMS 52]\ntheorem crossing_number : answer(sorry) ↔\n    ∀ (n : ℕ) (P : Finset ℝ²), P.card = n → NonTrilinear (P : Set ℝ²) →\n      (∀ Q : Finset ℝ², Q.card = n → NonTrilinear (Q : Set ℝ²) →\n        rectilinearCrossingCount P ≤ rectilinearCrossingCount Q) →\n      ∀ Q : Finset ℝ², Q.card = n → NonTrilinear (Q : Set ℝ²) →\n        halvingLineCount Q ≤ halvingLineCount P := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rectilinear crossing number and halving lines\n\nLet $S$ be a set of $n$ points in the plane in general position (no three collinear). Draw the\ncomplete graph $K_n$ with vertex set $S$ and straight-line edges. The number of crossings of this\ndrawing is the number of pairs of edges that cross. The *rectilinear crossing number*\n$\\overline{cr}(n)$ of $K_n$ is the minimum of this number over all such $S$.\n\nA *halving line* of $S$ is a line through two points of $S$ that equally bisects the remaining\n$n - 2$ points, i.e. has $(n - 2)/2$ of them on each side.\n\nIt is conjectured that for each arrangement of points for which $\\overline{cr}(n)$ is minimized,\nthe number of halving lines is maximized.\n\n*References:*\n- [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nopen EuclideanGeometry Finset\n\nnamespace CrossingNumber\n\nopen scoped Classical in\n/--\nThe number of crossings of the straight-line drawing of the complete graph with vertex set `S`.\nThe edges of the drawing are the segments joining two distinct points of `S`. Two edges cross when\ntheir open segments meet. `crossings S` is the number of unordered pairs of distinct edges that\ncross.\n-/\nnoncomputable def crossings (S : Finset ℝ²) : ℕ :=\n  #{P ∈ (S.powersetCard 2).powersetCard 2 |\n    ∃ a b c d, P = {{a, b}, {c, d}} ∧ (openSegment ℝ a b ∩ openSegment ℝ c d).Nonempty}\n\n/--\nThe line through the points `a` and `b` is a halving line of `S` if the points of `S` strictly on\none side of it are as many as the points of `S` strictly on the other side. The side of a point\n`c` is given by the sign of the signed area `triangle_area a b c` of the triangle `a b c`.\n-/\ndef IsHalvingLine (S : Finset ℝ²) (a b : ℝ²) : Prop :=\n  #{c ∈ S | 0 < triangle_area a b c} = #{c ∈ S | triangle_area a b c < 0}\n\n/-- The number of halving lines of `S`: the number of lines through two distinct points of `S`\nthat equally bisect the remaining points of `S`. -/\nnoncomputable def halvingLines (S : Finset ℝ²) : ℕ :=\n  {ℓ : AffineSubspace ℝ ℝ² | ∃ a ∈ S, ∃ b ∈ S, a ≠ b ∧ ℓ = line[ℝ, a, b] ∧ IsHalvingLine S a b}.ncard\n\n/--\n**Rectilinear crossing number and halving lines.**\n\nLet $S$ be a set of $n$ points in the plane in general position (no three collinear) whose\nstraight-line drawing of $K_n$ has the minimum number of crossings among all such $n$-point sets,\ni.e. an arrangement of points for which the rectilinear crossing number $\\overline{cr}(n)$ is\nattained. Is the number of halving lines of $S$ then maximal among all $n$-point sets in general\nposition?\n\nThe conjecture asserts the positive answer. For odd $n$ no set in general position has a halving\nline, so the question is only of interest for even $n$. The converse is known to be false.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number :\n    answer(sorry) ↔ ∀ S : Finset ℝ², NonTrilinear (S : Set ℝ²) →\n      (∀ T : Finset ℝ², #T = #S → NonTrilinear (T : Set ℝ²) → crossings S ≤ crossings T) →\n      ∀ T : Finset ℝ², #T = #S → NonTrilinear (T : Set ℝ²) → halvingLines T ≤ halvingLines S := by\n  sorry\n\n/-- The empty drawing has no crossings. -/\n@[category test, AMS 5 52]\ntheorem crossings_empty : crossings ∅ = 0 := by\n  rw [crossings, Finset.powersetCard_eq_empty.mpr (by simp)]\n  simp\n\n/-- The vertices $(0,0), (2,0), (1,1), (1,-1)$ of a convex quadrilateral give one crossing: the two\ndiagonals $(0,0)(2,0)$ and $(1,1)(1,-1)$ cross. -/\n@[category test, AMS 5 52]\ntheorem crossings_convex_quadrilateral :\n    crossings {!₂[0, 0], !₂[2, 0], !₂[1, 1], !₂[1, -1]} = 1 := by\n  sorry\n\n/-- The diagonal $(0,0)(2,0)$ of the convex quadrilateral $(0,0), (1,-1), (2,0), (1,1)$ is a\nhalving line: $(1,1)$ and $(1,-1)$ lie on opposite sides of it. -/\n@[category test, AMS 5 52]\ntheorem isHalvingLine_diagonal :\n    IsHalvingLine {!₂[0, 0], !₂[2, 0], !₂[1, 1], !₂[1, -1]} !₂[0, 0] !₂[2, 0] := by\n  simp [IsHalvingLine, triangle_area_eq_det, Matrix.det_fin_three, Finset.filter_insert,\n    Finset.filter_singleton]\n  norm_num\n\n/-- The side $(0,0)(1,1)$ of the convex quadrilateral $(0,0), (1,-1), (2,0), (1,1)$ is not a\nhalving line: $(2,0)$ and $(1,-1)$ lie on the same side of it. -/\n@[category test, AMS 5 52]\ntheorem not_isHalvingLine_side :\n    ¬ IsHalvingLine {!₂[0, 0], !₂[2, 0], !₂[1, 1], !₂[1, -1]} !₂[0, 0] !₂[1, 1] := by\n  simp [IsHalvingLine, triangle_area_eq_det, Matrix.det_fin_three, Finset.filter_insert,\n    Finset.filter_singleton]\n  norm_num\n\nend CrossingNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The single-slot table matches the source; I conformed to its reading (implicit quantifier over all n, implicit general-position hypothesis, trivial odd-n case, converse remark treated as background).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "General position is formalized as `NonTrilinear` (no three distinct points collinear), imposed both on the minimizing set S and on all competitor sets T for both the crossing minimum and the halving-line maximum; this is the standard implicit hypothesis for both notions (a straight-line drawing of K_n needs no vertex on an edge).",
+    "The rectilinear crossing number and the halving-line maximum are not introduced as separate `sInf`/`sSup` quantities; instead 'cr̄(n) is minimized' is written directly as `∀ T, #T = #S → NonTrilinear T → crossings S ≤ crossings T` and 'halving lines maximized' as `∀ T, ... → halvingLines T ≤ halvingLines S`. This avoids any dependence on `sInf`/`sSup` defaults.",
+    "Quantification is over all n (via `#T = #S`), not only even n. For odd n no general-position set has a halving line (n-2 remaining points cannot split equally), so the conclusion is trivially true there, matching the decomposition notes; the docstring records this.",
+    "Crossings are counted as unordered pairs of distinct edges whose *open* segments meet (the literature's 'pairwise intersections of edges'). Under general position this excludes adjacent edges (which only share an endpoint) and coincides with the number of pairs of crossing edges (= number of convex quadrilaterals). Concurrent crossings at the same point are counted once per pair, as in the standard definition.",
+    "The side of a point c relative to the line ab is determined by the sign of `EuclideanGeometry.triangle_area a b c` (signed area / areaForm). Two proved `category test` lemmas check the intended sign semantics on a concrete quadrilateral. Halving lines are counted as lines (`Set.ncard` over `AffineSubspace ℝ ℝ²`); under general position distinct point pairs give distinct lines.",
+    "The question form of the list entry is rendered as `answer(sorry) ↔ P`, with `answer(True)` being the positive answer asserted by the article's conjecture. The article's remark that the converse fails is mentioned only in the docstring, not formalized.",
+    "One `category test` lemma (`crossings_convex_quadrilateral`: the convex quadrilateral (0,0),(2,0),(1,1),(1,-1) has exactly one crossing) is left with `sorry`, as is customary for tests in this repo; the other tests are proved."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `openSegment`, `segment`, `Finset.powersetCard` (used as building blocks); `SimpleGraph` has no planar drawing/crossing API; FormalConjecturesForMathlib/Geometry/2d.lean has `ConvexIndep`/`HasConvexNGon` (counting convex 4-subsets would be equivalent under general position but less literal).",
+     "name": "CrossingNumber.crossings",
+     "why_needed": "The number of crossings of the straight-line drawing of the complete graph on a finite point set S: the number of unordered pairs of distinct edges (2-subsets of S) whose open segments meet. Mathlib has no rectilinear/geometric drawing or crossing-number notion."
+    },
+    {
+     "closest_existing_considered": "Mathlib `AffineSubspace.SSameSide`/`SOppSide` (would require an existential choice of reference points on each side); repo's `EuclideanGeometry.triangle_area` (signed area) is used as the side test.",
+     "name": "CrossingNumber.IsHalvingLine",
+     "why_needed": "The line through a, b ∈ S equally bisects the remaining points: the number of points of S with positive signed area `triangle_area a b c` equals the number with negative signed area (points on the line, i.e. a and b under general position, are excluded from both)."
+    },
+    {
+     "closest_existing_considered": "Counting 2-subsets of S instead of lines (equivalent under general position, but counting lines is the literal reading).",
+     "name": "CrossingNumber.halvingLines",
+     "why_needed": "The number of halving lines of S, as `Set.ncard` of the set of lines `line[ℝ, a, b]` (a ≠ b ∈ S) satisfying `IsHalvingLine S a b`."
+    }
+   ],
+   "per_slot": {
+    "crossing_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ S in general position (NonTrilinear), (S minimizes `crossings` among same-size general-position sets) → (S maximizes `halvingLines` among same-size general-position sets)`. Needed bespoke definitions for the number of crossings of the straight-line drawing of K_n on a point set and for halving lines; neither exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number": "/--\n**Rectilinear crossing number and halving lines.**\n\nLet $S$ be a set of $n$ points in the plane in general position (no three collinear) whose\nstraight-line drawing of $K_n$ has the minimum number of crossings among all such $n$-point sets,\ni.e. an arrangement of points for which the rectilinear crossing number $\\overline{cr}(n)$ is\nattained. Is the number of halving lines of $S$ then maximal among all $n$-point sets in general\nposition?\n\nThe conjecture asserts the positive answer. For odd $n$ no set in general position has a halving\nline, so the question is only of interest for even $n$. The converse is known to be false.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number :\n    answer(sorry) ↔ ∀ S : Finset ℝ², NonTrilinear (S : Set ℝ²) →\n      (∀ T : Finset ℝ², #T = #S → NonTrilinear (T : Set ℝ²) → crossings S ≤ crossings T) →\n      ∀ T : Finset ℝ², #T = #S → NonTrilinear (T : Set ℝ²) → halvingLines T ≤ halvingLines S := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Crossing number: rectilinear crossing number and halving lines\n\nThe *rectilinear crossing number* $\\overline{cr}(n)$ of the complete graph $K_n$ is the\nminimum number of crossings in a straight-line drawing of $K_n$, that is, the minimum, over\nall sets $S$ of $n$ points in the plane with no three collinear, of the number of pairs of\nsegments spanned by $S$ that cross.\n\nA *halving line* of $S$ is a line through two points of $S$ that equally bisects the\nremaining points of $S$.\n\nWikipedia records the conjecture that every $n$-point set which minimizes the number of\ncrossings also maximizes the number of halving lines. The converse is known to be false.\n\n*References:*\n- [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nopen Finset EuclideanGeometry\n\nnamespace CrossingNumber\n\n/-- The four-element set `T` carries a crossing of the straight-line drawing of the complete\ngraph on `T`: `T = {a, b, c, d}` and the open segments `ab` and `cd` meet.\n\nFor a point set with no three points collinear, two spanned segments can only cross if their\nfour endpoints are distinct, and a four-point set carries at most one crossing pair (the two\ndiagonals of a convex quadrilateral). So the number of crossings of the straight-line drawing of\n$K_n$ on such a set equals the number of its four-element subsets satisfying `HasCrossing`. -/\ndef HasCrossing (T : Finset ℝ²) : Prop :=\n  ∃ a b c d, T = {a, b, c, d} ∧ (openSegment ℝ a b ∩ openSegment ℝ c d).Nonempty\n\n/-- The number of crossings of the straight-line drawing of the complete graph with vertex\nset `S`, that is, the number of four-element subsets of `S` carrying a crossing. -/\nnoncomputable def crossingCount (S : Finset ℝ²) : ℕ :=\n  open scoped Classical in\n  #{T ∈ S.powersetCard 4 | HasCrossing T}\n\n/-- The line through `a` and `b` equally bisects `S`: the number of points of `S` strictly on\none side of the line equals the number of points of `S` strictly on the other side. The two sides\nare distinguished by the sign of the signed area `triangle_area a b c`. -/\ndef IsHalvingLine (S : Finset ℝ²) (a b : ℝ²) : Prop :=\n  #{c ∈ S | 0 < triangle_area a b c} = #{c ∈ S | triangle_area a b c < 0}\n\n/-- The number of halving lines of `S`: the number of two-element subsets `{a, b}` of `S` such\nthat the line through `a` and `b` equally bisects the remaining points of `S`.\n\nFor a point set with no three points collinear, distinct pairs span distinct lines, so this is\nthe number of halving lines of `S`. -/\nnoncomputable def halvingLineCount (S : Finset ℝ²) : ℕ :=\n  open scoped Classical in\n  #{T ∈ S.powersetCard 2 | ∃ a b, T = {a, b} ∧ IsHalvingLine S a b}\n\n/--\nIs it true that, for every $n$ and every set $S$ of $n$ points in the plane with no three\ncollinear such that the straight-line drawing of $K_n$ on $S$ has the minimum number of\ncrossings among all such $n$-point sets (i.e. $S$ realizes the rectilinear crossing number\n$\\overline{cr}(n)$), the number of halving lines of $S$ is the maximum number of halving lines\nof an $n$-point set with no three collinear?\n\nA halving line of $S$ is a line through two points of $S$ that equally bisects the remaining\npoints of $S$. For odd $n$ no line can equally bisect the $n - 2$ remaining points, so the\nquestion is only of interest for even $n$.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number :\n    answer(sorry) ↔ ∀ (n : ℕ) (S : Finset ℝ²), #S = n → NonTrilinear (S : Set ℝ²) →\n      (∀ T : Finset ℝ², #T = n → NonTrilinear (T : Set ℝ²) →\n        crossingCount S ≤ crossingCount T) →\n      ∀ T : Finset ℝ², #T = n → NonTrilinear (T : Set ℝ²) →\n        halvingLineCount T ≤ halvingLineCount S := by\n  sorry\n\n/-- A set with fewer than four points has no crossings. -/\n@[category test, AMS 5 52]\ntheorem crossingCount_eq_zero_of_card_lt (S : Finset ℝ²) (hS : #S < 4) :\n    crossingCount S = 0 := by\n  classical\n  simp [crossingCount, powersetCard_eq_empty.mpr hS]\n\n/-- A set with fewer than two points has no halving lines. -/\n@[category test, AMS 5 52]\ntheorem halvingLineCount_eq_zero_of_card_lt (S : Finset ℝ²) (hS : #S < 2) :\n    halvingLineCount S = 0 := by\n  classical\n  simp [halvingLineCount, powersetCard_eq_empty.mpr hS]\n\n/-- Being a halving line does not depend on the order of the two points. -/\n@[category API, AMS 5 52]\ntheorem isHalvingLine_comm (S : Finset ℝ²) (a b : ℝ²) :\n    IsHalvingLine S a b ↔ IsHalvingLine S b a := by\n  have h : ∀ c, triangle_area b a c = - triangle_area a b c := fun c => by\n    unfold triangle_area\n    rw [Orientation.areaForm_swap]\n    ring\n  simp only [IsHalvingLine, h, neg_pos, neg_neg_iff_pos]\n  exact eq_comm\n\nend CrossingNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single slot matches the list entry; I agree with the notes that the general-position hypothesis is implicit, that n is implicitly universally quantified, and that the converse remark in the article is background only.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Point arrangements are `Finset ℝ²` (`ℝ² = EuclideanSpace ℝ (Fin 2)`), following `ErdosProblems/107.lean`; general position (no three collinear) is the existing `EuclideanGeometry.NonTrilinear`, applied to both the minimizing set S and all competitor sets T. General position is implicit in the notion of a straight-line drawing (no vertex on the interior of an edge) and in the standard definition of the rectilinear crossing number.",
+    "The question form of the list entry is rendered as `answer(sorry) ↔ P` per CONTRIBUTING.md; `answer(True)` is the positive answer (the conjecture asserted by the article).",
+    "Minimality/maximality are stated explicitly (`∀ T, ... → crossingCount S ≤ crossingCount T` and `∀ T, ... → halvingLineCount T ≤ halvingLineCount S`) rather than via `sInf`/`sSup`, avoiding default-value boundary issues; n is quantified implicitly over all naturals via `#S = n`.",
+    "`crossingCount S` counts 4-element subsets `{a,b,c,d}` of S whose open segments ab and cd meet. For sets with no three collinear this equals the number of pairs of crossing edges of the straight-line drawing of K_n: two edges sharing an endpoint cannot cross (that would force three collinear points), and a 4-point set carries at most one crossing pairing (the diagonals of a convex quadrilateral). This is also the classical 'number of convex quadrilaterals' reformulation. Open segments are used since a crossing is an interior intersection.",
+    "A halving line is modelled by a pair {a,b} ⊆ S such that #{c ∈ S | 0 < triangle_area a b c} = #{c ∈ S | triangle_area a b c < 0}, i.e. equally many points of S strictly on each side of the line through a and b (the sign of the existing signed area `EuclideanGeometry.triangle_area` from FormalConjecturesForMathlib distinguishes the sides; sign convention checked on concrete points). `halvingLineCount` counts such 2-subsets; under no-three-collinear, distinct pairs give distinct lines, so this equals the number of halving lines.",
+    "For odd n the literal 'equally bisects the remaining points' definition gives halving-line count 0 for every S, so the statement is trivially true there; the quantification over all n is kept (as in the statement) and this is noted in the docstring. Some sources restrict to even n; that restriction would not change the truth value of the formal statement.",
+    "AMS tags 5 (combinatorics) and 52 (convex and discrete geometry) were chosen; the problem is tagged 'geometry, discrete geometry'.",
+    "Small `test`/`API` lemmas (no crossings below 4 points, no halving lines below 2 points, symmetry of `IsHalvingLine` in a and b) are included with full proofs to exercise the bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Erdos1071.SegmentsDisjoint` (problem-local, states disjointness rather than crossing and is not reusable); Mathlib `openSegment`/`segment` (used as building blocks); `EuclideanGeometry.ConvexIndep`/`HasConvexNGon` (convex-position reformulation, less directly 'a crossing').",
+     "name": "CrossingNumber.HasCrossing",
+     "why_needed": "A predicate on a 4-element point set saying it carries a crossing of the straight-line drawing of K_4 on it (`T = {a,b,c,d}` with `openSegment ℝ a b ∩ openSegment ℝ c d` nonempty). Neither Mathlib nor the repo has any notion of segment crossing or crossing number."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjectures for 'crossing', 'rectilinear': nothing; `SimpleGraph` has no drawing/crossing API.",
+     "name": "CrossingNumber.crossingCount",
+     "why_needed": "Number of crossings of the straight-line drawing of the complete graph on a finite point set (count of 4-subsets satisfying `HasCrossing`). No crossing-number notion exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "Mathlib `AffineSubspace.SSameSide`/`SOppSide` (would require an auxiliary reference point or partition, making the definition heavier); `EuclideanGeometry.oangle` sign (equivalent side indicator); reused the repo's `triangle_area` instead of re-defining a determinant.",
+     "name": "CrossingNumber.IsHalvingLine",
+     "why_needed": "The line through a and b has equally many points of S strictly on each side (sign of `EuclideanGeometry.triangle_area`). No halving-line/k-set notion exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib/repo; searched 'halving'.",
+     "name": "CrossingNumber.halvingLineCount",
+     "why_needed": "Number of halving lines of a finite point set, as the number of 2-subsets {a,b} of S with `IsHalvingLine S a b`."
+    }
+   ],
+   "per_slot": {
+    "crossing_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ n S, #S = n → NonTrilinear S → (S minimizes crossingCount over all n-point NonTrilinear sets) → (S maximizes halvingLineCount over all n-point NonTrilinear sets)`. Needed bespoke problem-local definitions of the crossing count of the straight-line drawing of K_n on a point set and of the halving-line count, since neither Mathlib nor FormalConjecturesForMathlib has them."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number": "/--\nIs it true that, for every $n$ and every set $S$ of $n$ points in the plane with no three\ncollinear such that the straight-line drawing of $K_n$ on $S$ has the minimum number of\ncrossings among all such $n$-point sets (i.e. $S$ realizes the rectilinear crossing number\n$\\overline{cr}(n)$), the number of halving lines of $S$ is the maximum number of halving lines\nof an $n$-point set with no three collinear?\n\nA halving line of $S$ is a line through two points of $S$ that equally bisects the remaining\npoints of $S$. For odd $n$ no line can equally bisect the $n - 2$ remaining points, so the\nquestion is only of interest for even $n$.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number :\n    answer(sorry) ↔ ∀ (n : ℕ) (S : Finset ℝ²), #S = n → NonTrilinear (S : Set ℝ²) →\n      (∀ T : Finset ℝ², #T = n → NonTrilinear (T : Set ℝ²) →\n        crossingCount S ≤ crossingCount T) →\n      ∀ T : Finset ℝ², #T = n → NonTrilinear (T : Set ℝ²) →\n        halvingLineCount T ≤ halvingLineCount S := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rectilinear crossing number and halving lines\n\nA *rectilinear drawing* of the complete graph $K_n$ is given by a set $S$ of $n$ points in\ngeneral position in the plane (no three collinear); its edges are the straight line segments\njoining the points of $S$. The number of crossings of this drawing is denoted $\\overline{cr}(S)$,\nand the *rectilinear crossing number* $\\overline{cr}(n)$ of $K_n$ is the minimum of\n$\\overline{cr}(S)$ over all such $S$.\n\nA *halving line* of $S$ is a line which passes through two points of $S$ and equally bisects the\nremaining points.\n\nConjecture: for each arrangement of points in which $\\overline{cr}(n)$ is minimized, the number\nof halving lines is maximized. The converse is known to be false.\n\n*References:*\n* [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* [Rectilinear Crossing Number project](http://www.ist.tugraz.at/staff/aichholzer/research/rp/triangulations/crossing/)\n-/\n\nopen EuclideanGeometry Finset\n\nnamespace CrossingNumber\n\n/-- The number of crossings $\\overline{cr}(S)$ of the rectilinear drawing of the complete graph\non the point set `S`: the number of unordered pairs of edges `s(a, b)`, `s(c, d)` with four\ndistinct endpoints in `S` whose interiors (open segments) meet. -/\nnoncomputable def crossings (S : Finset ℝ²) : ℕ :=\n  {e : Sym2 (Sym2 ℝ²) | ∃ a ∈ S, ∃ b ∈ S, ∃ c ∈ S, ∃ d ∈ S, e = s(s(a, b), s(c, d)) ∧\n    ({a, b, c, d} : Finset ℝ²).card = 4 ∧ (openSegment ℝ a b ∩ openSegment ℝ c d).Nonempty}.ncard\n\n/-- The line `ℓ` is a *halving line* of `S`: it passes through two distinct points `a, b` of `S`,\nand the two open half-planes bounded by `ℓ` contain the same number of points of `S`.\nThe side of `ℓ` on which a point `p` lies is recorded by the sign of the oriented angle\n`∡ a b p`, which is `0` exactly when `p` lies on `ℓ`.\n\nFor `S` in general position (no three collinear) the only points of `S` on `ℓ` are `a` and `b`,\nso `ℓ` equally bisects the remaining `#S - 2` points. -/\ndef IsHalvingLine (S : Finset ℝ²) (ℓ : AffineSubspace ℝ ℝ²) : Prop :=\n  ∃ a ∈ S, ∃ b ∈ S, a ≠ b ∧ ℓ = line[ℝ, a, b] ∧\n    #{p ∈ S | (∡ a b p).sign = 1} = #{p ∈ S | (∡ a b p).sign = -1}\n\n/-- The number of halving lines of the point set `S`. -/\nnoncomputable def halvingLines (S : Finset ℝ²) : ℕ :=\n  {ℓ | IsHalvingLine S ℓ}.ncard\n\n/--\nFor each arrangement of points in which the rectilinear crossing number is minimized, is the\nnumber of halving lines maximized?\n\nPrecisely: let $S$ be a set of $n$ points in general position (no three collinear) in the plane\nsuch that $\\overline{cr}(S) = \\overline{cr}(n)$, i.e. the straight-line drawing of $K_n$ on $S$\nhas the minimum number of crossings among all $n$-point sets in general position. Is the number\nof halving lines of $S$ then the maximum number of halving lines of an $n$-point set in general\nposition?\n\nThe question is asked for every $n$. For odd $n$ no line through two points of a set in general\nposition equally bisects the remaining $n - 2$ points, so the statement is trivially true in that\ncase; the content of the conjecture is for even $n$.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number : answer(sorry) ↔\n    ∀ S : Finset ℝ², NonTrilinear (S : Set ℝ²) →\n      (∀ T : Finset ℝ², #T = #S → NonTrilinear (T : Set ℝ²) → crossings S ≤ crossings T) →\n      ∀ T : Finset ℝ², #T = #S → NonTrilinear (T : Set ℝ²) → halvingLines T ≤ halvingLines S := by\n  sorry\n\n/-- A drawing with fewer than four vertices has no crossings. -/\n@[category test, AMS 5 52]\ntheorem crossings_eq_zero_of_card_lt {S : Finset ℝ²} (h : #S < 4) : crossings S = 0 := by\n  rw [crossings]\n  convert Set.ncard_empty (Sym2 (Sym2 ℝ²)) using 2\n  ext e\n  simp only [Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false, not_exists, not_and]\n  rintro a ha b hb c hc d hd - hcard -\n  have hsub : ({a, b, c, d} : Finset ℝ²) ⊆ S := by\n    intro x hx\n    simp only [mem_insert, mem_singleton] at hx\n    rcases hx with rfl | rfl | rfl | rfl <;> assumption\n  have := card_le_card hsub\n  omega\n\n/-- A set with fewer than two points has no halving lines. -/\n@[category test, AMS 5 52]\ntheorem halvingLines_eq_zero_of_card_lt {S : Finset ℝ²} (h : #S < 2) : halvingLines S = 0 := by\n  rw [halvingLines]\n  convert Set.ncard_empty (AffineSubspace ℝ ℝ²) using 2\n  ext ℓ\n  simp only [Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false, IsHalvingLine, not_exists,\n    not_and]\n  rintro a ha b hb hab - -\n  have hsub : ({a, b} : Finset ℝ²) ⊆ S := by\n    intro x hx\n    simp only [mem_insert, mem_singleton] at hx\n    rcases hx with rfl | rfl <;> assumption\n  have := card_le_card hsub\n  rw [card_pair hab] at this\n  omega\n\nend CrossingNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. One minor remark: the note says the claim is 'vacuous' for odd n; more precisely it is trivially true there (all halving-line counts are 0, so the conclusion 0 ≤ 0 holds), which is consistent with quantifying over all n.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "General position is taken as 'no three collinear' (`EuclideanGeometry.NonTrilinear` from FormalConjecturesForMathlib) and is imposed both on the arrangement S and on all competitors T; this is the standard domain of rectilinear drawings of K_n (Aichholzer et al. / Rectilinear Crossing Number project) and matches the decomposition note.",
+    "The minimization/maximization is expressed directly as comparisons against every T with `#T = #S` (rather than via `sInf`/`sSup` definitions of cr̄(n) and the maximum halving-line count) to avoid default-value pitfalls; the two formulations are equivalent.",
+    "`crossings S` counts unordered pairs of edges `s(a,b)`, `s(c,d)` with four pairwise distinct endpoints whose open segments meet (elements of `Sym2 (Sym2 ℝ²)`). In general position this is exactly the number of crossings of the straight-line drawing (adjacent edges cannot cross, closed vs. open segments coincide). Distinctness of endpoints is required explicitly so the definition does not depend on general position for degenerate cases.",
+    "`IsHalvingLine S ℓ` requires ℓ = line through two distinct points a, b ∈ S with equally many points of S in each open half-plane; sides are encoded by `(∡ a b p).sign = 1` vs `= -1` (sign 0 ⇔ p on the line, by `oangle_sign_eq_zero_iff_collinear`; sign constant on a side and negated across sides by `SSameSide.oangle_sign_eq`/`SOppSide.oangle_sign_eq_neg`). Under the general-position hypothesis the only points of S on ℓ are a and b, so this is exactly 'equally bisects the remaining n-2 points' with (n-2)/2 on each side. The count is of lines (`AffineSubspace ℝ ℝ²`), which in general position equals the count of point pairs.",
+    "Quantification is over all n (implicit in the statement), following the decomposition note. For odd n every general-position set has 0 halving lines under the literal 'equally bisects' definition, so the statement is trivially true there; the docstring records this. The question form of the list entry is rendered as `answer(sorry) ↔ P`, where `answer(True)` is the positive conjecture asserted by the article.",
+    "Two `@[category test]` lemmas with short proofs are included as basic API for the new definitions (no crossings with < 4 points; no halving lines with < 2 points)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Erdos1071.SegmentsDisjoint (problem-local, about disjoint segments, not a crossing count); SimpleGraph crossing-number notions do not exist in Mathlib; `openSegment` is used as the primitive.",
+     "name": "CrossingNumber.crossings",
+     "why_needed": "The number of crossings of the rectilinear drawing of K_n on a finite point set is not in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "AffineSubspace.SSameSide/SOppSide and EuclideanGeometry.oangle sign (used as primitives); no existing halving-line or k-set definition.",
+     "name": "CrossingNumber.IsHalvingLine",
+     "why_needed": "Halving lines of a planar point set are not defined anywhere in Mathlib or the repository."
+    },
+    {
+     "closest_existing_considered": "Set.ncard applied to the bespoke predicate; no existing counting definition.",
+     "name": "CrossingNumber.halvingLines",
+     "why_needed": "Cardinality of the set of halving lines, needed to compare arrangements."
+    }
+   ],
+   "per_slot": {
+    "crossing_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ S in general position, (S minimizes crossings among same-size general-position sets) → (S maximizes halving lines among same-size general-position sets)`. Needed bespoke definitions for the crossing count of a rectilinear drawing of K_n and for halving lines, neither of which exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number": "/--\nFor each arrangement of points in which the rectilinear crossing number is minimized, is the\nnumber of halving lines maximized?\n\nPrecisely: let $S$ be a set of $n$ points in general position (no three collinear) in the plane\nsuch that $\\overline{cr}(S) = \\overline{cr}(n)$, i.e. the straight-line drawing of $K_n$ on $S$\nhas the minimum number of crossings among all $n$-point sets in general position. Is the number\nof halving lines of $S$ then the maximum number of halving lines of an $n$-point set in general\nposition?\n\nThe question is asked for every $n$. For odd $n$ no line through two points of a set in general\nposition equally bisects the remaining $n - 2$ points, so the statement is trivially true in that\ncase; the content of the conjecture is for even $n$.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number : answer(sorry) ↔\n    ∀ S : Finset ℝ², NonTrilinear (S : Set ℝ²) →\n      (∀ T : Finset ℝ², #T = #S → NonTrilinear (T : Set ℝ²) → crossings S ≤ crossings T) →\n      ∀ T : Finset ℝ², #T = #S → NonTrilinear (T : Set ℝ²) → halvingLines T ≤ halvingLines S := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Crossing number\n\nThis file states a conjectured relation between crossing-minimal straight-line drawings of\ncomplete graphs and point sets with the maximum number of halving lines.\n\n*References:*\n- [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nopen scoped EuclideanGeometry\nopen EuclideanGeometry\n\nnamespace CrossingNumber\n\n/-- Two straight edges cross properly when their open segments intersect. The arguments are\nunordered endpoint sets. -/\ndef SegmentsCross (e f : Finset ℝ²) : Prop :=\n  ∃ a b c d : ℝ², e = {a, b} ∧ f = {c, d} ∧\n    (openSegment ℝ a b ∩ openSegment ℝ c d).Nonempty\n\n/-- The number of crossings in the straight-line drawing of the complete graph on `P`.\nEach crossing pair of edges is counted once. -/\nnoncomputable def rectilinearCrossingCount (P : Finset ℝ²) : ℕ :=\n  open scoped Classical in\n  let edges := P.powersetCard 2\n  ((edges.powersetCard 2).filter fun E ↦\n    ∃ e ∈ E, ∃ f ∈ E, e ≠ f ∧ SegmentsCross e f).card\n\n/-- The signed side of `p` relative to the directed line from `a` to `b`. Its sign distinguishes\nthe two open half-planes bounded by that line. -/\ndef sideValue (a b p : ℝ²) : ℝ :=\n  (b 0 - a 0) * (p 1 - a 1) - (b 1 - a 1) * (p 0 - a 0)\n\n/-- The number of lines through two points of `P` which leave equally many of the other points\nin each of their two open half-planes. -/\nnoncomputable def halvingLineCount (P : Finset ℝ²) : ℕ :=\n  open scoped Classical in\n  ((P.powersetCard 2).filter fun e ↦\n    ∃ a ∈ e, ∃ b ∈ e, a ≠ b ∧\n      (P.filter fun p ↦ 0 < sideValue a b p).card =\n        (P.filter fun p ↦ sideValue a b p < 0).card).card\n\n/--\nFor every `n` and every `n`-point set in general position (no three points collinear), if its\nstraight-line drawing of $K_n$ has the minimum possible number of crossings among all such\n`n`-point sets, must its number of halving lines be the maximum possible among all such sets?\nA halving line passes through two points and has equally many remaining points in each open\nhalf-plane. Thus, under this literal definition, odd-cardinality sets have no halving lines.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number : answer(sorry) ↔\n    ∀ (n : ℕ) (S : Finset ℝ²), S.card = n → NonTrilinear (S : Set ℝ²) →\n      (∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n        rectilinearCrossingCount S ≤ rectilinearCrossingCount T) →\n      ∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n        halvingLineCount T ≤ halvingLineCount S := by\n  sorry\n\nend CrossingNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the article's yes/no question using `answer(sorry) ↔ P`, where `P` is the positive conjectured relationship stated by the article.",
+    "Modeled an arrangement as a `Finset ℝ²` and general position as `EuclideanGeometry.NonTrilinear`, exactly the needed no-three-collinear condition. The repository's `InGeneralPosition` was deliberately not used because it additionally forbids four cocircular points.",
+    "Defined an arrangement's straight-line crossing count directly as the number of unordered pairs of two-point edges whose open segments intersect. This counts each crossing edge-pair once and excludes intersections at shared endpoints.",
+    "Defined a halving line by an unordered pair of points for which oriented determinant signs partition the point set into equally large positive and negative open half-planes. Under no-three-collinear, only the two endpoints have sign zero; consequently the literal formulation gives zero halving lines for odd cardinality.",
+    "Expressed minimum and maximum without `sInf` or `sSup`: a point set is crossing-minimal when its count is at most every admissible set's count, and its halving-line count is maximal when every admissible set's count is at most its count. Competitors are required to have the same cardinality and no three collinear."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib provides `openSegment`, but the searches found no predicate for proper crossing of two finite unordered endpoint sets.",
+     "name": "CrossingNumber.SegmentsCross",
+     "why_needed": "Represents proper crossing of two unordered straight edges via intersection of their open segments."
+    },
+    {
+     "closest_existing_considered": "No rectilinear crossing-count definition was found in Mathlib or FormalConjecturesForMathlib; the convex-independent quadruple characterization was considered but rejected in favor of the direct edge-crossing definition.",
+     "name": "CrossingNumber.rectilinearCrossingCount",
+     "why_needed": "Counts crossings in the straight-line complete-graph drawing induced by a finite planar point set."
+    },
+    {
+     "closest_existing_considered": "Oriented-angle and orientation APIs exist, but no simple existing real-valued side-of-directed-line function suitable for finite filtering was found.",
+     "name": "CrossingNumber.sideValue",
+     "why_needed": "Provides the signed planar determinant needed to distinguish the two open sides of a line through two points."
+    },
+    {
+     "closest_existing_considered": "No halving-line predicate or count was found in Mathlib, FormalConjecturesForMathlib, or existing formal-conjectures files.",
+     "name": "CrossingNumber.halvingLineCount",
+     "why_needed": "Counts unordered point pairs whose line equally bisects all remaining points."
+    }
+   ],
+   "per_slot": {
+    "crossing_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number": "/--\nFor every `n` and every `n`-point set in general position (no three points collinear), if its\nstraight-line drawing of $K_n$ has the minimum possible number of crossings among all such\n`n`-point sets, must its number of halving lines be the maximum possible among all such sets?\nA halving line passes through two points and has equally many remaining points in each open\nhalf-plane. Thus, under this literal definition, odd-cardinality sets have no halving lines.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number : answer(sorry) ↔\n    ∀ (n : ℕ) (S : Finset ℝ²), S.card = n → NonTrilinear (S : Set ℝ²) →\n      (∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n        rectilinearCrossingCount S ≤ rectilinearCrossingCount T) →\n      ∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n        halvingLineCount T ≤ halvingLineCount S := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rectilinear crossing number and halving lines\n\nFor a finite set of points in general position in the plane, the crossings in the\nstraight-line drawing of the complete graph correspond to its four-point subsets in\nconvex position. A halving line passes through two points and has equally many of the\nremaining points in each of its two open half-planes.\n\n*Reference:* [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n-/\n\nnamespace CrossingNumber\n\nopen scoped EuclideanGeometry\nopen EuclideanGeometry\n\n/-- The two points in `e` determine a halving line of `S`: the remaining points of `S`\nare split equally between the two open half-planes bounded by their line. -/\ndef IsHalvingPair (S e : Finset ℝ²) : Prop :=\n  e ⊆ S ∧ e.card = 2 ∧\n    ∃ a ∈ e, ∃ b ∈ e, a ≠ b ∧\n      ((S \\ e).filter fun c ↦ 0 < triangle_area a b c).card =\n        ((S \\ e).filter fun c ↦ triangle_area a b c < 0).card\n\n/-- The number of halving lines determined by `S`. Each line is represented by its\nunordered pair of incident points. -/\nnoncomputable def halvingLineCount (S : Finset ℝ²) : ℕ := by\n  classical\n  exact (S.powerset.filter fun e ↦ IsHalvingPair S e).card\n\n/-- The number of crossings in the straight-line drawing of the complete graph on a\npoint set `S` in general position. It is the number of four-point subsets of `S` in\nconvex position. -/\nnoncomputable def rectilinearCrossingCount (S : Finset ℝ²) : ℕ := by\n  classical\n  exact (S.powerset.filter fun Q : Finset ℝ² ↦\n    Q.card = 4 ∧ ConvexIndep (Q : Set ℝ²)).card\n\n/--\nFor every $n$, does every $n$-point set $S$ in the plane with no three collinear that\nminimizes the rectilinear crossing number among all such sets also maximize the number\nof halving lines among all such sets? Here a halving line passes through two points of\n$S$ and has equally many of the other points in each open half-plane.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number :\n    answer(sorry) ↔\n      ∀ (n : ℕ) (S : Finset ℝ²), S.card = n → NonTrilinear (S : Set ℝ²) →\n        (∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n          rectilinearCrossingCount S ≤ rectilinearCrossingCount T) →\n        ∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n          halvingLineCount T ≤ halvingLineCount S := by\n  sorry\n\nend CrossingNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used `EuclideanGeometry.NonTrilinear` for the implicit general-position condition, because the relevant meaning here is exactly “no three collinear”; the existing `InGeneralPosition` is intentionally not used because it additionally forbids four concyclic points.",
+    "Represented the crossing count of the straight-line drawing of the complete graph by the number of four-point subsets in convex position. Under the theorem's no-three-collinear hypothesis, each such subset contributes exactly one crossing and every crossing determines such a subset.",
+    "Represented a halving line by its unordered two-point subset and compared the numbers of remaining points with positive and negative signed triangle area. This counts each line once and implements the two open half-planes bounded by the line.",
+    "Quantified over every natural number `n`, including odd `n`. For odd `n`, the no-three-collinear hypothesis ensures all remaining points lie strictly on one side or the other, so equal side counts are impossible and the halving-line count is zero, as required by the literal definition.",
+    "Expressed minimization and maximization relationally over all no-three-collinear point sets of the same cardinality, avoiding artificial default values from infima or suprema.",
+    "Used `answer(sorry) ↔ P` because the source is a yes/no question, while `P` is the precise positive relationship described by the background article."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`EuclideanGeometry.triangle_area` supplies the signed-side test, but no existing halving-line abstraction was found.",
+     "name": "CrossingNumber.IsHalvingPair",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no predicate for a line through two points that equally splits the remaining finite point set."
+    },
+    {
+     "closest_existing_considered": "Finite-set filtering and cardinality in `Finset`; no domain-specific count exists.",
+     "name": "CrossingNumber.halvingLineCount",
+     "why_needed": "The statement compares the number of halving lines determined by finite point configurations, and no existing counting function was found."
+    },
+    {
+     "closest_existing_considered": "`EuclideanGeometry.ConvexIndep` provides the standard equivalent characterization by convex four-point subsets under general position.",
+     "name": "CrossingNumber.rectilinearCrossingCount",
+     "why_needed": "No rectilinear crossing-number primitive for a complete straight-line drawing on a finite planar point set was found."
+    }
+   ],
+   "per_slot": {
+    "crossing_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number": "/--\nFor every $n$, does every $n$-point set $S$ in the plane with no three collinear that\nminimizes the rectilinear crossing number among all such sets also maximize the number\nof halving lines among all such sets? Here a halving line passes through two points of\n$S$ and has equally many of the other points in each open half-plane.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number :\n    answer(sorry) ↔\n      ∀ (n : ℕ) (S : Finset ℝ²), S.card = n → NonTrilinear (S : Set ℝ²) →\n        (∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n          rectilinearCrossingCount S ≤ rectilinearCrossingCount T) →\n        ∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n          halvingLineCount T ≤ halvingLineCount S := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rectilinear crossing numbers and halving lines\n\n*Reference:* [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n-/\n\nnamespace CrossingNumber\n\nopen EuclideanGeometry\nopen scoped Classical EuclideanGeometry\n\n/--\nThe number of crossings in the straight-line drawing of the complete graph on `S`.\nFor points in general position, every crossing corresponds to a unique four-point subset in\nconvex position.\n-/\nnoncomputable def rectilinearCrossingCount (S : Finset ℝ²) : ℕ :=\n  (S.powersetCard 4 |>.filter fun T ↦ ConvexIndep (T : Set ℝ²)).card\n\n/--\nA two-point subset `L` of `S` determines a halving line if the two open half-planes bounded by\nits line contain the same number of points of `S \\ L`.\n-/\nnoncomputable def IsHalvingLine (S L : Finset ℝ²) : Prop :=\n  L ∈ S.powersetCard 2 ∧\n    ∀ a ∈ L, ∀ b ∈ L, a ≠ b →\n      ((S \\ L).filter fun p ↦ (∡ a b p).sign = 1).card =\n        ((S \\ L).filter fun p ↦ (∡ a b p).sign = -1).card\n\n/-- The number of halving lines determined by `S`. -/\nnoncomputable def halvingLineCount (S : Finset ℝ²) : ℕ :=\n  (S.powersetCard 2 |>.filter (IsHalvingLine S)).card\n\n/--\nFor every natural number $n$ and every set $S$ of $n$ points in the plane in general position\n(no three collinear), does the following hold? If the straight-line drawing of $K_n$ on $S$\nhas the minimum number of crossings among all such $n$-point sets, then $S$ has the maximum\nnumber of halving lines among all such sets. A halving line passes through two points of $S$ and\nhas equally many of the other points in each of its two open half-planes.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number : answer(sorry) ↔\n    ∀ (n : ℕ) (S : Finset ℝ²), S.card = n → NonTrilinear (S : Set ℝ²) →\n      (∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n        rectilinearCrossingCount S ≤ rectilinearCrossingCount T) →\n      ∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n        halvingLineCount T ≤ halvingLineCount S := by\n  sorry\n\nend CrossingNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "An arrangement of n distinct planar points is modeled as a `Finset ℝ²` of cardinality n, and the implicit general-position assumption is modeled by `EuclideanGeometry.NonTrilinear`, meaning no three distinct points are collinear.",
+    "For a general-position point set, the crossing count of the straight-line drawing of the complete graph is modeled as the number of four-point subsets in convex position. Such subsets correspond bijectively to crossing pairs of edges.",
+    "A halving line is represented by its unique two-point subset. The two open half-planes are detected by signs `1` and `-1` of the oriented angle relative to the ordered pair; equality of the two counts is invariant under reversing that order.",
+    "The conjecture quantifies over every natural number n. Thus odd n are included; under general position their halving-line count is zero, matching the decomposition's literal equally-bisects reading.",
+    "Because the source phrases the conjecture as a yes/no question, the positive proposed answer is represented using `answer(sorry) ↔ ...`.",
+    "Minimum crossing count and maximum halving-line count are stated by comparison with every general-position point finset of the same cardinality, avoiding any choice of numerical extrema."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`EuclideanGeometry.ConvexIndep` and `Finset.powersetCard`; these provide the ingredients but not the crossing count itself.",
+     "name": "CrossingNumber.rectilinearCrossingCount",
+     "why_needed": "No rectilinear crossing-count primitive for a finite planar point arrangement was found. The conjecture needs the number of crossings in the straight-line complete-graph drawing."
+    },
+    {
+     "closest_existing_considered": "Mathlib's oriented affine-angle sign and affine/convex geometry APIs; oriented-angle sign directly identifies the two open sides of the determined line.",
+     "name": "CrossingNumber.IsHalvingLine",
+     "why_needed": "No predicate for a line through two points equally splitting the remaining points was found."
+    },
+    {
+     "closest_existing_considered": "`Finset.powersetCard` together with the bespoke `IsHalvingLine` predicate; these make the intended unordered-line count explicit.",
+     "name": "CrossingNumber.halvingLineCount",
+     "why_needed": "No primitive counting halving lines of a finite point set was found."
+    }
+   ],
+   "per_slot": {
+    "crossing_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number": "/--\nFor every natural number $n$ and every set $S$ of $n$ points in the plane in general position\n(no three collinear), does the following hold? If the straight-line drawing of $K_n$ on $S$\nhas the minimum number of crossings among all such $n$-point sets, then $S$ has the maximum\nnumber of halving lines among all such sets. A halving line passes through two points of $S$ and\nhas equally many of the other points in each of its two open half-planes.\n-/\n@[category research open, AMS 5 52]\ntheorem crossing_number : answer(sorry) ↔\n    ∀ (n : ℕ) (S : Finset ℝ²), S.card = n → NonTrilinear (S : Set ℝ²) →\n      (∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n        rectilinearCrossingCount S ≤ rectilinearCrossingCount T) →\n      ∀ T : Finset ℝ², T.card = n → NonTrilinear (T : Set ℝ²) →\n        halvingLineCount T ≤ halvingLineCount S := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "crossing_number": "c05"
+ },
+ "id": "wp-crossing-number",
+ "main_attempt": "c05"
+}

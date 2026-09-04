@@ -1,0 +1,529 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Borromean rings\n\nThe Borromean rings are three simple closed curves in $\\mathbb{R}^3$ that are linked, but such\nthat any two of them are unlinked (the link L6a4 in the Knot Atlas). It is impossible to form the\nBorromean rings out of three round circles (Freedman–Skora), but they can be formed out of three\ncongruent ellipses, or out of three mutually perpendicular golden rectangles.\n\nMatthew Cook conjectured that any three unknotted simple closed curves in space, not all circles,\ncan be combined *without scaling* to form the Borromean rings. After Jason Cantarella suggested a\npossible counterexample, Hugh Nelson Howards conjectured the opposite. The Wikipedia list of\nunsolved problems asks:\n\n> Are there three unknotted space curves, not all three circles, which cannot be arranged to form\n> this link?\n\nHere \"arranged\" means that a rigid motion of $\\mathbb{R}^3$ is applied to each curve separately\n(no scaling), and \"form this link\" means that the moved curves are pairwise disjoint and their\nunion is ambient isotopic to the standard Borromean rings.\n\n*References:*\n- [Wikipedia, Borromean rings](https://en.wikipedia.org/wiki/Borromean_rings)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Howards, *Forming the Borromean rings out of arbitrary polygonal unknots*](https://arxiv.org/abs/1406.3370),\n  Conjecture 1.1 (Cook) and the conjecture of Section 3\n- [Cook, *Borromean rings*](http://paradise.caltech.edu/~cook/Workshop/Math/Borromean/Borrring.html)\n-/\n\nopen scoped EuclideanGeometry\nopen unitInterval\n\nnamespace BorromeanRings\n\n/-- Two subsets `A` and `B` of $\\mathbb{R}^3$ are *ambient isotopic* if there is a continuous\nfamily $(H_t)_{t \\in [0,1]}$ of homeomorphisms of $\\mathbb{R}^3$ with $H_0 = \\mathrm{id}$ and\n$H_1(A) = B$. -/\ndef AmbientIsotopic (A B : Set ℝ³) : Prop :=\n  ∃ H : C(I × ℝ³, ℝ³), (∀ t, IsHomeomorph fun x => H (t, x)) ∧ (∀ x, H (0, x) = x) ∧\n    (fun x => H (1, x)) '' A = B\n\n@[category API, AMS 51 57]\nlemma AmbientIsotopic.refl (A : Set ℝ³) : AmbientIsotopic A A :=\n  ⟨ContinuousMap.snd, fun _ => (Homeomorph.refl ℝ³).isHomeomorph, fun _ => rfl, Set.image_id A⟩\n\n/-- A subset `K` of $\\mathbb{R}^3$ is a *round circle* if it is the set of points of some plane\nat a fixed positive distance `r` from a center `c` lying in that plane. The plane is described by\nits center `c` and a nonzero normal vector `n`. -/\ndef IsRoundCircle (K : Set ℝ³) : Prop :=\n  ∃ (c n : ℝ³) (r : ℝ), n ≠ 0 ∧ 0 < r ∧ K = {x | dist x c = r ∧ inner ℝ (x - c) n = 0}\n\n/-- The unit circle in the $xy$-plane is a round circle. -/\n@[category test, AMS 51 57]\nlemma isRoundCircle_unitCircle : IsRoundCircle {p : ℝ³ | p 2 = 0 ∧ ‖p‖ = 1} := by\n  refine ⟨0, EuclideanSpace.single 2 1, 1, ?_, one_pos, ?_⟩\n  · simp\n  · ext x\n    simp [EuclideanSpace.inner_single_right, and_comm]\n\n/-- A subset `K` of $\\mathbb{R}^3$ is an *unknotted space curve* (an unknot) if it is ambient\nisotopic to a round circle. In particular it is a tame simple closed curve. -/\ndef IsUnknot (K : Set ℝ³) : Prop :=\n  ∃ C, IsRoundCircle C ∧ AmbientIsotopic C K\n\n@[category API, AMS 51 57]\nlemma IsRoundCircle.isUnknot {C : Set ℝ³} (hC : IsRoundCircle C) : IsUnknot C :=\n  ⟨C, hC, .refl C⟩\n\n/-- A standard model of the Borromean rings: three mutually perpendicular ellipses with semi-axes\n`1` and `2`, namely\n$\\{x = 0,\\ y^2 + z^2/4 = 1\\}$, $\\{y = 0,\\ z^2 + x^2/4 = 1\\}$ and $\\{z = 0,\\ x^2 + y^2/4 = 1\\}$.\nThe first ellipse passes twice through the disk bounded by the third, the third passes twice\nthrough the disk bounded by the second, and the second passes twice through the disk bounded by\nthe first; each ellipse misses the disk bounded by the remaining one. This is the configuration\nof the three golden rectangles inscribed in a regular icosahedron, with each rectangle replaced by\nits inscribed ellipse. -/\ndef borromeanRings : Set ℝ³ :=\n  {p | p 0 = 0 ∧ p 1 ^ 2 + p 2 ^ 2 / 4 = 1} ∪\n  {p | p 1 = 0 ∧ p 2 ^ 2 + p 0 ^ 2 / 4 = 1} ∪\n  {p | p 2 = 0 ∧ p 0 ^ 2 + p 1 ^ 2 / 4 = 1}\n\n/-- A subset `L` of $\\mathbb{R}^3$ *is the Borromean rings* (the link L6a4) if it is ambient\nisotopic to the standard model `borromeanRings`. -/\ndef IsBorromeanRings (L : Set ℝ³) : Prop :=\n  AmbientIsotopic borromeanRings L\n\n@[category API, AMS 51 57]\nlemma isBorromeanRings_borromeanRings : IsBorromeanRings borromeanRings :=\n  .refl _\n\n/--\n**Borromean rings problem.**\nAre there three unknotted space curves $K_1, K_2, K_3 \\subseteq \\mathbb{R}^3$, not all three\nround circles, which cannot be arranged to form the Borromean rings?\n\n\"Arranged\" means that a rigid motion (Euclidean isometry) $g_i$ of $\\mathbb{R}^3$ is applied to\neach curve $K_i$ individually, without any scaling. \"Form the Borromean rings\" means that the\nmoved curves $g_1(K_1), g_2(K_2), g_3(K_3)$ are pairwise disjoint and their union is ambient\nisotopic to the standard Borromean rings.\n\nA negative answer is Matthew Cook's conjecture (Howards, Conjecture 1.1). Howards conjectured a\npositive answer (Howards, Section 3), based on a candidate counterexample of Jason\nCantarella consisting of two round circles and a third unknot that is made of circular arcs\noutside a small region. Howards notes that if scaling of the components were allowed, this\ncandidate would likely fail; the question here does not allow scaling.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔ ∃ K₁ K₂ K₃ : Set ℝ³,\n      IsUnknot K₁ ∧ IsUnknot K₂ ∧ IsUnknot K₃ ∧\n      ¬ (IsRoundCircle K₁ ∧ IsRoundCircle K₂ ∧ IsRoundCircle K₃) ∧\n      ¬ ∃ g₁ g₂ g₃ : ℝ³ ≃ᵢ ℝ³,\n        Disjoint (g₁ '' K₁) (g₂ '' K₂) ∧ Disjoint (g₂ '' K₂) (g₃ '' K₃) ∧\n        Disjoint (g₃ '' K₃) (g₁ '' K₁) ∧\n        IsBorromeanRings (g₁ '' K₁ ∪ g₂ '' K₂ ∪ g₃ '' K₃) := by\n  sorry\n\nend BorromeanRings\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None of substance. One nuance: the table glosses 'rigid motion' as 'Euclidean isometry'; in some conventions 'rigid motion' means orientation-preserving isometry only (SE(3)), which would exclude reflections. I followed the table (`ℝ³ ≃ᵢ ℝ³`) and recorded the alternative reading as a modeling decision.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Curves are modelled as subsets `K : Set ℝ³` (their images), not as parametrizations; 'unknotted space curve' is `IsUnknot K` := K is ambient isotopic in ℝ³ to some round circle. This is the standard meaning (tame unknot); wild simple closed curves are thereby excluded, as in Cook/Howards.",
+    "Ambient isotopy is defined as a continuous map `H : C(I × ℝ³, ℝ³)` with each level `H (t, ·)` a homeomorphism (`IsHomeomorph`), `H (0, ·) = id`, and `H (1, ·) '' A = B`. Joint continuity of the inverse family is not required explicitly; for ℝ³ (locally compact, locally connected) it is automatic (Arens), so this agrees with the level-preserving-homeomorphism definition.",
+    "'Arranged' = a rigid motion applied to each component individually, formalized as `g₁ g₂ g₃ : ℝ³ ≃ᵢ ℝ³` (Euclidean isometries, following the decomposition table's gloss 'rigid motion (Euclidean isometry)'). No scaling is allowed, matching 'combined without scaling' and Howards's remark. NOTE for reviewer: `IsometryEquiv` includes reflections; if 'rigid motion' is read as orientation-preserving only (SE(3)), one would add a determinant/orientation condition. The two readings plausibly have the same truth value but are not provably equivalent; the table's wording was followed.",
+    "'Not all three circles' is `¬ (IsRoundCircle K₁ ∧ IsRoundCircle K₂ ∧ IsRoundCircle K₃)`; `IsRoundCircle K` := ∃ center c, nonzero normal n, radius r > 0 with K = {x | dist x c = r ∧ ⟪x - c, n⟫ = 0}. Circles of any radius/plane; the three curves need not be congruent.",
+    "'Form this link' is: the moved curves are pairwise disjoint (stated explicitly, although it follows from the union being a 3-component link) and their union is ambient isotopic to a fixed standard model `borromeanRings`. The model is three mutually perpendicular congruent ellipses {x=0, y²+z²/4=1}, {y=0, z²+x²/4=1}, {z=0, x²+y²/4=1}; this is the classical icosahedral golden-rectangle configuration (Wikipedia 'Ring shape' section; also the 2×4 integer-rectangle realization) with rectangles replaced by inscribed ellipses, isotopic to it. Equivalence is unlabelled/unoriented ambient isotopy; since the Borromean rings are amphichiral, using isotopy rather than arbitrary homeomorphism of ℝ³ makes no difference.",
+    "AMS tags 51 (geometry) and 57 (manifolds / knot theory). Small `API`/`test` lemmas (reflexivity of ambient isotopy, unit circle is a round circle, round circles are unknots, the model is Borromean) are included with proofs to sanity-check the bespoke definitions, as CONTRIBUTING.md asks; the slot itself is the single declaration `borromean_rings`.",
+    "The scaling-allowed variant and Howards's planar-curves variant are mentioned only in docstrings and not formalized, per the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Homeomorph`, `IsHomeomorph`, `Path`, `ContinuousMap.Homotopy` (homotopy of maps, not a family of homeomorphisms of the ambient space); none expresses ambient isotopy.",
+     "name": "BorromeanRings.AmbientIsotopic",
+     "why_needed": "Knot/link equivalence (ambient isotopy of subsets of ℝ³) does not exist in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`EuclideanGeometry.Sphere` / `Metric.sphere` (a 2-sphere in ℝ³, needs intersection with a plane), `Circle` (the unit circle in ℂ, not a subset of ℝ³), `AffineSubspace` with finrank 2 (used instead an explicit normal vector).",
+     "name": "BorromeanRings.IsRoundCircle",
+     "why_needed": "A round (Euclidean) circle in ℝ³ is needed for both 'unknotted' (isotopic to a circle) and 'not all three circles'."
+    },
+    {
+     "closest_existing_considered": "`IsEmbedding (γ : Circle → ℝ³)` as used in Wikipedia/InscribedSquare.lean gives a simple closed curve but carries no knottedness information.",
+     "name": "BorromeanRings.IsUnknot",
+     "why_needed": "'Unknotted simple closed curve' has no Mathlib counterpart."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib; chose the classical three-perpendicular-ellipses realization (Wikipedia 'Ring shape').",
+     "name": "BorromeanRings.borromeanRings",
+     "why_needed": "An explicit reference subset of ℝ³ representing the link L6a4 is needed since Mathlib has no link tables or link diagrams."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "BorromeanRings.IsBorromeanRings",
+     "why_needed": "'Forms the Borromean rings' = ambient isotopic to the standard model."
+    }
+   ],
+   "per_slot": {
+    "borromean_rings": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ K₁ K₂ K₃ : Set ℝ³, IsUnknot K₁ ∧ IsUnknot K₂ ∧ IsUnknot K₃ ∧ ¬(all three IsRoundCircle) ∧ ¬ ∃ g₁ g₂ g₃ : ℝ³ ≃ᵢ ℝ³, pairwise disjoint images ∧ IsBorromeanRings (g₁ '' K₁ ∪ g₂ '' K₂ ∪ g₃ '' K₃)`. Mathlib and the repo have no notion of knot, unknot, ambient isotopy, or the Borromean link, so bespoke problem-local definitions were needed (ambient isotopy of subsets of ℝ³, round circle, unknot, an explicit model of the Borromean rings)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "borromean_rings": "/--\n**Borromean rings problem.**\nAre there three unknotted space curves $K_1, K_2, K_3 \\subseteq \\mathbb{R}^3$, not all three\nround circles, which cannot be arranged to form the Borromean rings?\n\n\"Arranged\" means that a rigid motion (Euclidean isometry) $g_i$ of $\\mathbb{R}^3$ is applied to\neach curve $K_i$ individually, without any scaling. \"Form the Borromean rings\" means that the\nmoved curves $g_1(K_1), g_2(K_2), g_3(K_3)$ are pairwise disjoint and their union is ambient\nisotopic to the standard Borromean rings.\n\nA negative answer is Matthew Cook's conjecture (Howards, Conjecture 1.1). Howards conjectured a\npositive answer (Howards, Section 3), based on a candidate counterexample of Jason\nCantarella consisting of two round circles and a third unknot that is made of circular arcs\noutside a small region. Howards notes that if scaling of the components were allowed, this\ncandidate would likely fail; the question here does not allow scaling.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔ ∃ K₁ K₂ K₃ : Set ℝ³,\n      IsUnknot K₁ ∧ IsUnknot K₂ ∧ IsUnknot K₃ ∧\n      ¬ (IsRoundCircle K₁ ∧ IsRoundCircle K₂ ∧ IsRoundCircle K₃) ∧\n      ¬ ∃ g₁ g₂ g₃ : ℝ³ ≃ᵢ ℝ³,\n        Disjoint (g₁ '' K₁) (g₂ '' K₂) ∧ Disjoint (g₂ '' K₂) (g₃ '' K₃) ∧\n        Disjoint (g₃ '' K₃) (g₁ '' K₁) ∧\n        IsBorromeanRings (g₁ '' K₁ ∪ g₂ '' K₂ ∪ g₃ '' K₃) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Borromean rings\n\nThis file states the question of whether some three unknotted simple closed curves in\nthree-dimensional Euclidean space, not all round circles, cannot be moved independently by rigid\nmotions to form the Borromean rings. Scaling is not allowed.\n\n*References:*\n- [Wikipedia, Borromean rings](https://en.wikipedia.org/wiki/Borromean_rings)\n- [H. N. Howards, *Forming the Borromean rings out of arbitrary polygonal unknots*](https://arxiv.org/abs/1406.3370)\n-/\n\nopen scoped EuclideanGeometry\nopen Set Topology\n\nnamespace BorromeanRings\n\n/-- A rigid motion of three-dimensional Euclidean space. -/\nabbrev RigidMotion := AffineIsometryEquiv ℝ ℝ³ ℝ³\n\n/-- Two subsets of `ℝ³` are ambient-isotopic if a jointly continuous family of homeomorphisms of\n`ℝ³`, beginning with the identity, carries the first set to the second. The maps `F t` and `G t`\nare required to be mutual inverses for every time `t`. -/\ndef AmbientIsotopic (A B : Set ℝ³) : Prop :=\n  ∃ F G : unitInterval × ℝ³ → ℝ³,\n    Continuous F ∧ Continuous G ∧\n    (∀ t x, G (t, F (t, x)) = x ∧ F (t, G (t, x)) = x) ∧\n    (∀ x, F (0, x) = x) ∧\n    F ∘ (fun x ↦ (1, x)) '' A = B\n\n/-- A round Euclidean circle in `ℝ³`, described as the intersection of a sphere of positive radius\nwith a plane through its center. -/\ndef IsRoundCircle (K : Set ℝ³) : Prop :=\n  ∃ (c : ℝ³) (r : ℝ) (n : ℝ³),\n    0 < r ∧ ‖n‖ = 1 ∧ K = {x | dist x c = r ∧ inner ℝ (x - c) n = 0}\n\n/-- A simple closed curve is unknotted when its image is ambient-isotopic to a round circle. -/\ndef IsUnknotted (K : Circle → ℝ³) : Prop :=\n  ∃ C : Set ℝ³, IsRoundCircle C ∧ AmbientIsotopic (range K) C\n\n/-- A fixed geometric representative of the Borromean rings (`L6a4`): the union of the boundaries\nof three mutually perpendicular golden rectangles. Here `φ = (1 + √5) / 2`. -/\ndef standardBorromeanRings : Set ℝ³ :=\n  let φ := (1 + √5) / 2\n  {x | x 2 = 0 ∧ ((|x 0| = φ ∧ |x 1| ≤ 1) ∨ (|x 0| ≤ φ ∧ |x 1| = 1))} ∪\n  {x | x 0 = 0 ∧ ((|x 1| = φ ∧ |x 2| ≤ 1) ∨ (|x 1| ≤ φ ∧ |x 2| = 1))} ∪\n  {x | x 1 = 0 ∧ ((|x 2| = φ ∧ |x 0| ≤ 1) ∨ (|x 2| ≤ φ ∧ |x 0| = 1))}\n\n/-- Three curves can be arranged without scaling to form the Borromean rings if an independent\nrigid motion can be applied to each curve so that the moved images are pairwise disjoint and their\nunion is ambient-isotopic to `standardBorromeanRings`. -/\ndef CanFormBorromeanRings (K : Fin 3 → Circle → ℝ³) : Prop :=\n  ∃ σ : Fin 3 → RigidMotion,\n    (∀ i j, i ≠ j → Disjoint (σ i '' range (K i)) (σ j '' range (K j))) ∧\n    AmbientIsotopic (⋃ i, σ i '' range (K i)) standardBorromeanRings\n\n/--\nAre there three unknotted simple closed curves in `ℝ³`, not all three round Euclidean circles,\nwhich cannot be arranged to form the Borromean rings? Each curve may be moved by its own rigid\nmotion (an affine Euclidean isometry), but it may not be scaled. To form the link, the moved curves\nmust be pairwise disjoint and their union must be ambient-isotopic to the standard Borromean link\n`L6a4`.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔ ∃ K : Fin 3 → Circle → ℝ³,\n      (∀ i, IsEmbedding (K i)) ∧\n      (∀ i, IsUnknotted (K i)) ∧\n      (∃ i, ¬ IsRoundCircle (range (K i))) ∧\n      ¬ CanFormBorromeanRings K := by\n  sorry\n\nend BorromeanRings\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A space curve is modeled by a map `Circle → ℝ³` satisfying Mathlib's `IsEmbedding`; geometric properties are applied to its image, so they do not depend on parametrization.",
+    "An unknotted curve is one whose image is ambient-isotopic to a round Euclidean circle. A round circle is intrinsically represented as the intersection of a positive-radius sphere with a plane through its center, allowing arbitrary centers, radii, and plane orientations.",
+    "Ambient isotopy is modeled by jointly continuous maps `F G : unitInterval × ℝ³ → ℝ³` which are pointwise mutual inverses, with `F 0` the identity and `F 1` carrying one set onto the other. This spells out the missing ambient-isotopy primitive.",
+    "The standard Borromean link `L6a4` is fixed as the union of the boundaries of three mutually perpendicular golden rectangles with vertices `(±φ, ±1, 0)`, `(0, ±φ, ±1)`, and `(±1, 0, ±φ)`, where `φ = (1 + √5) / 2`, a standard geometric realization described in the background article.",
+    "“Arranged” is modeled by an independent `AffineIsometryEquiv ℝ ℝ³ ℝ³` for each component. This allows translations, rotations, and reflections but not scaling, following the decomposition's explicit choice of Euclidean isometry.",
+    "Forming the link explicitly requires the three moved images to be pairwise disjoint and their union to be ambient-isotopic to the fixed standard Borromean link.",
+    "Because the source is a yes/no question asking whether a counterexample exists, `answer(sorry)` is equivalent to the existential assertion of three such curves for which no permitted arrangement exists."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Exactly abbreviates Mathlib's `AffineIsometryEquiv ℝ ℝ³ ℝ³`; no new mathematical structure is introduced.",
+     "name": "RigidMotion",
+     "why_needed": "Provides a problem-local readable name for the allowed transformations of each component."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Homeomorph`, `Continuous`, `IsEmbedding`, and ordinary homotopy APIs, but no ambient isotopy or suitable topologized family of homeomorphisms.",
+     "name": "AmbientIsotopic",
+     "why_needed": "Ambient isotopy is essential both for unknottedness and for equivalence to the Borromean link, but no ambient-isotopy predicate was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Metric.sphere` alone is a 2-sphere in `ℝ³`; intersecting a sphere with a central affine plane is needed to characterize a 1-dimensional round circle.",
+     "name": "IsRoundCircle",
+     "why_needed": "The statement distinguishes genuine round Euclidean circles from other unknotted curves, including circles of arbitrary radius and orientation."
+    },
+    {
+     "closest_existing_considered": "No knot, unknot, or ambient-isotopy-based curve predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsUnknotted",
+     "why_needed": "The conjecture quantifies specifically over unknotted simple closed space curves."
+    },
+    {
+     "closest_existing_considered": "No Borromean-link or link-table representative was found; the explicit mutually perpendicular golden-rectangle realization avoids an uninterpreted placeholder.",
+     "name": "standardBorromeanRings",
+     "why_needed": "Equivalence to the specific link `L6a4`, rather than merely a generic Brunnian property, requires a fixed representative."
+    },
+    {
+     "closest_existing_considered": "No link-arrangement predicate exists in Mathlib or the repository helpers; the definition composes the existing `AffineIsometryEquiv` and `Set` APIs with the problem-local ambient-isotopy predicate.",
+     "name": "CanFormBorromeanRings",
+     "why_needed": "Packages the exact arrangement condition: independent rigid motions without scaling, pairwise disjoint moved components, and ambient isotopy of their union to `L6a4`."
+    }
+   ],
+   "per_slot": {
+    "borromean_rings": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "borromean_rings": "/--\nAre there three unknotted simple closed curves in `ℝ³`, not all three round Euclidean circles,\nwhich cannot be arranged to form the Borromean rings? Each curve may be moved by its own rigid\nmotion (an affine Euclidean isometry), but it may not be scaled. To form the link, the moved curves\nmust be pairwise disjoint and their union must be ambient-isotopic to the standard Borromean link\n`L6a4`.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔ ∃ K : Fin 3 → Circle → ℝ³,\n      (∀ i, IsEmbedding (K i)) ∧\n      (∀ i, IsUnknotted (K i)) ∧\n      (∃ i, ¬ IsRoundCircle (range (K i))) ∧\n      ¬ CanFormBorromeanRings K := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Borromean rings\n\nThe Borromean rings are the three-component link `L6a4`: three simple closed curves in\n$\\mathbb{R}^3$ that are linked, but such that any two of them are unlinked. Here they are\nmodelled by the standard realization as three mutually perpendicular ellipses.\n\nA classical theorem (Lindström–Zetterström, and Freedman–Skora for arbitrary Brunnian links) says\nthat the Borromean rings cannot be formed from three round circles. In the other direction,\nMatthew Cook conjectured that *any* three unknotted simple closed curves in $\\mathbb{R}^3$ that\nare not all circles can be arranged, by rigid motions of the individual components without\nscaling, to form the Borromean rings. Howards proved this for polygonal unknots when scaling is\nallowed (and, without scaling, when at least two of the polygons are planar), but also stated the\nopposite conjecture, based on a candidate counterexample suggested by Jason Cantarella.\n\nThe Wikipedia list of unsolved problems asks:\n*are there three unknotted space curves, not all three circles, which cannot be arranged to form\nthis link?*\n\n*References:*\n- [Wikipedia, Borromean rings](https://en.wikipedia.org/wiki/Borromean_rings)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [H. N. Howards, *Forming the Borromean rings out of arbitrary polygonal unknots*,\n  arXiv:1406.3370](https://arxiv.org/abs/1406.3370)\n- B. Lindström, H.-O. Zetterström, *Borromean circles are impossible*,\n  Amer. Math. Monthly 98 (1991), 340–341.\n- M. H. Freedman, R. Skora, *Strange actions of groups on spheres*,\n  J. Differential Geom. 25 (1987), 75–98.\n-/\n\nopen scoped EuclideanGeometry unitInterval\n\nnamespace BorromeanRings\n\n/-- Two subsets `A`, `B` of `ℝ³` are **ambient isotopic** if there is a continuous family\n`H t` (`t ∈ [0, 1]`) of homeomorphisms of `ℝ³` that starts at the identity and whose final\nhomeomorphism `H 1` maps `A` onto `B`. -/\ndef AmbientIsotopic (A B : Set ℝ³) : Prop :=\n  ∃ H : I → ℝ³ ≃ₜ ℝ³,\n    Continuous (fun p : I × ℝ³ => H p.1 p.2) ∧ H 0 = Homeomorph.refl ℝ³ ∧ H 1 '' A = B\n\n@[category API]\ntheorem ambientIsotopic_refl (A : Set ℝ³) : AmbientIsotopic A A :=\n  ⟨fun _ => Homeomorph.refl ℝ³, continuous_snd, rfl, Set.image_id A⟩\n\n/-- A subset of `ℝ³` is a **round circle** if it is the intersection of a Euclidean sphere of\npositive radius with a plane through the centre of that sphere. -/\ndef IsRoundCircle (K : Set ℝ³) : Prop :=\n  ∃ (c : ℝ³) (r : ℝ) (P : AffineSubspace ℝ ℝ³),\n    0 < r ∧ c ∈ P ∧ Module.finrank ℝ P.direction = 2 ∧ K = Metric.sphere c r ∩ P\n\n/-- A subset `K` of `ℝ³` is an **unknotted space curve** (an unknot) if it is ambient isotopic to\na round circle. Such a set is automatically a simple closed curve, i.e. the image of a topological\nembedding of the circle. -/\ndef IsUnknot (K : Set ℝ³) : Prop :=\n  ∃ C, IsRoundCircle C ∧ AmbientIsotopic K C\n\n@[category API]\ntheorem IsRoundCircle.isUnknot {K : Set ℝ³} (hK : IsRoundCircle K) : IsUnknot K :=\n  ⟨K, hK, ambientIsotopic_refl K⟩\n\n/-- The ellipse $x^2 / 4 + y^2 = 1$ in the plane $z = 0$. -/\ndef ellipse₁ : Set ℝ³ := {p | p 0 ^ 2 / 4 + p 1 ^ 2 = 1 ∧ p 2 = 0}\n\n/-- The ellipse $y^2 / 4 + z^2 = 1$ in the plane $x = 0$. -/\ndef ellipse₂ : Set ℝ³ := {p | p 1 ^ 2 / 4 + p 2 ^ 2 = 1 ∧ p 0 = 0}\n\n/-- The ellipse $z^2 / 4 + x^2 = 1$ in the plane $y = 0$. -/\ndef ellipse₃ : Set ℝ³ := {p | p 2 ^ 2 / 4 + p 0 ^ 2 = 1 ∧ p 1 = 0}\n\n/-- The standard **Borromean rings**: the union of the three mutually perpendicular ellipses\n`ellipse₁`, `ellipse₂`, `ellipse₃`, each with semi-axes `2` and `1`. The long axis of each ellipse\npasses through the interior of the next one, so that any two of the ellipses are unlinked while\nthe three together are linked; this is the link `L6a4` (Alexander–Briggs `6³₂`). -/\ndef borromeanRings : Set ℝ³ := ellipse₁ ∪ ellipse₂ ∪ ellipse₃\n\n@[category API]\ntheorem disjoint_ellipse₁_ellipse₂ : Disjoint ellipse₁ ellipse₂ := by\n  rw [Set.disjoint_left]\n  rintro p ⟨h₁, h₂⟩ ⟨h₃, h₄⟩\n  rw [h₂] at h₃\n  rw [h₄] at h₁\n  linarith\n\n@[category API]\ntheorem disjoint_ellipse₂_ellipse₃ : Disjoint ellipse₂ ellipse₃ := by\n  rw [Set.disjoint_left]\n  rintro p ⟨h₁, h₂⟩ ⟨h₃, h₄⟩\n  rw [h₂] at h₃\n  rw [h₄] at h₁\n  linarith\n\n@[category API]\ntheorem disjoint_ellipse₁_ellipse₃ : Disjoint ellipse₁ ellipse₃ := by\n  rw [Set.disjoint_left]\n  rintro p ⟨h₁, h₂⟩ ⟨h₃, h₄⟩\n  rw [h₂] at h₃\n  rw [h₄] at h₁\n  linarith\n\n/-- Three subsets `K₁`, `K₂`, `K₃` of `ℝ³` **form the Borromean rings** if they are pairwise\ndisjoint and their union is ambient isotopic to the standard Borromean rings `borromeanRings`. -/\ndef FormBorromeanRings (K₁ K₂ K₃ : Set ℝ³) : Prop :=\n  Disjoint K₁ K₂ ∧ Disjoint K₂ K₃ ∧ Disjoint K₁ K₃ ∧\n    AmbientIsotopic (K₁ ∪ K₂ ∪ K₃) borromeanRings\n\n@[category test]\ntheorem formBorromeanRings_ellipses : FormBorromeanRings ellipse₁ ellipse₂ ellipse₃ :=\n  ⟨disjoint_ellipse₁_ellipse₂, disjoint_ellipse₂_ellipse₃, disjoint_ellipse₁_ellipse₃,\n    ambientIsotopic_refl _⟩\n\n/--\n**Borromean rings from arbitrary unknots.**\nAre there three unknotted space curves $K_1, K_2, K_3 \\subseteq \\mathbb{R}^3$, not all three\nround circles, which cannot be arranged to form the Borromean rings? Here \"arranged\" means that\neach curve $K_i$ is moved by a rigid motion (Euclidean isometry) $\\sigma_i$ of $\\mathbb{R}^3$,\nwithout scaling, and the moved curves $\\sigma_1(K_1), \\sigma_2(K_2), \\sigma_3(K_3)$ form the\nBorromean rings when they are pairwise disjoint and their union is ambient isotopic to the\nstandard Borromean rings.\n\nA positive answer is the conjecture of Howards (arXiv:1406.3370, Conjecture 5.1, based on a\ncandidate counterexample of Cantarella); a negative answer is the conjecture of Matthew Cook\n(arXiv:1406.3370, Conjecture 1.1) that any three unknots, not all circles, can be arranged to\nform the Borromean rings.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔ ∃ K₁ K₂ K₃ : Set ℝ³, IsUnknot K₁ ∧ IsUnknot K₂ ∧ IsUnknot K₃ ∧\n      ¬ (IsRoundCircle K₁ ∧ IsRoundCircle K₂ ∧ IsRoundCircle K₃) ∧\n      ¬ ∃ σ₁ σ₂ σ₃ : ℝ³ ≃ᵃⁱ[ℝ] ℝ³, FormBorromeanRings (σ₁ '' K₁) (σ₂ '' K₂) (σ₃ '' K₃) := by\n  sorry\n\n/--\nThree round circles in $\\mathbb{R}^3$ never form the Borromean rings. This was proved by\nLindström and Zetterström, and follows from the theorem of Freedman and Skora that no Brunnian\nlink can be formed from round circles. It explains the hypothesis \"not all three circles\" in\n`borromean_rings`.\n-/\n@[category research solved, AMS 51 57]\ntheorem not_formBorromeanRings_of_isRoundCircle {K₁ K₂ K₃ : Set ℝ³} (h₁ : IsRoundCircle K₁)\n    (h₂ : IsRoundCircle K₂) (h₃ : IsRoundCircle K₃) : ¬ FormBorromeanRings K₁ K₂ K₃ := by\n  sorry\n\nend BorromeanRings\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.82,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate. One remark: the notes say 'rigid motion (Euclidean isometry)'; the two phrases can differ (proper rigid motions vs. all isometries including reflections). I followed the parenthetical (all isometries) and recorded this as a modeling decision.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Arranged' = each component moved individually by an `AffineIsometryEquiv ℝ ℝ³ ℝ³` (a Euclidean isometry, following the decomposition notes and the repo precedent in PompeiuProblem.lean). This includes reflections as well as translations/rotations; for planar components (e.g. the circles in Cantarella's candidate) this makes no difference, but for a chiral space curve an orientation-preserving-only reading would be a slightly different (formally weaker-to-arrange) statement. No scaling is allowed, matching 'combined without scaling'.",
+    "'Unknotted space curve' is modelled as a subset of ℝ³ ambient isotopic to a round circle. This automatically makes the set a tame simple closed curve (so no separate `IsEmbedding` condition is imposed) and excludes wild curves, for which 'unknotted' is not meaningful.",
+    "Ambient isotopy is defined as a jointly continuous family of homeomorphisms of ℝ³ starting at the identity whose end map sends A onto B (the standard definition); the isotopy is required at the level of the union of the three curves, which is equivalent to a component-wise formulation (up to permuting components) since homeomorphisms preserve connected components, and the Borromean rings are unordered/unoriented and amphichiral so no orientation or ordering bookkeeping is needed.",
+    "The 'standard Borromean rings' is a concrete set: the union of three mutually perpendicular ellipses with semi-axes 2 and 1. Reviewers should check that this configuration is indeed L6a4 (each ellipse's long axis pierces the interior of the next one cyclically; pairwise disjointness is proved in the file).",
+    "'Not all three circles' is `¬ (IsRoundCircle K₁ ∧ IsRoundCircle K₂ ∧ IsRoundCircle K₃)`; the curves need not be congruent or distinct.",
+    "`answer(True)` corresponds to Howards's conjecture (such curves exist), `answer(False)` to Cook's conjecture; the docstring records both.",
+    "A `research solved` companion theorem `not_formBorromeanRings_of_isRoundCircle` (three round circles never form the Borromean rings; Lindström–Zetterström, Freedman–Skora) is included as a sanity variant motivating the 'not all circles' hypothesis; it is not one of the table's slots.",
+    "Category `research open`, AMS tags 51 (geometry) and 57 (manifolds and cell complexes, which includes knot theory)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "ContinuousMap.Homotopy / HomotopyEquiv (homotopies of maps, not ambient isotopies of subsets); Homeomorph alone (would not capture isotopy to the identity).",
+     "name": "BorromeanRings.AmbientIsotopic",
+     "why_needed": "Link equivalence (ambient isotopy in ℝ³) is not in Mathlib or FormalConjecturesForMathlib. Defined as a family `H : I → ℝ³ ≃ₜ ℝ³` of homeomorphisms, jointly continuous in (t, x), with `H 0 = id` and `H 1 '' A = B`."
+    },
+    {
+     "closest_existing_considered": "EuclideanGeometry.Sphere and Metric.sphere (spheres, not circles in ℝ³); `Circle` (the unit circle in ℂ, not a subset of ℝ³); SquarePacking.Circle (a disc in ℝ²).",
+     "name": "BorromeanRings.IsRoundCircle",
+     "why_needed": "Needed for both 'unknotted' (ambient isotopic to a round circle) and 'not all three circles'. Defined as `Metric.sphere c r ∩ P` with `0 < r`, `c ∈ P`, `P` an affine subspace of ℝ³ with `finrank P.direction = 2`."
+    },
+    {
+     "closest_existing_considered": "IsEmbedding γ for γ : Circle → ℝ³ (used in InscribedSquare.lean) gives simple closed curves but says nothing about being unknotted.",
+     "name": "BorromeanRings.IsUnknot",
+     "why_needed": "'Unknotted space curve': a subset of ℝ³ ambient isotopic to a round circle (hence automatically a tame simple closed curve)."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or the repo models any specific link or link diagram.",
+     "name": "BorromeanRings.ellipse₁ / ellipse₂ / ellipse₃ / borromeanRings",
+     "why_needed": "A concrete representative of the link L6a4 is needed to say 'this link'. Used the standard realization by three mutually perpendicular ellipses with semi-axes 2 and 1 (x²/4+y²=1 in z=0, y²/4+z²=1 in x=0, z²/4+x²=1 in y=0); the pairwise disk-intersection pattern (crossed arcs, one with endpoints on the boundary curve, one with endpoints interior) is the pattern Howards (arXiv:1406.3370) notes characterizes the Borromean rings, and the Wikipedia article states that ellipses (and perpendicular golden rectangles) realize them. Pairwise disjointness of the three ellipses is proved as API lemmas."
+    },
+    {
+     "closest_existing_considered": "None (no link equivalence primitive exists).",
+     "name": "BorromeanRings.FormBorromeanRings",
+     "why_needed": "'Form this link': three subsets of ℝ³ are pairwise disjoint and their union is ambient isotopic to `borromeanRings`."
+    }
+   ],
+   "per_slot": {
+    "borromean_rings": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ K₁ K₂ K₃ : Set ℝ³, IsUnknot K₁ ∧ IsUnknot K₂ ∧ IsUnknot K₃ ∧ ¬(all three IsRoundCircle) ∧ ¬∃ σ₁ σ₂ σ₃ : ℝ³ ≃ᵃⁱ[ℝ] ℝ³, FormBorromeanRings (σ₁ '' K₁) (σ₂ '' K₂) (σ₃ '' K₃)`. Mathlib and the repo have no knot theory (no ambient isotopy, unknot, link, or Borromean rings), so bespoke definitions were needed for ambient isotopy, round circles, unknots, a concrete standard model of the Borromean rings, and 'forming the Borromean rings'. Rigid motions are Euclidean isometries applied to each component individually, with no scaling, as in the decomposition notes."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "borromean_rings": "/--\n**Borromean rings from arbitrary unknots.**\nAre there three unknotted space curves $K_1, K_2, K_3 \\subseteq \\mathbb{R}^3$, not all three\nround circles, which cannot be arranged to form the Borromean rings? Here \"arranged\" means that\neach curve $K_i$ is moved by a rigid motion (Euclidean isometry) $\\sigma_i$ of $\\mathbb{R}^3$,\nwithout scaling, and the moved curves $\\sigma_1(K_1), \\sigma_2(K_2), \\sigma_3(K_3)$ form the\nBorromean rings when they are pairwise disjoint and their union is ambient isotopic to the\nstandard Borromean rings.\n\nA positive answer is the conjecture of Howards (arXiv:1406.3370, Conjecture 5.1, based on a\ncandidate counterexample of Cantarella); a negative answer is the conjecture of Matthew Cook\n(arXiv:1406.3370, Conjecture 1.1) that any three unknots, not all circles, can be arranged to\nform the Borromean rings.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔ ∃ K₁ K₂ K₃ : Set ℝ³, IsUnknot K₁ ∧ IsUnknot K₂ ∧ IsUnknot K₃ ∧\n      ¬ (IsRoundCircle K₁ ∧ IsRoundCircle K₂ ∧ IsRoundCircle K₃) ∧\n      ¬ ∃ σ₁ σ₂ σ₃ : ℝ³ ≃ᵃⁱ[ℝ] ℝ³, FormBorromeanRings (σ₁ '' K₁) (σ₂ '' K₂) (σ₃ '' K₃) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Borromean rings\n\nThis file asks whether there are three unknotted space curves, not all circles, that cannot be\nmoved individually by rigid motions to form the Borromean rings. The standard Borromean link is\nrepresented below by the boundaries of three mutually perpendicular golden rectangles whose\nvertices are vertices of a regular icosahedron.\n\n*References:*\n- [Wikipedia, *Borromean rings*](https://en.wikipedia.org/wiki/Borromean_rings)\n- [H. N. Howards, *Forming the Borromean rings out of arbitrary polygonal unknots*](https://arxiv.org/abs/1406.3370)\n-/\n\nnoncomputable section\n\nnamespace BorromeanRings\n\nopen Set unitInterval\n\nlocal macro:max \"ℝ³\" : term => `(EuclideanSpace ℝ (Fin 3))\n\n/-- Two subsets of Euclidean three-space are ambient-isotopic if a jointly continuous family of\nhomeomorphisms, starting at the identity, carries the first set to the second. The jointly\ncontinuous family of inverses is included explicitly. -/\ndef AmbientIsotopic (A B : Set ℝ³) : Prop :=\n  ∃ f g : I × ℝ³ → ℝ³,\n    Continuous f ∧ Continuous g ∧\n    (∀ t x, g (t, f (t, x)) = x ∧ f (t, g (t, x)) = x) ∧\n    (∀ x, f (0, x) = x) ∧\n    (fun x => f (1, x)) '' A = B\n\n/-- A round Euclidean circle is a positive-radius circle in an affine plane in `ℝ³`. -/\ndef IsRoundCircle (K : Set ℝ³) : Prop :=\n  ∃ (c n : ℝ³) (r : ℝ), 0 < r ∧ ‖n‖ = 1 ∧\n    K = {x | ‖x - c‖ = r ∧ inner ℝ (x - c) n = 0}\n\n/-- An unknotted space curve is a subset of `ℝ³` ambient-isotopic to a round circle. -/\ndef IsUnknottedCurve (K : Set ℝ³) : Prop :=\n  ∃ C : Set ℝ³, IsRoundCircle C ∧ AmbientIsotopic K C\n\n/-- A fixed representative of the Borromean-rings link L6a4: the union of the boundaries of the\nthree mutually perpendicular golden rectangles with vertices\n`(0, ±1, ±φ)`, `(±φ, 0, ±1)`, and `(±1, ±φ, 0)`. -/\ndef standardBorromeanRings : Set ℝ³ :=\n  {p | p 0 = 0 ∧ |p 1| ≤ 1 ∧ |p 2| ≤ Real.goldenRatio ∧\n    (|p 1| = 1 ∨ |p 2| = Real.goldenRatio)} ∪\n  {p | p 1 = 0 ∧ |p 0| ≤ Real.goldenRatio ∧ |p 2| ≤ 1 ∧\n    (|p 0| = Real.goldenRatio ∨ |p 2| = 1)} ∪\n  {p | p 2 = 0 ∧ |p 0| ≤ 1 ∧ |p 1| ≤ Real.goldenRatio ∧\n    (|p 0| = 1 ∨ |p 1| = Real.goldenRatio)}\n\n/-- Three curves form the Borromean rings if they are pairwise disjoint and their union is\nambient-isotopic to the standard golden-rectangle representative of L6a4. -/\ndef FormBorromeanRings (K₁ K₂ K₃ : Set ℝ³) : Prop :=\n  Disjoint K₁ K₂ ∧ Disjoint K₁ K₃ ∧ Disjoint K₂ K₃ ∧\n    AmbientIsotopic (K₁ ∪ K₂ ∪ K₃) standardBorromeanRings\n\n/--\nAre there three unknotted simple closed curves in Euclidean three-space, not all round Euclidean\ncircles, such that no choice of a separate rigid motion for each curve makes their images pairwise\ndisjoint with union ambient-isotopic to the Borromean-rings link L6a4? Rigid motions are affine\nEuclidean isometries, so scaling is not allowed.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔\n      ∃ K₁ K₂ K₃ : Set ℝ³,\n        IsUnknottedCurve K₁ ∧ IsUnknottedCurve K₂ ∧ IsUnknottedCurve K₃ ∧\n        ¬(IsRoundCircle K₁ ∧ IsRoundCircle K₂ ∧ IsRoundCircle K₃) ∧\n        ¬∃ (m₁ m₂ m₃ : ℝ³ ≃ᵃⁱ[ℝ] ℝ³),\n          FormBorromeanRings (m₁ '' K₁) (m₂ '' K₂) (m₃ '' K₃) := by\n  sorry\n\nend BorromeanRings\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented each unparametrized space curve by its image as a subset of Euclidean three-space. Being ambient-isotopic to a round circle both supplies the simple-closed-curve condition and expresses unknottedness.",
+    "Defined ambient isotopy using jointly continuous forward and inverse maps on the unit interval times Euclidean three-space, with mutually inverse time slices, identity at time zero, and the required image at time one.",
+    "Used the boundaries of the three cyclically dimensioned, mutually perpendicular golden rectangles with icosahedral vertices `(0, ±1, ±φ)`, `(±φ, 0, ±1)`, and `(±1, ±φ, 0)` as a concrete standard representative of the Borromean link L6a4.",
+    "Interpreted “arranged” as applying one independent `AffineIsometryEquiv` of Euclidean three-space to each component. Such maps preserve distances and therefore do not permit scaling.",
+    "Required the moved component sets to be pairwise disjoint before requiring their union to be ambient-isotopic to the standard Borromean link.",
+    "Interpreted the list-page yes/no question positively: `answer(True)` means that a counterexample to Cook's conjecture exists, namely three unknotted curves, not all round circles, for which no rigid-motion arrangement forms the Borromean rings."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's homotopy and `Homeomorph` APIs; no ambient-isotopy predicate or suitable topology on families of homeomorphisms was found.",
+     "name": "AmbientIsotopic",
+     "why_needed": "The statement requires ambient isotopy of subsets of Euclidean three-space, including a continuous family of ambient homeomorphisms."
+    },
+    {
+     "closest_existing_considered": "Mathlib's metric spheres and Euclidean `Sphere`; these describe spheres rather than one-dimensional circles in arbitrary planes.",
+     "name": "IsRoundCircle",
+     "why_needed": "The exception “not all three circles” specifically concerns round Euclidean circles in arbitrary affine planes in three-space."
+    },
+    {
+     "closest_existing_considered": "No knot, unknot, or simple-closed-space-curve predicate exists in Mathlib or FormalConjecturesForMathlib; the definition uses ambient isotopy to `IsRoundCircle`.",
+     "name": "IsUnknottedCurve",
+     "why_needed": "The quantified objects must be unknotted simple closed space curves."
+    },
+    {
+     "closest_existing_considered": "No knot/link table or Borromean-rings representative exists in Mathlib or FormalConjecturesForMathlib. The concrete icosahedral golden-rectangle realization described by the source was used.",
+     "name": "standardBorromeanRings",
+     "why_needed": "Ambient equivalence must target the specific Borromean link L6a4 rather than the weaker and non-characterizing property of being a three-component Brunnian link."
+    },
+    {
+     "closest_existing_considered": "No link formation/equivalence predicate exists; this is a problem-specific combination of `Disjoint`, set union, `AmbientIsotopic`, and `standardBorromeanRings`.",
+     "name": "FormBorromeanRings",
+     "why_needed": "Packages the two requirements for a moved triple to form a link: pairwise disjoint components and ambient isotopy of their union to L6a4."
+    }
+   ],
+   "per_slot": {
+    "borromean_rings": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "borromean_rings": "/--\nAre there three unknotted simple closed curves in Euclidean three-space, not all round Euclidean\ncircles, such that no choice of a separate rigid motion for each curve makes their images pairwise\ndisjoint with union ambient-isotopic to the Borromean-rings link L6a4? Rigid motions are affine\nEuclidean isometries, so scaling is not allowed.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔\n      ∃ K₁ K₂ K₃ : Set ℝ³,\n        IsUnknottedCurve K₁ ∧ IsUnknottedCurve K₂ ∧ IsUnknottedCurve K₃ ∧\n        ¬(IsRoundCircle K₁ ∧ IsRoundCircle K₂ ∧ IsRoundCircle K₃) ∧\n        ¬∃ (m₁ m₂ m₃ : ℝ³ ≃ᵃⁱ[ℝ] ℝ³),\n          FormBorromeanRings (m₁ '' K₁) (m₂ '' K₂) (m₃ '' K₃) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Borromean rings\n\nThe Borromean rings are the three-component link in which no two components are linked, but\nthe three together are. They cannot be formed from three round circles (Freedman–Skora,\nTverberg), but they can be formed from three ellipses of arbitrarily small eccentricity.\n\nMatthew Cook conjectured that any three unknotted simple closed curves in $\\mathbb{R}^3$, not\nall circles, can be arranged (by a rigid motion applied to each curve, without scaling) to form\nthe Borromean rings. Jason Cantarella suggested a possible counterexample, and Hugh Nelson\nHowards conjectured the opposite. Wikipedia's list of unsolved problems asks:\n\n> Are there three unknotted space curves, not all three circles, which cannot be arranged to\n> form this link?\n\nWe model the Borromean rings by three mutually perpendicular $2 \\times 4$ rectangles whose\nvertices are the vertices of Jessen's icosahedron, and use topological ambient isotopy in\n$\\mathbb{R}^3$ as the notion of link equivalence.\n\n*References:*\n- [Wikipedia: Borromean rings](https://en.wikipedia.org/wiki/Borromean_rings)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ho14] H. N. Howards, *Forming the Borromean Rings out of arbitrary polygonal unknots*,\n  [arXiv:1406.3370](https://arxiv.org/abs/1406.3370), Conjecture 1.1 and Section 4.\n-/\n\nopen scoped EuclideanGeometry unitInterval\nopen Function\n\nnamespace BorromeanRings\n\n/-- A family `F` of homeomorphisms of `ℝ³` indexed by `[0, 1]` is an **ambient isotopy** if it\ndepends continuously on the parameter and starts at the identity. -/\nstructure IsAmbientIsotopy (F : I → ℝ³ ≃ₜ ℝ³) : Prop where\n  continuous : Continuous fun p : ℝ³ × I => F p.2 p.1\n  zero : F 0 = Homeomorph.refl ℝ³\n\n/-- Two subsets `A` and `B` of `ℝ³` are **ambient isotopic** if some ambient isotopy of `ℝ³`\ncarries `A` onto `B` at time `1`. -/\ndef AmbientIsotopic (A B : Set ℝ³) : Prop :=\n  ∃ F : I → ℝ³ ≃ₜ ℝ³, IsAmbientIsotopy F ∧ F 1 '' A = B\n\n/-- A subset of `ℝ³` is a **round circle** if it is the intersection of a sphere of positive\nradius with a plane through its centre. -/\ndef IsRoundCircle (K : Set ℝ³) : Prop :=\n  ∃ (c n : ℝ³) (r : ℝ), n ≠ 0 ∧ 0 < r ∧\n    K = Metric.sphere c r ∩ {p | inner ℝ (p - c) n = 0}\n\n/-- A subset of `ℝ³` is an **unknot** (an unknotted simple closed curve) if it is ambient\nisotopic to a round circle. -/\ndef IsUnknot (K : Set ℝ³) : Prop :=\n  ∃ C, IsRoundCircle C ∧ AmbientIsotopic K C\n\n/-- A **rigid motion** of `ℝ³` is an orientation-preserving isometry: a rotation `e` followed by\na translation by `v`. No scaling is allowed. -/\ndef IsRigidMotion (f : ℝ³ → ℝ³) : Prop :=\n  ∃ (e : ℝ³ ≃ₗᵢ[ℝ] ℝ³) (v : ℝ³), e.toLinearEquiv.det = 1 ∧ ∀ x, f x = e x + v\n\n/-- The boundary of the axis-parallel rectangle with half-sides `2` in coordinate `i` and `1` in\ncoordinate `j`, centred at the origin and lying in the coordinate plane where coordinate `k`\nvanishes. -/\ndef rectangle (i j k : Fin 3) : Set ℝ³ :=\n  {p | p k = 0 ∧ |p i| ≤ 2 ∧ |p j| ≤ 1 ∧ (|p i| = 2 ∨ |p j| = 1)}\n\n/-- A standard model of the **Borromean rings**: the three mutually perpendicular `2 × 4`\nrectangles with vertices $(\\pm 2, \\pm 1, 0)$, $(0, \\pm 2, \\pm 1)$ and $(\\pm 1, 0, \\pm 2)$, the\nvertices of Jessen's icosahedron. This is the minimum-length lattice realization of the\nBorromean rings described in the Wikipedia article. -/\ndef borromeanRings : Set ℝ³ :=\n  rectangle 0 1 2 ∪ rectangle 1 2 0 ∪ rectangle 2 0 1\n\n/-- Three subsets `L 0`, `L 1`, `L 2` of `ℝ³` **form the Borromean rings** if they are pairwise\ndisjoint and their union is ambient isotopic to the standard Borromean rings. -/\ndef FormsBorromeanRings (L : Fin 3 → Set ℝ³) : Prop :=\n  Pairwise (Disjoint on L) ∧ AmbientIsotopic (⋃ i, L i) borromeanRings\n\n/-- Ambient isotopy is reflexive: use the constant family of identity homeomorphisms. -/\n@[category API, AMS 51 57]\ntheorem AmbientIsotopic.refl (A : Set ℝ³) : AmbientIsotopic A A :=\n  ⟨fun _ => Homeomorph.refl ℝ³, ⟨continuous_fst, rfl⟩, Set.image_id A⟩\n\n/-- The identity is a rigid motion. -/\n@[category API, AMS 51]\ntheorem isRigidMotion_id : IsRigidMotion id :=\n  ⟨LinearIsometryEquiv.refl ℝ ℝ³, 0, LinearEquiv.det_refl .., by simp⟩\n\n/-- Translations are rigid motions. -/\n@[category API, AMS 51]\ntheorem isRigidMotion_add_const (v : ℝ³) : IsRigidMotion (· + v) :=\n  ⟨LinearIsometryEquiv.refl ℝ ℝ³, v, LinearEquiv.det_refl .., by simp⟩\n\n/-- The unit circle in the plane `z = 0` is a round circle. -/\n@[category test, AMS 51]\ntheorem isRoundCircle_unitCircle :\n    IsRoundCircle (Metric.sphere 0 1 ∩ {p : ℝ³ | p 2 = 0}) := by\n  refine ⟨0, EuclideanSpace.single 2 1, 1, by simp, one_pos, ?_⟩\n  ext p\n  simp [EuclideanSpace.inner_single_right]\n\n/-- The three rectangles of the standard Borromean rings are pairwise disjoint. -/\n@[category test, AMS 51]\ntheorem rectangle_disjoint (i j k : Fin 3) :\n    Disjoint (rectangle i j k) (rectangle j k i) := by\n  rw [Set.disjoint_left]\n  rintro p ⟨hk, -, -, h⟩ ⟨hi, -, -, h'⟩\n  rw [hi] at h\n  rw [hk] at h'\n  norm_num at h h'\n  linarith\n\n/-- **Freedman–Skora, Tverberg.** The Borromean rings cannot be formed from three round\ncircles. This is the reason for the restriction \"not all three circles\" in the problem below. -/\n@[category research solved, AMS 51 57]\ntheorem not_formsBorromeanRings_of_isRoundCircle (K : Fin 3 → Set ℝ³)\n    (hK : ∀ i, IsRoundCircle (K i)) : ¬ FormsBorromeanRings K := by\n  sorry\n\n/-- **Borromean rings problem.**\nAre there three unknotted space curves, not all three circles, which cannot be arranged to form\nthe Borromean rings?\n\nHere the three curves are unknotted simple closed curves $K_0, K_1, K_2 \\subseteq \\mathbb{R}^3$\n(each ambient isotopic to a round circle) of which at least one is not a round circle. To\n*arrange* them one applies a rigid motion (an orientation-preserving Euclidean isometry, with\nno scaling) to each curve individually; the arranged curves *form the Borromean rings* if they\nare pairwise disjoint and their union is ambient isotopic to the standard Borromean rings.\n\nA positive answer is the conjecture of Howards [Ho14, Section 4]; a negative answer is\nMatthew Cook's conjecture [Ho14, Conjecture 1.1]. -/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔ ∃ K : Fin 3 → Set ℝ³,\n      (∀ i, IsUnknot (K i)) ∧ (∃ i, ¬ IsRoundCircle (K i)) ∧\n      ¬ ∃ f : Fin 3 → ℝ³ → ℝ³, (∀ i, IsRigidMotion (f i)) ∧\n        FormsBorromeanRings fun i => f i '' K i := by\n  sorry\n\nend BorromeanRings\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None of substance. The table's parenthetical 'rigid motion (Euclidean isometry)' is ambiguous about orientation; I took 'rigid motion' in its proper (orientation-preserving, SE(3)) sense and flagged it in modeling_decisions. Otherwise the table's reading (single yes/no question, no scaling, unknots = ambient isotopic to round circles, at least one not a round circle, pairwise disjoint union ambient isotopic to L6a4) is exactly what the file states.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Arranged' = a rigid motion applied to each curve individually, with NO scaling, following the article ('combined without scaling') and Howards §4. A rigid motion is modelled as an orientation-preserving Euclidean isometry x ↦ e x + v with e a linear isometry of determinant 1 (SE(3); same idiom as `MoserWorm.lean`). Reflections are excluded because 'rigid motion' in the physical sense of arranging rings (and per Wikipedia's 'rigid transformation' article) means a proper motion, and Howards's proofs use only rotations and translations. Reviewer should check whether they prefer all isometries (`E(3)`, as in `PompeiuProblem.RigidMotion`); for Cantarella's candidate counterexample (two circles + one curve) the two readings coincide, since circles are reflection-invariant and the Borromean rings are amphichiral.",
+    "Link equivalence is topological ambient isotopy of subsets of ℝ³: a jointly continuous family `F : I → ℝ³ ≃ₜ ℝ³` of homeomorphisms with `F 0 = id` and `F 1 '' A = B`. This is the standard (Wikipedia/textbook) definition. All curves involved are tame (an unknot is by definition ambient isotopic to a round circle), so this agrees with PL/smooth equivalence.",
+    "'Unknotted space curve' = a subset of ℝ³ ambient isotopic to a round circle. This implies it is a simple closed curve and tame; wild curves are excluded, matching the intended 'unknotted simple closed curves' of Cook's conjecture.",
+    "'Circle' = round Euclidean circle: `Metric.sphere c r ∩ {p | inner ℝ (p - c) n = 0}` with `r > 0`, `n ≠ 0`. 'Not all three circles' = `∃ i, ¬ IsRoundCircle (K i)`.",
+    "The standard Borromean rings are modelled concretely as the union of three mutually perpendicular axis-parallel 2×4 rectangles with vertices (±2,±1,0), (0,±2,±1), (±1,0,±2) (Jessen's icosahedron realization, explicitly stated in the article to be the Borromean rings; also the well-known golden-rectangles-in-an-icosahedron picture up to a reflection, immaterial since the link is amphichiral). I verified pairwise disjointness formally (`rectangle_disjoint`) and by hand that each pair is unlinked while the three flat disks meet in Howards's 'cross' pattern, which characterises the Borromean rings.",
+    "'Form this link' = the moved curves are pairwise disjoint AND their union is ambient isotopic to the model set. Disjointness is in fact implied by the isotopy but is stated explicitly as the notes require.",
+    "The three curves are given as `K : Fin 3 → Set ℝ³`; the sets may coincide (three congruent copies), which is the intended meaning of 'three curves' as shapes to be arranged.",
+    "Extra declarations besides the slot: a `research solved` theorem `not_formsBorromeanRings_of_isRoundCircle` (Freedman–Skora/Tverberg: three round circles never form the Borromean rings), which explains the domain restriction and tests the definitions, plus small API/test lemmas (`AmbientIsotopic.refl`, `isRigidMotion_id`, `isRigidMotion_add_const`, `isRoundCircle_unitCircle`, `rectangle_disjoint`) with proofs.",
+    "AMS tags 51 (geometry) and 57 (manifolds / knot theory); Howards's paper uses MSC 57M25."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`ContinuousMap.Homotopy`, `Homeomorph`, `ContinuousMap.HomotopyEquiv` — none require each time-slice to be a homeomorphism of the ambient space.",
+     "name": "BorromeanRings.IsAmbientIsotopy",
+     "why_needed": "Mathlib has homotopies (`ContinuousMap.Homotopy`) but no notion of (ambient) isotopy; needed to define link equivalence and unknottedness."
+    },
+    {
+     "closest_existing_considered": "`Homeomorph.image`, `ContinuousMap.Homotopic` (not ambient, not isotopy).",
+     "name": "BorromeanRings.AmbientIsotopic",
+     "why_needed": "Equivalence of subsets of ℝ³ under an ambient isotopy; the standard notion of link equivalence used by 'form this link' and 'unknotted'."
+    },
+    {
+     "closest_existing_considered": "`EuclideanGeometry.Sphere`, `Metric.sphere` (spheres, not circles in ℝ³), `Circle` (the unit circle in ℂ as a type).",
+     "name": "BorromeanRings.IsRoundCircle",
+     "why_needed": "'Circle' in the statement means a round Euclidean circle in ℝ³; Mathlib has spheres but no circle-in-3-space predicate."
+    },
+    {
+     "closest_existing_considered": "`IsEmbedding` from `Circle` (Jordan curve, as in `InscribedSquare.lean`) — gives a simple closed curve but no knottedness information.",
+     "name": "BorromeanRings.IsUnknot",
+     "why_needed": "'Unknotted space curve': a set ambient isotopic to a round circle. No knot theory in Mathlib."
+    },
+    {
+     "closest_existing_considered": "`AffineIsometryEquiv` / `PompeiuProblem.RigidMotion` (include reflections, and the latter is local to another file); the `MoserWorm.WormCovers` idiom `e.toLinearEquiv.det = 1` with a translation, which is what was adopted.",
+     "name": "BorromeanRings.IsRigidMotion",
+     "why_needed": "Orientation-preserving Euclidean isometry (SE(3)) without scaling, the meaning of 'arranged'."
+    },
+    {
+     "closest_existing_considered": "`parallelepiped`, `Set.Icc` boxes — give solid boxes, not the boundary curve.",
+     "name": "BorromeanRings.rectangle",
+     "why_needed": "Boundary of an axis-parallel 2×4 rectangle in a coordinate plane; building block for the concrete Borromean model."
+    },
+    {
+     "closest_existing_considered": "None (no link tables or link types in Mathlib).",
+     "name": "BorromeanRings.borromeanRings",
+     "why_needed": "A concrete model of the Borromean rings link is required to say what 'this link' is; none exists in Mathlib."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "BorromeanRings.FormsBorromeanRings",
+     "why_needed": "Predicate 'three sets form the Borromean rings': pairwise disjoint and union ambient isotopic to the model."
+    }
+   ],
+   "per_slot": {
+    "borromean_rings": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ K : Fin 3 → Set ℝ³, (∀ i, IsUnknot (K i)) ∧ (∃ i, ¬ IsRoundCircle (K i)) ∧ ¬ ∃ f : Fin 3 → ℝ³ → ℝ³, (∀ i, IsRigidMotion (f i)) ∧ FormsBorromeanRings (fun i => f i '' K i)`. Mathlib has no knot/link theory (no ambient isotopy, no unknot, no Borromean rings, no SE(3) predicate), so bespoke problem-local definitions were needed; each follows the standard textbook definition. answer(True) = Howards's conjecture (counterexample exists), answer(False) = Cook's conjecture."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "borromean_rings": "/-- **Borromean rings problem.**\nAre there three unknotted space curves, not all three circles, which cannot be arranged to form\nthe Borromean rings?\n\nHere the three curves are unknotted simple closed curves $K_0, K_1, K_2 \\subseteq \\mathbb{R}^3$\n(each ambient isotopic to a round circle) of which at least one is not a round circle. To\n*arrange* them one applies a rigid motion (an orientation-preserving Euclidean isometry, with\nno scaling) to each curve individually; the arranged curves *form the Borromean rings* if they\nare pairwise disjoint and their union is ambient isotopic to the standard Borromean rings.\n\nA positive answer is the conjecture of Howards [Ho14, Section 4]; a negative answer is\nMatthew Cook's conjecture [Ho14, Conjecture 1.1]. -/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔ ∃ K : Fin 3 → Set ℝ³,\n      (∀ i, IsUnknot (K i)) ∧ (∃ i, ¬ IsRoundCircle (K i)) ∧\n      ¬ ∃ f : Fin 3 → ℝ³ → ℝ³, (∀ i, IsRigidMotion (f i)) ∧\n        FormsBorromeanRings fun i => f i '' K i := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Borromean rings\n\nThis file states the open problem asking whether some three unknotted, non-circular space curves\ncannot be positioned to form the Borromean rings without changing their scales.\n\n*References:*\n- [Wikipedia, Borromean rings](https://en.wikipedia.org/wiki/Borromean_rings)\n- [H. N. Howards, *Forming the Borromean Rings out of arbitrary polygonal unknots*](https://arxiv.org/abs/1406.3370)\n-/\n\nnamespace BorromeanRings\n\nabbrev Space := EuclideanSpace ℝ (Fin 3)\nabbrev Time := Set.Icc (0 : ℝ) 1\n\n/-- Two subsets of three-space are ambient-isotopic if a jointly continuous family of\nhomeomorphisms, starting at the identity, carries one to the other. -/\ndef AmbientIsotopic (K L : Set Space) : Prop :=\n  ∃ H : Time → (Space ≃ₜ Space),\n    Continuous (fun p : Time × Space ↦ H p.1 p.2) ∧\n    (∀ x, H 0 x = x) ∧\n    H 1 '' K = L\n\n/-- The unit circle in the first two coordinate directions of three-space. -/\ndef unitCircle : Set Space :=\n  {x | x 2 = 0 ∧ ‖x‖ = 1}\n\n/-- A round Euclidean circle is a positive scaling of `unitCircle`, followed by a Euclidean\nisometry. The isometry allows arbitrary position and orientation. -/\ndef IsRoundCircle (K : Set Space) : Prop :=\n  ∃ r : ℝ, 0 < r ∧ ∃ e : Space ≃ᵢ Space,\n    K = e '' ((fun x : Space ↦ r • x) '' unitCircle)\n\n/-- An unknotted space curve is an embedded circle whose image is ambient-isotopic to a round\ncircle. -/\ndef IsUnknottedCurve (K : Circle → Space) : Prop :=\n  Topology.IsEmbedding K ∧ ∃ C : Set Space, IsRoundCircle C ∧ AmbientIsotopic (Set.range K) C\n\n/-- The boundary of one of the three mutually perpendicular golden rectangles whose vertices are\nthe standard coordinates for a regular icosahedron. Their three boundaries form a standard\ngeometric model of the Borromean rings. -/\ndef goldenRectangle (i : Fin 3) : Set Space :=\n  let φ := (1 + Real.sqrt 5) / 2\n  {x | x i = 0 ∧\n    ((|x (i + 1)| = 1 ∧ |x (i + 2)| ≤ φ) ∨\n      (|x (i + 1)| ≤ 1 ∧ |x (i + 2)| = φ))}\n\n/-- A fixed standard realization of the Borromean rings. -/\ndef standardBorromeanRings : Set Space :=\n  ⋃ i : Fin 3, goldenRectangle i\n\n/--\n**Borromean rings problem.** Are there three unknotted simple closed curves in three-dimensional\nEuclidean space, at least one of which is not a round Euclidean circle, such that no choice of an\nindependent rigid motion for each curve makes their images pairwise disjoint with union\nambient-isotopic to the standard Borromean rings? Scaling the individual curves is not allowed.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔\n      ∃ K : Fin 3 → Circle → Space,\n        (∀ i, IsUnknottedCurve (K i)) ∧\n        (∃ i, ¬ IsRoundCircle (Set.range (K i))) ∧\n        ¬ ∃ e : Fin 3 → (Space ≃ᵢ Space),\n          (Pairwise fun i j ↦ Disjoint (e i '' Set.range (K i)) (e j '' Set.range (K j))) ∧\n          AmbientIsotopic (⋃ i, e i '' Set.range (K i)) standardBorromeanRings := by\n  sorry\n\nend BorromeanRings\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented each space curve by a topological embedding from Mathlib's `Circle` into three-dimensional Euclidean space; knot and link properties are imposed on its image set.",
+    "Defined ambient isotopy as a time-indexed family of homeomorphisms of all of Euclidean three-space whose evaluation map is jointly continuous, starts at the identity, and carries one set onto the other.",
+    "Interpreted a round Euclidean circle as a positive uniform scaling of a fixed unit circle followed by a surjective Euclidean isometry. Thus circles of arbitrary radius, center, and plane are included, while degenerate radius-zero circles are excluded.",
+    "Interpreted an unknotted curve as an embedded circle whose image is ambient-isotopic to a round Euclidean circle.",
+    "Used the boundaries of the three mutually perpendicular golden rectangles on the standard regular-icosahedron coordinates as a concrete standard realization of the Borromean link L6a4, as described in the background article.",
+    "Interpreted arrangement without scaling as choosing one `IsometryEquiv` of Euclidean three-space independently for each component. Reflections are included because a Euclidean isometry is the decomposition table's specified reading of rigid motion.",
+    "Required the moved component images to be pairwise disjoint and required their unlabeled union to be ambient-isotopic to the fixed standard Borromean link; ambient isotopy may consequently permute components, as ordinary unoriented link equivalence permits.",
+    "Formalized the list-entry question with `answer(sorry) ↔ ∃ ...`; therefore a positive answer means that a counterexample to Cook's universal conjecture exists."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`EuclideanSpace ℝ (Fin 3)`; this is exactly the aliased existing type.",
+     "name": "Space",
+     "why_needed": "Convenient local name for three-dimensional real Euclidean space."
+    },
+    {
+     "closest_existing_considered": "`Set.Icc (0 : ℝ) 1`; this is exactly the aliased existing subtype.",
+     "name": "Time",
+     "why_needed": "Convenient local name for the closed unit interval used to parameterize ambient isotopies."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Homeomorph`, `Continuous`, and homotopy-related APIs; no existing ambient-isotopy predicate was found.",
+     "name": "AmbientIsotopic",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides ambient isotopy of subsets by homeomorphisms of the surrounding space."
+    },
+    {
+     "closest_existing_considered": "`Metric.sphere` describes a two-sphere in three-space, not a one-dimensional circle; Mathlib's type `Circle` is a parameter space rather than a specified subset of three-space.",
+     "name": "unitCircle",
+     "why_needed": "A fixed concrete circle in three-space is needed to define geometric round circles and unknottedness."
+    },
+    {
+     "closest_existing_considered": "`Metric.sphere` and `IsometryEquiv`; neither existing notion by itself captures a circle of arbitrary positive radius lying in an arbitrary affine plane in three-space.",
+     "name": "IsRoundCircle",
+     "why_needed": "The conjecture distinguishes exact round Euclidean circles from arbitrary unknotted curves."
+    },
+    {
+     "closest_existing_considered": "`Topology.IsEmbedding` captures simple closedness but not ambient-isotopy to a circle.",
+     "name": "IsUnknottedCurve",
+     "why_needed": "No knot-theory API or predicate for an unknotted embedded space curve exists in Mathlib or the helper library."
+    },
+    {
+     "closest_existing_considered": "General set and Euclidean-coordinate primitives; no polygonal-link or Borromean-ring definition was found.",
+     "name": "goldenRectangle",
+     "why_needed": "A concrete component of a fixed standard Borromean-link realization is required; no standard Borromean link exists in the searched libraries."
+    },
+    {
+     "closest_existing_considered": "No knot/link table or standard Borromean-link representative exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "standardBorromeanRings",
+     "why_needed": "Link equivalence must target a concrete representative of L6a4 rather than an uninterpreted Borromean predicate."
+    }
+   ],
+   "per_slot": {
+    "borromean_rings": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "borromean_rings": "/--\n**Borromean rings problem.** Are there three unknotted simple closed curves in three-dimensional\nEuclidean space, at least one of which is not a round Euclidean circle, such that no choice of an\nindependent rigid motion for each curve makes their images pairwise disjoint with union\nambient-isotopic to the standard Borromean rings? Scaling the individual curves is not allowed.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔\n      ∃ K : Fin 3 → Circle → Space,\n        (∀ i, IsUnknottedCurve (K i)) ∧\n        (∃ i, ¬ IsRoundCircle (Set.range (K i))) ∧\n        ¬ ∃ e : Fin 3 → (Space ≃ᵢ Space),\n          (Pairwise fun i j ↦ Disjoint (e i '' Set.range (K i)) (e j '' Set.range (K j))) ∧\n          AmbientIsotopic (⋃ i, e i '' Set.range (K i)) standardBorromeanRings := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Borromean rings\n\nThis file states the open problem asking whether some three unknotted simple closed curves, not\nall round circles, cannot be placed by independent rigid motions so as to form the Borromean\nrings.\n\n*References:*\n- [Wikipedia, Borromean rings](https://en.wikipedia.org/wiki/Borromean_rings)\n- [H. N. Howards, *Forming the Borromean Rings out of arbitrary polygonal unknots*](https://arxiv.org/abs/1406.3370)\n-/\n\nopen scoped EuclideanGeometry unitInterval\nopen Set Topology\n\nnamespace BorromeanRings\n\n/-- A rigid motion of three-dimensional Euclidean space. -/\nabbrev RigidMotion := AffineIsometryEquiv ℝ ℝ³ ℝ³\n\n/-- Two subsets of three-dimensional space are ambient-isotopic if a continuously evaluated\nfamily of self-homeomorphisms, starting at the identity, carries the first set to the second. -/\ndef AmbientIsotopic (s t : Set ℝ³) : Prop :=\n  ∃ F : I → (ℝ³ ≃ₜ ℝ³),\n    Continuous (fun p : I × ℝ³ ↦ F p.1 p.2) ∧\n    (∀ x, F 0 x = x) ∧ F 1 '' s = t\n\n/-- The standard unit circle in the first two coordinate directions of `ℝ³`. -/\ndef standardCircle (z : Circle) : ℝ³ := !₂[(z : ℂ).re, (z : ℂ).im, 0]\n\n/-- A parametrized curve is a round Euclidean circle if its image is obtained from the standard\ncircle by a positive uniform scaling followed by a rigid motion. -/\ndef IsRoundCircle (K : Circle → ℝ³) : Prop :=\n  ∃ (r : ℝ) (m : RigidMotion), 0 < r ∧\n    Set.range K = Set.range (fun z ↦ m (r • standardCircle z))\n\n/-- A parametrized simple closed curve is unknotted if its image is ambient-isotopic to a round\ncircle. -/\ndef IsUnknot (K : Circle → ℝ³) : Prop :=\n  IsEmbedding K ∧ AmbientIsotopic (Set.range K) (Set.range standardCircle)\n\n/-- Three mutually perpendicular ellipses of cyclic semiaxes `1` and `2`, a standard geometric\nrepresentative of the Borromean rings. -/\ndef standardBorromeanCurve : Fin 3 → Circle → ℝ³ := ![\n  fun z ↦ !₂[(z : ℂ).re, 2 * (z : ℂ).im, 0],\n  fun z ↦ !₂[0, (z : ℂ).re, 2 * (z : ℂ).im],\n  fun z ↦ !₂[2 * (z : ℂ).im, 0, (z : ℂ).re]]\n\n/-- The standard Borromean link, as the union of its three elliptical components. -/\ndef standardBorromeanLink : Set ℝ³ :=\n  ⋃ i, Set.range (standardBorromeanCurve i)\n\n/-- Three parametrized curves form the Borromean rings if their images are pairwise disjoint and\ntheir union is ambient-isotopic to the standard Borromean link. -/\ndef FormBorromeanRings (K : Fin 3 → Circle → ℝ³) : Prop :=\n  (∀ i j, i ≠ j → Disjoint (Set.range (K i)) (Set.range (K j))) ∧\n    AmbientIsotopic (⋃ i, Set.range (K i)) standardBorromeanLink\n\n/--\nAre there three unknotted simple closed curves in three-dimensional space, not all round\nEuclidean circles, which cannot be arranged to form the Borromean rings? Here each curve may be\nmoved by its own rigid motion, but it may not be scaled, and forming the Borromean rings means\nthat the moved curves are pairwise disjoint and their union is ambient-isotopic to the standard\nBorromean link `L6a4`.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔\n      ∃ K : Fin 3 → Circle → ℝ³,\n        (∀ i, IsUnknot (K i)) ∧\n        (∃ i, ¬ IsRoundCircle (K i)) ∧\n        ∀ m : Fin 3 → RigidMotion, ¬ FormBorromeanRings (fun i z ↦ m i (K i z)) := by\n  sorry\n\nend BorromeanRings\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted each space curve as a topological embedding `Circle → ℝ³`; being unknotted means that its image is ambient-isotopic to the standard unit circle.",
+    "Interpreted ambient isotopy as a jointly continuous evaluation map from the unit interval times `ℝ³`, whose time slices are self-homeomorphisms and whose time-zero slice is the identity.",
+    "Interpreted a round Euclidean circle as the image of the standard unit circle under a positive uniform scaling and an affine isometry. This scaling is only part of recognizing whether a fixed curve is circular; arrangements quantify only over independent `AffineIsometryEquiv`s and therefore do not allow scaling.",
+    "Used the union of three mutually perpendicular, congruent ellipses with cyclic semiaxes 1 and 2 as a fixed standard representative of the Borromean link L6a4; forming the link requires pairwise-disjoint moved images whose union is ambient-isotopic to this representative.",
+    "Allowed each of the three components its own Euclidean affine isometry, including orientation-reversing isometries, as specified by the decomposition table's reading of rigid motion.",
+    "Formalized “not all three circles” as the existence of at least one component whose image is not a round Euclidean circle; no congruence condition is imposed on the three original curves."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`AffineIsometryEquiv ℝ ℝ³ ℝ³`, which is used directly by the abbreviation.",
+     "name": "RigidMotion",
+     "why_needed": "A local readable name for affine Euclidean self-isometries of three-space."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Homeomorph`, `Continuous`, unit interval, and homotopy APIs; none packages a continuously evaluated family of ambient homeomorphisms.",
+     "name": "AmbientIsotopic",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have homotopies and homeomorphisms but no ambient-isotopy predicate for subsets."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Circle` and `Metric.sphere`; `Circle` supplies the parameter space, but no canonical embedding of it into `ℝ³` exists.",
+     "name": "standardCircle",
+     "why_needed": "A fixed parametrized round circle in three-space is needed both for unknot and round-circle definitions."
+    },
+    {
+     "closest_existing_considered": "Mathlib metric spheres and affine isometries; a circle in three-space is not a full metric sphere, and no existing coplanar round-circle predicate was found.",
+     "name": "IsRoundCircle",
+     "why_needed": "The statement distinguishes exact round Euclidean circles from arbitrary unknotted simple closed curves."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsEmbedding` and homotopy APIs; no knot or unknot predicate exists.",
+     "name": "IsUnknot",
+     "why_needed": "The statement quantifies over individually unknotted space curves."
+    },
+    {
+     "closest_existing_considered": "No knot/link diagrams or standard Borromean-link representative exist in Mathlib or FormalConjecturesForMathlib.",
+     "name": "standardBorromeanCurve",
+     "why_needed": "A concrete three-component representative is required to identify the Borromean link type rather than merely the much broader class of Brunnian links."
+    },
+    {
+     "closest_existing_considered": "No existing Borromean-link object or link-table entry L6a4 was found.",
+     "name": "standardBorromeanLink",
+     "why_needed": "Packages the union of the three explicit standard elliptical components as the target subset for ambient isotopy."
+    },
+    {
+     "closest_existing_considered": "Mathlib `Set.Disjoint` and the newly required `AmbientIsotopic`; no existing link-equivalence predicate was found.",
+     "name": "FormBorromeanRings",
+     "why_needed": "Packages the required pairwise disjointness and ambient-isotopy-to-L6a4 conditions for an arranged triple."
+    }
+   ],
+   "per_slot": {
+    "borromean_rings": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "borromean_rings": "/--\nAre there three unknotted simple closed curves in three-dimensional space, not all round\nEuclidean circles, which cannot be arranged to form the Borromean rings? Here each curve may be\nmoved by its own rigid motion, but it may not be scaled, and forming the Borromean rings means\nthat the moved curves are pairwise disjoint and their union is ambient-isotopic to the standard\nBorromean link `L6a4`.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔\n      ∃ K : Fin 3 → Circle → ℝ³,\n        (∀ i, IsUnknot (K i)) ∧\n        (∃ i, ¬ IsRoundCircle (K i)) ∧\n        ∀ m : Fin 3 → RigidMotion, ¬ FormBorromeanRings (fun i z ↦ m i (K i z)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Borromean rings\n\nThe Borromean rings are the three-component link `L6a4`: three unknotted, pairwise unlinked\nsimple closed curves in $\\mathbb{R}^3$ that are nevertheless linked. They can be realised by\nthree mutually perpendicular ellipses (or golden rectangles), but by a theorem of Freedman and\nSkora they cannot be realised by three round circles.\n\nMatthew Cook conjectured that *any* three unknotted simple closed curves in $\\mathbb{R}^3$,\nnot all of them circles, can be arranged (each moved by a rigid motion, without scaling) to\nform the Borromean rings. Howards proved this for polygonal unknots when scaling is allowed, or\nwhen at least two of the unknots are planar, but, following a candidate counterexample of\nCantarella, conjectured the opposite: that there are three unknotted curves, not all circles,\nwhich cannot be arranged to form the Borromean rings.\n\nWikipedia's list of unsolved problems asks: are there three unknotted space curves, not all three\ncircles, which cannot be arranged to form this link?\n\n*References:*\n- [Wikipedia, *Borromean rings*](https://en.wikipedia.org/wiki/Borromean_rings)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ho14] Howards, H. N., *Forming the Borromean rings out of arbitrary polygonal unknots*,\n  [arXiv:1406.3370](https://arxiv.org/abs/1406.3370) (Conjecture 1.1, Conjecture 5.1).\n- [FS87] Freedman, M. H. and Skora, R., *Strange actions of groups on spheres*,\n  J. Differential Geom. 25 (1987), 75–98.\n-/\n\nnamespace BorromeanRings\n\nopen Function\nopen scoped unitInterval EuclideanGeometry\n\nvariable {X : Type*} [TopologicalSpace X]\n\n/-- Two subsets `A` and `B` of a topological space `X` are **ambient isotopic** if there is a\nhomotopy `F` from the identity of `X` to a map `f`, such that every level `F (t, ·)` is a\nhomeomorphism of `X` and the final map `f` sends `A` onto `B`. -/\ndef IsAmbientIsotopic (A B : Set X) : Prop :=\n  ∃ (f : C(X, X)) (F : (ContinuousMap.id X).Homotopy f),\n    (∀ t : I, IsHomeomorph fun x => F (t, x)) ∧ f '' A = B\n\n/-- A subset of $\\mathbb{R}^3$ is a **(round) circle** if it is the intersection of a sphere of\npositive radius `r` centred at `c` with a plane through `c`, the plane being given by a nonzero\nnormal vector `n`. -/\ndef IsRoundCircle (K : Set ℝ³) : Prop :=\n  ∃ (c n : ℝ³) (r : ℝ), 0 < r ∧ n ≠ 0 ∧ K = {x | inner ℝ (x - c) n = 0 ∧ dist x c = r}\n\n/-- A subset of $\\mathbb{R}^3$ is an **unknot** (an unknotted simple closed curve) if it is\nambient isotopic to a round circle. -/\ndef IsUnknot (K : Set ℝ³) : Prop :=\n  ∃ C, IsRoundCircle C ∧ IsAmbientIsotopic C K\n\n/-- A **rigid motion** of $\\mathbb{R}^3$ is an orientation-preserving isometry, i.e. an affine\nisometry of $\\mathbb{R}^3$ onto itself whose linear part has positive determinant (a composition\nof a rotation and a translation; reflections and scalings are excluded). -/\ndef IsRigidMotion (g : ℝ³ ≃ᵃⁱ[ℝ] ℝ³) : Prop :=\n  0 < LinearMap.det (g.linear : ℝ³ →ₗ[ℝ] ℝ³)\n\n/-- The **standard Borromean rings**: three mutually perpendicular ellipses, the `i`-th lying in\nthe coordinate plane `xᵢ = 0` with semi-axis `1` along the `xᵢ₊₁`-axis and semi-axis `2` along the\n`xᵢ₊₂`-axis (indices mod `3`). This is the classical realisation of the Borromean rings `L6a4`\nby three mutually perpendicular ellipses; it is ambient isotopic to the realisation by three\nmutually perpendicular golden rectangles inscribed in a regular icosahedron. -/\ndef standardBorromeanRings (i : Fin 3) : Set ℝ³ :=\n  {p | p i = 0 ∧ (p (i + 1)) ^ 2 + (p (i + 2)) ^ 2 / 4 = 1}\n\n/-- Three subsets `K 0`, `K 1`, `K 2` of $\\mathbb{R}^3$ **form the Borromean rings** if they are\npairwise disjoint and their union is ambient isotopic to the standard Borromean rings. -/\ndef FormsBorromeanRings (K : Fin 3 → Set ℝ³) : Prop :=\n  Pairwise (Disjoint on K) ∧ IsAmbientIsotopic (⋃ i, K i) (⋃ i, standardBorromeanRings i)\n\n/-- Three subsets `K 0`, `K 1`, `K 2` of $\\mathbb{R}^3$ **can be arranged to form the Borromean\nrings** if, after applying a rigid motion `g i` (without scaling) to each `K i` individually, the\nmoved curves `g i '' K i` form the Borromean rings. -/\ndef CanBeArrangedToFormBorromeanRings (K : Fin 3 → Set ℝ³) : Prop :=\n  ∃ g : Fin 3 → ℝ³ ≃ᵃⁱ[ℝ] ℝ³, (∀ i, IsRigidMotion (g i)) ∧\n    FormsBorromeanRings fun i => g i '' K i\n\n/--\n**Borromean rings problem.** Are there three unknotted space curves, not all three circles,\nwhich cannot be arranged to form the Borromean rings?\n\nHere \"arranged\" means that each curve is moved by a rigid motion of $\\mathbb{R}^3$ (rotations and\ntranslations, without scaling), and \"form the Borromean rings\" means that the moved curves are\npairwise disjoint and their union is ambient isotopic to the standard Borromean rings. The three\ncurves need not be distinct or congruent.\n\nA positive answer (`answer(True)`) is Howards's conjecture [Ho14, Conjecture 5.1]; a negative\nanswer (`answer(False)`) is Cook's conjecture [Ho14, Conjecture 1.1] that any three unknotted\nsimple closed curves in space, not all circles, can be combined without scaling to form the\nBorromean rings.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔ ∃ K : Fin 3 → Set ℝ³,\n      (∀ i, IsUnknot (K i)) ∧ (¬ ∀ i, IsRoundCircle (K i)) ∧\n        ¬ CanBeArrangedToFormBorromeanRings K := by\n  sorry\n\n/-- Ambient isotopy is reflexive: the constant homotopy at the identity works. -/\n@[category API, AMS 51 57]\ntheorem IsAmbientIsotopic.refl (A : Set X) : IsAmbientIsotopic A A :=\n  ⟨ContinuousMap.id X, ContinuousMap.Homotopy.refl _, fun _ => by simpa using IsHomeomorph.id,\n    Set.image_id A⟩\n\n/-- Every round circle is an unknot. -/\n@[category API, AMS 51 57]\ntheorem IsRoundCircle.isUnknot {K : Set ℝ³} (hK : IsRoundCircle K) : IsUnknot K :=\n  ⟨K, hK, IsAmbientIsotopic.refl K⟩\n\n/-- The identity is a rigid motion. -/\n@[category test, AMS 51 57]\ntheorem isRigidMotion_refl : IsRigidMotion (AffineIsometryEquiv.refl ℝ ℝ³) := by\n  simp [IsRigidMotion]\n\n/-- The three standard Borromean rings are pairwise disjoint. -/\n@[category test, AMS 51 57]\ntheorem pairwise_disjoint_standardBorromeanRings :\n    Pairwise (Disjoint on standardBorromeanRings) := by\n  intro i j hij\n  rw [onFun, Set.disjoint_left]\n  rintro p ⟨hi, hi'⟩ ⟨hj, hj'⟩\n  fin_cases i <;> fin_cases j <;> simp_all <;> rcases ‹_ ∨ _› with h | h <;> simp_all\n\nend BorromeanRings\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot table is appropriate. Only remark: the table glosses 'rigid motion' as '(Euclidean isometry)' without settling whether reflections are allowed; I chose orientation-preserving isometries (the standard meaning of 'rigid motion' and the physical sense of 'arranged') and flagged it as a modeling decision.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Ambient space is `EuclideanSpace ℝ (Fin 3)`; curves are subsets (`Set ℝ³`), and the three curves are indexed by `Fin 3` and are allowed to coincide (Cook's conjecture explicitly covers copies of one curve).",
+    "'Unknotted space curve' is formalized as `IsUnknot K := ∃ C, IsRoundCircle C ∧ IsAmbientIsotopic C K`; being ambient isotopic to a round circle already forces K to be a simple closed (tame) curve, so no separate simple-closed-curve predicate is needed.",
+    "Ambient isotopy follows the standard definition: a homotopy F from the identity of ℝ³ to f with every level F(t,·) a homeomorphism of ℝ³ and f '' A = B (`ContinuousMap.Homotopy` + `IsHomeomorph`). Joint continuity of the inverses is not required (for ℝ³ it follows by invariance of domain; it is also the Wikipedia/standard definition).",
+    "'Circle' means a round Euclidean circle of any positive radius in any plane: `{x | ⟪x - c, n⟫ = 0 ∧ dist x c = r}` with r > 0, n ≠ 0.",
+    "'Arranged' = one rigid motion applied to each component individually, WITHOUT scaling. Rigid motion is taken to be an orientation-preserving isometry (affine isometry equivalence of ℝ³ with positive-determinant linear part, i.e. SE(3)); reflections are excluded, following the standard meaning of 'rigid motion' and the physical sense of 'arranging' rings. A reviewer may prefer to allow improper isometries (drop the determinant condition); the two readings could in principle differ because only the mirror image of the whole configuration is controlled by amphichirality of the Borromean rings.",
+    "'Form this link' = the moved curves are pairwise disjoint and their union is ambient isotopic to an explicit standard model of L6a4: three mutually perpendicular ellipses `{p | p i = 0 ∧ p (i+1)^2 + p (i+2)^2 / 4 = 1}` (i : Fin 3, indices mod 3). This has the same cyclic piercing pattern as the golden-rectangle model in the regular icosahedron (yz-plane long in z, zx-plane long in x, xy-plane long in y) and as the 2×4 integer-rectangle model; each ellipse pierces exactly one other's spanning disk and is pierced by the third. Pairwise disjointness of the model is proved as a test lemma.",
+    "Ambient isotopy of the union (not component-wise with a permutation) is used for 'form this link'; the two are equivalent since components are the connected components of the union.",
+    "`answer(True)` corresponds to Howards's conjecture (arXiv:1406.3370, Conj. 5.1: such a triple exists) and `answer(False)` to Cook's conjecture (Conj. 1.1). The scaling-allowed variant and Howards's planar-curve variant are not stated, per the decomposition table.",
+    "The direction of `IsAmbientIsotopic` (circle → K, union → standard rings) is immaterial since ambient isotopy is symmetric."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "ContinuousMap.Homotopy / IsHomeomorph (used as building blocks), Homeomorph, ContinuousMap.HomotopyEquiv (not the right notion: no level-wise homeomorphism condition or subset tracking).",
+     "name": "BorromeanRings.IsAmbientIsotopic",
+     "why_needed": "Mathlib has no notion of isotopy or ambient isotopy of subsets; needed to define unknots and link equivalence."
+    },
+    {
+     "closest_existing_considered": "EuclideanGeometry.Sphere, Metric.sphere, Circle, EuclideanGeometry.Cospherical.",
+     "name": "BorromeanRings.IsRoundCircle",
+     "why_needed": "Need 'round Euclidean circle in ℝ³' (any centre, radius, plane); Mathlib's `EuclideanGeometry.Sphere` in ℝ³ is a 2-sphere and `Circle` is the unit circle in ℂ, neither is a circle in 3-space."
+    },
+    {
+     "closest_existing_considered": "None (no knots in Mathlib or FormalConjecturesForMathlib).",
+     "name": "BorromeanRings.IsUnknot",
+     "why_needed": "No knot theory in Mathlib; unknot = subset ambient isotopic to a round circle."
+    },
+    {
+     "closest_existing_considered": "AffineIsometryEquiv (used, but includes reflections), PompeiuProblem.RigidMotion (problem-local, includes reflections), MovingSofa's E(2) notation, Matrix.specialOrthogonalGroup.",
+     "name": "BorromeanRings.IsRigidMotion",
+     "why_needed": "Orientation-preserving Euclidean isometries (SE(3)) are not in Mathlib as such; defined as an `AffineIsometryEquiv` of ℝ³ with positive-determinant linear part."
+    },
+    {
+     "closest_existing_considered": "None (no links in Mathlib).",
+     "name": "BorromeanRings.standardBorromeanRings",
+     "why_needed": "A concrete representative of the link L6a4 is required to state 'form this link'; realised as three mutually perpendicular ellipses."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "BorromeanRings.FormsBorromeanRings",
+     "why_needed": "Three subsets form the Borromean rings: pairwise disjoint and union ambient isotopic to the standard model."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "BorromeanRings.CanBeArrangedToFormBorromeanRings",
+     "why_needed": "Encodes 'can be arranged (rigid motion per component, no scaling) to form the link'."
+    }
+   ],
+   "per_slot": {
+    "borromean_rings": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ K : Fin 3 → Set ℝ³, (∀ i, IsUnknot (K i)) ∧ (¬ ∀ i, IsRoundCircle (K i)) ∧ ¬ CanBeArrangedToFormBorromeanRings K`. Mathlib has no knot/link/isotopy theory, so bespoke problem-local definitions (ambient isotopy, round circle, unknot, rigid motion, standard Borromean rings, forming/arranging) were added in the problem file; they are built only from Mathlib primitives (ContinuousMap.Homotopy, IsHomeomorph, AffineIsometryEquiv, LinearMap.det, EuclideanSpace)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "borromean_rings": "/--\n**Borromean rings problem.** Are there three unknotted space curves, not all three circles,\nwhich cannot be arranged to form the Borromean rings?\n\nHere \"arranged\" means that each curve is moved by a rigid motion of $\\mathbb{R}^3$ (rotations and\ntranslations, without scaling), and \"form the Borromean rings\" means that the moved curves are\npairwise disjoint and their union is ambient isotopic to the standard Borromean rings. The three\ncurves need not be distinct or congruent.\n\nA positive answer (`answer(True)`) is Howards's conjecture [Ho14, Conjecture 5.1]; a negative\nanswer (`answer(False)`) is Cook's conjecture [Ho14, Conjecture 1.1] that any three unknotted\nsimple closed curves in space, not all circles, can be combined without scaling to form the\nBorromean rings.\n-/\n@[category research open, AMS 51 57]\ntheorem borromean_rings :\n    answer(sorry) ↔ ∃ K : Fin 3 → Set ℝ³,\n      (∀ i, IsUnknot (K i)) ∧ (¬ ∀ i, IsRoundCircle (K i)) ∧\n        ¬ CanBeArrangedToFormBorromeanRings K := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "borromean_rings": "c03"
+ },
+ "id": "wp-borromean-rings",
+ "main_attempt": "c03"
+}

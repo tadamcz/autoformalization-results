@@ -1,0 +1,453 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tutte's 4-flow conjecture (Petersen-minor-free graphs)\n\nTutte conjectured that every bridgeless graph with no Petersen graph minor has a nowhere-zero\n$4$-flow. The Wikipedia list of unsolved problems records it as: \"every Petersen-minor-free\nbridgeless graph has a nowhere-zero 4-flow\".\n\n*References:*\n- [Wikipedia, Petersen graph](https://en.wikipedia.org/wiki/Petersen_graph)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Nowhere-zero flow](https://en.wikipedia.org/wiki/Nowhere-zero_flow)\n- [Wikipedia, Graph minor](https://en.wikipedia.org/wiki/Graph_minor)\n- [Tu66] Tutte, W. T., *On the algebraic theory of graph colorings*,\n  J. Combinatorial Theory 1 (1966), 15--50.\n-/\n\nopen SimpleGraph\n\nnamespace Petersen\n\nvariable {V W : Type*}\n\n/-- The Petersen graph, as the Kneser graph $K(5, 2)$: the vertices are the $2$-element subsets\nof a $5$-element set, and two of them are adjacent when they are disjoint. -/\ndef petersenGraph : SimpleGraph {s : Finset (Fin 5) // s.card = 2} :=\n  SimpleGraph.fromRel fun s t => Disjoint s.1 t.1\n\ninstance : DecidableRel petersenGraph.Adj := by\n  unfold petersenGraph\n  infer_instance\n\n/-- `IsMinor H G` means that `H` is a minor of `G`, i.e. `H` can be obtained from `G` by deleting\nvertices, deleting edges and contracting edges. This is stated through branch sets: each vertex\n`w` of `H` is assigned a set `φ w` of vertices of `G` inducing a connected subgraph of `G`, these\nsets are pairwise disjoint, and every edge `w w'` of `H` is witnessed by an edge of `G` between\n`φ w` and `φ w'`. -/\ndef IsMinor (H : SimpleGraph W) (G : SimpleGraph V) : Prop :=\n  ∃ φ : W → Set V, (∀ w, (G.induce (φ w)).Connected) ∧\n    (Pairwise fun w w' => Disjoint (φ w) (φ w')) ∧\n    ∀ w w', H.Adj w w' → ∃ u ∈ φ w, ∃ v ∈ φ w', G.Adj u v\n\n/-- `HasNowhereZeroFlow G k` means that `G` has a nowhere-zero `k`-flow: an integer `f u v`\nattached to each ordered pair of vertices, with `f v u = -f u v`, which is nonzero exactly on the\nedges of `G`, has absolute value less than `k`, and satisfies Kirchhoff's law\n$\\sum_v f(u, v) = 0$ at every vertex `u`. Equivalently, `G` has an orientation together with\nvalues in $\\{1, \\dots, k - 1\\}$ on its edges such that, at every vertex, the total value of the\nincoming edges equals the total value of the outgoing edges. -/\ndef HasNowhereZeroFlow [Fintype V] (G : SimpleGraph V) (k : ℕ) : Prop :=\n  ∃ f : V → V → ℤ, (∀ u v, f v u = -f u v) ∧ (∀ u v, G.Adj u v ↔ f u v ≠ 0) ∧\n    (∀ u v, |f u v| < k) ∧ ∀ u, ∑ v, f u v = 0\n\n/-- **Tutte's 4-flow conjecture.** Every finite bridgeless graph with no Petersen graph minor\nhas a nowhere-zero $4$-flow. -/\n@[category research open, AMS 5]\ntheorem petersen [Fintype V] (G : SimpleGraph V) (hG : G.IsBridgeless)\n    (hP : ¬ IsMinor petersenGraph G) : HasNowhereZeroFlow G 4 := by\n  sorry\n\n/-- The cubic case of Tutte's 4-flow conjecture: every finite bridgeless cubic graph with no\nPetersen graph minor has a nowhere-zero $4$-flow. A cubic graph has a nowhere-zero $4$-flow if\nand only if it is $3$-edge-colourable, so this is the snark theorem announced by Robertson,\nSanders, Seymour and Thomas. -/\n@[category research solved, AMS 5]\ntheorem petersen.variants.cubic [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hcubic : G.IsRegularOfDegree 3) (hG : G.IsBridgeless) (hP : ¬ IsMinor petersenGraph G) :\n    HasNowhereZeroFlow G 4 := by\n  sorry\n\n/-- The Petersen graph has `10` vertices. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_vertices : Fintype.card {s : Finset (Fin 5) // s.card = 2} = 10 := by\n  decide\n\n/-- The Petersen graph has `15` edges. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_edgeFinset : petersenGraph.edgeFinset.card = 15 := by\n  decide\n\n/-- The Petersen graph is cubic. -/\n@[category test, AMS 5]\ntheorem petersenGraph_isRegularOfDegree_three : petersenGraph.IsRegularOfDegree 3 := by\n  unfold IsRegularOfDegree\n  decide\n\n/-- Every graph is a minor of itself. -/\n@[category API, AMS 5]\ntheorem isMinor_refl (G : SimpleGraph V) : IsMinor G G := by\n  refine ⟨fun v => {v}, fun v => ?_, fun v w hvw => Set.disjoint_singleton.mpr hvw,\n    fun u v huv => ⟨u, rfl, v, rfl, huv⟩⟩\n  haveI : Nonempty ({v} : Set V) := ⟨⟨v, rfl⟩⟩\n  exact Connected.of_subsingleton\n\n/-- An edgeless graph has a nowhere-zero `k`-flow for every `k ≥ 1`, namely the zero flow. -/\n@[category test, AMS 5]\ntheorem bot_hasNowhereZeroFlow [Fintype V] {k : ℕ} (hk : 0 < k) :\n    HasNowhereZeroFlow (⊥ : SimpleGraph V) k :=\n  ⟨0, by simp, by simp, fun _ _ => by simpa using hk, by simp⟩\n\nend Petersen\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate; the notes' description (finite bridgeless graphs, Petersen minor via minors not subgraphs, integer 4-flow, vacuous for edgeless graphs) is what the file formalizes. The only divergence is the choice of simple graphs over multigraphs, which is mathematically equivalent (see modeling_decisions).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite *simple* graphs (`SimpleGraph V` with `[Fintype V]`) rather than multigraphs. The decomposition notes say multigraphs are conventional; the two versions are equivalent: subdividing every edge of a loopless multigraph gives a simple graph with the same nowhere-zero k-flows, the same bridges (an edge is a bridge iff it lies on no cycle), and the same Petersen-minor status (Petersen is cubic, so having it as a minor is equivalent to having it as a topological minor, which is preserved by subdivision in both directions), while loops are never bridges, are irrelevant to Petersen minors, and can carry flow value 1 without affecting Kirchhoff's law. Mathlib's `Graph α β` multigraph type has no connectivity, bridge or minor API, so using it would have required far more bespoke infrastructure. This follows the precedent of `FormalConjectures/Arxiv/2607.06396/AlonTarsi.lean`, which states the (multigraph) Alon–Tarsi conjecture for `SimpleGraph`.",
+    "Bridgeless uses the existing `SimpleGraph.IsBridgeless` (no edge is a bridge); connectivity is deliberately not required, matching the conjecture (a flow on a disconnected graph is a flow on each component). Edgeless graphs, including the empty vertex type, satisfy the conclusion via the zero flow (proved in `bot_hasNowhereZeroFlow`).",
+    "Nowhere-zero 4-flow is taken in the integer sense (values in {±1,±2,±3} after orienting), following the Wikipedia definition of a nowhere-zero k-flow; by Tutte's theorem this is equivalent to the Z_4 or Z_2×Z_2 versions. The flow is encoded as an antisymmetric `V → V → ℤ` rather than an explicit orientation, which is equivalent for simple graphs.",
+    "The Petersen graph is defined as the Kneser graph K(5,2) on `{s : Finset (Fin 5) // s.card = 2}`; `decide` tests confirm 10 vertices, 15 edges and 3-regularity. Petersen-minor-freeness is `¬ IsMinor petersenGraph G`, where `IsMinor` is the branch-set characterisation of minors (isomorphic copies are automatically covered since the definition is via maps).",
+    "An extra variant `petersen.variants.cubic` (cubic graphs, `G.IsRegularOfDegree 3`) is included with `category research solved`, since it is a special case of the slot equivalent to the snark theorem announced by Robertson–Sanders–Seymour–Thomas (via Tutte's equivalence of nowhere-zero 4-flows and 3-edge-colourings for cubic graphs). A reviewer may prefer `research open` given that the complete RSST proof is not fully published, or may drop the variant; it does not affect the main slot.",
+    "Bespoke definitions were placed in the problem file (namespace `Petersen`) rather than `FormalConjecturesForMathlib/`, because the task restricts writing to the single candidate file; `IsMinor` and `HasNowhereZeroFlow` are reusable and could be moved to `FormalConjecturesForMathlib/Combinatorics/SimpleGraph/` in a real PR."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`WrittenOnTheWallII.Test.PetersenGraph` (an edge-list definition inside a problem/test file, not importable from a problem file); Mathlib has no Kneser or Petersen graph.",
+     "name": "Petersen.petersenGraph",
+     "why_needed": "No Petersen graph is available from Mathlib or `FormalConjecturesForMathlib`. Defined as the Kneser graph K(5,2): vertices are the 2-element subsets of `Fin 5`, adjacent iff disjoint (`SimpleGraph.fromRel fun s t => Disjoint s.1 t.1`). Tests prove by `decide` that it has 10 vertices, 15 edges and is 3-regular."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Subgraph`, `SimpleGraph.Copy`, `SimpleGraph.Embedding` (all subgraph/containment notions, insufficient since contraction is required); `Matroid.IsMinor` (matroids, not graphs).",
+     "name": "Petersen.IsMinor",
+     "why_needed": "Mathlib has `Matroid.IsMinor` but no graph minor. `IsMinor H G` is the standard branch-set (inflated copy) characterisation: a map `φ : W → Set V` with each `G.induce (φ w)` connected (hence nonempty), branch sets pairwise disjoint, and every edge `w w'` of `H` witnessed by an edge of `G` between `φ w` and `φ w'`. This is equivalent to obtaining `H` by vertex deletions, edge deletions and edge contractions (Diestel, Prop. 1.7.2), so it is a genuine minor notion and not subgraph containment. API lemma `isMinor_refl` is proved."
+    },
+    {
+     "closest_existing_considered": "`Digraph`/`Quiver` orientations plus a weight function (would need a bespoke orientation-of-a-SimpleGraph notion anyway); no `Flow`/`NowhereZero` declarations found in Mathlib or `FormalConjecturesForMathlib`.",
+     "name": "Petersen.HasNowhereZeroFlow",
+     "why_needed": "No flow notion exists in Mathlib or the repo. `HasNowhereZeroFlow G k` asserts an `f : V → V → ℤ` with `f v u = -f u v`, `G.Adj u v ↔ f u v ≠ 0` (support exactly the edges, nowhere zero), `|f u v| < k`, and Kirchhoff's law `∑ v, f u v = 0` at every vertex. For simple graphs this is exactly an orientation with edge weights in {1,…,k−1} balancing at every vertex (orient uv from u to v iff f u v > 0). Test `bot_hasNowhereZeroFlow` shows edgeless graphs satisfy it via the zero flow."
+    }
+   ],
+   "per_slot": {
+    "petersen": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `Petersen.petersen`: for every finite simple graph `G` (any `V` with `[Fintype V]`), if `G.IsBridgeless` (existing repo definition: no edge is a bridge) and `¬ IsMinor petersenGraph G`, then `HasNowhereZeroFlow G 4`. Mathlib and the repo have no graph-minor or nowhere-zero-flow notion and no Petersen graph outside a test file, so three bespoke definitions were added (see new_definitions)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "petersen": "/-- **Tutte's 4-flow conjecture.** Every finite bridgeless graph with no Petersen graph minor\nhas a nowhere-zero $4$-flow. -/\n@[category research open, AMS 5]\ntheorem petersen [Fintype V] (G : SimpleGraph V) (hG : G.IsBridgeless)\n    (hP : ¬ IsMinor petersenGraph G) : HasNowhereZeroFlow G 4 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tutte's four-flow conjecture\n\nEvery bridgeless finite multigraph with no Petersen graph minor has a nowhere-zero\nfour-flow.\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Petersen graph](https://en.wikipedia.org/wiki/Petersen_graph)\n-/\n\nopen Finset SimpleGraph\n\nnamespace Petersen\n\n/-- The simple graph obtained from a multigraph given by its edge endpoint map.\nParallel edges are identified and loops are discarded. -/\ndef underlyingGraph {V E : Type*} (ends : E → Sym2 V) : SimpleGraph V :=\n  SimpleGraph.fromEdgeSet (Set.range ends)\n\n/-- An undirected edge crosses a vertex cut when exactly one of its endpoints is in the cut. -/\ndef CrossesCut {V : Type*} (S : Set V) (e : Sym2 V) : Prop :=\n  ∃ u v, e = s(u, v) ∧ ((u ∈ S ∧ v ∉ S) ∨ (v ∈ S ∧ u ∉ S))\n\n/-- An edge of a multigraph is a bridge when it is the unique edge crossing some vertex cut. -/\ndef IsBridge {V E : Type*} (ends : E → Sym2 V) (e : E) : Prop :=\n  ∃ S : Set V, CrossesCut S (ends e) ∧ ∀ d, CrossesCut S (ends d) → d = e\n\n/-- The Petersen graph, with an outer pentagon, five spokes, and an inner pentagram. -/\ndef petersenGraph : SimpleGraph (Fin 10) :=\n  SimpleGraph.fromEdgeSet {\n    s(0, 1), s(1, 2), s(2, 3), s(3, 4), s(4, 0),\n    s(0, 5), s(1, 6), s(2, 7), s(3, 8), s(4, 9),\n    s(5, 7), s(7, 9), s(9, 6), s(6, 8), s(8, 5)\n  }\n\n/-- A simple graph has a Petersen minor when it has ten pairwise disjoint, nonempty,\nconnected branch sets, with adjacent branch sets for every edge of the Petersen graph. -/\ndef HasPetersenMinor {V : Type*} (G : SimpleGraph V) : Prop :=\n  ∃ branch : Fin 10 → Set V,\n    (∀ i, (branch i).Nonempty) ∧\n    (∀ i j, i ≠ j → Disjoint (branch i) (branch j)) ∧\n    (∀ i, (G.induce (branch i)).Preconnected) ∧\n    ∀ ⦃i j⦄, petersenGraph.Adj i j →\n      ∃ u ∈ branch i, ∃ v ∈ branch j, G.Adj u v\n\n/-- A nowhere-zero four-flow on a finite multigraph. An orientation is represented by\n`source` and `target`; the flow values lie in the additive group `ZMod 4`, and Kirchhoff's\nlaw holds at every vertex. -/\ndef HasNowhereZeroFourFlow {V E : Type*} [Fintype E] [DecidableEq V]\n    (ends : E → Sym2 V) : Prop :=\n  ∃ source target : E → V,\n    (∀ e, ends e = s(source e, target e)) ∧\n    ∃ flow : E → ZMod 4,\n      (∀ e, flow e ≠ 0) ∧\n      ∀ v, ∑ e with source e = v, flow e = ∑ e with target e = v, flow e\n\n/-- **Tutte's four-flow conjecture.** Every finite bridgeless multigraph with no Petersen\nminor has a nowhere-zero four-flow. -/\n@[category research open, AMS 5]\ntheorem petersen :\n    ∀ (V E : Type) [Fintype V] [Fintype E] [DecidableEq V] (ends : E → Sym2 V),\n      (∀ e, ¬ IsBridge ends e) →\n      ¬ HasPetersenMinor (underlyingGraph ends) →\n      HasNowhereZeroFourFlow ends := by\n  sorry\n\nend Petersen\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite multigraphs are represented by finite vertex and edge types together with an endpoint map `E → Sym2 V`; this preserves parallel-edge identities and also permits loops.",
+    "Bridgelessness uses the equivalent cut characterization: an edge is a bridge exactly when it is the unique edge crossing some vertex cut. This correctly accounts for parallel edges and disconnected graphs.",
+    "Petersen-minor containment is expressed by the standard branch-set model: ten nonempty, pairwise disjoint connected vertex sets, with an edge between branch sets corresponding to each Petersen edge. This formalizes graph minors rather than subgraphs.",
+    "For minor containment, the multigraph is simplified to its underlying simple graph. Parallel copies and loops do not affect containment of the simple Petersen graph.",
+    "A nowhere-zero 4-flow is modeled over the additive group `ZMod 4`, with an explicit orientation and equality of outgoing and incoming sums at each vertex. This is equivalent to the conventional integer-valued formulation by Tutte's group-independence theorem.",
+    "Loops are retained in the multigraph model: they never cross cuts, are discarded by the underlying simple graph used for minors, and contribute equally to incoming and outgoing flow sums.",
+    "No connectedness or nonemptiness assumption is added; disconnected bridgeless graphs are allowed, and edgeless graphs satisfy the conclusion vacuously."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.fromEdgeSet`; it is used internally, but a wrapper is needed to form its edge set from multigraph edge endpoints.",
+     "name": "Petersen.underlyingGraph",
+     "why_needed": "Converts the endpoint-map multigraph to the simple graph on which the available Mathlib connectivity API and the Petersen branch-set model can operate."
+    },
+    {
+     "closest_existing_considered": "Mathlib simple-graph cut and edge notions; none directly applies to edge identities in an endpoint-map multigraph.",
+     "name": "Petersen.CrossesCut",
+     "why_needed": "Defines when an unordered multigraph edge has exactly one endpoint in a vertex set, needed for a bridge predicate that respects parallel edges."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.IsBridge` and `SimpleGraph.IsBridgeless` in Mathlib/FormalConjecturesForMathlib.",
+     "name": "Petersen.IsBridge",
+     "why_needed": "The existing `SimpleGraph.IsBridge` collapses parallel edges and would incorrectly model multigraph bridgelessness."
+    },
+    {
+     "closest_existing_considered": "`WrittenOnTheWallII.Test.PetersenGraph` exists in an unrelated test problem module and is not part of a reusable imported API; Mathlib has no Petersen graph definition.",
+     "name": "Petersen.petersenGraph",
+     "why_needed": "Provides the fixed simple Petersen graph used by the minor model in this standalone problem file."
+    },
+    {
+     "closest_existing_considered": "Mathlib `SimpleGraph` subgraph, induced graph, connectivity, and map APIs; Mathlib's `Matroid.IsMinor` is for matroids and is not a graph-minor predicate.",
+     "name": "Petersen.HasPetersenMinor",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib contains a graph-minor relation; a standard branch-set characterization is required to distinguish minors from subgraphs."
+    },
+    {
+     "closest_existing_considered": "Mathlib simple-graph darts/orientations and incidence matrices; these concern simple graphs and do not provide nowhere-zero group-valued flows.",
+     "name": "Petersen.HasNowhereZeroFourFlow",
+     "why_needed": "No graph-flow predicate exists in Mathlib or FormalConjecturesForMathlib, especially none retaining parallel edge identities."
+    }
+   ],
+   "per_slot": {
+    "petersen": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "petersen": "/-- **Tutte's four-flow conjecture.** Every finite bridgeless multigraph with no Petersen\nminor has a nowhere-zero four-flow. -/\n@[category research open, AMS 5]\ntheorem petersen :\n    ∀ (V E : Type) [Fintype V] [Fintype E] [DecidableEq V] (ends : E → Sym2 V),\n      (∀ e, ¬ IsBridge ends e) →\n      ¬ HasPetersenMinor (underlyingGraph ends) →\n      HasNowhereZeroFourFlow ends := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tutte's four-flow conjecture\n\nEvery finite bridgeless multigraph with no Petersen graph minor has a nowhere-zero\n$4$-flow.\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Petersen graph](https://en.wikipedia.org/wiki/Petersen_graph)\n- [Wikipedia, Tutte conjecture](https://en.wikipedia.org/wiki/Tutte_conjecture)\n-/\n\nnamespace Petersen\n\nopen Graph\n\n/-- The Petersen graph, with an outer pentagon on `0, ..., 4`, spokes, and an inner pentagram. -/\nabbrev petersenGraph : SimpleGraph (Fin 10) :=\n  SimpleGraph.fromEdgeSet {\n    s(0, 1), s(1, 2), s(2, 3), s(3, 4), s(4, 0),\n    s(0, 5), s(1, 6), s(2, 7), s(3, 8), s(4, 9),\n    s(5, 7), s(7, 9), s(9, 6), s(6, 8), s(8, 5)\n  }\n\n/-- Two vertices are connected by a walk that does not use the edge `e`. -/\ndef ReachableWithout {V E : Type*} (G : Graph V E) (e : E) (x y : V) : Prop :=\n  Relation.ReflTransGen (fun u v ↦ ∃ f, f ≠ e ∧ G.IsLink f u v) x y\n\n/-- A multigraph is bridgeless when deleting any one edge leaves its two ends connected. -/\ndef IsBridgeless {V E : Type*} (G : Graph V E) : Prop :=\n  ∀ e ∈ E(G), ∀ ⦃x y⦄, G.IsLink e x y → ReachableWithout G e x y\n\n/-- A set of vertices is a nonempty connected branch set in `G`. -/\ndef IsConnectedBranchSet {V E : Type*} (G : Graph V E) (S : Set V) : Prop :=\n  S.Nonempty ∧ S ⊆ V(G) ∧\n    ∀ ⦃x⦄, x ∈ S → ∀ ⦃y⦄, y ∈ S →\n      Relation.ReflTransGen (fun u v ↦ u ∈ S ∧ v ∈ S ∧ G.Adj u v) x y\n\n/-- `G` has a Petersen minor if it has ten pairwise disjoint connected branch sets, with an\nedge between the corresponding branch sets for every edge of the Petersen graph. This is the\nstandard branch-set characterization of a graph minor. -/\ndef HasPetersenMinor {V E : Type*} (G : Graph V E) : Prop :=\n  ∃ branch : Fin 10 → Set V,\n    (∀ i, IsConnectedBranchSet G (branch i)) ∧\n    (∀ i j, i ≠ j → Disjoint (branch i) (branch j)) ∧\n    ∀ ⦃i j⦄, petersenGraph.Adj i j →\n      ∃ x ∈ branch i, ∃ y ∈ branch j, G.Adj x y\n\n/-- A nowhere-zero integer $4$-flow consists of an orientation of every edge and a value in\n$\\{\\pm1,\\pm2,\\pm3\\}$ on every edge, such that total flow into each vertex equals total flow out. -/\ndef HasNowhereZeroFourFlow {V E : Type*} [Fintype E] (G : Graph V E) : Prop := by\n  classical\n  exact ∃ source target : E(G) → V, ∃ value : E(G) → ℤ,\n    (∀ e, G.IsLink e.1 (source e) (target e)) ∧\n    (∀ e, 0 < |value e| ∧ |value e| < 4) ∧\n    ∀ v ∈ V(G),\n      (∑ e, if source e = v then value e else 0) =\n        ∑ e, if target e = v then value e else 0\n\n/--\n**Tutte's four-flow conjecture.** Every finite Petersen-minor-free bridgeless multigraph has a\nnowhere-zero $4$-flow. Parallel edges are retained; loops are harmless in the bridge, minor, and\nflow conditions. In particular, an edgeless graph has the empty flow.\n-/\n@[category research open, AMS 5]\ntheorem petersen {V E : Type*} [Fintype V] [Fintype E] (G : Graph V E)\n    (hbridgeless : IsBridgeless G) (hminor : ¬ HasPetersenMinor G) :\n    HasNowhereZeroFourFlow G := by\n  sorry\n\nend Petersen\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Mathlib's `Graph V E`, whose embedded edge set and incidence relation model finite undirected multigraphs with parallel edges and loops; finiteness is imposed by `Fintype V` and `Fintype E`.",
+    "Formalized bridgelessness by requiring the endpoints of each edge to remain connected after that particular edge is deleted. This handles disconnected graphs, parallel edges, and loops with the conventional behavior.",
+    "Formalized Petersen-minor containment by the standard branch-set characterization: ten nonempty, pairwise disjoint connected vertex sets, with a host edge between branch sets for every Petersen edge. Unused vertices and edges implement vertex/edge deletion, and contracting each branch set gives the Petersen minor.",
+    "Represented a nowhere-zero 4-flow by an orientation of each actual edge, integer values with absolute value 1, 2, or 3, and Kirchhoff conservation at every actual vertex. Flow data is indexed by the embedded edge subtype `E(G)`, ensuring edgeless graphs are vacuous even when ambient types contain unused elements.",
+    "Allowed loops because they are irrelevant: they are non-bridges, cannot connect distinct minor branch sets, and contribute equally to incoming and outgoing flow sums.",
+    "Used the explicit standard 10-vertex, 15-edge presentation of the Petersen graph (outer pentagon, spokes, inner pentagram)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`WrittenOnTheWallII.Test.PetersenGraph` exists in an unrelated problem/test module; importing that problem module would create an inappropriate dependency, and Mathlib has no canonical Petersen graph definition.",
+     "name": "petersenGraph",
+     "why_needed": "A concrete Petersen graph is required to state exclusion of its minor."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Reachable` and `SimpleGraph.IsBridge` only apply to simple graphs and collapse parallel edges; the multigraph `Graph` API currently has incidence/adjacency basics but no walks or edge deletion.",
+     "name": "ReachableWithout",
+     "why_needed": "Bridge detection for Mathlib's multigraph `Graph` requires reachability after deleting one specified edge."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.IsBridgeless` in `FormalConjecturesForMathlib.Combinatorics.SimpleGraph.Cycle` cannot faithfully model parallel edges.",
+     "name": "IsBridgeless",
+     "why_needed": "The conjecture quantifies over bridgeless multigraphs, and no such predicate exists for Mathlib's `Graph`."
+    },
+    {
+     "closest_existing_considered": "Mathlib has connectivity for `SimpleGraph`, but the current multigraph `Graph` API has no connectivity notion.",
+     "name": "IsConnectedBranchSet",
+     "why_needed": "The branch-set formulation of graph minors needs nonempty connected subsets of a Mathlib multigraph."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Matroid.IsMinor` concerns matroids, not graph minors. The standard equivalent connected branch-set characterization was used.",
+     "name": "HasPetersenMinor",
+     "why_needed": "Neither Mathlib nor the repository provides graph minors for multigraphs; the conjecture specifically requires a Petersen minor rather than a subgraph."
+    },
+    {
+     "closest_existing_considered": "Mathlib's unrelated dynamical `Flow` API does not express graph flows; the definition directly encodes orientation, values in `±1, ±2, ±3`, and Kirchhoff's law.",
+     "name": "HasNowhereZeroFourFlow",
+     "why_needed": "No graph-theoretic nowhere-zero flow definition exists in Mathlib or `FormalConjecturesForMathlib`."
+    }
+   ],
+   "per_slot": {
+    "petersen": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "petersen": "/--\n**Tutte's four-flow conjecture.** Every finite Petersen-minor-free bridgeless multigraph has a\nnowhere-zero $4$-flow. Parallel edges are retained; loops are harmless in the bridge, minor, and\nflow conditions. In particular, an edgeless graph has the empty flow.\n-/\n@[category research open, AMS 5]\ntheorem petersen {V E : Type*} [Fintype V] [Fintype E] (G : Graph V E)\n    (hbridgeless : IsBridgeless G) (hminor : ¬ HasPetersenMinor G) :\n    HasNowhereZeroFourFlow G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tutte's 4-flow conjecture\n\nEvery bridgeless graph with no Petersen graph minor has a nowhere-zero $4$-flow.\n\nThe conjecture is due to Tutte. The cubic case is equivalent to the snark theorem of\nRobertson, Sanders, Seymour and Thomas. The general case is open.\n\n*References:*\n- [Wikipedia, Petersen graph](https://en.wikipedia.org/wiki/Petersen_graph)\n- [Wikipedia, Nowhere-zero flow](https://en.wikipedia.org/wiki/Nowhere-zero_flow)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Tu66] Tutte, W. T., *On the algebraic theory of graph colorings*.\n  J. Combinatorial Theory 1 (1966), 15--50.\n-/\n\nopen Finset SimpleGraph\n\nnamespace Petersen\n\nvariable {V W : Type*}\n\n/-- The Petersen graph, realised as the Kneser graph $KG(5, 2)$: its vertices are the\n$2$-element subsets of a $5$-element set, and two vertices are adjacent when the corresponding\nsubsets are disjoint. -/\ndef petersenGraph : SimpleGraph {s : Finset (Fin 5) // #s = 2} :=\n  SimpleGraph.fromRel fun s t => Disjoint s.1 t.1\n\ninstance : DecidableRel petersenGraph.Adj := by unfold petersenGraph; infer_instance\n\n/-- The Petersen graph has $10$ vertices. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_vertices : Fintype.card {s : Finset (Fin 5) // #s = 2} = 10 := by\n  decide\n\n/-- The Petersen graph is cubic. -/\n@[category test, AMS 5]\ntheorem petersenGraph_isRegularOfDegree_three : petersenGraph.IsRegularOfDegree 3 := by\n  unfold IsRegularOfDegree\n  decide\n\n/-- The Petersen graph has $15$ edges. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_edgeFinset : #petersenGraph.edgeFinset = 15 := by\n  decide\n\n/-- `IsMinor H G` means that `H` is a minor of `G`, i.e. a graph isomorphic to `H` can be obtained\nfrom `G` by deleting vertices, deleting edges and contracting edges. Equivalently, as stated here,\nthere are pairwise disjoint *branch sets* `B w ⊆ V` (`w` a vertex of `H`), each inducing a\nconnected (in particular nonempty) subgraph of `G`, such that every edge `w w'` of `H` is realised\nby an edge of `G` between `B w` and `B w'`. -/\ndef IsMinor (H : SimpleGraph W) (G : SimpleGraph V) : Prop :=\n  ∃ B : W → Set V, (Pairwise fun w w' => Disjoint (B w) (B w')) ∧\n    (∀ w, (G.induce (B w)).Connected) ∧\n    ∀ w w', H.Adj w w' → ∃ u ∈ B w, ∃ v ∈ B w', G.Adj u v\n\n/-- A subgraph of `G` on the same vertex set is a minor of `G`, using singleton branch sets. -/\n@[category API, AMS 5]\ntheorem IsMinor.of_le {H G : SimpleGraph V} (h : H ≤ G) : IsMinor H G := by\n  refine ⟨fun v => {v}, fun v w hvw => Set.disjoint_singleton.mpr hvw, fun v => ?_,\n    fun v w hvw => ⟨v, rfl, w, rfl, h hvw⟩⟩\n  exact Connected.of_subsingleton\n\n/-- `HasNowhereZeroFlow G k` means that `G` has a nowhere-zero $k$-flow: an assignment of an\ninteger `f d` with $0 < |f(d)| < k$ to every dart `d` of `G`, antisymmetric in the sense that\nreversing a dart negates its value, such that Kirchhoff's law holds at every vertex: the values\nof the darts leaving the vertex sum to zero. Reading the signs of `f` as an orientation of the\nedges of `G`, this is exactly an orientation of `G` together with weights in\n$\\{1, \\dots, k - 1\\}$ on the edges such that, at every vertex, the total incoming weight equals\nthe total outgoing weight. -/\ndef HasNowhereZeroFlow [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj]\n    (k : ℕ) : Prop :=\n  ∃ f : G.Dart → ℤ, (∀ d, f d.symm = -f d) ∧ (∀ d, f d ≠ 0) ∧ (∀ d, |f d| < k) ∧\n    ∀ v, ∑ d : G.Dart with d.fst = v, f d = 0\n\n/-- The edgeless graph has a nowhere-zero $k$-flow for every $k$, vacuously. -/\n@[category API, AMS 5]\ntheorem hasNowhereZeroFlow_bot [Fintype V] [DecidableEq V] (k : ℕ) :\n    HasNowhereZeroFlow (⊥ : SimpleGraph V) k :=\n  ⟨fun d => d.adj.elim, fun d => d.adj.elim, fun d => d.adj.elim, fun d => d.adj.elim,\n    fun _ => Finset.sum_eq_zero fun d _ => d.adj.elim⟩\n\n/-- A nowhere-zero $k$-flow is a nowhere-zero $k'$-flow for every $k' \\geq k$. -/\n@[category API, AMS 5]\ntheorem HasNowhereZeroFlow.mono [Fintype V] [DecidableEq V] {G : SimpleGraph V}\n    [DecidableRel G.Adj] {k k' : ℕ} (hk : k ≤ k') (h : HasNowhereZeroFlow G k) :\n    HasNowhereZeroFlow G k' :=\n  let ⟨f, hsymm, hne, hlt, hsum⟩ := h\n  ⟨f, hsymm, hne, fun d => (hlt d).trans_le (by exact_mod_cast hk), hsum⟩\n\n/-- **Tutte's 4-flow conjecture.** Every bridgeless graph with no Petersen graph minor has a\nnowhere-zero $4$-flow.\n\nThe conjecture is usually stated for finite multigraphs. It is stated here for finite simple\ngraphs. This is equivalent: removing loops and subdividing edges preserves bridgelessness,\nthe absence of a Petersen minor, and the existence of a nowhere-zero $4$-flow. -/\n@[category research open, AMS 5]\ntheorem petersen [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hG : G.IsBridgeless) (hP : ¬ IsMinor petersenGraph G) : HasNowhereZeroFlow G 4 := by\n  sorry\n\nend Petersen\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single slot matches the source entry; the notes' requirements (finite bridgeless graphs, minors via deletion/contraction not subgraphs, orientation with weights in {±1,±2,±3} satisfying Kirchhoff, edgeless graphs vacuous) are all met. The only deviation from the notes' 'conventionally multigraphs' remark is the use of simple graphs, which is provably equivalent (see modeling decisions).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite SimpleGraphs rather than multigraphs (Mathlib's `Graph α β` multigraph type has essentially no API: no connectivity, no minors, no flows). This is mathematically equivalent to the multigraph statement: loops never are bridges, never matter for Petersen minors, and can carry flow value 1; and subdividing every edge of a loopless multigraph gives a simple graph that is bridgeless iff the original is, has a nowhere-zero 4-flow iff the original does (a degree-2 vertex forces equal values on its two darts), and has a Petersen minor iff the original does (Petersen is 3-regular, so a subdivision vertex can never be a branch set on its own and can be absorbed into a neighbouring branch set). This is recorded briefly in the theorem docstring.",
+    "Minor relation `IsMinor H G` is formalized via the standard branch-set model: pairwise disjoint vertex sets `B w` (w a vertex of H), each inducing a connected (hence nonempty) subgraph of G, with an edge of G between `B w` and `B w'` for every edge `w w'` of H. For finite simple graphs this is equivalent to obtaining a graph isomorphic to H by vertex deletions, edge deletions and edge contractions (Diestel §1.7); it is not the subgraph relation.",
+    "Nowhere-zero k-flow is the literal integer definition from Wikipedia's 'Nowhere-zero flow' article: `f : G.Dart → ℤ`, `f d.symm = -f d`, `f d ≠ 0`, `|f d| < k`, and for every vertex v the sum of f over darts with first coordinate v is 0. The sign of f encodes the orientation, so this is exactly an orientation with edge weights in {1,…,k-1} satisfying Kirchhoff's law; by Tutte's theorem it is also equivalent to the ℤ/4 or ℤ₂×ℤ₂ versions, but the integer version was chosen to match the statement literally.",
+    "The Petersen graph is defined as the Kneser graph KG(5,2) (vertices = 2-subsets of Fin 5, adjacent iff disjoint), via `SimpleGraph.fromRel`, as in the Wikipedia article's 'Constructions' section; `decide` unit tests confirm 10 vertices, 3-regularity and 15 edges.",
+    "Typeclass assumptions `[Fintype V] [DecidableEq V] [DecidableRel G.Adj]` are used only to form the finite sum in Kirchhoff's law; they do not restrict the class of graphs.",
+    "Bridgelessness uses the existing `SimpleGraph.IsBridgeless` from FormalConjecturesForMathlib (no edge is a bridge); connectedness of G is not assumed, matching the source, and the edgeless/empty graphs satisfy the conclusion vacuously (proved as `hasNowhereZeroFlow_bot`)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "WrittenOnTheWallII.PetersenGraph (local abbrev in a test file, not a library definition); SimpleGraph.fromEdgeSet on Fin 10 as an alternative encoding.",
+     "name": "Petersen.petersenGraph",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines the Petersen graph (only a test file WrittenOnTheWallII/Test.lean has a local abbrev not importable here). Defined as the Kneser graph KG(5,2)."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Copy / SimpleGraph.Subgraph / SimpleGraph embeddings (these are subgraph notions, explicitly not acceptable per the decomposition notes); Matroid.IsMinor (wrong structure).",
+     "name": "Petersen.IsMinor",
+     "why_needed": "Mathlib has no graph-minor relation for SimpleGraph (only Matroid.IsMinor). Branch-set formulation of the minor relation (vertex/edge deletion and edge contraction)."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Dart / Dart.symm (used as the building blocks); Digraph orientations plus Sym2-indexed weights (rejected as less convenient and equivalent).",
+     "name": "Petersen.HasNowhereZeroFlow",
+     "why_needed": "Mathlib has no notion of (nowhere-zero) flows or circulations on graphs. Defined as an antisymmetric integer dart function with 0 < |f| < k satisfying Kirchhoff's law."
+    }
+   ],
+   "per_slot": {
+    "petersen": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `Petersen.petersen`: for every finite simple graph G (Fintype V, DecidableEq V, DecidableRel G.Adj), if G.IsBridgeless (existing repo definition) and the Petersen graph is not a minor of G (bespoke `IsMinor`, branch-set formulation of deletion/contraction minors), then G has a nowhere-zero 4-flow (bespoke `HasNowhereZeroFlow G 4`: antisymmetric integer dart function with 0 < |f| < 4 satisfying Kirchhoff's law at every vertex). Mathlib has no minor relation, no nowhere-zero flows and no Petersen graph for SimpleGraph, so these three had to be defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "petersen": "/-- **Tutte's 4-flow conjecture.** Every bridgeless graph with no Petersen graph minor has a\nnowhere-zero $4$-flow.\n\nThe conjecture is usually stated for finite multigraphs. It is stated here for finite simple\ngraphs. This is equivalent: removing loops and subdividing edges preserves bridgelessness,\nthe absence of a Petersen minor, and the existence of a nowhere-zero $4$-flow. -/\n@[category research open, AMS 5]\ntheorem petersen [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hG : G.IsBridgeless) (hP : ¬ IsMinor petersenGraph G) : HasNowhereZeroFlow G 4 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tutte's four-flow conjecture\n\n*References:*\n- [Wikipedia, Petersen graph](https://en.wikipedia.org/wiki/Petersen_graph)\n- [Wikipedia, Tutte conjectures](https://en.wikipedia.org/wiki/Tutte_conjectures)\n-/\n\nnamespace Petersen\n\n/-- Two vertices are reachable within `S` in `G` without using an edge in `D`. -/\ndef ReachableWithinAvoiding {V E : Type*} (G : Graph V E) (S : Set V) (D : Set E)\n    (x y : V) : Prop :=\n  Relation.ReflTransGen\n    (fun u v ↦ u ∈ S ∧ v ∈ S ∧ ∃ e, e ∈ G.edgeSet ∧ e ∉ D ∧ G.IsLink e u v) x y\n\n/-- A nonempty set of vertices which is connected by edges of `G`. -/\ndef IsConnectedSet {V E : Type*} (G : Graph V E) (S : Set V) : Prop :=\n  S.Nonempty ∧ S ⊆ G.vertexSet ∧\n    ∀ ⦃x⦄, x ∈ S → ∀ ⦃y⦄, y ∈ S → ReachableWithinAvoiding G S ∅ x y\n\n/-- The vertices in the Kneser-graph presentation of the Petersen graph. -/\nabbrev PetersenVertex := {S : Finset (Fin 5) // S.card = 2}\n\n/--\n`G` has the Petersen graph as a minor, expressed by the standard branch-set characterization:\nthere are pairwise disjoint nonempty connected branch sets for the two-element subsets of a\nfive-element set, with an edge between branch sets whose indices are disjoint.\n-/\ndef HasPetersenMinor {V E : Type*} (G : Graph V E) : Prop :=\n  ∃ branch : PetersenVertex → Set V,\n    (∀ i, IsConnectedSet G (branch i)) ∧\n    (∀ ⦃i j⦄, i ≠ j → Disjoint (branch i) (branch j)) ∧\n    ∀ ⦃i j : PetersenVertex⦄, Disjoint (i : Finset (Fin 5)) (j : Finset (Fin 5)) →\n      ∃ e ∈ G.edgeSet, ∃ x ∈ branch i, ∃ y ∈ branch j, G.IsLink e x y\n\n/-- An edge is a bridge if deleting it disconnects its two ends. -/\ndef IsBridge {V E : Type*} (G : Graph V E) (e : E) : Prop :=\n  e ∈ G.edgeSet ∧ ∃ x y, G.IsLink e x y ∧\n    ¬ ReachableWithinAvoiding G G.vertexSet {e} x y\n\n/-- A multigraph is bridgeless if none of its edges is a bridge. -/\ndef IsBridgeless {V E : Type*} (G : Graph V E) : Prop :=\n  ∀ e ∈ G.edgeSet, ¬ IsBridge G e\n\n/-- The net boundary at `v` of a flow, relative to the chosen orientation. -/\nnoncomputable def flowBoundary {V E : Type*} [Fintype E] (G : Graph V E)\n    (tail head : G.edgeSet → V) (f : G.edgeSet → ZMod 4) (v : V) : ZMod 4 := by\n  classical\n  exact (∑ e : G.edgeSet, if tail e = v then f e else 0) -\n    ∑ e : G.edgeSet, if head e = v then f e else 0\n\n/--\n`G` has a nowhere-zero four-flow if its actual edges can be oriented and assigned nonzero values\nin `ZMod 4` so that the net boundary is zero at every actual vertex.\n-/\ndef HasNowhereZeroFourFlow {V E : Type*} [Fintype E] (G : Graph V E) : Prop :=\n  ∃ (tail head : G.edgeSet → V) (f : G.edgeSet → ZMod 4),\n    (∀ e, G.IsLink e.1 (tail e) (head e)) ∧\n    (∀ e, f e ≠ 0) ∧\n    ∀ v ∈ G.vertexSet, flowBoundary G tail head f v = 0\n\n/--\n**Tutte's four-flow conjecture:** Every finite bridgeless multigraph with no Petersen graph minor\nhas a nowhere-zero $4$-flow. Parallel edges are allowed; loops do not affect the condition.\n-/\n@[category research open, AMS 5]\ntheorem petersen {V E : Type*} [Fintype V] [Fintype E] (G : Graph V E)\n    (hbridgeless : IsBridgeless G) (hminor : ¬ HasPetersenMinor G) :\n    HasNowhereZeroFourFlow G := by\n  sorry\n\nend Petersen\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Mathlib's `Graph V E`, whose distinct edge identities support parallel edges and whose incidence relation supports loops; finite ambient vertex and edge types make the represented graph finite.",
+    "Formalized Petersen-minor containment via the standard branch-set characterization: ten pairwise disjoint nonempty connected vertex sets indexed by the 2-subsets of `Fin 5`, with crossing edges for disjoint indices. This is equivalent to obtaining the Petersen graph by vertex deletion, edge deletion, and edge contraction.",
+    "Formalized a nowhere-zero 4-flow as a chosen orientation of every actual edge together with nonzero values in `ZMod 4`, satisfying zero boundary at every actual vertex. This uses the standard group-valued formulation, equivalent to the integer formulation by Tutte's group-independence theorem.",
+    "Defined bridges by failure of reachability between an edge's endpoints after deleting that edge. This works componentwise for disconnected graphs, treats parallel edges correctly, and makes loops non-bridges.",
+    "Quantified flow data over the subtype of actual edges rather than the ambient edge type, ensuring graphs with no actual edges satisfy the flow condition vacuously even when their ambient types contain unused elements."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.Reachable` and `SimpleGraph.IsBridge`, which apply only to simple graphs; Mathlib's multigraph `Graph` currently has only basic incidence/adjacency API.",
+     "name": "Petersen.ReachableWithinAvoiding",
+     "why_needed": "Expresses paths in a multigraph restricted to an allowed vertex set while omitting deleted edges; needed both for connected minor branch sets and bridges."
+    },
+    {
+     "closest_existing_considered": "Simple-graph connected subgraph/reachability predicates, which do not preserve parallel-edge multigraph semantics and are not defined for `Graph`.",
+     "name": "Petersen.IsConnectedSet",
+     "why_needed": "States that a nonempty subset of actual multigraph vertices is internally connected, as required by the branch-set characterization of a minor."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjecturesForMathlib for Petersen and Kneser graph constants; none exists.",
+     "name": "Petersen.PetersenVertex",
+     "why_needed": "Provides the ten vertices of the Petersen graph through its Kneser `KG(5,2)` presentation."
+    },
+    {
+     "closest_existing_considered": "Searched for graph minor, contraction, branch-set, and `IsMinor` APIs. Only matroid minors exist; the `Graph.Basic` documentation notes graph minors as future API.",
+     "name": "Petersen.HasPetersenMinor",
+     "why_needed": "Mathlib's multigraph `Graph` has no implemented graph-minor relation; the branch-set predicate faithfully captures Petersen minors."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.IsBridge`, which identifies edges only by endpoint pairs and therefore cannot represent parallel multigraph edges.",
+     "name": "Petersen.IsBridge",
+     "why_needed": "Defines bridges for multigraph edges, including correct behavior for loops and parallel edges."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.IsBridgeless` in FormalConjecturesForMathlib, which is restricted to simple graphs.",
+     "name": "Petersen.IsBridgeless",
+     "why_needed": "Packages the assertion that no actual multigraph edge is a bridge."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjecturesForMathlib for graph flow, nowhere-zero flow, and Kirchhoff-law definitions; none exists.",
+     "name": "Petersen.flowBoundary",
+     "why_needed": "Defines the finite incoming/outgoing difference of a `ZMod 4` edge weighting at a vertex."
+    },
+    {
+     "closest_existing_considered": "No graph-flow primitive was found; Mathlib's digraph orientation API concerns simple graphs and does not define edge-valued flows or support parallel edges.",
+     "name": "Petersen.HasNowhereZeroFourFlow",
+     "why_needed": "Encodes an orientation and nowhere-zero `ZMod 4` weighting satisfying Kirchhoff's law at every actual vertex."
+    }
+   ],
+   "per_slot": {
+    "petersen": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "petersen": "/--\n**Tutte's four-flow conjecture:** Every finite bridgeless multigraph with no Petersen graph minor\nhas a nowhere-zero $4$-flow. Parallel edges are allowed; loops do not affect the condition.\n-/\n@[category research open, AMS 5]\ntheorem petersen {V E : Type*} [Fintype V] [Fintype E] (G : Graph V E)\n    (hbridgeless : IsBridgeless G) (hminor : ¬ HasPetersenMinor G) :\n    HasNowhereZeroFourFlow G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tutte's 4-flow conjecture\n\nEvery Petersen-minor-free bridgeless graph has a nowhere-zero 4-flow.\n\nThe conjecture is stated for finite simple graphs. This is no loss of generality: subdividing every\nedge of a multigraph gives a simple graph, and subdivision preserves being bridgeless, having a\nPetersen graph minor, and having a nowhere-zero 4-flow.\n\n*References:*\n- [Wikipedia, Petersen graph](https://en.wikipedia.org/wiki/Petersen_graph)\n- [Wikipedia, Nowhere-zero flow](https://en.wikipedia.org/wiki/Nowhere-zero_flow)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Di17] Diestel, R., *Graph Theory*, 5th edition, Springer (2017), Sections 1.7 and 6.1-6.6.\n-/\n\nopen SimpleGraph Finset\n\nnamespace Petersen\n\n/-- The Petersen graph, realised as the Kneser graph $KG(5,2)$: the vertices are the\n$2$-element subsets of a $5$-element set, and two of them are adjacent exactly when they are\ndisjoint. -/\ndef petersenGraph : SimpleGraph {s : Finset (Fin 5) // #s = 2} where\n  Adj s t := Disjoint s.1 t.1\n  symm _ _ h := h.symm\n  loopless s h := by\n    have := s.2\n    simp_all\n\ninstance : DecidableRel petersenGraph.Adj := fun s t =>\n  inferInstanceAs (Decidable (Disjoint s.1 t.1))\n\nvariable {V W : Type*}\n\n/-- `IsMinor H G` means that the graph `H` is a minor of the graph `G`, i.e. that `H` can be\nobtained (up to isomorphism) from `G` by deleting vertices, deleting edges and contracting edges.\n\nThis is formalised through the standard *minor model* (or *branch set*) characterisation: there is a\nfamily of pairwise disjoint, connected (in particular nonempty) vertex sets `B w ⊆ V(G)` indexed\nby the vertices `w` of `H`, such that for every edge `w₁w₂` of `H` some edge of `G` joins `B w₁`\nto `B w₂`. Contracting each `B w` to a single vertex and deleting the remaining vertices and\nthe unused edges produces `H`; conversely any such sequence of operations yields such a family\n(see [Di17, Section 1.7]). -/\ndef IsMinor (H : SimpleGraph W) (G : SimpleGraph V) : Prop :=\n  ∃ B : W → Set V,\n    (∀ w, (G.induce (B w)).Connected) ∧\n    (Pairwise fun w₁ w₂ => Disjoint (B w₁) (B w₂)) ∧\n    ∀ w₁ w₂, H.Adj w₁ w₂ → ∃ v₁ ∈ B w₁, ∃ v₂ ∈ B w₂, G.Adj v₁ v₂\n\n/-- `IsNowhereZeroFlow G k f` means that `f` is a nowhere-zero `k`-flow on the finite graph `G`,\nin the formulation of [Di17, Chapter 6]: `f` assigns an integer to every ordered pair of\nvertices, is antisymmetric, is nonzero exactly on the pairs `(u, v)` with `uv` an edge of `G`,\ntakes values of absolute value less than `k`, and satisfies Kirchhoff's law at every vertex.\n\nEquivalently, there is an orientation of the edges of `G` together with an assignment of a value in\n$\\{1, \\dots, k - 1\\}$ to every edge such that, at every vertex, the sum of the values on the\nincoming edges equals the sum of the values on the outgoing edges: orient `uv` from `u` to `v`\nwhen `f u v > 0` and give it the value `f u v`. -/\nstructure IsNowhereZeroFlow [Fintype V] (G : SimpleGraph V) (k : ℕ) (f : V → V → ℤ) : Prop where\n  /-- Reversing an oriented edge negates the flow through it. -/\n  antisymm : ∀ u v, f v u = -f u v\n  /-- The flow is nonzero precisely on the edges of `G`. -/\n  ne_zero_iff : ∀ u v, f u v ≠ 0 ↔ G.Adj u v\n  /-- The flow through every edge has absolute value less than `k`. -/\n  abs_lt : ∀ u v, G.Adj u v → |f u v| < k\n  /-- Kirchhoff's law: the net flow out of every vertex is zero. -/\n  kirchhoff : ∀ v, ∑ w, f v w = 0\n\n/--\n**Tutte's 4-flow conjecture.** Every finite bridgeless graph that does not contain the Petersen\ngraph as a minor has a nowhere-zero $4$-flow.\n\nEdgeless graphs (including the graph with no vertices) are bridgeless and Petersen-minor-free, and\nthe zero function is a nowhere-zero $4$-flow on them, so the statement is consistent with these\ndegenerate cases.\n-/\n@[category research open, AMS 5]\ntheorem petersen [Fintype V] (G : SimpleGraph V) (hG : G.IsBridgeless)\n    (hP : ¬ IsMinor petersenGraph G) :\n    ∃ f : V → V → ℤ, IsNowhereZeroFlow G 4 f := by\n  sorry\n\n/-- The Petersen graph has `10` vertices. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_vertices : Fintype.card {s : Finset (Fin 5) // #s = 2} = 10 := by\n  rw [Fintype.card_finset_len]\n  rfl\n\n/-- The Petersen graph is cubic. -/\n@[category test, AMS 5]\ntheorem petersenGraph_isRegularOfDegree_three : petersenGraph.IsRegularOfDegree 3 := by\n  unfold IsRegularOfDegree\n  decide\n\n/-- Every graph is a minor of itself. -/\n@[category API, AMS 5]\ntheorem IsMinor.refl (G : SimpleGraph V) : IsMinor G G := by\n  refine ⟨fun v => {v}, fun v => ?_, fun v w hvw => Set.disjoint_singleton.mpr hvw,\n    fun v w hvw => ⟨v, rfl, w, rfl, hvw⟩⟩\n  rw [induce_singleton_eq_top]\n  exact connected_top\n\n/-- The zero function is a nowhere-zero `k`-flow on an edgeless graph, for every `k`. -/\n@[category test, AMS 5]\ntheorem isNowhereZeroFlow_bot [Fintype V] (k : ℕ) : IsNowhereZeroFlow (⊥ : SimpleGraph V) k 0 where\n  antisymm _ _ := by simp\n  ne_zero_iff _ _ := by simp\n  abs_lt _ _ h := by simp at h\n  kirchhoff _ := by simp\n\n/-- A single edge is a bridge, and a graph with a bridge has no nowhere-zero `k`-flow. -/\n@[category test, AMS 5]\ntheorem not_isNowhereZeroFlow_top_fin_two (k : ℕ) (f : Fin 2 → Fin 2 → ℤ) :\n    ¬ IsNowhereZeroFlow (⊤ : SimpleGraph (Fin 2)) k f := by\n  intro hf\n  have h00 : f 0 0 = 0 := by simpa using hf.ne_zero_iff 0 0\n  have h01 : f 0 1 ≠ 0 := (hf.ne_zero_iff 0 1).mpr (by decide)\n  have := hf.kirchhoff 0\n  rw [Fin.sum_univ_two, h00, zero_add] at this\n  exact h01 this\n\nend Petersen\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is correct: the entry is one universally quantified Prop. The table's note that the graphs are 'conventionally multigraphs' was handled by stating the (equivalent) simple-graph version, following repository precedent; see modeling_decisions.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple graphs (`SimpleGraph V` with `[Fintype V]`), following the repository precedent for bridgeless-graph conjectures (Arxiv/2607.06396/AlonTarsi.lean). The source's convention is multigraphs; this loses no generality because subdividing every edge of a multigraph yields a simple graph, and subdivision preserves bridgelessness, the existence of a Petersen minor (Petersen has maximum degree 3, so minor = topological minor, and a subdivision of Petersen in the subdivided graph un-subdivides to one in the original), and the existence of a nowhere-zero 4-flow. This is noted in the module docstring.",
+    "`IsMinor H G` is formalised by the standard minor-model / branch-set characterisation (Diestel, Section 1.7): pairwise disjoint connected (hence nonempty) vertex sets `B w ⊆ V(G)` indexed by vertices of `H`, with an edge of `G` between `B w₁` and `B w₂` for every edge `w₁w₂` of `H`. For a simple `H` this is exactly 'H is obtainable from G by vertex deletions, edge deletions and edge contractions' (injectivity of the edge map is automatic from disjointness of branch sets), so it is a genuine minor notion and not a subgraph notion, as the decomposition table requires. Connectivity of a branch set is connectivity of the induced subgraph `G.induce (B w)`.",
+    "A nowhere-zero k-flow is formalised as in Diestel (Chapter 6): an antisymmetric `f : V → V → ℤ`, nonzero exactly on adjacent ordered pairs (`f u v ≠ 0 ↔ G.Adj u v`, which also forces `f` to vanish off edges so Kirchhoff sums only range over edges), with `|f u v| < k` on edges, and `∑ w, f v w = 0` at every vertex. This is equivalent to the orientation-plus-weights formulation (orient `uv` from `u` to `v` when `f u v > 0`); with `k = 4` the allowed edge values are exactly ±1, ±2, ±3. The `|f| < k` bound is imposed only on edges, matching Diestel's `0 < |f(e)| < k` on oriented edges and making the edgeless test hold for every `k`.",
+    "The Petersen graph is defined as the Kneser graph KG(5,2) (2-element subsets of `Fin 5`, adjacent iff disjoint), exactly as described in the Wikipedia article; tests check it has 10 vertices and is 3-regular. The conjecture is isomorphism-invariant so the choice of concrete vertex type is immaterial.",
+    "No connectivity hypothesis is imposed (bridgeless graphs may be disconnected); the conjecture is about bridgeless graphs in general and flows are component-wise, so this is the faithful reading. Edgeless graphs (including the empty vertex type) satisfy the conclusion with the zero flow, as noted in the decomposition table; a test records this, and another test records that a single edge (a bridge) admits no nowhere-zero k-flow, showing the bridgeless hypothesis is not vacuous.",
+    "Dot-notation (`G.IsMinor`, `G.IsNowhereZeroFlow`) is not used because the definitions live in the `Petersen` namespace rather than `SimpleGraph`, as the task fixes the namespace to `Petersen`; the definitions are applied as ordinary functions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`WrittenOnTheWallII.Test.PetersenGraph` (explicit 15-edge list on `Fin 10`, in a test file); Mathlib has no Kneser graphs or Petersen graph (grepped `Petersen`, `kneser` in Mathlib/Combinatorics/SimpleGraph).",
+     "name": "Petersen.petersenGraph",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines the Petersen graph (the only existing one is a test-local `abbrev` in FormalConjectures/WrittenOnTheWallII/Test.lean, which problem files should not import). Defined as the Kneser graph KG(5,2) on 2-element subsets of `Fin 5`."
+    },
+    {
+     "closest_existing_considered": "`Matroid.IsMinor` / `Matroid.contract` (matroids, not graphs); `SimpleGraph.Subgraph`, `SimpleGraph.IsContained`/subgraph isomorphism in FormalConjecturesForMathlib (subgraph notions, explicitly ruled out by the decomposition table).",
+     "name": "Petersen.IsMinor",
+     "why_needed": "Mathlib has no graph-minor relation for `SimpleGraph` (only `Matroid` minors and no contraction operation for graphs; `Combinatorics/Graph/Basic.lean` multigraphs have only basic incidence API). The branch-set model characterisation is the standard definition-level equivalent and avoids formalising edge contraction via quotients."
+    },
+    {
+     "closest_existing_considered": "Nothing comparable: Mathlib's `Combinatorics/SimpleGraph` has orientations only implicitly via `Digraph`/`Quiver`, and no Kirchhoff-type flow definitions.",
+     "name": "Petersen.IsNowhereZeroFlow",
+     "why_needed": "No notion of (nowhere-zero) flow / circulation on graphs exists in Mathlib or the repository (grepped `flow`, `NowhereZero`, `circulation`). Defined à la Diestel as a Prop-structure with fields antisymm, ne_zero_iff, abs_lt, kirchhoff."
+    }
+   ],
+   "per_slot": {
+    "petersen": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `Petersen.petersen`: for every finite simple graph `G` that is bridgeless (`G.IsBridgeless`, from FormalConjecturesForMathlib, built on Mathlib's `SimpleGraph.IsBridge`) and has no Petersen minor (`¬ IsMinor petersenGraph G`), there exists a nowhere-zero 4-flow (`∃ f : V → V → ℤ, IsNowhereZeroFlow G 4 f`). Mathlib has no graph-minor notion, no Petersen graph and no nowhere-zero flows, so three bespoke definitions were added in the problem file, each with tests."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "petersen": "/--\n**Tutte's 4-flow conjecture.** Every finite bridgeless graph that does not contain the Petersen\ngraph as a minor has a nowhere-zero $4$-flow.\n\nEdgeless graphs (including the graph with no vertices) are bridgeless and Petersen-minor-free, and\nthe zero function is a nowhere-zero $4$-flow on them, so the statement is consistent with these\ndegenerate cases.\n-/\n@[category research open, AMS 5]\ntheorem petersen [Fintype V] (G : SimpleGraph V) (hG : G.IsBridgeless)\n    (hP : ¬ IsMinor petersenGraph G) :\n    ∃ f : V → V → ℤ, IsNowhereZeroFlow G 4 f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Petersen graph: Tutte's 4-flow conjecture\n\nTutte's 4-flow conjecture states that every Petersen-minor-free bridgeless graph has a\nnowhere-zero 4-flow. Here graphs are finite multigraphs (loops and parallel edges are allowed),\nand \"Petersen-minor-free\" means that the Petersen graph is not a minor of the graph.\n\n*References:*\n- [Wikipedia, Petersen graph](https://en.wikipedia.org/wiki/Petersen_graph)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Nowhere-zero flow](https://en.wikipedia.org/wiki/Nowhere-zero_flow)\n- [Tu66] Tutte, W. T. *On the algebraic theory of graph colorings*.\n  J. Combinatorial Theory 1 (1966), 15–50.\n- [Zh97] Zhang, Cun-Quan. *Integer Flows and Cycle Covers of Graphs*. CRC Press (1997).\n-/\n\nopen scoped Graph\n\nnamespace Petersen\n\nvariable {α β : Type*}\n\n/-- The Petersen graph, realised as the Kneser graph `KG(5,2)`: the vertices are the 2-element\nsubsets of a 5-element set, and two vertices are adjacent when the subsets are disjoint. -/\ndef petersenGraph : SimpleGraph {s : Finset (Fin 5) // s.card = 2} where\n  Adj s t := Disjoint s.1 t.1\n  symm _ _ h := h.symm\n  loopless s h := by\n    have hs := s.2\n    simp only [disjoint_self, Finset.bot_eq_empty] at h\n    simp [h] at hs\n\ninstance : DecidableRel petersenGraph.Adj :=\n  fun s t => inferInstanceAs (Decidable (Disjoint s.1 t.1))\n\n/-- The Petersen graph has 10 vertices. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_vertices : Fintype.card {s : Finset (Fin 5) // s.card = 2} = 10 := by\n  decide\n\n/-- The Petersen graph has 15 edges. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_edges : petersenGraph.edgeFinset.card = 15 := by\n  decide\n\n/-- The Petersen graph is cubic. -/\n@[category test, AMS 5]\ntheorem petersenGraph_degree (v : {s : Finset (Fin 5) // s.card = 2}) :\n    petersenGraph.degree v = 3 := by\n  revert v\n  decide\n\n/-- An edge `e` of a multigraph `G` is a *bridge* if its ends are not joined by a walk of `G`\navoiding `e`, i.e. deleting `e` disconnects its ends. Loops, edges having a parallel edge, and\nelements of `β` that are not edges of `G` are never bridges. -/\ndef IsBridge (G : Graph α β) (e : β) : Prop :=\n  ∃ x y, G.IsLink e x y ∧ ¬ Relation.ReflTransGen (fun a b ↦ ∃ f ≠ e, G.IsLink f a b) x y\n\n/-- A multigraph is *bridgeless* if none of its edges is a bridge. -/\ndef IsBridgeless (G : Graph α β) : Prop := ∀ e, ¬ IsBridge G e\n\n/-- A finite multigraph `G` has a *nowhere-zero `k`-flow* if there are an orientation of `G`,\ngiven by tail and head maps `t h : E(G) → α` with `G.IsLink e (t e) (h e)` for every edge `e`,\nand an integer weighting `φ` of the edges with `0 < |φ e| < k`, that satisfy Kirchhoff's law at\nevery vertex `v`: the total weight of the edges with tail `v` equals the total weight of the\nedges with head `v`. (Sums are `finsum`s, which are the usual finite sums when `E(G)` is\nfinite.) -/\ndef HasNowhereZeroFlow (G : Graph α β) (k : ℕ) : Prop :=\n  ∃ (t h : E(G) → α) (φ : E(G) → ℤ),\n    (∀ e : E(G), G.IsLink e (t e) (h e)) ∧\n    (∀ e, 0 < |φ e| ∧ |φ e| < k) ∧\n    ∀ v, ∑ᶠ e ∈ {e | t e = v}, φ e = ∑ᶠ e ∈ {e | h e = v}, φ e\n\n/-- A graph with no edges has a nowhere-zero `k`-flow for every `k`. -/\n@[category test, AMS 5]\ntheorem hasNowhereZeroFlow_of_edgeSet_eq_empty (G : Graph α β) (hE : E(G) = ∅) (k : ℕ) :\n    HasNowhereZeroFlow G k := by\n  have : IsEmpty E(G) := by simp [hE]\n  exact ⟨isEmptyElim, isEmptyElim, isEmptyElim, isEmptyElim, isEmptyElim, fun v ↦ by simp⟩\n\n/-- The multigraph with two vertices joined by a single edge. -/\ndef singleEdge : Graph (Fin 2) Unit where\n  vertexSet := Set.univ\n  IsLink _ x y := x ≠ y\n  edgeSet := Set.univ\n  isLink_symm _ _ _ _ h := h.symm\n  eq_or_eq_of_isLink_of_isLink := by decide\n  edge_mem_iff_exists_isLink := by simp\n  left_mem_of_isLink := by simp\n\n/-- The edge of `singleEdge` is a bridge. -/\n@[category test, AMS 5]\ntheorem isBridge_singleEdge : IsBridge singleEdge () := by\n  refine ⟨0, 1, show (0 : Fin 2) ≠ 1 by decide, fun h ↦ ?_⟩\n  rw [Relation.reflTransGen_iff_eq fun _ ⟨_, hf, _⟩ ↦ hf rfl] at h\n  exact absurd h (by decide)\n\n/-- `singleEdge` has no nowhere-zero `k`-flow, for any `k`. -/\n@[category test, AMS 5]\ntheorem not_hasNowhereZeroFlow_singleEdge (k : ℕ) : ¬ HasNowhereZeroFlow singleEdge k := by\n  rintro ⟨t, h, φ, hlink, hnz, hK⟩\n  set e : E(singleEdge) := ⟨(), trivial⟩\n  have he : ∀ e' : E(singleEdge), e' = e := fun _ ↦ Subtype.ext rfl\n  have h1 : {e' : E(singleEdge) | t e' = t e} = Set.univ := by\n    ext e'\n    simp [he e']\n  have h2 : {e' : E(singleEdge) | h e' = t e} = ∅ := by\n    ext e'\n    simpa [he e'] using fun heq ↦ hlink e heq.symm\n  have key := hK (t e)\n  rw [h1, h2, finsum_mem_univ, finsum_mem_empty, finsum_eq_sum_of_fintype,\n    show (Finset.univ : Finset E(singleEdge)) = {e} from Finset.ext fun e' ↦ by simp [he e'],\n    Finset.sum_singleton] at key\n  simpa [key] using (hnz e).1\n\n/-- A simple graph `H` is a *minor* of the multigraph `G` if `G` contains a model of `H`:\npairwise disjoint nonempty sets `B i ⊆ V(G)` of vertices (the *branch sets*, indexed by the\nvertices `i` of `H`), each connected in `G`, such that for every edge `ij` of `H` some edge of\n`G` joins `B i` to `B j`. This is the standard characterisation of `H` being obtainable from `G`\nby deleting vertices and edges and contracting edges. -/\ndef HasMinor {ι : Type*} (G : Graph α β) (H : SimpleGraph ι) : Prop :=\n  ∃ B : ι → Set α,\n    (∀ i, B i ⊆ V(G)) ∧\n    (∀ i, (B i).Nonempty) ∧\n    Pairwise (fun i j ↦ Disjoint (B i) (B j)) ∧\n    (∀ i, ∀ x ∈ B i, ∀ y ∈ B i,\n      Relation.ReflTransGen (fun a b ↦ a ∈ B i ∧ b ∈ B i ∧ G.Adj a b) x y) ∧\n    ∀ i j, H.Adj i j → ∃ x ∈ B i, ∃ y ∈ B j, G.Adj x y\n\n/-- The complete graph on two vertices is a minor of `singleEdge`. -/\n@[category test, AMS 5]\ntheorem hasMinor_singleEdge_top : HasMinor singleEdge (⊤ : SimpleGraph (Fin 2)) := by\n  refine ⟨fun i ↦ {i}, fun _ ↦ Set.subset_univ _, fun _ ↦ Set.singleton_nonempty _,\n    fun i j hij ↦ Set.disjoint_singleton.mpr hij, ?_,\n    fun i j hij ↦ ⟨i, rfl, j, rfl, (), hij⟩⟩\n  rintro i x rfl y rfl\n  exact Relation.ReflTransGen.refl\n\n/-- **Tutte's 4-flow conjecture.** Every Petersen-minor-free bridgeless graph has a nowhere-zero\n4-flow. That is, every finite multigraph (loops and parallel edges allowed) with no bridge and\nwithout the Petersen graph as a minor admits an orientation and an edge weighting with values in\n$\\{\\pm 1, \\pm 2, \\pm 3\\}$ satisfying Kirchhoff's law at every vertex. -/\n@[category research open, AMS 5]\ntheorem petersen [Finite α] [Finite β] (G : Graph α β)\n    (hG : IsBridgeless G) (hP : ¬ HasMinor G petersenGraph) :\n    HasNowhereZeroFlow G 4 := by\n  sorry\n\nend Petersen\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot table is appropriate; the statement is a single universally quantified Prop. Minor note: the table's parenthetical that the cubic case is equivalent to the snark theorem is correct but was not formalized as a separate variant.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite multigraphs, modelled with Mathlib's `Graph α β` (loops and parallel edges allowed) and hypotheses `[Finite α] [Finite β]`; this follows the flow-theory convention noted in the decomposition table. The simple-graph special case would be equivalent by subdividing edges, but the multigraph form is the literal convention.",
+    "`petersenGraph` is defined as the Kneser graph KG(5,2) (2-subsets of Fin 5, adjacent iff disjoint), as in the Wikipedia article. Tests prove by `decide` that it has 10 vertices, 15 edges and is 3-regular.",
+    "Bridge: an edge `e` with ends `x, y` is a bridge iff `x` and `y` are not joined by a walk avoiding `e` (`Relation.ReflTransGen` over links `f ≠ e`). Loops, edges with a parallel edge and non-edges are never bridges. `IsBridgeless G := ∀ e, ¬ IsBridge G e`; connectedness of `G` is not required (standard).",
+    "Nowhere-zero k-flow: ∃ tail/head maps `t h : E(G) → α` with `G.IsLink e (t e) (h e)` (an orientation), and `φ : E(G) → ℤ` with `0 < |φ e| < k`, such that at every vertex the finsum of `φ` over edges with tail `v` equals that over edges with head `v`. Loops contribute equally to both sides. Orientation/flow are indexed by the edge subtype `E(G)` (not `β`) so that a graph with empty vertex set but nonempty ambient edge type `β` still vacuously has a flow; edgeless graphs satisfy the conclusion (proved as a test). Sums use `finsum`, exact under the `Finite β` hypothesis.",
+    "Petersen minor: `HasMinor G H` (H a simple graph) is defined via the standard model/branch-set characterisation: pairwise disjoint nonempty connected vertex sets `B i ⊆ V(G)` indexed by vertices of `H`, with an edge of `G` between `B i` and `B j` for each edge `ij` of `H`. This is equivalent to `H` being obtained from `G` by vertex/edge deletions and edge contractions (edge injectivity is automatic for simple `H` since branch sets are disjoint). It is a genuine minor notion, not a subgraph notion.",
+    "Only the general (open) conjecture is stated; no cubic-case (snark theorem) variant was added, to avoid extra bespoke degree definitions for multigraphs."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`PetersenGraph` in FormalConjectures/WrittenOnTheWallII/Test.lean (explicit edge list on Fin 10); Mathlib has no Kneser or Petersen graph.",
+     "name": "Petersen.petersenGraph",
+     "why_needed": "Neither Mathlib nor the repo has a Petersen graph (only a test-file `abbrev` in WrittenOnTheWallII/Test.lean, not importable for a problem file). Defined as the Kneser graph KG(5,2)."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.IsBridge`, `SimpleGraph.Reachable`.",
+     "name": "Petersen.IsBridge / Petersen.IsBridgeless",
+     "why_needed": "Mathlib's `SimpleGraph.IsBridge` exists only for simple graphs; the conjecture concerns multigraphs (`Graph α β`), for which Mathlib has no connectivity or bridge notion."
+    },
+    {
+     "closest_existing_considered": "Nothing comparable (searched `NowhereZero`, `flow`, `circulation`, `orientation`).",
+     "name": "Petersen.HasNowhereZeroFlow",
+     "why_needed": "No notion of orientation, circulation or nowhere-zero flow exists in Mathlib or the repo for any graph type."
+    },
+    {
+     "closest_existing_considered": "`Matroid.IsMinor` (matroids, not graphs); `SimpleGraph.Subgraph` and repo's `SubgraphIsomorphism` (subgraphs only, which the table explicitly rules out).",
+     "name": "Petersen.HasMinor",
+     "why_needed": "No graph-minor notion exists in Mathlib or the repo (only matroid minors). Defined via the standard branch-set model characterisation."
+    },
+    {
+     "closest_existing_considered": "No constructors for `Graph α β` exist in Mathlib's `Combinatorics/Graph/Basic.lean`.",
+     "name": "Petersen.singleEdge",
+     "why_needed": "A concrete two-vertex, one-edge multigraph used only for `category test` theorems validating `IsBridge`, `HasNowhereZeroFlow` and `HasMinor`."
+    }
+   ],
+   "per_slot": {
+    "petersen": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `Petersen.petersen`: for every finite multigraph `G : Graph α β` (Mathlib's multigraph type, loops and parallel edges allowed; `[Finite α] [Finite β]`), if `G` is bridgeless and does not have the Petersen graph as a minor, then `G` has a nowhere-zero 4-flow (orientation + integer edge weights with 0 < |φ e| < 4 satisfying Kirchhoff's law at every vertex). Mathlib has no bridge/minor/flow notions for multigraphs, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "petersen": "/-- **Tutte's 4-flow conjecture.** Every Petersen-minor-free bridgeless graph has a nowhere-zero\n4-flow. That is, every finite multigraph (loops and parallel edges allowed) with no bridge and\nwithout the Petersen graph as a minor admits an orientation and an edge weighting with values in\n$\\{\\pm 1, \\pm 2, \\pm 3\\}$ satisfying Kirchhoff's law at every vertex. -/\n@[category research open, AMS 5]\ntheorem petersen [Finite α] [Finite β] (G : Graph α β)\n    (hG : IsBridgeless G) (hP : ¬ HasMinor G petersenGraph) :\n    HasNowhereZeroFlow G 4 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tutte's 4-flow conjecture\n\nTutte's 4-flow conjecture states that every finite bridgeless multigraph with no Petersen graph\nminor has a nowhere-zero 4-flow.\n\n*References:*\n- [Wikipedia: Petersen graph](https://en.wikipedia.org/wiki/Petersen_graph)\n- [Wikipedia: Tutte's conjectures](https://en.wikipedia.org/wiki/Tutte%27s_conjectures)\n-/\n\nnamespace Petersen\n\nopen Graph\n\n/-- The vertices of the Petersen graph, presented as the two-element subsets of a five-element\nset. Two such vertices are adjacent exactly when they are disjoint. -/\nabbrev PetersenVertex := {s : Finset (Fin 5) // s.card = 2}\n\n/-- Two vertices are connected inside `S` if they are related by the reflexive transitive closure\nof adjacency with both endpoints restricted to `S`. -/\ndef ConnectedIn {α β : Type*} (G : Graph α β) (S : Set α) : Prop :=\n  S.Nonempty ∧ ∀ ⦃x⦄, x ∈ S → ∀ ⦃y⦄, y ∈ S →\n    Relation.ReflTransGen (fun u v ↦ u ∈ S ∧ v ∈ S ∧ G.Adj u v) x y\n\n/-- A multigraph contains the Petersen graph as a minor if it has ten pairwise disjoint,\nnonempty connected branch sets, with an edge between branch sets whenever the corresponding\nvertices of the Petersen graph are adjacent. This is the standard branch-set characterization\nof a graph minor. -/\ndef HasPetersenMinor {α β : Type*} (G : Graph α β) : Prop :=\n  ∃ branch : PetersenVertex → Set α,\n    (∀ i, branch i ⊆ V(G)) ∧\n    (∀ i, ConnectedIn G (branch i)) ∧\n    (∀ i j, i ≠ j → Disjoint (branch i) (branch j)) ∧\n    (∀ (i j : PetersenVertex), Disjoint (i : Finset (Fin 5)) (j : Finset (Fin 5)) →\n      ∃ x ∈ branch i, ∃ y ∈ branch j, G.Adj x y)\n\n/-- A multigraph is bridgeless if the endpoints of each edge remain connected after that edge is\ndeleted. Loops are therefore never bridges. -/\ndef IsBridgeless {α β : Type*} (G : Graph α β) : Prop :=\n  ∀ ⦃e⦄, e ∈ E(G) → ∀ ⦃x y⦄, G.IsLink e x y →\n    Relation.ReflTransGen\n      (fun u v ↦ ∃ f ∈ E(G), f ≠ e ∧ G.IsLink f u v) x y\n\n/-- A nowhere-zero 4-flow is an orientation and an integer circulation whose value on every\nedge has absolute value strictly between zero and four. The first disjunct records the unique\nvacuous flow on an edgeless graph. -/\ndef HasNowhereZeroFourFlow {α β : Type*} [DecidableEq α] [Fintype β]\n    (G : Graph α β) : Prop :=\n  E(G) = ∅ ∨\n    ∃ tail head : β → α, ∃ flow : β → ℤ,\n      (∀ e ∈ E(G), G.IsLink e (tail e) (head e)) ∧\n      (∀ e, flow e = 0 ↔ e ∉ E(G)) ∧\n      (∀ e ∈ E(G), |flow e| < 4) ∧\n      (∀ v ∈ V(G),\n        ∑ e, (if head e = v then flow e else 0) =\n          ∑ e, (if tail e = v then flow e else 0))\n\n/--\n**Tutte's 4-flow conjecture.** Every finite Petersen-minor-free bridgeless multigraph has a\nnowhere-zero 4-flow. Parallel edges and loops are allowed; loops do not affect bridgelessness or\nflow conservation, and an edgeless graph has the vacuous flow.\n-/\n@[category research open, AMS 5]\ntheorem petersen {α β : Type*} [Fintype α] [DecidableEq α] [Fintype β]\n    (G : Graph α β)\n    (hbridge : IsBridgeless G) (hminor : ¬ HasPetersenMinor G) :\n    HasNowhereZeroFourFlow G := by\n  sorry\n\nend Petersen\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Mathlib's `Graph α β`, whose separate vertex and edge carriers and incidence relation faithfully model finite undirected multigraphs with parallel edges and loops.",
+    "Interpreted Petersen-minor containment by the standard branch-set characterization: ten pairwise disjoint nonempty connected vertex sets indexed by the vertices of the Petersen graph, with a host edge between branch sets for every Petersen edge. This is equivalent to obtaining the Petersen graph by vertex/edge deletion and edge contraction, rather than merely finding it as a subgraph.",
+    "Presented the Petersen graph as the Kneser graph KG(5,2): its vertices are two-element subsets of `Fin 5`, adjacent exactly when disjoint.",
+    "Defined bridgelessness edgewise: after deleting an edge, its two endpoints remain reachable. This handles disconnected graphs, regards loops as non-bridges, and distinguishes parallel edges.",
+    "Used the integer formulation of a nowhere-zero 4-flow: choose an orientation, assign each graph edge an integer of absolute value 1, 2, or 3, and require incoming and outgoing sums to agree at every graph vertex. Values on ambient nonedges are forced to zero.",
+    "Included an explicit edgeless disjunct in the flow predicate so an edgeless graph has a vacuous flow even when the ambient vertex type is empty.",
+    "Quantified over finite ambient vertex and edge types. Since `Graph` stores vertex and edge sets inside those types, this covers all finite graphs; unused ambient elements are ignored. `DecidableEq α` is computational data needed by finite sums and is not a mathematical restriction on finite types."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "A `PetersenGraph` abbreviation exists only locally in `FormalConjectures/WrittenOnTheWallII/Test.lean`; Mathlib has no reusable Petersen graph declaration.",
+     "name": "PetersenVertex",
+     "why_needed": "Provides the ten vertices of the Petersen graph through its canonical KG(5,2) presentation."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `SimpleGraph.Reachable` and connectedness API applies only to simple graphs, not `Graph α β` multigraphs.",
+     "name": "ConnectedIn",
+     "why_needed": "Expresses connected branch sets in Mathlib's multigraph `Graph` model."
+    },
+    {
+     "closest_existing_considered": "Mathlib has matroid minors and simple-graph subgraph containment, but no graph-minor API; neither is a faithful replacement.",
+     "name": "HasPetersenMinor",
+     "why_needed": "Expresses Petersen minor containment for multigraphs via connected branch sets."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.IsBridge` and `SimpleGraph.IsBridgeless` collapse parallel edges and therefore cannot represent the stated conventional multigraph domain.",
+     "name": "IsBridgeless",
+     "why_needed": "Defines bridges for edge-indexed multigraphs, preserving parallel-edge behavior."
+    },
+    {
+     "closest_existing_considered": "No nowhere-zero graph-flow primitive was found in Mathlib or `FormalConjecturesForMathlib`; digraph orientations and incidence matrices do not supply this multigraph flow notion.",
+     "name": "HasNowhereZeroFourFlow",
+     "why_needed": "Expresses an oriented nowhere-zero integer 4-flow and Kirchhoff conservation for multigraphs."
+    }
+   ],
+   "per_slot": {
+    "petersen": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "petersen": "/--\n**Tutte's 4-flow conjecture.** Every finite Petersen-minor-free bridgeless multigraph has a\nnowhere-zero 4-flow. Parallel edges and loops are allowed; loops do not affect bridgelessness or\nflow conservation, and an edgeless graph has the vacuous flow.\n-/\n@[category research open, AMS 5]\ntheorem petersen {α β : Type*} [Fintype α] [DecidableEq α] [Fintype β]\n    (G : Graph α β)\n    (hbridge : IsBridgeless G) (hminor : ¬ HasPetersenMinor G) :\n    HasNowhereZeroFourFlow G := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "petersen": "c07"
+ },
+ "id": "wp-petersen",
+ "main_attempt": "c07"
+}

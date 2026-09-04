@@ -1,0 +1,288 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tutte's 5-flow conjecture\n\n*References:*\n- [Wikipedia, Nowhere-zero flow](https://en.wikipedia.org/wiki/nowhere-zero_flows)\n- [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- W. T. Tutte, *A contribution to the theory of chromatic polynomials*,\n  Canadian Journal of Mathematics 6 (1954), 80–91.\n-/\n\nnamespace NowhereZero5Flow\n\nopen SimpleGraph\n\nvariable {V : Type*} [Fintype V]\n\n/--\nA nowhere-zero `k`-flow on a finite simple graph `G`, in orientation-free form.\n\nAn orientation of `G` together with an integer circulation `φ` on it is encoded as the\nskew-symmetric function `f : V → V → ℤ` with `f u v = φ(e)` if the edge `e = {u, v}` is\noriented from `u` to `v`, and `f u v = -φ(e)` otherwise. Under this encoding:\n- `f` vanishes on non-adjacent pairs, so it only carries values on edges of `G`;\n- Kirchhoff's law (inflow equals outflow at every vertex) is `∑ w, f v w = 0`;\n- the flow is a nowhere-zero `k`-flow when `0 < |φ(e)| < k` on every edge.\n\nReversing the orientation of an edge and negating its value does not change `f`, so this\ncaptures precisely the statement that some (equivalently, every) orientation of `G` admits a\nnowhere-zero `k`-flow.\n-/\nstructure IsNowhereZeroFlow (G : SimpleGraph V) (k : ℕ) (f : V → V → ℤ) : Prop where\n  skew : ∀ u v, f u v = -f v u\n  eq_zero_of_not_adj : ∀ u v, ¬ G.Adj u v → f u v = 0\n  ne_zero_of_adj : ∀ u v, G.Adj u v → f u v ≠ 0\n  abs_lt_of_adj : ∀ u v, G.Adj u v → |f u v| < k\n  sum_eq_zero : ∀ v, ∑ w, f v w = 0\n\n/-- The triangle has a nowhere-zero `2`-flow: send one unit around the cycle. -/\n@[category test, AMS 5]\ntheorem isNowhereZeroFlow_triangle :\n    ∃ f, IsNowhereZeroFlow (⊤ : SimpleGraph (Fin 3)) 2 f := by\n  refine ⟨fun i j => if j = i + 1 then 1 else if i = j + 1 then -1 else 0, ?_, ?_, ?_, ?_, ?_⟩\n  all_goals decide\n\n/-- A single edge is a bridge, and indeed it has no nowhere-zero `k`-flow for any `k`. -/\n@[category test, AMS 5]\ntheorem not_isNowhereZeroFlow_edge (k : ℕ) (f : Fin 2 → Fin 2 → ℤ) :\n    ¬ IsNowhereZeroFlow (⊤ : SimpleGraph (Fin 2)) k f := by\n  intro hf\n  have h00 := hf.skew 0 0\n  have h01 := hf.ne_zero_of_adj 0 1 (by decide)\n  have hsum := hf.sum_eq_zero 0\n  rw [Fin.sum_univ_two] at hsum\n  omega\n\n/--\n**Tutte's 5-flow conjecture.** Every bridgeless graph has a nowhere-zero $5$-flow.\n\nThat is, if $G$ is a finite graph in which no edge is a bridge, then some (equivalently,\nevery) orientation of $G$ admits an integer circulation $\\varphi$, i.e. a map on the edges\nsatisfying Kirchhoff's law at every vertex, with $0 < |\\varphi(e)| < 5$ for every edge $e$.\n\nWe state this for finite simple graphs. The version for multigraphs is equivalent, by deleting\nloops (which never affect the existence of a nowhere-zero flow) and subdividing parallel edges.\nThe statement holds trivially for graphs without edges.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow (G : SimpleGraph V) (hG : ∀ e, ¬ G.IsBridge e) :\n    ∃ f, IsNowhereZeroFlow G 5 f := by\n  sorry\n\nend NowhereZero5Flow\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single slot matches the statement; the notes' remarks (finite graphs, some/every orientation equivalence, ℤ vs ℤ/5 equivalence, multigraph vs simple-graph equivalence, trivial truth for edgeless graphs) are all consistent with the formalization.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple graphs (`SimpleGraph V` with `[Fintype V]`). The list entry says 'graph'; Tutte's conjecture is usually stated for finite (multi)graphs. The multigraph version is equivalent (delete loops, subdivide parallel edges), as the decomposition notes say; this is recorded in the theorem docstring.",
+    "Bridgeless is formalized as `∀ e, ¬ G.IsBridge e` using Mathlib's `SimpleGraph.IsBridge` (which includes `e ∈ G.edgeSet`), i.e. no edge of G is a bridge. Connectedness is NOT assumed, matching the conjecture (it applies to disconnected bridgeless graphs too, componentwise).",
+    "A nowhere-zero k-flow is encoded orientation-free as a skew-symmetric function f : V → V → ℤ supported exactly on edges with |f u v| < k on edges and Kirchhoff's law ∑ w, f v w = 0. This is equivalent to choosing an orientation D and a circulation φ with 0 < |φ(e)| < k: set f u v = φ(e) if e is oriented u→v and -φ(e) otherwise; then ∑_w f v w = outflow − inflow. Since existence of a nowhere-zero k-flow is orientation-independent (Wikipedia, 'Orientation independence'), no orientation needs to be quantified.",
+    "The bound uses `k : ℕ` cast to ℤ: `|f u v| < (k : ℤ)` together with `f u v ≠ 0`, i.e. exactly 0 < |φ(e)| < k with strict inequalities; for k = 5 the allowed values are ±1, ±2, ±3, ±4.",
+    "Integer flows (ℤ-valued) are used rather than ZMod 5; the two are equivalent by Tutte's theorem, and the integer version is the one the Wikipedia article gives as the definition of a k-flow.",
+    "Boundary cases: the empty graph and edgeless graphs satisfy the hypothesis and the conclusion (f = 0), so the statement is trivially true there, as the notes require. Two `category test` lemmas check the definition: the triangle has a nowhere-zero 2-flow, and a single edge (a bridge) has no nowhere-zero k-flow for any k."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Digraph.IsOrientation` (FormalConjecturesForMathlib/Combinatorics/Digraph/Tournament.lean) could have been used to quantify an explicit orientation D of G together with a map on arcs; this was rejected in favour of the equivalent, simpler orientation-free skew-symmetric encoding (Diestel's definition), which avoids decidability side conditions on filtered sums. Mathlib's `SimpleGraph.IsBridge` and `SimpleGraph.IsEdgeConnected` were used/considered for the bridgeless hypothesis; `IsBridge` was used directly.",
+     "name": "NowhereZero5Flow.IsNowhereZeroFlow",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines flows, circulations, or nowhere-zero k-flows on graphs (grep for circulation/nowhere-zero/kirchhoff/flow found nothing relevant). The predicate `IsNowhereZeroFlow (G : SimpleGraph V) (k : ℕ) (f : V → V → ℤ) : Prop` records skew-symmetry, support on edges, nonzero-ness and |f| < k on edges, and Kirchhoff's law ∑ w, f v w = 0."
+    }
+   ],
+   "per_slot": {
+    "nowhere_zero_5_flow": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G on a Fintype V with no bridge edge (∀ e, ¬ G.IsBridge e, Mathlib's IsBridge), there exists f : V → V → ℤ that is a nowhere-zero 5-flow. Mathlib and FormalConjecturesForMathlib have no notion of (nowhere-zero) flow/circulation on a graph, so a bespoke predicate IsNowhereZeroFlow G k f was added: f skew-symmetric, zero on non-adjacent pairs, nonzero with |f u v| < k on edges, and ∑ w, f v w = 0 at every vertex. This is the standard orientation-free encoding (Diestel) and is equivalent to Wikipedia's 'some (equivalently every) orientation admits an integer circulation with 0 < |φ(e)| < 5'."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "nowhere_zero_5_flow": "/--\n**Tutte's 5-flow conjecture.** Every bridgeless graph has a nowhere-zero $5$-flow.\n\nThat is, if $G$ is a finite graph in which no edge is a bridge, then some (equivalently,\nevery) orientation of $G$ admits an integer circulation $\\varphi$, i.e. a map on the edges\nsatisfying Kirchhoff's law at every vertex, with $0 < |\\varphi(e)| < 5$ for every edge $e$.\n\nWe state this for finite simple graphs. The version for multigraphs is equivalent, by deleting\nloops (which never affect the existence of a nowhere-zero flow) and subdividing parallel edges.\nThe statement holds trivially for graphs without edges.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow (G : SimpleGraph V) (hG : ∀ e, ¬ G.IsBridge e) :\n    ∃ f, IsNowhereZeroFlow G 5 f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Nowhere-zero 5-flow conjecture\n\n*References:*\n- [Wikipedia, \"Nowhere-zero flow\"](https://en.wikipedia.org/wiki/nowhere-zero_flows)\n- [Wikipedia, \"List of unsolved problems in mathematics\"](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace NowhereZero5Flow\n\n/--\n**Tutte's 5-flow conjecture.** Every finite bridgeless graph has a nowhere-zero $5$-flow.\nMore precisely, there is an antisymmetric integer value on each oriented edge, of absolute value\nstrictly between $0$ and $5$, such that the signed sum of the values at every vertex is zero.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow :\n    ∀ (V : Type) [Fintype V] [DecidableEq V] (G : SimpleGraph V), G.IsBridgeless →\n      ∃ φ : V → V → ℤ,\n        (∀ u v, φ u v = -φ v u) ∧\n        (∀ u v, ¬G.Adj u v → φ u v = 0) ∧\n        (∀ u v, G.Adj u v → 0 < |φ u v| ∧ |φ u v| < 5) ∧\n        ∀ v, ∑ w, φ v w = 0 := by\n  sorry\n\nend NowhereZero5Flow\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “graph” as a finite simple undirected graph, using `SimpleGraph` and the repository’s existing `SimpleGraph.IsBridgeless`. This is equivalent to the usual finite multigraph formulation of Tutte’s conjecture by subdivision of parallel edges and deletion of loops, as specified in the decomposition notes.",
+    "Encoded an integer 5-flow without choosing a separate digraph orientation: `φ u v` is antisymmetric, vanishes on nonedges, has `0 < |φ u v| < 5` on every edge, and sums to zero over all `w` at each vertex `v`. Antisymmetry makes this the standard signed incidence/Kirchhoff circulation condition and captures orientation independence.",
+    "Allowed empty, edgeless, and disconnected finite graphs. In particular, the zero assignment witnesses the conclusion for an edgeless graph, matching the stipulated vacuous boundary case."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "nowhere_zero_5_flow": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "nowhere_zero_5_flow": "/--\n**Tutte's 5-flow conjecture.** Every finite bridgeless graph has a nowhere-zero $5$-flow.\nMore precisely, there is an antisymmetric integer value on each oriented edge, of absolute value\nstrictly between $0$ and $5$, such that the signed sum of the values at every vertex is zero.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow :\n    ∀ (V : Type) [Fintype V] [DecidableEq V] (G : SimpleGraph V), G.IsBridgeless →\n      ∃ φ : V → V → ℤ,\n        (∀ u v, φ u v = -φ v u) ∧\n        (∀ u v, ¬G.Adj u v → φ u v = 0) ∧\n        (∀ u v, G.Adj u v → 0 < |φ u v| ∧ |φ u v| < 5) ∧\n        ∀ v, ∑ w, φ v w = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Nowhere-zero 5-flow conjecture\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Nowhere-zero flow](https://en.wikipedia.org/wiki/nowhere-zero_flows)\n-/\n\nnamespace NowhereZero5Flow\n\n/--\n**Tutte's 5-flow conjecture.** Every finite bridgeless graph has a nowhere-zero\n5-flow: an integer circulation whose value on every edge has absolute value strictly\nbetween $0$ and $5$.\n\nHere a flow is represented on the two darts of each edge. Reversing a dart negates its\nvalue, and the sum of the values on all darts leaving any vertex is zero.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow :\n    ∀ (V : Type*) [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj], G.IsBridgeless →\n      ∃ φ : G.Dart → ℤ,\n        (∀ d, φ d.symm = -φ d) ∧\n        (∀ v, ∑ w : G.neighborSet v, φ (G.dartOfNeighborSet v w) = 0) ∧\n        ∀ d, 0 < |φ d| ∧ |φ d| < 5 := by\n  sorry\n\nend NowhereZero5Flow\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse word “graph” is formalized as a finite simple graph (`SimpleGraph V` with `Fintype V`). This uses the standard equivalent simple-graph form of Tutte's conjecture noted in the decomposition: parallel edges can be removed by subdivision and loops do not affect the conjecture.",
+    "A 5-flow is represented orientation-independently by an integer-valued function on darts. Values on opposite darts are negatives, Kirchhoff's law is the zero sum over all darts leaving each vertex, and every dart value satisfies the strict bounds `0 < |φ d|` and `|φ d| < 5`. This is equivalent to an integer circulation on any orientation.",
+    "The existing `SimpleGraph.IsBridgeless` is used. Its definition quantifies over actual edges and asserts that none is a `SimpleGraph.IsBridge`.",
+    "The quantified `DecidableRel G.Adj` supplies only the computational data needed to enumerate finite neighbor sets; it imposes no mathematical restriction on finite graphs.",
+    "No nonemptiness or connectedness assumption is imposed. Thus the empty and edgeless cases are included and satisfy the conclusion vacuously, as required."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "nowhere_zero_5_flow": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "nowhere_zero_5_flow": "/--\n**Tutte's 5-flow conjecture.** Every finite bridgeless graph has a nowhere-zero\n5-flow: an integer circulation whose value on every edge has absolute value strictly\nbetween $0$ and $5$.\n\nHere a flow is represented on the two darts of each edge. Reversing a dart negates its\nvalue, and the sum of the values on all darts leaving any vertex is zero.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow :\n    ∀ (V : Type*) [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj], G.IsBridgeless →\n      ∃ φ : G.Dart → ℤ,\n        (∀ d, φ d.symm = -φ d) ∧\n        (∀ v, ∑ w : G.neighborSet v, φ (G.dartOfNeighborSet v w) = 0) ∧\n        ∀ d, 0 < |φ d| ∧ |φ d| < 5 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Nowhere-zero 5-flow conjecture\n\n*References:*\n- [Wikipedia, Nowhere-zero flow](https://en.wikipedia.org/wiki/nowhere-zero_flows)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace NowhereZero5Flow\n\nopen Finset SimpleGraph\n\n/-- A finite simple graph has a nowhere-zero 5-flow if its darts can be assigned integers\nantisymmetrically so that the sum on darts leaving each vertex is zero and every assigned\ninteger has absolute value strictly between zero and five. This is the orientation-independent\nform of an integer circulation on the edges. -/\ndef HasNowhereZero5Flow {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    [DecidableRel G.Adj] : Prop :=\n  ∃ φ : G.Dart → ℤ,\n    (∀ d, φ d.symm = -φ d) ∧\n    (∀ v, ∑ d : G.Dart with d.fst = v, φ d = 0) ∧\n    ∀ d, 0 < |φ d| ∧ |φ d| < 5\n\n/-- **Tutte's 5-flow conjecture.** Every finite bridgeless graph has a nowhere-zero 5-flow:\nthere is an integer circulation whose value on each edge has absolute value strictly between\nzero and five. The statement is given for simple graphs, an equivalent form of the finite\nmultigraph conjecture. -/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow :\n    ∀ (V : Type) [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      G.IsBridgeless → HasNowhereZero5Flow G := by\n  sorry\n\nend NowhereZero5Flow\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Formalized the conjecture for finite simple graphs using `SimpleGraph`; as noted in the decomposition, this is equivalent to the finite multigraph formulation by subdividing parallel edges and deleting loops.",
+    "Encoded an orientation-independent integer flow as a function on `SimpleGraph.Dart`: reversal negates the value, and the sum over all darts leaving each vertex is zero. This is equivalent to choosing an orientation and imposing the usual circulation law.",
+    "Used strict integer bounds `0 < |φ(d)|` and `|φ(d)| < 5`, matching the article's definition of a nowhere-zero 5-flow rather than replacing it with a modular flow.",
+    "Used the repository helper `SimpleGraph.IsBridgeless`, which means that no edge in the graph is a bridge and does not unnecessarily require the graph to be connected. Edgeless graphs are included and the flow conditions are vacuous on their empty dart type."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.Dart` supplies oriented edge incidences and dart reversal, while `Digraph.IsOrientation` supplies graph orientations, but neither defines a circulation, Kirchhoff's law, or nowhere-zero k-flow. The dart-based predicate uses the former and avoids adding an arbitrary orientation witness.",
+     "name": "NowhereZero5Flow.HasNowhereZero5Flow",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides graph circulations or nowhere-zero flows. A transparent local predicate was needed to state the conjecture."
+    }
+   ],
+   "per_slot": {
+    "nowhere_zero_5_flow": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "nowhere_zero_5_flow": "/-- **Tutte's 5-flow conjecture.** Every finite bridgeless graph has a nowhere-zero 5-flow:\nthere is an integer circulation whose value on each edge has absolute value strictly between\nzero and five. The statement is given for simple graphs, an equivalent form of the finite\nmultigraph conjecture. -/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow :\n    ∀ (V : Type) [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      G.IsBridgeless → HasNowhereZero5Flow G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Nowhere-zero 5-flow conjecture (Tutte's 5-flow conjecture)\n\nEvery bridgeless graph has a nowhere-zero $5$-flow.\n\n*References:*\n* [Wikipedia, Nowhere-zero flow](https://en.wikipedia.org/wiki/nowhere-zero_flows)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* [Tu54] Tutte, W. T. (1954). \"A contribution to the theory of chromatic polynomials.\"\n  *Canadian Journal of Mathematics* 6, pp. 80--91.\n* [Se81] Seymour, P. D. (1981). \"Nowhere-zero 6-flows.\"\n  *Journal of Combinatorial Theory, Series B* 30, pp. 130--135.\n-/\n\nnamespace NowhereZero5Flow\n\nvariable {V : Type*} [Fintype V]\n\n/--\nA map $\\varphi$ on ordered pairs of vertices is a **nowhere-zero $k$-flow** on the digraph `D` if\n$0 < |\\varphi(e)| < k$ for every arc $e = (u, v)$ of `D`, and Kirchhoff's law holds at every\nvertex $v$: the sum of $\\varphi$ over the arcs leaving $v$ equals the sum of $\\varphi$ over the\narcs entering $v$. The values of $\\varphi$ on pairs that are not arcs of `D` are irrelevant.\n-/\ndef IsNowhereZeroFlow (D : Digraph V) [DecidableRel D.Adj] (k : ℕ) (φ : V → V → ℤ) : Prop :=\n  (∀ u v, D.Adj u v → 0 < |φ u v| ∧ |φ u v| < k) ∧\n    ∀ v, ∑ u with D.Adj v u, φ v u = ∑ u with D.Adj u v, φ u v\n\nopen scoped Classical in\n/--\nAn undirected graph `G` has a **nowhere-zero $k$-flow** if some orientation of `G` admits a\nnowhere-zero $k$-flow. Since reversing an arc $e$ and replacing $\\varphi(e)$ by $-\\varphi(e)$\npreserves nowhere-zero $k$-flows, this holds if and only if every orientation of `G` admits one.\n-/\ndef HasNowhereZeroFlow (G : SimpleGraph V) (k : ℕ) : Prop :=\n  ∃ D : Digraph V, D.IsOrientation G ∧ ∃ φ : V → V → ℤ, IsNowhereZeroFlow D k φ\n\n/--\n**Tutte's 5-flow conjecture.** Every bridgeless graph has a nowhere-zero $5$-flow.\n\nThat is, for every finite graph $G$ in which no edge is a bridge, some (equivalently, every)\norientation of $G$ admits an integer-valued map $\\varphi$ on its arcs with $0 < |\\varphi(e)| < 5$\nfor every arc $e$ that satisfies Kirchhoff's law at every vertex. The graph need not be connected,\nand the statement is vacuously true when $G$ has no edges.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow (G : SimpleGraph V) (hG : ∀ e, ¬ G.IsBridge e) :\n    HasNowhereZeroFlow G 5 := by\n  sorry\n\n/-- The edgeless graph is bridgeless and has a nowhere-zero $5$-flow. -/\n@[category test, AMS 5]\ntheorem hasNowhereZeroFlow_bot : (∀ e, ¬ (⊥ : SimpleGraph V).IsBridge e) ∧\n    HasNowhereZeroFlow (⊥ : SimpleGraph V) 5 := by\n  refine ⟨fun e he => by simp [SimpleGraph.IsBridge] at he, ⊥, ?_, 0, ?_⟩\n  · exact ⟨fun _ _ h => h.elim, fun _ _ h => h.elim⟩\n  · exact ⟨fun _ _ h => h.elim, fun _ => by simp⟩\n\nend NowhereZero5Flow\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single-slot decomposition matches the source; the notes' guidance (finite graphs, simple-graph version equivalent to the multigraph version, integer flows with 0 < |φ(e)| < 5, some/every orientation) was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple graphs (`SimpleGraph V` with `[Fintype V]`). The decomposition notes state the multigraph version is equivalent (subdivide parallel edges, delete loops); Mathlib's multigraph `Graph α β` has no connectivity/bridge API, so it was not used.",
+    "Bridgeless is `∀ e, ¬ G.IsBridge e` using Mathlib's `SimpleGraph.IsBridge` (which already includes `e ∈ G.edgeSet`), i.e. no edge of G is a bridge. Connectedness is not assumed, matching the source (the conjecture is for all bridgeless graphs).",
+    "Nowhere-zero k-flow is the integer version from the Wikipedia definitions section: an orientation plus φ with 0 < |φ(e)| < k on every arc and Kirchhoff's law at every vertex. The Z/5 version is equivalent by Tutte's theorem but the integer form is what the source defines as a 'k-flow'.",
+    "Undirected graph G 'has a nowhere-zero k-flow' is formalized as: SOME orientation admits one (`∃ D, D.IsOrientation G ∧ ∃ φ, IsNowhereZeroFlow D k φ`), following Wikipedia's 'some (and thus every) orientation'. Orientation uses the repo's `Digraph.IsOrientation` (exactly one direction per edge of G, no extra arcs), so the flow must be nonzero on every edge.",
+    "The flow φ is a function on ordered pairs V → V → ℤ rather than on an arc type; its values on non-arcs are irrelevant since both the nowhere-zero condition and the Kirchhoff sums range only over arcs of D. This is equivalent to a map E → ℤ on the arc set.",
+    "Kirchhoff's law is written literally as `∑ u with D.Adj v u, φ v u = ∑ u with D.Adj u v, φ u v`; `IsNowhereZeroFlow` takes `[DecidableRel D.Adj]` and `HasNowhereZeroFlow` uses `open scoped Classical in` because D is existentially quantified.",
+    "The empty/edgeless graph satisfies the conclusion (verified by a `@[category test]` lemma `hasNowhereZeroFlow_bot`), consistent with the note that the statement is vacuously true there. Infinite graphs are excluded by `[Fintype V]`, as in the standard statement of the conjecture."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `SimpleGraph.incMatrix`, `Digraph`, `Digraph.IsOrientation` (repo), and `Graph α β` (multigraph, no flows). Searched Mathlib and the repo for 'flow', 'circulation', 'Kirchhoff', 'nowhere' — nothing applicable.",
+     "name": "NowhereZero5Flow.IsNowhereZeroFlow",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib has any notion of circulation / nowhere-zero flow on a digraph. Defined as: 0 < |φ u v| < k on every arc (u,v) of D, and for every vertex the sum of φ over out-arcs equals the sum over in-arcs."
+    },
+    {
+     "closest_existing_considered": "`Digraph.IsOrientation` from FormalConjecturesForMathlib/Combinatorics/Digraph/Tournament.lean is reused for the orientation; no existing undirected-graph flow predicate exists.",
+     "name": "NowhereZero5Flow.HasNowhereZeroFlow",
+     "why_needed": "Wraps the standard definition that an undirected graph has a nowhere-zero k-flow iff some orientation of it admits one: `∃ D : Digraph V, D.IsOrientation G ∧ ∃ φ, IsNowhereZeroFlow D k φ`."
+    }
+   ],
+   "per_slot": {
+    "nowhere_zero_5_flow": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `nowhere_zero_5_flow`: for every finite vertex type V and every G : SimpleGraph V with no bridge (`∀ e, ¬ G.IsBridge e`, Mathlib's SimpleGraph.IsBridge), `HasNowhereZeroFlow G 5`, i.e. some orientation D of G (repo's `Digraph.IsOrientation`) admits φ : V → V → ℤ with 0 < |φ u v| < 5 on every arc and Kirchhoff's law (sum over out-arcs = sum over in-arcs) at every vertex. Mathlib/repo have no flow or circulation notion, so two bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "nowhere_zero_5_flow": "/--\n**Tutte's 5-flow conjecture.** Every bridgeless graph has a nowhere-zero $5$-flow.\n\nThat is, for every finite graph $G$ in which no edge is a bridge, some (equivalently, every)\norientation of $G$ admits an integer-valued map $\\varphi$ on its arcs with $0 < |\\varphi(e)| < 5$\nfor every arc $e$ that satisfies Kirchhoff's law at every vertex. The graph need not be connected,\nand the statement is vacuously true when $G$ has no edges.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow (G : SimpleGraph V) (hG : ∀ e, ¬ G.IsBridge e) :\n    HasNowhereZeroFlow G 5 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tutte's 5-flow conjecture\n\n*References:*\n- [Wikipedia, Nowhere-zero flow](https://en.wikipedia.org/wiki/nowhere-zero_flows)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Tu54] Tutte, W. T., \"A contribution to the theory of chromatic polynomials\",\n  Canadian Journal of Mathematics 6 (1954), 80–91.\n\nLet $D$ be a digraph and $k$ an integer. A map $\\varphi$ from the arcs of $D$ to $\\mathbb{Z}$ is a\n*nowhere-zero $k$-flow* if it satisfies Kirchhoff's law at every vertex $v$,\n$$\\sum_{e \\in \\delta^+(v)} \\varphi(e) = \\sum_{e \\in \\delta^-(v)} \\varphi(e),$$\nand $0 < |\\varphi(e)| < k$ for every arc $e$. Reversing an arc $e$ and replacing $\\varphi(e)$ by\n$-\\varphi(e)$ preserves these conditions, so an undirected graph $G$ is said to have a\nnowhere-zero $k$-flow if some (equivalently, every) orientation of $G$ has one.\n\nTutte conjectured in 1954 that every bridgeless graph has a nowhere-zero 5-flow. Seymour proved\nin 1981 that every bridgeless graph has a nowhere-zero 6-flow. The constant 5 would be best\npossible: the Petersen graph has no nowhere-zero 4-flow.\n-/\n\nnamespace NowhereZero5Flow\n\nopen SimpleGraph\n\nvariable {V : Type*} [Fintype V]\n\n/--\n`φ` is a nowhere-zero `k`-flow on the digraph `D`. The arc `(u, v)` of `D` carries the value\n`φ u v`; the map `φ` vanishes on pairs that are not arcs of `D`, so that Kirchhoff's law at a\nvertex `v` reads $\\sum_u \\varphi(v, u) = \\sum_u \\varphi(u, v)$ (total outflow equals total inflow),\nand every arc carries a value with $0 < |\\varphi(e)| < k$.\n-/\ndef IsNowhereZeroFlow (D : Digraph V) (k : ℕ) (φ : V → V → ℤ) : Prop :=\n  (∀ u v, ¬ D.Adj u v → φ u v = 0) ∧\n  (∀ v, ∑ u, φ v u = ∑ u, φ u v) ∧\n  (∀ u v, D.Adj u v → 0 < |φ u v| ∧ |φ u v| < k)\n\n/--\nAn undirected graph `G` has a nowhere-zero `k`-flow if some (equivalently, every) orientation of\n`G` carries a nowhere-zero `k`-flow.\n-/\ndef HasNowhereZeroFlow (G : SimpleGraph V) (k : ℕ) : Prop :=\n  ∃ D : Digraph V, D.IsOrientation G ∧ ∃ φ : V → V → ℤ, IsNowhereZeroFlow D k φ\n\n/--\n**Tutte's 5-flow conjecture.** Every bridgeless graph has a nowhere-zero 5-flow.\n\nThat is, for every finite graph $G$ in which no edge is a bridge, some (equivalently, every)\norientation of $G$ admits an integer-valued map $\\varphi$ on its arcs that satisfies Kirchhoff's\nlaw at every vertex and has $0 < |\\varphi(e)| < 5$ on every arc $e$.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow (G : SimpleGraph V) (hG : G.IsBridgeless) :\n    HasNowhereZeroFlow G 5 := by\n  sorry\n\n/-- The graph with no edges has a nowhere-zero `k`-flow for every `k`: take the empty orientation\nand the zero map. -/\n@[category test, AMS 5]\ntheorem hasNowhereZeroFlow_bot (k : ℕ) : HasNowhereZeroFlow (⊥ : SimpleGraph V) k :=\n  ⟨⊥, ⟨fun _ _ h => h.elim, fun _ _ h => h.elim⟩, 0,\n    fun _ _ _ => rfl, fun _ => rfl, fun _ _ h => h.elim⟩\n\n/-- A single edge is a bridge, and indeed it has no nowhere-zero `k`-flow for any `k`: Kirchhoff's\nlaw at an endpoint forces the value on the edge to be zero. -/\n@[category test, AMS 5]\ntheorem not_hasNowhereZeroFlow_top_fin_two (k : ℕ) :\n    ¬ HasNowhereZeroFlow (⊤ : SimpleGraph (Fin 2)) k := by\n  rintro ⟨D, ⟨-, hD⟩, φ, hzero, hK, hnz⟩\n  have hadj : (⊤ : SimpleGraph (Fin 2)).Adj 0 1 := by decide\n  have h0 := hK 0\n  simp only [Fin.sum_univ_two, add_right_inj] at h0\n  by_cases h : D.Adj 0 1\n  · have := hnz 0 1 h\n    rw [h0, hzero 1 0 ((hD 0 1 hadj).mp h)] at this\n    simp at this\n  · have h' : D.Adj 1 0 := by\n      by_contra h'\n      exact h ((hD 0 1 hadj).mpr h')\n    have := hnz 1 0 h'\n    rw [← h0, hzero 0 1 h] at this\n    simp at this\n\n/-- The triangle has a nowhere-zero `2`-flow: orient it cyclically and send every arc to `1`. -/\n@[category test, AMS 5]\ntheorem hasNowhereZeroFlow_top_fin_three_two :\n    HasNowhereZeroFlow (⊤ : SimpleGraph (Fin 3)) 2 := by\n  refine ⟨{ Adj := fun u v => v = u + 1 }, ⟨by decide, by decide⟩,\n    fun u v => if v = u + 1 then 1 else 0, ?_, ?_, ?_⟩\n  · exact fun _ _ h => if_neg h\n  · decide\n  · decide\n\nend NowhereZero5Flow\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single slot matches the statement; the notes' equivalence claims (orientation independence, multigraph/simple-graph equivalence, vacuity for edgeless graphs) are correct and were relied upon.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple graphs (`SimpleGraph V` with `[Fintype V]`). Tutte's conjecture is about finite graphs; the multigraph version (loops, parallel edges) is equivalent to the simple-graph version by deleting loops and subdividing edges, as the decomposition notes state, so no multigraph machinery was introduced.",
+    "A k-flow uses the Wikipedia/Diestel integer definition: Kirchhoff's law plus 0 < |φ(e)| < k on every arc (k : ℕ coerced to ℤ, so for k = 5 the values are ±1,…,±4). The equivalent Z/5 formulation (Tutte's theorem) was not stated as a variant.",
+    "Orientation-independence is handled as on Wikipedia: `HasNowhereZeroFlow G k` asks for SOME orientation `D` (via the existing `Digraph.IsOrientation D G`) carrying a flow; since every finite simple graph has an orientation and flow existence is orientation-independent, this equals the 'every orientation' reading.",
+    "The flow is encoded as `φ : V → V → ℤ` on ordered pairs, required to be 0 on non-arcs of D, so Kirchhoff's law is simply `∑ u, φ v u = ∑ u, φ u v` with no decidability assumptions. Values on non-arcs are forced to 0, so they carry no extra freedom.",
+    "Bridgeless uses the repo's `SimpleGraph.IsBridgeless` (∀ e ∈ G.edgeSet, ¬ G.IsBridge e); connectivity is not required, matching the conjecture (a disconnected graph has a flow iff each component does).",
+    "Boundary cases: the edgeless/empty graph is bridgeless and trivially has a nowhere-zero k-flow (test `hasNowhereZeroFlow_bot`), consistent with the notes; a single edge has no nowhere-zero flow (test `not_hasNowhereZeroFlow_top_fin_two`) showing the definition is not vacuous; the triangle has a nowhere-zero 2-flow (test `hasNowhereZeroFlow_top_fin_three_two`) showing it is satisfiable.",
+    "Category `research open`, AMS 5 (Combinatorics). Module docstring cites https://en.wikipedia.org/wiki/nowhere-zero_flows, the Wikipedia list page, and Tutte 1954."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Searched Mathlib and the repo for 'flow', 'circulation', 'Kirchhoff', 'NowhereZero'; nothing relevant exists (Mathlib's `Graph`/`Digraph` files have no flow API). `Digraph.IsOrientation` (FormalConjecturesForMathlib/Combinatorics/Digraph/Tournament.lean) was reused for orientations.",
+     "name": "NowhereZero5Flow.IsNowhereZeroFlow",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib has any notion of a (nowhere-zero) flow / circulation on a digraph. Defines: φ : V → V → ℤ vanishes off the arcs of D, satisfies Kirchhoff's law (∑ u, φ v u = ∑ u, φ u v) at every vertex, and has 0 < |φ u v| < k on every arc."
+    },
+    {
+     "closest_existing_considered": "No existing predicate; `Digraph.IsOrientation` reused for the orientation part, `SimpleGraph.IsBridgeless` reused for the hypothesis.",
+     "name": "NowhereZero5Flow.HasNowhereZeroFlow",
+     "why_needed": "Expresses that an undirected simple graph has a nowhere-zero k-flow: some orientation D of G (Digraph.IsOrientation D G) carries a φ with IsNowhereZeroFlow D k φ. This is the Wikipedia definition for undirected graphs."
+    }
+   ],
+   "per_slot": {
+    "nowhere_zero_5_flow": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G (Fintype V) with G.IsBridgeless (repo definition: no edge of G is a bridge), HasNowhereZeroFlow G 5, i.e. some orientation D of G (Digraph.IsOrientation from FormalConjecturesForMathlib) carries an integer map φ on arcs that vanishes off the arcs, satisfies Kirchhoff's law at every vertex, and has 0 < |φ(e)| < 5 on every arc. Mathlib/repo have no notion of (nowhere-zero) flow on a graph, so two bespoke Prop definitions were added in the problem file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "nowhere_zero_5_flow": "/--\n**Tutte's 5-flow conjecture.** Every bridgeless graph has a nowhere-zero 5-flow.\n\nThat is, for every finite graph $G$ in which no edge is a bridge, some (equivalently, every)\norientation of $G$ admits an integer-valued map $\\varphi$ on its arcs that satisfies Kirchhoff's\nlaw at every vertex and has $0 < |\\varphi(e)| < 5$ on every arc $e$.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow (G : SimpleGraph V) (hG : G.IsBridgeless) :\n    HasNowhereZeroFlow G 5 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Nowhere-zero 5-flow conjecture\n\n*References:*\n- [Wikipedia, Nowhere-zero flow](https://en.wikipedia.org/wiki/nowhere-zero_flows)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace NowhereZero5Flow\n\nopen scoped Classical in\n/--\n**Tutte's 5-flow conjecture.** Every finite bridgeless graph has an orientation and an\ninteger circulation satisfying Kirchhoff's law at every vertex and\n$0 < |\\varphi(e)| < 5$ on every edge; that is, it has a nowhere-zero 5-flow.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow :\n    ∀ (V : Type) [Fintype V] (G : SimpleGraph V), G.IsBridgeless →\n      ∃ (D : Digraph V) (φ : V → V → ℤ),\n        D.IsOrientation G ∧\n        (∀ u v, D.Adj u v → 0 < |φ u v| ∧ |φ u v| < 5) ∧\n        ∀ v, (∑ w with D.Adj v w, φ v w) = ∑ u with D.Adj u v, φ u v := by\n  sorry\n\nend NowhereZero5Flow\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Formalized finite simple graphs using `SimpleGraph`; this is faithful to the stated finite (multi)graph conjecture because the supplied decomposition notes explicitly identify the simple-graph and multigraph versions via edge subdivision and loop deletion.",
+    "Expanded “nowhere-zero 5-flow” as an integer circulation on some orientation, with Kirchhoff conservation at every vertex and the strict edge bounds `0 < |φ(e)| < 5`, following the supplied Wikipedia article.",
+    "Represented an orientation by a `Digraph D` satisfying the existing `D.IsOrientation G` predicate. The flow is a total function `V → V → ℤ`; only values on arcs of `D` occur in conservation sums or bounds, so values on non-arcs are irrelevant and this is equivalent to a function on the directed edge subtype.",
+    "Allowed empty and edgeless finite graphs. Their edge conditions are vacuous and their Kirchhoff sums are zero, matching the decomposition note."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "nowhere_zero_5_flow": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "nowhere_zero_5_flow": "open scoped Classical in\n/--\n**Tutte's 5-flow conjecture.** Every finite bridgeless graph has an orientation and an\ninteger circulation satisfying Kirchhoff's law at every vertex and\n$0 < |\\varphi(e)| < 5$ on every edge; that is, it has a nowhere-zero 5-flow.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow :\n    ∀ (V : Type) [Fintype V] (G : SimpleGraph V), G.IsBridgeless →\n      ∃ (D : Digraph V) (φ : V → V → ℤ),\n        D.IsOrientation G ∧\n        (∀ u v, D.Adj u v → 0 < |φ u v| ∧ |φ u v| < 5) ∧\n        ∀ v, (∑ w with D.Adj v w, φ v w) = ∑ u with D.Adj u v, φ u v := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Tutte's 5-flow conjecture\n\n*References:*\n* [Wikipedia, Nowhere-zero flows](https://en.wikipedia.org/wiki/nowhere-zero_flows)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* [Tu54] Tutte, W. T. (1954). \"A contribution to the theory of chromatic polynomials.\"\n  *Canadian Journal of Mathematics* 6, pp. 80--91.\n* [Se81] Seymour, P. D. (1981). \"Nowhere-zero 6-flows.\"\n  *Journal of Combinatorial Theory, Series B* 30 (2), pp. 130--135.\n\nLet $G = (V, E)$ be a finite graph. A *nowhere-zero $k$-flow* on $G$ is an orientation of $E$\ntogether with a map $\\varphi : E \\to \\mathbb{Z}$ with $0 < |\\varphi(e)| < k$ for every edge $e$\nthat satisfies Kirchhoff's law at every vertex: the total flow into $v$ equals the total flow\nout of $v$. The existence of such a flow does not depend on the chosen orientation.\n\nThe **5-flow conjecture** (Tutte, 1954) states that every bridgeless graph has a nowhere-zero\n5-flow. The best known result is Seymour's 6-flow theorem: every bridgeless graph has a\nnowhere-zero 6-flow.\n\nNowhere-zero flows are usually considered on multigraphs. Subdividing every edge of a\nmultigraph and deleting its loops preserves bridgelessness and the existence of a nowhere-zero\n$k$-flow, so it suffices to state the conjecture for finite simple graphs.\n\nWe encode an orientation together with a flow as a single skew-symmetric function\n$f : V \\times V \\to \\mathbb{Z}$: the edge $\\{u, v\\}$ is oriented from $u$ to $v$ exactly when\n$f(u, v) > 0$, and $|f(u, v)|$ is the flow along it.\n-/\n\nopen Finset\n\nnamespace NowhereZero5Flow\n\nvariable {V : Type*} [Fintype V]\n\n/--\n`f : V → V → ℤ` is a nowhere-zero `k`-flow on the finite simple graph `G` if\n* it is skew-symmetric: `f v u = -f u v`;\n* it is nonzero exactly on the edges of `G`;\n* it is bounded: `|f u v| < k`;\n* it satisfies Kirchhoff's law: the net flow out of every vertex is `0`.\n\nThe value `f u v` is the flow along the edge `{u, v}` in the direction from `u` to `v`.\n-/\nstructure IsNowhereZeroFlow (G : SimpleGraph V) (k : ℕ) (f : V → V → ℤ) : Prop where\n  skew : ∀ u v, f v u = -f u v\n  ne_zero_iff : ∀ u v, f u v ≠ 0 ↔ G.Adj u v\n  abs_lt : ∀ u v, |f u v| < k\n  sum_eq_zero : ∀ v, ∑ w, f v w = 0\n\n/-- The finite simple graph `G` has a nowhere-zero `k`-flow. -/\ndef HasNowhereZeroFlow (G : SimpleGraph V) (k : ℕ) : Prop :=\n  ∃ f, IsNowhereZeroFlow G k f\n\n/--\n**Tutte's 5-flow conjecture** (1954).\n\nEvery bridgeless graph has a nowhere-zero 5-flow: for every finite simple graph $G$ without\nbridges there is a skew-symmetric $f : V \\times V \\to \\mathbb{Z}$ that is nonzero exactly on\nthe edges of $G$, satisfies $|f(u, v)| < 5$, and has zero net flow at every vertex.\n\nAn edgeless graph is bridgeless and admits the zero flow, so the statement holds trivially for\nit.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow (G : SimpleGraph V) (hG : G.IsBridgeless) :\n    HasNowhereZeroFlow G 5 := by\n  sorry\n\n/--\n**Seymour's 6-flow theorem** (1981).\n\nEvery bridgeless graph has a nowhere-zero 6-flow.\n-/\n@[category research solved, AMS 5]\ntheorem nowhere_zero_6_flow (G : SimpleGraph V) (hG : G.IsBridgeless) :\n    HasNowhereZeroFlow G 6 := by\n  sorry\n\n/-- A nowhere-zero `k`-flow is a nowhere-zero `m`-flow for every `m ≥ k`. -/\n@[category API, AMS 5]\ntheorem HasNowhereZeroFlow.mono {G : SimpleGraph V} {k m : ℕ} (hkm : k ≤ m)\n    (h : HasNowhereZeroFlow G k) : HasNowhereZeroFlow G m := by\n  obtain ⟨f, hf⟩ := h\n  exact ⟨f, hf.skew, hf.ne_zero_iff, fun u v => (hf.abs_lt u v).trans_le (by exact_mod_cast hkm),\n    hf.sum_eq_zero⟩\n\n/-- The edgeless graph has a nowhere-zero `k`-flow for every `k ≥ 1`, namely the zero flow. -/\n@[category test, AMS 5]\ntheorem hasNowhereZeroFlow_bot {k : ℕ} (hk : 0 < k) :\n    HasNowhereZeroFlow (⊥ : SimpleGraph V) k :=\n  ⟨0, fun _ _ => by simp, fun _ _ => by simp, fun _ _ => by simpa, fun _ => by simp⟩\n\n/-- A single edge is a bridge and has no nowhere-zero `k`-flow. -/\n@[category test, AMS 5]\ntheorem not_hasNowhereZeroFlow_top_fin_two (k : ℕ) :\n    ¬ HasNowhereZeroFlow (⊤ : SimpleGraph (Fin 2)) k := by\n  rintro ⟨f, hf⟩\n  have h01 : f 0 1 ≠ 0 := (hf.ne_zero_iff 0 1).mpr (by decide)\n  have h00 : f 0 0 = 0 := by\n    have := hf.skew 0 0\n    omega\n  have := hf.sum_eq_zero 0\n  simp [Fin.sum_univ_two, h00] at this\n  exact h01 this\n\n/-- The triangle has a nowhere-zero `2`-flow: send one unit of flow around the cycle. -/\n@[category test, AMS 5]\ntheorem hasNowhereZeroFlow_top_fin_three : HasNowhereZeroFlow (⊤ : SimpleGraph (Fin 3)) 2 := by\n  refine ⟨fun u v => if v = u + 1 then 1 else if u = v + 1 then -1 else 0, ?_, ?_, ?_, ?_⟩\n  all_goals decide\n\nend NowhereZero5Flow\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single slot matches the source entry; the notes' reading (finite, multigraph ⇔ simple graph, integer circulation with 0 < |φ| < 5, vacuous for edgeless graphs) was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple graphs (`SimpleGraph V` with `[Fintype V]`), as everywhere in the repository. The conjecture is usually stated for multigraphs; the module docstring records that deleting loops and subdividing every edge preserves bridgelessness and existence of a nowhere-zero k-flow, so the simple-graph statement is equivalent to the multigraph one (as the decomposition notes also say).",
+    "The flow is encoded orientation-free as a skew-symmetric `f : V → V → ℤ` with `f u v ≠ 0 ↔ G.Adj u v`, `|f u v| < k` and `∑ w, f v w = 0` at each vertex. This is equivalent to choosing an orientation and an integer circulation φ with 0 < |φ(e)| < k (Diestel's textbook formulation); orientation independence is stated in the source article. Requiring `f = 0` off edges is what makes the Kirchhoff sum over all `w` range over incident edges only.",
+    "The bound is strict on both sides (`0 < |f| < 5`), following the article's definition 'if k is an integer and 0 < |φ(e)| < k then φ is a k-flow'. Integer flows rather than ZMod 5 flows were chosen since that is the article's definition of a k-flow (equivalent by Tutte's theorem).",
+    "Bridgelessness uses the repository's `SimpleGraph.IsBridgeless` (every edge is not a Mathlib `IsBridge`). No connectivity assumption is added, matching the source; the edgeless graph is bridgeless and satisfies the statement via the zero flow (checked by the test `hasNowhereZeroFlow_bot`).",
+    "The theorem is stated in the direct form `hG : G.IsBridgeless → HasNowhereZeroFlow G 5` (not `answer(sorry) ↔ ...`) since the source is an assertion, not a question, per CONTRIBUTING.md.",
+    "Extra declarations in the file beyond the slot: Seymour's 6-flow theorem as a `research solved` variant (from the same article section), an `API` monotonicity lemma, and three proved `test` theorems (edgeless graph has a k-flow for k ≥ 1; a single edge has no nowhere-zero flow; the triangle has a nowhere-zero 2-flow) that check the bespoke definition from both sides, as CONTRIBUTING.md asks for bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Digraph.IsOrientation` (FormalConjecturesForMathlib) plus an explicit `Digraph` and edge-indexed φ; rejected as more cumbersome and equivalent to the skew-symmetric encoding (sign of `f u v` determines the orientation of edge {u,v}). Mathlib's `Digraph.toSimpleGraphInclusive` and `SimpleGraph.IsBridge` were also inspected.",
+     "name": "NowhereZero5Flow.IsNowhereZeroFlow",
+     "why_needed": "No notion of a (nowhere-zero, k-bounded) integer flow/circulation on a graph exists in Mathlib or FormalConjecturesForMathlib (grepped for flow, circulation, nowhere-zero, Kirchhoff). Structure with fields: skew-symmetry `f v u = -f u v`; `f u v ≠ 0 ↔ G.Adj u v`; `|f u v| < k`; `∑ w, f v w = 0` for every `v`."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or the repo.",
+     "name": "NowhereZero5Flow.HasNowhereZeroFlow",
+     "why_needed": "`∃ f, IsNowhereZeroFlow G k f`: the graph-level predicate 'G has a nowhere-zero k-flow' used in the conjecture statement."
+    }
+   ],
+   "per_slot": {
+    "nowhere_zero_5_flow": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `theorem nowhere_zero_5_flow (G : SimpleGraph V) [Fintype V] (hG : G.IsBridgeless) : HasNowhereZeroFlow G 5`, where `HasNowhereZeroFlow G k` is the existence of a skew-symmetric `f : V → V → ℤ` that is nonzero exactly on the edges of `G`, satisfies `|f u v| < k`, and has zero net outflow at every vertex. This is the standard orientation-free encoding of 'some (equivalently every) orientation admits an integer circulation with 0 < |φ(e)| < k'. Mathlib and FormalConjecturesForMathlib have no flow/circulation primitives, so the two definitions are bespoke; `G.IsBridgeless` comes from FormalConjecturesForMathlib."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "nowhere_zero_5_flow": "/--\n**Tutte's 5-flow conjecture** (1954).\n\nEvery bridgeless graph has a nowhere-zero 5-flow: for every finite simple graph $G$ without\nbridges there is a skew-symmetric $f : V \\times V \\to \\mathbb{Z}$ that is nonzero exactly on\nthe edges of $G$, satisfies $|f(u, v)| < 5$, and has zero net flow at every vertex.\n\nAn edgeless graph is bridgeless and admits the zero flow, so the statement holds trivially for\nit.\n-/\n@[category research open, AMS 5]\ntheorem nowhere_zero_5_flow (G : SimpleGraph V) (hG : G.IsBridgeless) :\n    HasNowhereZeroFlow G 5 := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "nowhere_zero_5_flow": "c01"
+ },
+ "id": "wp-nowhere-zero-5-flow",
+ "main_attempt": "c01"
+}

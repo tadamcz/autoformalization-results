@@ -1,0 +1,306 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Newman–Shanks–Williams primes\n\n*References:*\n- [Wikipedia, Newman–Shanks–Williams prime](https://en.wikipedia.org/wiki/Newman%E2%80%93Shanks%E2%80%93Williams_prime)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [OEIS A001333](https://oeis.org/A001333) (the sequence $S_n$)\n- [OEIS A088165](https://oeis.org/A088165) (the NSW primes)\n- [OEIS A005850](https://oeis.org/A005850) (the indices $n$ with $S_n$ an NSW prime)\n- M. Newman, D. Shanks, H. C. Williams, *Simple groups of square order and an interesting\n  sequence of primes*, Acta Arithmetica 38 (1980), 129–140.\n\nLet $S_0 = S_1 = 1$ and $S_n = 2 S_{n-1} + S_{n-2}$ for $n \\geq 2$, so that\n$$S_n = \\frac{(1 + \\sqrt 2)^n + (1 - \\sqrt 2)^n}{2}.$$\nA *Newman–Shanks–Williams prime* (NSW prime) is a prime number of the form $S_{2m+1}$,\ni.e. a prime that is an odd-indexed term of this sequence. The first NSW primes are\n$7, 41, 239, 9369319, 63018038201, \\ldots$, with indices $3, 5, 7, 19, 29, \\ldots$.\n\nIt is an open question whether there are infinitely many NSW primes.\n-/\n\nnamespace NewmanShanksWilliamsPrime\n\n/-- The sequence $S_n$ defined by $S_0 = 1$, $S_1 = 1$ and $S_{n+2} = 2 S_{n+1} + S_n$.\nIts terms are half the companion Pell numbers, and $S_n = ((1 + \\sqrt 2)^n + (1 - \\sqrt 2)^n)/2$.\n-/\ndef nsw : ℕ → ℕ\n  | 0 => 1\n  | 1 => 1\n  | n + 1 + 1 => 2 * nsw (n + 1) + nsw n\n\n@[category test, AMS 11]\ntheorem nsw_zero : nsw 0 = 1 := rfl\n\n@[category test, AMS 11]\ntheorem nsw_one : nsw 1 = 1 := rfl\n\n@[category test, AMS 11]\ntheorem nsw_two : nsw 2 = 3 := rfl\n\n@[category test, AMS 11]\ntheorem nsw_three : nsw 3 = 7 := rfl\n\n@[category test, AMS 11]\ntheorem nsw_four : nsw 4 = 17 := rfl\n\n@[category test, AMS 11]\ntheorem nsw_five : nsw 5 = 41 := rfl\n\n@[category test, AMS 11]\ntheorem nsw_six : nsw 6 = 99 := rfl\n\n@[category test, AMS 11]\ntheorem nsw_seven : nsw 7 = 239 := rfl\n\n@[category test, AMS 11]\ntheorem nsw_nineteen : nsw 19 = 9369319 := by decide\n\n/-- The closed form $S_n = ((1 + \\sqrt 2)^n + (1 - \\sqrt 2)^n) / 2$ used in the definition of\nNSW primes on Wikipedia. -/\n@[category textbook, AMS 11]\ntheorem coe_nsw_eq (n : ℕ) : (nsw n : ℝ) = ((1 + √2) ^ n + (1 - √2) ^ n) / 2 := by\n  -- The characteristic polynomial of the recursion is $x^2 = 2x + 1$, with roots\n  -- $\\alpha = 1 + \\sqrt 2$ and $\\beta = 1 - \\sqrt 2$. The function $(\\alpha^n + \\beta^n) / 2$\n  -- satisfies the same recursion and the same base cases as `nsw`.\n  set α : ℝ := 1 + √2 with hα_def\n  set β : ℝ := 1 - √2 with hβ_def\n  have hsq2 : (√2 : ℝ) ^ 2 = 2 := Real.sq_sqrt (by norm_num)\n  have hα_sq : α ^ 2 = 2 * α + 1 := by rw [hα_def]; ring_nf; linarith [hsq2]\n  have hβ_sq : β ^ 2 = 2 * β + 1 := by rw [hβ_def]; ring_nf; linarith [hsq2]\n  have hα_rec : ∀ n, α ^ (n + 2) = 2 * α ^ (n + 1) + α ^ n := by\n    intro n\n    have : α ^ (n + 2) = α ^ n * α ^ 2 := by ring\n    rw [this, hα_sq]; ring\n  have hβ_rec : ∀ n, β ^ (n + 2) = 2 * β ^ (n + 1) + β ^ n := by\n    intro n\n    have : β ^ (n + 2) = β ^ n * β ^ 2 := by ring\n    rw [this, hβ_sq]; ring\n  suffices h : ∀ n,\n      (nsw n : ℝ) = (α ^ n + β ^ n) / 2 ∧\n      (nsw (n + 1) : ℝ) = (α ^ (n + 1) + β ^ (n + 1)) / 2 from\n    (h n).1\n  intro n\n  induction n with\n  | zero =>\n    refine ⟨?_, ?_⟩\n    · simp [nsw]\n    · simp only [nsw, pow_one, Nat.cast_one, zero_add, hα_def, hβ_def]\n      ring\n  | succ k ih =>\n    obtain ⟨hk, hk1⟩ := ih\n    refine ⟨hk1, ?_⟩\n    have hrec : nsw (k + 1 + 1) = 2 * nsw (k + 1) + nsw k := rfl\n    show (nsw (k + 1 + 1) : ℝ) = (α ^ (k + 1 + 1) + β ^ (k + 1 + 1)) / 2\n    rw [hrec]\n    push_cast\n    rw [hk1, hk, hα_rec k, hβ_rec k]\n    ring\n\n/-- The sequence $S_n$ is strictly increasing for $n \\geq 1$. -/\n@[category textbook, AMS 11]\ntheorem nsw_lt_nsw_succ {n : ℕ} (hn : 1 ≤ n) : nsw n < nsw (n + 1) := by\n  induction n with\n  | zero => omega\n  | succ k ih =>\n    rcases Nat.eq_zero_or_pos k with rfl | hk\n    · decide\n    · have := ih hk\n      show nsw (k + 1) < 2 * nsw (k + 1) + nsw k\n      omega\n\n/-- A *Newman–Shanks–Williams prime* is a prime number $p$ of the form\n$$p = S_{2m+1} = \\frac{(1 + \\sqrt 2)^{2m+1} + (1 - \\sqrt 2)^{2m+1}}{2}$$\nfor some $m \\geq 0$, where $S_0 = S_1 = 1$ and $S_n = 2 S_{n-1} + S_{n-2}$.\nOnly odd indices are allowed: for instance $S_2 = 3$ and $S_4 = 17$ are prime but are not\nNSW primes. -/\ndef IsNSWPrime (p : ℕ) : Prop :=\n  p.Prime ∧ ∃ m : ℕ, p = nsw (2 * m + 1)\n\n@[category test, AMS 11]\ntheorem isNSWPrime_seven : IsNSWPrime 7 :=\n  ⟨by norm_num, 1, rfl⟩\n\n@[category test, AMS 11]\ntheorem isNSWPrime_fortyOne : IsNSWPrime 41 :=\n  ⟨by norm_num, 2, rfl⟩\n\n@[category test, AMS 11]\ntheorem isNSWPrime_twoHundredThirtyNine : IsNSWPrime 239 :=\n  ⟨by norm_num, 3, rfl⟩\n\n/-- $S_2 = 3$ is prime, but it is not an NSW prime since its index is even. -/\n@[category test, AMS 11]\ntheorem not_isNSWPrime_three : ¬ IsNSWPrime 3 := by\n  rintro ⟨-, m, hm⟩\n  rcases m with _ | m\n  · exact absurd hm (by decide)\n  · have h1 : nsw 3 ≤ nsw (2 * (m + 1) + 1) := by\n      have hmono : ∀ k, nsw 3 ≤ nsw (3 + k) := by\n        intro k\n        induction k with\n        | zero => exact le_rfl\n        | succ j ihj => exact ihj.trans (nsw_lt_nsw_succ (by omega)).le\n      simpa [show 2 * (m + 1) + 1 = 3 + 2 * m by ring] using hmono (2 * m)\n    rw [← hm] at h1\n    exact absurd h1 (by decide)\n\n/--\nAre there infinitely many Newman–Shanks–Williams primes? That is, are there infinitely many\nprimes $p$ of the form\n$$p = S_{2m+1} = \\frac{(1 + \\sqrt 2)^{2m+1} + (1 - \\sqrt 2)^{2m+1}}{2},$$\nwhere $S_0 = S_1 = 1$ and $S_n = 2 S_{n-1} + S_{n-2}$ for $n \\geq 2$?\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ {p : ℕ | IsNSWPrime p}.Infinite := by\n  sorry\n\n/-- There are infinitely many NSW primes if and only if there are infinitely many indices $m$\nwith $S_{2m+1}$ prime, since $S_{2m+1}$ is strictly increasing in $m$. -/\n@[category test, AMS 11]\ntheorem infinite_isNSWPrime_iff :\n    {p : ℕ | IsNSWPrime p}.Infinite ↔ {m : ℕ | (nsw (2 * m + 1)).Prime}.Infinite := by\n  have hinj : Function.Injective (fun m : ℕ => nsw (2 * m + 1)) := by\n    have hmono : StrictMono (fun m : ℕ => nsw (2 * m + 1)) := by\n      refine strictMono_nat_of_lt_succ fun m => ?_\n      have h1 : nsw (2 * m + 1) < nsw (2 * m + 2) := nsw_lt_nsw_succ (by omega)\n      have h2 : nsw (2 * m + 2) < nsw (2 * m + 3) := nsw_lt_nsw_succ (by omega)\n      show nsw (2 * m + 1) < nsw (2 * (m + 1) + 1)\n      rw [show 2 * (m + 1) + 1 = 2 * m + 3 by ring]\n      exact h1.trans h2\n    exact hmono.injective\n  have himage : {p : ℕ | IsNSWPrime p} =\n      (fun m : ℕ => nsw (2 * m + 1)) '' {m : ℕ | (nsw (2 * m + 1)).Prime} := by\n    ext p\n    simp only [IsNSWPrime, Set.mem_setOf_eq, Set.mem_image]\n    constructor\n    · rintro ⟨hp, m, rfl⟩\n      exact ⟨m, hp, rfl⟩\n    · rintro ⟨m, hm, rfl⟩\n      exact ⟨hm, m, rfl⟩\n  rw [himage, Set.infinite_image_iff hinj.injOn]\n\nend NewmanShanksWilliamsPrime\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "None. The single-slot decomposition matches the source: one yes/no question about the infinitude of the set of primes of the form S_{2m+1}. The note's claim that the prime-set and index formulations are equivalent is confirmed by a proven lemma in the file.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list-page entry is a yes/no question, so the repository's question style `answer(sorry) ↔ P` is used; `answer(True)` is the positive answer (infinitely many NSW primes exist).",
+    "'Infinitely many NSW primes' is modeled as the set of natural numbers p with `IsNSWPrime p` being `Set.Infinite`, i.e. counting distinct primes, exactly as the entry says. The alternative index formulation `{m | (nsw (2*m+1)).Prime}.Infinite` is proven equivalent in the file (`infinite_isNSWPrime_iff`) via strict monotonicity of S_n for n ≥ 1, but is not stated as a separate research-open declaration since the decomposition table has a single slot.",
+    "The sequence `nsw` is defined by the recurrence from the Wikipedia article (S_0 = S_1 = 1, S_n = 2S_{n-1} + S_{n-2}) rather than by the real closed form, to keep it in ℕ; the closed form `(nsw n : ℝ) = ((1+√2)^n + (1-√2)^n)/2` is proven as a textbook lemma so both descriptions in the source are verified to agree.",
+    "`IsNSWPrime` uses `Nat.Prime` and requires the index to be odd (`2*m+1` with `m : ℕ`, so m = 0 gives S_1 = 1, which is not prime and hence harmless). The test `not_isNSWPrime_three` confirms that the prime even-indexed term S_2 = 3 is excluded, as required by the definition.",
+    "Copyright year 2026 follows the most recent files in the repository (e.g. Wikipedia/Pell.lean)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `Pell.xn` (NumberTheory/PellMatiyasevic): `Pell.xn 3 n` equals S_{2n} but only produces even-indexed terms, so it cannot express S_{2m+1}. Also considered `PellNumbers.pellNumber` in Wikipedia/Pell.lean (the Pell numbers P_n, a different sequence, local to that file) and `Nat.fib`.",
+     "name": "NewmanShanksWilliamsPrime.nsw",
+     "why_needed": "The sequence S_0 = S_1 = 1, S_{n+2} = 2 S_{n+1} + S_n (OEIS A001333, half the companion Pell numbers) is not in Mathlib or FormalConjecturesForMathlib. It is needed to define NSW primes as the odd-indexed prime terms."
+    },
+    {
+     "closest_existing_considered": "Inlining `p.Prime ∧ ∃ m, p = nsw (2*m+1)` in the theorem statement (as FibonacciPrimes.lean does); a named predicate was preferred for clarity and testability (tests for 7, 41, 239 and ¬ IsNSWPrime 3).",
+     "name": "NewmanShanksWilliamsPrime.IsNSWPrime",
+     "why_needed": "Problem-specific predicate: p is prime and p = S_{2m+1} for some m. Mirrors `FactorialPrime.IsFactorialPrime` in Wikipedia/FactorialPrime.lean; makes the odd-index restriction explicit and documented."
+    }
+   ],
+   "per_slot": {
+    "newman_shanks_williams_prime": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ {p : ℕ | IsNSWPrime p}.Infinite`, where `IsNSWPrime p := p.Prime ∧ ∃ m, p = nsw (2*m+1)` and `nsw` is the sequence S_0 = S_1 = 1, S_{n+2} = 2 S_{n+1} + S_n. Mathlib has no definition of this sequence (Pell.xn 3 n only yields the even-indexed terms S_{2n}), so a bespoke sequence and predicate were added, following the pattern of Wikipedia/Pell.lean. The closed form ((1+√2)^n + (1-√2)^n)/2 from the Wikipedia definition is proven as a textbook lemma, and the equivalence with the 'infinitely many indices m with S_{2m+1} prime' reading is proven as a test."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "newman_shanks_williams_prime": "/--\nAre there infinitely many Newman–Shanks–Williams primes? That is, are there infinitely many\nprimes $p$ of the form\n$$p = S_{2m+1} = \\frac{(1 + \\sqrt 2)^{2m+1} + (1 - \\sqrt 2)^{2m+1}}{2},$$\nwhere $S_0 = S_1 = 1$ and $S_n = 2 S_{n-1} + S_{n-2}$ for $n \\geq 2$?\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ {p : ℕ | IsNSWPrime p}.Infinite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Newman–Shanks–Williams primes\n\n*References:*\n - [Wikipedia](https://en.wikipedia.org/wiki/Newman%E2%80%93Shanks%E2%80%93Williams_prime)\n - [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n - [A001333](https://oeis.org/A001333), [A088165](https://oeis.org/A088165),\n   [A005850](https://oeis.org/A005850)\n - [NSW80] Newman, M., Shanks, D. and Williams, H. C., *Simple groups of square order and an\n   interesting sequence of primes*. Acta Arithmetica (1980), 129–140.\n\nLet $S_0 = 1$, $S_1 = 1$ and $S_n = 2 S_{n-1} + S_{n-2}$ for $n \\geq 2$, so that\n$$S_n = \\frac{(1 + \\sqrt 2)^n + (1 - \\sqrt 2)^n}{2}.$$\nThe first few terms are $1, 1, 3, 7, 17, 41, 99, \\ldots$ ([A001333](https://oeis.org/A001333)).\nEach term is half the corresponding companion Pell number.\n\nA *Newman–Shanks–Williams prime* (NSW prime) is a prime number of the form $S_{2m+1}$, that is,\na prime term of odd index in this sequence. The first few NSW primes are\n$7, 41, 239, 9369319, 63018038201, \\ldots$ ([A088165](https://oeis.org/A088165)), with indices\n$3, 5, 7, 19, 29, \\ldots$ ([A005850](https://oeis.org/A005850)). The odd-index restriction\nmatters: $S_2 = 3$, $S_4 = 17$ and $S_8 = 577$ are prime but are not NSW primes.\n\nThe question asks whether there are infinitely many NSW primes.\n-/\n\nnamespace NewmanShanksWilliamsPrime\n\n/-- The sequence $S_n$ defined by $S_0 = 1$, $S_1 = 1$ and $S_{n+2} = 2 S_{n+1} + S_n$\n([A001333](https://oeis.org/A001333)). Its terms of odd index are the candidates for\nNewman–Shanks–Williams primes. -/\ndef nswSeq : ℕ → ℕ\n  | 0 => 1\n  | 1 => 1\n  | n + 1 + 1 => 2 * nswSeq (n + 1) + nswSeq n\n\n@[category test, AMS 11]\ntheorem nswSeq_zero : nswSeq 0 = 1 := rfl\n\n@[category test, AMS 11]\ntheorem nswSeq_one : nswSeq 1 = 1 := rfl\n\n@[category test, AMS 11]\ntheorem nswSeq_two : nswSeq 2 = 3 := rfl\n\n@[category test, AMS 11]\ntheorem nswSeq_three : nswSeq 3 = 7 := rfl\n\n@[category test, AMS 11]\ntheorem nswSeq_five : nswSeq 5 = 41 := rfl\n\n@[category test, AMS 11]\ntheorem nswSeq_six : nswSeq 6 = 99 := rfl\n\n@[category test, AMS 11]\ntheorem nswSeq_seven : nswSeq 7 = 239 := rfl\n\n/-- The closed form $S_n = \\frac{(1 + \\sqrt 2)^n + (1 - \\sqrt 2)^n}{2}$. -/\n@[category textbook, AMS 11]\ntheorem coe_nswSeq_eq (n : ℕ) : (nswSeq n : ℝ) = ((1 + √2) ^ n + (1 - √2) ^ n) / 2 := by\n  -- The characteristic polynomial of the recursion is $x^2 = 2x + 1$, with roots\n  -- $\\alpha = 1 + \\sqrt{2}$ and $\\beta = 1 - \\sqrt{2}$. The function $(\\alpha^n + \\beta^n) / 2$\n  -- satisfies the same recursion and the same base cases as `nswSeq`.\n  set α : ℝ := 1 + √2 with hα_def\n  set β : ℝ := 1 - √2 with hβ_def\n  have hsq2 : (√2 : ℝ) ^ 2 = 2 := Real.sq_sqrt (by norm_num)\n  have hα_sq : α ^ 2 = 2 * α + 1 := by rw [hα_def]; ring_nf; linarith [hsq2]\n  have hβ_sq : β ^ 2 = 2 * β + 1 := by rw [hβ_def]; ring_nf; linarith [hsq2]\n  have hα_rec : ∀ n, α ^ (n + 2) = 2 * α ^ (n + 1) + α ^ n := by\n    intro n\n    have : α ^ (n + 2) = α ^ n * α ^ 2 := by ring\n    rw [this, hα_sq]; ring\n  have hβ_rec : ∀ n, β ^ (n + 2) = 2 * β ^ (n + 1) + β ^ n := by\n    intro n\n    have : β ^ (n + 2) = β ^ n * β ^ 2 := by ring\n    rw [this, hβ_sq]; ring\n  -- Joint induction on consecutive indices.\n  suffices h : ∀ n,\n      (nswSeq n : ℝ) = (α ^ n + β ^ n) / 2 ∧\n      (nswSeq (n + 1) : ℝ) = (α ^ (n + 1) + β ^ (n + 1)) / 2 from (h n).1\n  intro n\n  induction n with\n  | zero =>\n    refine ⟨?_, ?_⟩\n    · simp [nswSeq]\n    · simp only [nswSeq, pow_one, Nat.cast_one, zero_add]\n      rw [hα_def, hβ_def]; ring\n  | succ k ih =>\n    obtain ⟨hk, hk1⟩ := ih\n    refine ⟨hk1, ?_⟩\n    have hrec : nswSeq (k + 1 + 1) = 2 * nswSeq (k + 1) + nswSeq k := rfl\n    show (nswSeq (k + 1 + 1) : ℝ) = (α ^ (k + 1 + 1) + β ^ (k + 1 + 1)) / 2\n    rw [hrec]\n    push_cast\n    rw [hk1, hk, hα_rec k, hβ_rec k]\n    ring\n\n@[category API, AMS 11]\ntheorem nswSeq_pos (n : ℕ) : 0 < nswSeq n := by\n  induction n using nswSeq.induct with\n  | case1 => decide\n  | case2 => decide\n  | case3 n _ _ => show 0 < 2 * nswSeq (n + 1) + nswSeq n; omega\n\n@[category API, AMS 11]\ntheorem nswSeq_lt_nswSeq_succ (n : ℕ) : nswSeq (n + 1) < nswSeq (n + 2) := by\n  show nswSeq (n + 1) < 2 * nswSeq (n + 1) + nswSeq n\n  have := nswSeq_pos (n + 1)\n  omega\n\n/-- The odd-index subsequence $m \\mapsto S_{2m+1}$ is strictly increasing. -/\n@[category API, AMS 11]\ntheorem strictMono_nswSeq_odd : StrictMono fun m => nswSeq (2 * m + 1) := by\n  refine strictMono_nat_of_lt_succ fun m => ?_\n  calc nswSeq (2 * m + 1) < nswSeq (2 * m + 2) := nswSeq_lt_nswSeq_succ _\n    _ < nswSeq (2 * m + 3) := nswSeq_lt_nswSeq_succ _\n    _ = nswSeq (2 * (m + 1) + 1) := by ring_nf\n\n/-- A natural number $p$ is a *Newman–Shanks–Williams prime* if it is prime and it is of the\nform $S_{2m+1}$ for some $m$, where $S$ is the sequence `nswSeq`. -/\ndef IsNSWPrime (p : ℕ) : Prop :=\n  p.Prime ∧ ∃ m : ℕ, p = nswSeq (2 * m + 1)\n\n@[category test, AMS 11]\ntheorem isNSWPrime_7 : IsNSWPrime 7 :=\n  ⟨by norm_num, 1, rfl⟩\n\n@[category test, AMS 11]\ntheorem isNSWPrime_41 : IsNSWPrime 41 :=\n  ⟨by norm_num, 2, rfl⟩\n\n@[category test, AMS 11]\ntheorem isNSWPrime_239 : IsNSWPrime 239 :=\n  ⟨by norm_num, 3, rfl⟩\n\n/-- $S_2 = 3$ is prime but it is not a Newman–Shanks–Williams prime, since its index is even. -/\n@[category test, AMS 11]\ntheorem not_isNSWPrime_3 : ¬ IsNSWPrime 3 := by\n  rintro ⟨-, m, hm⟩\n  rcases m with _ | m\n  · exact absurd hm (by decide)\n  · have h7 : nswSeq (2 * 1 + 1) ≤ nswSeq (2 * (m + 1) + 1) :=\n      strictMono_nswSeq_odd.monotone (by omega)\n    rw [← hm] at h7\n    exact absurd h7 (by decide)\n\n/--\n**Newman–Shanks–Williams primes.**\nAre there infinitely many Newman–Shanks–Williams primes? That is, are there infinitely many\nprimes of the form\n$$S_{2m+1} = \\frac{(1 + \\sqrt 2)^{2m+1} + (1 - \\sqrt 2)^{2m+1}}{2},$$\nwhere $S_0 = S_1 = 1$ and $S_n = 2 S_{n-1} + S_{n-2}$ for $n \\geq 2$?\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ {p : ℕ | IsNSWPrime p}.Infinite := by\n  sorry\n\n/--\nEquivalent formulation in terms of indices: are there infinitely many $m$ such that\n$S_{2m+1}$ is prime?\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime.variant :\n    answer(sorry) ↔ {m : ℕ | (nswSeq (2 * m + 1)).Prime}.Infinite := by\n  sorry\n\n/-- The set of Newman–Shanks–Williams primes is the image of the set of indices $m$ with\n$S_{2m+1}$ prime under $m \\mapsto S_{2m+1}$. -/\n@[category API, AMS 11]\ntheorem setOf_isNSWPrime_eq_image :\n    {p : ℕ | IsNSWPrime p} =\n      (fun m => nswSeq (2 * m + 1)) '' {m : ℕ | (nswSeq (2 * m + 1)).Prime} := by\n  ext p\n  simp only [Set.mem_setOf_eq, Set.mem_image, IsNSWPrime]\n  constructor\n  · rintro ⟨hp, m, rfl⟩\n    exact ⟨m, hp, rfl⟩\n  · rintro ⟨m, hm, rfl⟩\n    exact ⟨hm, m, rfl⟩\n\n/-- The two formulations of the question are equivalent, since $m \\mapsto S_{2m+1}$ is\ninjective. -/\n@[category test, AMS 11]\ntheorem isNSWPrime_infinite_iff :\n    {p : ℕ | IsNSWPrime p}.Infinite ↔ {m : ℕ | (nswSeq (2 * m + 1)).Prime}.Infinite := by\n  rw [setOf_isNSWPrime_eq_image, Set.infinite_image_iff strictMono_nswSeq_odd.injective.injOn]\n\nend NewmanShanksWilliamsPrime\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "None. The single-slot decomposition is correct: the entry is one yes/no question. The notes' observations (odd-index restriction is essential; value-infinitude ⇔ index-infinitude by strict monotonicity) are both reflected and verified in the file.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Question form: the list entry is a yes/no question, so the repo's preferred `answer(sorry) ↔ P` style is used; `answer(True)` means there are infinitely many NSW primes.",
+    "'Infinitely many NSW primes' is formalized as infinitude of the set of prime *values* {p | IsNSWPrime p} (matching the article's definition of an NSW prime as a number). An index-based variant `newman_shanks_williams_prime.variant` ({m | (nswSeq (2m+1)).Prime}.Infinite) is also included, and the two are proved equivalent in the test `isNSWPrime_infinite_iff` via strict monotonicity of m ↦ S_{2m+1}.",
+    "The NSW sequence is defined by the recurrence (S₀ = S₁ = 1, Sₙ₊₂ = 2Sₙ₊₁ + Sₙ) rather than the real-number closed form, to keep it in ℕ; the closed form is stated and fully proved (`coe_nswSeq_eq`), so no faithfulness gap exists between the two descriptions.",
+    "The odd-index restriction 2m+1 is built into `IsNSWPrime`; the test `not_isNSWPrime_3` (S₂ = 3 is prime but not an NSW prime) checks it is enforced. m ranges over all of ℕ including m = 0 (S₁ = 1, not prime), which is harmless.",
+    "Tests `isNSWPrime_7`, `isNSWPrime_41`, `isNSWPrime_239` check the first three NSW primes from the article (A088165) against the definition.",
+    "Helper lemmas (`nswSeq_pos`, `nswSeq_lt_nswSeq_succ`, `strictMono_nswSeq_odd`, `setOf_isNSWPrime_eq_image`) are tagged `category API`; all are proved, no sorry outside the two open statements."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `Pell.xn` (in NumberTheory/PellMatiyasevic) with a = 3, d = 8: xn n = ((3+√8)^n + (3-√8)^n)/2 = S_{2n}, which only produces the even-index terms and so cannot express S_{2m+1}. Also considered `Zsqrtd`/`ℤ√2` powers (would need extracting the real part of (1+√2)^n and dividing by 2 — far less transparent). The repo's `PellNumbers.pellNumber` in Wikipedia/Pell.lean is the sibling sequence (P₀ = 0, P₁ = 1) with a different initial condition, and is file-local to that namespace; the same idiom was followed here.",
+     "name": "NewmanShanksWilliamsPrime.nswSeq",
+     "why_needed": "The sequence S₀ = S₁ = 1, Sₙ₊₂ = 2Sₙ₊₁ + Sₙ (OEIS A001333, half the companion Pell numbers) does not exist in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "No existing notion; inlining the conjunction into the set-builder (as TwinPrimes.lean does) was the alternative, but a named predicate allows the API/test lemmas (e.g. `not_isNSWPrime_3`) that check the odd-index restriction.",
+     "name": "NewmanShanksWilliamsPrime.IsNSWPrime",
+     "why_needed": "Predicate `p.Prime ∧ ∃ m, p = nswSeq (2*m+1)` packaging Wikipedia's definition of a Newman–Shanks–Williams prime, so the main statement reads directly as 'the set of NSW primes is infinite'."
+    }
+   ],
+   "per_slot": {
+    "newman_shanks_williams_prime": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ {p : ℕ | IsNSWPrime p}.Infinite` where `IsNSWPrime p := p.Prime ∧ ∃ m, p = nswSeq (2*m+1)` and `nswSeq` is the recurrence S₀ = S₁ = 1, Sₙ₊₂ = 2Sₙ₊₁ + Sₙ (A001333). This is exactly Wikipedia's definition of an NSW prime; the closed form ((1+√2)^n + (1-√2)^n)/2 is proved in the file as a textbook lemma, so the two descriptions of S are verified to agree. Mathlib has no sequence for these numbers (Pell.xn with a = 3 yields only the even-index terms S_{2n}), so bespoke definitions were needed, following the idiom of Wikipedia/Pell.lean."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "newman_shanks_williams_prime": "/--\n**Newman–Shanks–Williams primes.**\nAre there infinitely many Newman–Shanks–Williams primes? That is, are there infinitely many\nprimes of the form\n$$S_{2m+1} = \\frac{(1 + \\sqrt 2)^{2m+1} + (1 - \\sqrt 2)^{2m+1}}{2},$$\nwhere $S_0 = S_1 = 1$ and $S_n = 2 S_{n-1} + S_{n-2}$ for $n \\geq 2$?\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ {p : ℕ | IsNSWPrime p}.Infinite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Newman–Shanks–Williams primes\n\nThe Newman–Shanks–Williams numbers satisfy $S_0 = S_1 = 1$ and\n$S_{n+2} = 2S_{n+1} + S_n$. A Newman–Shanks–Williams prime is a prime of the form\n$S_{2m+1}$.\n\n*References:*\n- [Wikipedia, Newman–Shanks–Williams prime](https://en.wikipedia.org/wiki/Newman%E2%80%93Shanks%E2%80%93Williams_prime)\n-/\n\nnamespace NewmanShanksWilliamsPrime\n\n/-- The Newman–Shanks–Williams numbers, defined by $S_0 = S_1 = 1$ and\n$S_{n+2} = 2S_{n+1} + S_n$. -/\ndef newmanShanksWilliamsNumber : ℕ → ℕ\n  | 0 => 1\n  | 1 => 1\n  | n + 2 => 2 * newmanShanksWilliamsNumber (n + 1) + newmanShanksWilliamsNumber n\n\n/--\nAre there infinitely many Newman–Shanks–Williams primes? Precisely, is the set of primes of the\nform $S_{2m+1}$ infinite, where $S_0 = S_1 = 1$ and $S_{n+2} = 2S_{n+1} + S_n$?\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ Set.Infinite {p : ℕ | p.Prime ∧\n      ∃ m : ℕ, p = newmanShanksWilliamsNumber (2 * m + 1)} := by\n  sorry\n\nend NewmanShanksWilliamsPrime\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Preserved the source as a yes/no question using `answer(sorry) ↔ ...`; a positive answer is exactly infinitude of the specified set.",
+    "Formalized Newman–Shanks–Williams primes directly as prime values `p` for which `p = S_(2*m+1)` for some natural `m`, rather than as an index set. This follows the article's definition and the decomposition table's primary formulation.",
+    "Defined `S` over natural numbers by the article's recurrence `S_0 = S_1 = 1` and `S_(n+2) = 2*S_(n+1) + S_n`. The boundary value `m = 0` contributes `S_1 = 1`, which is not prime and therefore does not alter the intended set.",
+    "Used all indices of the form `2*m+1`; this essential odd-index restriction excludes prime even-index terms that are not Newman–Shanks–Williams primes."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`LucasSequence.V 2 (-1)` in `FormalConjecturesForMathlib.NumberTheory.WallSunSunPrimes` gives twice this sequence over the integers, requiring division and a conversion back to naturals. `PellNumbers.pellNumber` in another Wikipedia problem has initial values 0, 1, is not a helper-library primitive, and denotes a different sequence.",
+     "name": "NewmanShanksWilliamsPrime.newmanShanksWilliamsNumber",
+     "why_needed": "The conjecture requires the natural-valued sequence with initial values 1, 1 and recurrence `S_(n+2) = 2*S_(n+1) + S_n`; no direct NSW/companion-Pell-number primitive was found."
+    }
+   ],
+   "per_slot": {
+    "newman_shanks_williams_prime": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "newman_shanks_williams_prime": "/--\nAre there infinitely many Newman–Shanks–Williams primes? Precisely, is the set of primes of the\nform $S_{2m+1}$ infinite, where $S_0 = S_1 = 1$ and $S_{n+2} = 2S_{n+1} + S_n$?\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ Set.Infinite {p : ℕ | p.Prime ∧\n      ∃ m : ℕ, p = newmanShanksWilliamsNumber (2 * m + 1)} := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Newman–Shanks–Williams primes\n\n*Reference:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Newman%E2%80%93Shanks%E2%80%93Williams_prime)\n-/\n\nnamespace NewmanShanksWilliamsPrime\n\n/--\nThe Newman–Shanks–Williams sequence is defined by $S_0 = S_1 = 1$ and\n$S_{n+2} = 2S_{n+1} + S_n$.\n-/\ndef newmanShanksWilliamsNumber : ℕ → ℕ\n  | 0 => 1\n  | 1 => 1\n  | n + 1 + 1 =>\n      2 * newmanShanksWilliamsNumber (n + 1) + newmanShanksWilliamsNumber n\n\n@[category test, AMS 11]\ntheorem newmanShanksWilliamsNumber_zero : newmanShanksWilliamsNumber 0 = 1 := rfl\n\n@[category test, AMS 11]\ntheorem newmanShanksWilliamsNumber_two : newmanShanksWilliamsNumber 2 = 3 := rfl\n\n@[category test, AMS 11]\ntheorem newmanShanksWilliamsNumber_three : newmanShanksWilliamsNumber 3 = 7 := rfl\n\n/--\nAre there infinitely many Newman–Shanks–Williams primes? A Newman–Shanks–Williams\nprime is a prime $p$ equal to $S_{2m+1}$ for some $m \\in \\mathbb{N}$, where\n$S_0 = S_1 = 1$ and $S_{n+2} = 2S_{n+1} + S_n$.\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔\n      {p : ℕ | p.Prime ∧ ∃ m : ℕ, p = newmanShanksWilliamsNumber (2 * m + 1)}.Infinite := by\n  sorry\n\nend NewmanShanksWilliamsPrime\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Because the source is a yes/no question, the theorem is stated as `answer(sorry) ↔ P`, where `P` is the positive assertion that the set of Newman–Shanks–Williams prime values is infinite.",
+    "A Newman–Shanks–Williams prime is modeled as a natural prime `p` equal to `S (2 * m + 1)` for some natural `m`; this enforces the source's essential odd-index restriction and excludes prime terms at even indices.",
+    "The sequence is defined directly over `ℕ` by `S₀ = S₁ = 1` and `Sₙ₊₂ = 2 Sₙ₊₁ + Sₙ`, exactly as in the background article. The infinite set is a set of prime values, rather than indices, matching the definition of NSW primes."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`LucasSequence.V 2 (-1)` in `FormalConjecturesForMathlib.NumberTheory.WallSunSunPrimes` is integer-valued and equals twice this sequence, so using it would require integer division by two and conversion to naturals. `PellNumbers.pellNumber` has the same recurrence but different initial values 0, 1.",
+     "name": "NewmanShanksWilliamsPrime.newmanShanksWilliamsNumber",
+     "why_needed": "The conjecture requires the sequence with initial values 1, 1 and recurrence `Sₙ₊₂ = 2 Sₙ₊₁ + Sₙ`; no exact natural-number sequence definition was found."
+    }
+   ],
+   "per_slot": {
+    "newman_shanks_williams_prime": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "newman_shanks_williams_prime": "/--\nAre there infinitely many Newman–Shanks–Williams primes? A Newman–Shanks–Williams\nprime is a prime $p$ equal to $S_{2m+1}$ for some $m \\in \\mathbb{N}$, where\n$S_0 = S_1 = 1$ and $S_{n+2} = 2S_{n+1} + S_n$.\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔\n      {p : ℕ | p.Prime ∧ ∃ m : ℕ, p = newmanShanksWilliamsNumber (2 * m + 1)}.Infinite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Newman–Shanks–Williams primes\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Newman%E2%80%93Shanks%E2%80%93Williams_prime)\n-/\n\nnamespace NewmanShanksWilliamsPrime\n\n/-- The sequence $S_0 = S_1 = 1$ and $S_{n+2} = 2S_{n+1} + S_n$. -/\ndef newmanShanksWilliamsNumber : ℕ → ℕ\n  | 0 => 1\n  | 1 => 1\n  | n + 2 => 2 * newmanShanksWilliamsNumber (n + 1) + newmanShanksWilliamsNumber n\n\n/-- The first four Newman–Shanks–Williams sequence values are $1, 1, 3, 7$. -/\n@[category test, AMS 11]\ntheorem newmanShanksWilliamsNumber_first_terms :\n    newmanShanksWilliamsNumber 0 = 1 ∧ newmanShanksWilliamsNumber 1 = 1 ∧\n      newmanShanksWilliamsNumber 2 = 3 ∧ newmanShanksWilliamsNumber 3 = 7 := by\n  norm_num [newmanShanksWilliamsNumber]\n\n/--\nAre there infinitely many Newman–Shanks–Williams primes, namely primes of the form\n$S_{2m+1}$, where $S_0 = S_1 = 1$ and $S_{n+2} = 2S_{n+1} + S_n$?\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ {p : ℕ | p.Prime ∧ ∃ m : ℕ,\n      p = newmanShanksWilliamsNumber (2 * m + 1)}.Infinite := by\n  sorry\n\nend NewmanShanksWilliamsPrime\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted a Newman–Shanks–Williams prime from the background article as a natural prime value S_(2m+1), where m is natural and S_0 = S_1 = 1, S_(n+2) = 2 S_(n+1) + S_n.",
+    "Formalized “infinitely many ... primes” as infinitude of the set of prime values p having p = S_(2m+1), rather than infinitude of qualifying indices. This directly follows the wording and does not rely on an unstated injectivity/strict-growth lemma.",
+    "Retained the essential odd-index restriction 2m+1; m = 0 contributes S_1 = 1, which is harmless because the set also requires p.Prime.",
+    "Used answer(sorry) ↔ ... because the source is an unresolved yes/no question, following repository conventions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FormalConjecturesForMathlib.NumberTheory.WallSunSunPrimes defines the integer-valued LucasSequence.V; V 2 (-1) is twice the required sequence and would require division and coercions. The nearby PellNumbers.pellNumber has the same recurrence but different initial values (0, 1).",
+     "name": "NewmanShanksWilliamsPrime.newmanShanksWilliamsNumber",
+     "why_needed": "The conjecture requires the exact natural-number sequence S_0 = S_1 = 1 and S_(n+2) = 2 S_(n+1) + S_n, and no direct definition was found in Mathlib or the repository helpers."
+    }
+   ],
+   "per_slot": {
+    "newman_shanks_williams_prime": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "newman_shanks_williams_prime": "/--\nAre there infinitely many Newman–Shanks–Williams primes, namely primes of the form\n$S_{2m+1}$, where $S_0 = S_1 = 1$ and $S_{n+2} = 2S_{n+1} + S_n$?\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ {p : ℕ | p.Prime ∧ ∃ m : ℕ,\n      p = newmanShanksWilliamsNumber (2 * m + 1)}.Infinite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Newman–Shanks–Williams primes\n\n*Reference:*\n- [Wikipedia, Newman–Shanks–Williams prime](https://en.wikipedia.org/wiki/Newman%E2%80%93Shanks%E2%80%93Williams_prime)\n-/\n\nnamespace NewmanShanksWilliamsPrime\n\n/-- The sequence $S_0 = S_1 = 1$ and $S_{n+2} = 2S_{n+1} + S_n$. -/\ndef nswNumber : ℕ → ℕ\n  | 0 => 1\n  | 1 => 1\n  | n + 1 + 1 => 2 * nswNumber (n + 1) + nswNumber n\n\n@[category test, AMS 11]\ntheorem nswNumber_zero : nswNumber 0 = 1 := rfl\n\n@[category test, AMS 11]\ntheorem nswNumber_one : nswNumber 1 = 1 := rfl\n\n@[category test, AMS 11]\ntheorem nswNumber_three : nswNumber 3 = 7 := rfl\n\n/--\nAre there infinitely many Newman–Shanks–Williams primes? Here these are the prime values\n$S_{2m+1}$ of the sequence $S_0 = S_1 = 1$ and $S_{n+2} = 2S_{n+1} + S_n$.\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔\n      {p : ℕ | p.Prime ∧ ∃ m : ℕ, p = nswNumber (2 * m + 1)}.Infinite := by\n  sorry\n\nend NewmanShanksWilliamsPrime\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted a Newman–Shanks–Williams prime according to the background article as a natural prime equal to S_(2m+1) for some m : ℕ, where S_0 = S_1 = 1 and S_(n+2) = 2 S_(n+1) + S_n.",
+    "Formalized “infinitely many primes” as infinitude of the set of prime values p admitting that representation, rather than infinitude of indices. This directly matches the question and does not rely on a separate proof that the sequence is strictly increasing.",
+    "Used `answer(sorry) ↔ ...` because the verbatim source is a yes/no question, with `answer(True)` corresponding to the positive answer.",
+    "Kept the odd-index restriction explicit as `2 * m + 1`; this excludes prime even-index sequence terms that are not Newman–Shanks–Williams primes by definition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`LinearRecurrence.mkSol`, the direct `PellNumbers.pellNumber` recurrence idiom, and `LucasSequence.V` from FormalConjecturesForMathlib. `LinearRecurrence.mkSol` is unnecessarily indirect here; Pell numbers have different initial data; and `LucasSequence.V 2 (-1)` is integer-valued and twice this sequence, requiring an obscuring division/conversion.",
+     "name": "NewmanShanksWilliamsPrime.nswNumber",
+     "why_needed": "The conjecture requires the specific sequence S_0 = S_1 = 1, S_(n+2) = 2 S_(n+1) + S_n, and no direct NSW-number definition exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "newman_shanks_williams_prime": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "newman_shanks_williams_prime": "/--\nAre there infinitely many Newman–Shanks–Williams primes? Here these are the prime values\n$S_{2m+1}$ of the sequence $S_0 = S_1 = 1$ and $S_{n+2} = 2S_{n+1} + S_n$.\n-/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔\n      {p : ℕ | p.Prime ∧ ∃ m : ℕ, p = nswNumber (2 * m + 1)}.Infinite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Newman–Shanks–Williams primes\n\n*References:*\n- [Wikipedia, Newman–Shanks–Williams prime](https://en.wikipedia.org/wiki/Newman%E2%80%93Shanks%E2%80%93Williams_prime)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [OEIS A001333](https://oeis.org/A001333) (the sequence $S_n$)\n- [OEIS A088165](https://oeis.org/A088165) (the NSW primes)\n- Newman, M., Shanks, D., Williams, H. C., *Simple groups of square order and an interesting\n  sequence of primes*, Acta Arithmetica 38 (1980), 129–140.\n\nLet $S_0 = S_1 = 1$ and $S_n = 2 S_{n-1} + S_{n-2}$ for $n \\geq 2$, so that\n$$S_n = \\frac{(1 + \\sqrt 2)^n + (1 - \\sqrt 2)^n}{2}.$$\nA *Newman–Shanks–Williams prime* (NSW prime) is a prime number of the form $S_{2m+1}$.\nThe first few are $7, 41, 239, 9369319, \\ldots$, with indices $3, 5, 7, 19, \\ldots$.\n\nThe question is whether there are infinitely many NSW primes.\n-/\n\nnamespace NewmanShanksWilliamsPrime\n\n/-- The sequence $S_n$ defined by $S_0 = 1$, $S_1 = 1$ and $S_n = 2 S_{n-1} + S_{n-2}$ for\n$n \\geq 2$, i.e. `1, 1, 3, 7, 17, 41, 99, ...` ([OEIS A001333](https://oeis.org/A001333)).\nEquivalently, $S_n = ((1 + \\sqrt 2)^n + (1 - \\sqrt 2)^n) / 2$; see `coe_nswNumber_eq`. -/\ndef nswNumber : ℕ → ℕ\n  | 0 => 1\n  | 1 => 1\n  | n + 2 => 2 * nswNumber (n + 1) + nswNumber n\n\n@[category test, AMS 11]\ntheorem nswNumber_zero : nswNumber 0 = 1 := rfl\n\n@[category test, AMS 11]\ntheorem nswNumber_one : nswNumber 1 = 1 := rfl\n\n@[category test, AMS 11]\ntheorem nswNumber_two : nswNumber 2 = 3 := rfl\n\n@[category test, AMS 11]\ntheorem nswNumber_three : nswNumber 3 = 7 := rfl\n\n@[category test, AMS 11]\ntheorem nswNumber_five : nswNumber 5 = 41 := rfl\n\n@[category test, AMS 11]\ntheorem nswNumber_seven : nswNumber 7 = 239 := rfl\n\n/-- The closed form $S_n = ((1 + \\sqrt 2)^n + (1 - \\sqrt 2)^n) / 2$ used in the Wikipedia\ndefinition of NSW primes. -/\n@[category textbook, AMS 11]\ntheorem coe_nswNumber_eq (n : ℕ) :\n    (nswNumber n : ℝ) = ((1 + √2) ^ n + (1 - √2) ^ n) / 2 := by\n  set α : ℝ := 1 + √2 with hα_def\n  set β : ℝ := 1 - √2 with hβ_def\n  have hsq2 : (√2 : ℝ) ^ 2 = 2 := Real.sq_sqrt (by norm_num)\n  have hα_rec : ∀ n, α ^ (n + 2) = 2 * α ^ (n + 1) + α ^ n := by\n    intro n\n    have : α ^ (n + 2) = α ^ n * α ^ 2 := by ring\n    rw [this, hα_def]\n    ring_nf\n    rw [hsq2]\n    ring\n  have hβ_rec : ∀ n, β ^ (n + 2) = 2 * β ^ (n + 1) + β ^ n := by\n    intro n\n    have : β ^ (n + 2) = β ^ n * β ^ 2 := by ring\n    rw [this, hβ_def]\n    ring_nf\n    rw [hsq2]\n    ring\n  suffices h : ∀ n, (nswNumber n : ℝ) = (α ^ n + β ^ n) / 2 ∧\n      (nswNumber (n + 1) : ℝ) = (α ^ (n + 1) + β ^ (n + 1)) / 2 from (h n).1\n  intro n\n  induction n with\n  | zero =>\n    refine ⟨?_, ?_⟩\n    · simp [nswNumber]\n    · simp only [nswNumber, pow_one, Nat.cast_one, zero_add, hα_def, hβ_def]\n      ring\n  | succ k ih =>\n    obtain ⟨hk, hk1⟩ := ih\n    refine ⟨hk1, ?_⟩\n    have hrec : nswNumber (k + 1 + 1) = 2 * nswNumber (k + 1) + nswNumber k := rfl\n    rw [hrec]\n    push_cast\n    rw [hk1, hk, hα_rec k, hβ_rec k]\n    ring\n\n/-- A *Newman–Shanks–Williams prime* is a prime number of the form $S_{2m+1}$, where\n$S_n = ((1 + \\sqrt 2)^n + (1 - \\sqrt 2)^n) / 2$. Only odd indices are allowed: for instance\n$S_2 = 3$ and $S_4 = 17$ are prime but are not NSW primes. -/\ndef IsNSWPrime (p : ℕ) : Prop :=\n  p.Prime ∧ ∃ m, p = nswNumber (2 * m + 1)\n\n@[category test, AMS 11]\ntheorem isNSWPrime_seven : IsNSWPrime 7 :=\n  ⟨by norm_num, 1, rfl⟩\n\n@[category test, AMS 11]\ntheorem isNSWPrime_fortyOne : IsNSWPrime 41 :=\n  ⟨by norm_num, 2, rfl⟩\n\n@[category test, AMS 11]\ntheorem nswNumber_pos (n : ℕ) : 0 < nswNumber n := by\n  induction n using Nat.twoStepInduction with\n  | zero => decide\n  | one => decide\n  | more n h₁ h₂ => simp only [nswNumber]; omega\n\n/-- $S_2 = 3$ is prime, but $3$ is not an NSW prime since it is not of the form $S_{2m+1}$. -/\n@[category test, AMS 11]\ntheorem not_isNSWPrime_three : ¬ IsNSWPrime 3 := by\n  rintro ⟨-, m, hm⟩\n  rcases m with _ | k\n  · exact absurd hm (by decide)\n  · have h₁ := nswNumber_pos (2 * k)\n    have h₂ := nswNumber_pos (2 * k + 1)\n    have : nswNumber (2 * (k + 1) + 1) =\n        2 * (2 * nswNumber (2 * k + 1) + nswNumber (2 * k)) + nswNumber (2 * k + 1) := rfl\n    omega\n\n/-- Are there infinitely many Newman–Shanks–Williams primes, i.e. primes of the form\n$S_{2m+1} = ((1 + \\sqrt 2)^{2m+1} + (1 - \\sqrt 2)^{2m+1}) / 2$? -/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ {p : ℕ | IsNSWPrime p}.Infinite := by\n  sorry\n\nend NewmanShanksWilliamsPrime\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "None. The single-slot decomposition is correct; the notes about the essential odd-index restriction and the equivalence of the value/index formulations are accurate and were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list entry is a yes/no question, so the repository's preferred `answer(sorry) ↔ P` idiom is used; `answer(True)` means there are infinitely many NSW primes.",
+    "\"Infinitely many NSW primes\" is formalized as the set of prime VALUES `{p : ℕ | IsNSWPrime p}` being infinite (as in FibonacciPrimes.lean's `fib_primes_infinite`), not as infinitely many indices; this is the literal reading of the statement and, since S is strictly increasing for n ≥ 1, is equivalent to the index formulation.",
+    "The NSW definition follows Wikipedia exactly: a prime of the form S_{2m+1}, with m ranging over all naturals (m = 0 gives S_1 = 1, which is excluded automatically by `Nat.Prime`). Even-index terms such as S_2 = 3, S_4 = 17 are deliberately excluded; the test `not_isNSWPrime_three` checks this.",
+    "The sequence S is defined by the recurrence given in the article (OEIS A001333) rather than via real powers of 1 ± √2, so that it lands in ℕ; the closed form is proved as `coe_nswNumber_eq` (category textbook) to certify agreement with the article's formula.",
+    "`Nat.Prime` (`p.Prime`) is used for primality of a natural number, as in nearby files (Euclid.lean, Mersenne.lean)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Pell.xn`/`Pell.yn` (Mathlib.NumberTheory.PellMatiyasevic) — only for d = a^2 - 1, so unusable for √2; Mathlib `Pell.Solution₁ 2` — gives the group of solutions of x^2 - 2y^2 = 1 but not the indexed sequence including the norm −1 solutions needed for odd indices; `PellNumbers.pellNumber` in Wikipedia/Pell.lean — the Pell numbers, a different sequence (S_n would be P_n + P_{n-1}, which is less direct than the article's own recurrence).",
+     "name": "NewmanShanksWilliamsPrime.nswNumber",
+     "why_needed": "The sequence S_0 = S_1 = 1, S_{n+2} = 2 S_{n+1} + S_n (OEIS A001333, half the companion Pell numbers) does not exist in Mathlib or FormalConjecturesForMathlib. Local to the problem file, mirroring `PellNumbers.pellNumber` in Wikipedia/Pell.lean; verified by `rfl` tests (values 1,1,3,7,41,239) and by the proved Binet-type closed form `coe_nswNumber_eq`."
+    },
+    {
+     "closest_existing_considered": "No existing predicate; inlining `p.Prime ∧ ∃ m, p = nswNumber (2*m+1)` in the theorem was the alternative, but a named predicate matches the style of FactorialPrime.lean / PierpontPrime.lean and makes the odd-index restriction explicit and testable.",
+     "name": "NewmanShanksWilliamsPrime.IsNSWPrime",
+     "why_needed": "Names the notion 'prime of the form S_{2m+1}' from the Wikipedia article so that the conjecture reads as the source does; tested on 7 and 41 (positive) and 3 (negative, checking the odd-index restriction)."
+    }
+   ],
+   "per_slot": {
+    "newman_shanks_williams_prime": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ {p : ℕ | IsNSWPrime p}.Infinite` where `IsNSWPrime p := p.Prime ∧ ∃ m, p = nswNumber (2 * m + 1)` and `nswNumber` is the recurrence S_0 = S_1 = 1, S_{n+2} = 2 S_{n+1} + S_n from the Wikipedia article. The closed form S_n = ((1+√2)^n + (1-√2)^n)/2 (Wikipedia's primary definition) is proved in-file as a textbook theorem, so the definition matches both descriptions in the source. Neither Mathlib nor FormalConjecturesForMathlib has this sequence (Mathlib's `Pell.xn` needs d = a^2 - 1, which excludes d = 2), so bespoke definitions were needed, kept local to the problem file following `Wikipedia/Pell.lean`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "newman_shanks_williams_prime": "/-- Are there infinitely many Newman–Shanks–Williams primes, i.e. primes of the form\n$S_{2m+1} = ((1 + \\sqrt 2)^{2m+1} + (1 - \\sqrt 2)^{2m+1}) / 2$? -/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ {p : ℕ | IsNSWPrime p}.Infinite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Newman–Shanks–Williams primes\n\nA *Newman–Shanks–Williams prime* (NSW prime) is a prime number of the form\n$$S_{2m+1} = \\frac{(1+\\sqrt{2})^{2m+1} + (1-\\sqrt{2})^{2m+1}}{2},$$\nwhere the sequence $S$ is given by $S_0 = 1$, $S_1 = 1$ and $S_n = 2S_{n-1} + S_{n-2}$ for\n$n \\geq 2$. The first few NSW primes are $7, 41, 239, 9369319, \\ldots$, corresponding to the\nindices $3, 5, 7, 19, \\ldots$.\n\nIt is an open question whether there are infinitely many NSW primes.\n\n*References:*\n- [Wikipedia, Newman–Shanks–Williams prime](https://en.wikipedia.org/wiki/Newman%E2%80%93Shanks%E2%80%93Williams_prime)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [OEIS A001333](https://oeis.org/A001333) (the sequence $S$)\n- [OEIS A088165](https://oeis.org/A088165) (NSW primes)\n- [OEIS A005850](https://oeis.org/A005850) (indices $n$ with $S_n$ prime)\n- M. Newman, D. Shanks, H. C. Williams,\n  [Simple groups of square order and an interesting sequence of primes](https://doi.org/10.4064/aa-38-2-129-140),\n  Acta Arithmetica 38 (1980), 129–140.\n-/\n\nnamespace NewmanShanksWilliamsPrime\n\n/-- The sequence $S$ defined by $S_0 = 1$, $S_1 = 1$ and $S_n = 2S_{n-1} + S_{n-2}$ for\n$n \\geq 2$. Its terms are $1, 1, 3, 7, 17, 41, 99, \\ldots$\n([OEIS A001333](https://oeis.org/A001333)); they are the numerators of the continued fraction\nconvergents to $\\sqrt{2}$ and half the companion Pell numbers. -/\ndef S : ℕ → ℕ\n  | 0 => 1\n  | 1 => 1\n  | n + 2 => 2 * S (n + 1) + S n\n\n/-- A *Newman–Shanks–Williams prime* is a prime number of the form $S_{2m+1}$, i.e. a prime that\nis an odd-indexed term of the sequence $S$. -/\ndef IsNewmanShanksWilliamsPrime (p : ℕ) : Prop :=\n  p.Prime ∧ ∃ m : ℕ, S (2 * m + 1) = p\n\n@[category test, AMS 11]\ntheorem S_zero : S 0 = 1 := rfl\n\n@[category test, AMS 11]\ntheorem S_one : S 1 = 1 := rfl\n\n@[category test, AMS 11]\ntheorem S_two : S 2 = 3 := rfl\n\n@[category test, AMS 11]\ntheorem S_three : S 3 = 7 := rfl\n\n@[category test, AMS 11]\ntheorem S_five : S 5 = 41 := rfl\n\n@[category test, AMS 11]\ntheorem S_seven : S 7 = 239 := rfl\n\n/-- The recurrence $S_{n+2} = 2S_{n+1} + S_n$. -/\n@[category API, AMS 11]\ntheorem S_add_two (n : ℕ) : S (n + 2) = 2 * S (n + 1) + S n := rfl\n\n/-- Every term of the sequence $S$ is positive. -/\n@[category API, AMS 11]\ntheorem S_pos (n : ℕ) : 0 < S n := by\n  induction n using S.induct with\n  | case1 => decide\n  | case2 => decide\n  | case3 n _ _ => rw [S_add_two]; omega\n\n/-- The sequence $S$ is monotone (and strictly increasing from index $1$ onwards). -/\n@[category API, AMS 11]\ntheorem S_mono : Monotone S := by\n  refine monotone_nat_of_le_succ fun n => ?_\n  rcases n with _ | k\n  · exact le_rfl\n  · rw [S_add_two]; omega\n\n/-- The sequence $S$ is strictly increasing from index $1$ onwards. -/\n@[category API, AMS 11]\ntheorem S_lt_S_succ (n : ℕ) (hn : 1 ≤ n) : S n < S (n + 1) := by\n  obtain ⟨k, rfl⟩ : ∃ k, n = k + 1 := ⟨n - 1, by omega⟩\n  rw [S_add_two]\n  have := S_pos k\n  omega\n\n/-- The closed form $S_n = \\frac{(1+\\sqrt{2})^n + (1-\\sqrt{2})^n}{2}$ from the Wikipedia article. -/\n@[category textbook, AMS 11]\ntheorem coe_S_eq (n : ℕ) : (S n : ℝ) = ((1 + √2) ^ n + (1 - √2) ^ n) / 2 := by\n  have hsq : (√2 : ℝ) ^ 2 = 2 := Real.sq_sqrt (by norm_num)\n  have hα (k : ℕ) : (1 + √2 : ℝ) ^ (k + 2) = 2 * (1 + √2) ^ (k + 1) + (1 + √2) ^ k := by\n    have : (1 + √2 : ℝ) ^ 2 = 2 * (1 + √2) + 1 := by ring_nf; rw [hsq]; ring\n    rw [pow_add, this]; ring\n  have hβ (k : ℕ) : (1 - √2 : ℝ) ^ (k + 2) = 2 * (1 - √2) ^ (k + 1) + (1 - √2) ^ k := by\n    have : (1 - √2 : ℝ) ^ 2 = 2 * (1 - √2) + 1 := by ring_nf; rw [hsq]; ring\n    rw [pow_add, this]; ring\n  induction n using S.induct with\n  | case1 => simp [S]\n  | case2 => simp [S]\n  | case3 k ih1 ih2 =>\n    rw [S_add_two, hα, hβ]\n    push_cast\n    rw [ih1, ih2]\n    ring\n\n/-- $7 = S_3$ is a Newman–Shanks–Williams prime. -/\n@[category test, AMS 11]\ntheorem isNewmanShanksWilliamsPrime_seven : IsNewmanShanksWilliamsPrime 7 :=\n  ⟨by norm_num, 1, rfl⟩\n\n/-- $41 = S_5$ is a Newman–Shanks–Williams prime. -/\n@[category test, AMS 11]\ntheorem isNewmanShanksWilliamsPrime_fortyOne : IsNewmanShanksWilliamsPrime 41 :=\n  ⟨by norm_num, 2, rfl⟩\n\n/-- $239 = S_7$ is a Newman–Shanks–Williams prime. -/\n@[category test, AMS 11]\ntheorem isNewmanShanksWilliamsPrime_twoHundredThirtyNine : IsNewmanShanksWilliamsPrime 239 :=\n  ⟨by norm_num, 3, rfl⟩\n\n/-- $3 = S_2$ is prime but has even index, so it is not a Newman–Shanks–Williams prime. -/\n@[category test, AMS 11]\ntheorem not_isNewmanShanksWilliamsPrime_three : ¬ IsNewmanShanksWilliamsPrime 3 := by\n  rintro ⟨-, m, hm⟩\n  rcases m with _ | m\n  · simp [S] at hm\n  · have := S_mono (show 3 ≤ 2 * (m + 1) + 1 by omega)\n    rw [S_three] at this\n    omega\n\n/-- $17 = S_4$ is prime but has even index, so it is not a Newman–Shanks–Williams prime. -/\n@[category test, AMS 11]\ntheorem not_isNewmanShanksWilliamsPrime_seventeen : ¬ IsNewmanShanksWilliamsPrime 17 := by\n  rintro ⟨-, m, hm⟩\n  rcases m with _ | _ | m\n  · simp [S] at hm\n  · simp [S] at hm\n  · have := S_mono (show 5 ≤ 2 * (m + 1 + 1) + 1 by omega)\n    rw [S_five] at this\n    omega\n\n/-- Are there infinitely many Newman–Shanks–Williams primes, i.e. primes of the form\n$$S_{2m+1} = \\frac{(1+\\sqrt{2})^{2m+1} + (1-\\sqrt{2})^{2m+1}}{2}?$$ -/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ {p : ℕ | IsNewmanShanksWilliamsPrime p}.Infinite := by\n  sorry\n\nend NewmanShanksWilliamsPrime\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "None. The table's single-slot decomposition matches the statement; its note that the odd-index restriction is essential and that value/index infinitude are equivalent via strict monotonicity is correct and reflected in the file (tests for 3 and 17, lemma S_lt_S_succ).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list entry is a yes/no question, so the slot is `answer(sorry) ↔ P` with P = 'the set of NSW primes is infinite'; `answer(True)` is the positive answer.",
+    "Infinitude is stated for the set of prime VALUES {p | IsNewmanShanksWilliamsPrime p}, literally matching 'infinitely many NSW primes' (rather than infinitely many indices m). These are equivalent since S is strictly increasing from index 1 (lemma `S_lt_S_succ` included), but only the value formulation is stated as the slot, as the decomposition table requires a single Prop.",
+    "The sequence S is defined by the article's recurrence (S_0 = S_1 = 1, S_n = 2S_{n-1} + S_{n-2}) as ℕ → ℕ; the article's alternative closed form ((1+√2)^n + (1-√2)^n)/2 is proved as textbook lemma `coe_S_eq`, certifying the two descriptions agree.",
+    "The index m in S_{2m+1} ranges over ℕ (m ≥ 0). m = 0 gives S_1 = 1, which is not prime, so it is harmless; negative m would give negative values under the closed form (S_{-k} = -S_k for odd k), so nothing is lost.",
+    "The odd-index restriction is kept exactly (2*m+1). Tests `not_isNewmanShanksWilliamsPrime_three` and `_seventeen` verify that the even-index primes S_2 = 3 and S_4 = 17 are excluded, and tests verify 7 = S_3, 41 = S_5, 239 = S_7 are NSW primes, matching OEIS A088165.",
+    "The sequence is named `S` (matching the article's notation; precedent `DedekindNumber.M` in the repo) inside the namespace `NewmanShanksWilliamsPrime`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Pell.xn` / `Pell.yn` (Mathlib/NumberTheory/PellMatiyasevic.lean) only handle x^2 - d y^2 = 1 with d = a^2 - 1, which excludes d = 2; `Zsqrtd 2` (ℤ√2) could express S n as ((1 + sqrtd)^n).re but is less transparent than the source's recurrence; `PellNumbers.pellNumber` in Wikipedia/Pell.lean is a different sequence (P_0 = 0, P_1 = 1) in a problem file that cannot be imported.",
+     "name": "NewmanShanksWilliamsPrime.S",
+     "why_needed": "The sequence S_0 = S_1 = 1, S_n = 2S_{n-1} + S_{n-2} (OEIS A001333, half companion Pell numbers) is not in Mathlib or FormalConjecturesForMathlib. Defined by the article's recurrence; a proved textbook lemma shows it equals the article's closed form ((1+√2)^n + (1-√2)^n)/2."
+    },
+    {
+     "closest_existing_considered": "No existing NSW-prime predicate in Mathlib or the repo (grep for newman/shanks/A088165/companion returned nothing).",
+     "name": "NewmanShanksWilliamsPrime.IsNewmanShanksWilliamsPrime",
+     "why_needed": "Predicate 'p is prime and p = S_{2m+1} for some m', the article's definition of an NSW prime; mirrors the repo idiom `IsFactorialPrime`, `IsWilsonPrime`, `IsPierpontPrime`."
+    }
+   ],
+   "per_slot": {
+    "newman_shanks_williams_prime": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ {p : ℕ | IsNewmanShanksWilliamsPrime p}.Infinite` (question style per CONTRIBUTING), where an NSW prime is a prime p with p = S (2*m+1) for some m : ℕ and S is the article's recurrence S 0 = S 1 = 1, S (n+2) = 2 S (n+1) + S n. No Mathlib/repo primitive exists for this sequence (Mathlib's `Pell.xn` requires d = a^2 - 1, excluding d = 2), so S and the predicate are bespoke, with tests and a proved closed-form lemma."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "newman_shanks_williams_prime": "/-- Are there infinitely many Newman–Shanks–Williams primes, i.e. primes of the form\n$$S_{2m+1} = \\frac{(1+\\sqrt{2})^{2m+1} + (1-\\sqrt{2})^{2m+1}}{2}?$$ -/\n@[category research open, AMS 11]\ntheorem newman_shanks_williams_prime :\n    answer(sorry) ↔ {p : ℕ | IsNewmanShanksWilliamsPrime p}.Infinite := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "newman_shanks_williams_prime": "c02"
+ },
+ "id": "wp-newman-shanks-williams-prime",
+ "main_attempt": "c02"
+}

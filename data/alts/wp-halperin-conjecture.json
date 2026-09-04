@@ -1,0 +1,551 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Halperin conjecture\n\nSuppose that $F \\to E \\to B$ is a fibration of simply connected spaces such that $F$ is\nrationally elliptic and $\\chi(F) \\neq 0$ (i.e. $F$ has non-zero Euler characteristic). Then the\nSerre spectral sequence associated to the fibration collapses at the $E_2$ page.\n\nHere the Serre spectral sequence is the one for cohomology with rational coefficients. Its\ncollapse at $E_2$ is equivalent to the fibration being *totally non-cohomologous to zero* (TNCZ),\ni.e. to the fibre inclusion $j \\colon F \\to E$ inducing a surjection\n$j^* \\colon H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$ (see [Lu97], §1). Since $\\mathbb{Q}$ is a\nfield, $H^n(-; \\mathbb{Q})$ is the linear dual of $H_n(-; \\mathbb{Q})$, so this is in turn\nequivalent to the injectivity of $j_* \\colon H_*(F; \\mathbb{Q}) \\to H_*(E; \\mathbb{Q})$ on rational\nsingular homology. This is the form in which the conjecture is stated below, using Mathlib's\nsingular homology `AlgebraicTopology.singularHomologyFunctor`.\n\nFollowing [Lu97], \"fibration\" means Serre fibration and all spaces are simply connected and of\nfinite rational type (finite-dimensional rational homology in each degree).\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Halperin_conjecture)\n- [Lu97] G. Lupton, *Variations on a conjecture of Halperin*, Homotopy and Geometry\n  (Warsaw, 1997), Banach Center Publ. 45 (1998), 115–135.\n  [arXiv:math/0010124](https://arxiv.org/abs/math/0010124)\n-/\n\nnamespace HalperinConjecture\n\nopen CategoryTheory AlgebraicTopology Topology unitInterval\nopen scoped DirectSum TensorProduct\n\nnoncomputable section\n\n/-- The `n`-th rational singular homology group $H_n(X; \\mathbb{Q})$ of a topological\nspace `X`, as a `ℚ`-module. -/\nabbrev rationalHomology (X : Type) [TopologicalSpace X] (n : ℕ) : ModuleCat ℚ :=\n  ((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).obj (TopCat.of X)\n\n/-- The map $f_* \\colon H_n(X; \\mathbb{Q}) \\to H_n(Y; \\mathbb{Q})$ induced on rational singular\nhomology by a continuous map `f : X → Y`. -/\nabbrev rationalHomologyMap {X Y : Type} [TopologicalSpace X] [TopologicalSpace Y] (f : C(X, Y))\n    (n : ℕ) : rationalHomology X n ⟶ rationalHomology Y n :=\n  ((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).map (TopCat.ofHom f)\n\n/-- A topological space `X` is of *finite rational type* if each rational homology group\n$H_n(X; \\mathbb{Q})$ is finite-dimensional. -/\ndef IsFiniteRationalType (X : Type) [TopologicalSpace X] : Prop :=\n  ∀ n, Module.Finite ℚ (rationalHomology X n)\n\n/-- The (rational) *Euler characteristic*\n$\\chi(X) = \\sum_n (-1)^n \\dim_{\\mathbb{Q}} H_n(X; \\mathbb{Q})$ of a topological space `X`.\nThis is the intended value when the total rational homology of `X` is finite-dimensional\n(for instance when `X` is rationally elliptic); otherwise it is a junk value. -/\ndef eulerCharacteristic (X : Type) [TopologicalSpace X] : ℤ :=\n  ∑ᶠ n : ℕ, (-1 : ℤ) ^ n * Module.finrank ℚ (rationalHomology X n)\n\n/-- A simply connected topological space `X` is *rationally elliptic* if both its total rational\nhomology $H_*(X; \\mathbb{Q}) = \\bigoplus_n H_n(X; \\mathbb{Q})$ and its total rational homotopy\n$\\pi_*(X) \\otimes \\mathbb{Q} = \\bigoplus_{n \\ge 2} \\pi_n(X, x) \\otimes \\mathbb{Q}$ are\nfinite-dimensional. Only the homotopy groups $\\pi_n$ with $n \\ge 2$ are used since for a simply\nconnected space $\\pi_1$ is trivial and $\\pi_0$ is a point; the base point `x` is arbitrary since\n`X` is path connected. -/\ndef IsRationallyElliptic (X : Type) [TopologicalSpace X] : Prop :=\n  Module.Finite ℚ (⨁ n, rationalHomology X n) ∧\n    ∀ x : X, Module.Finite ℚ (⨁ n, ℚ ⊗[ℤ] Additive (π_ (n + 2) X x))\n\n/-- A continuous map `p : E → B` is a *Serre fibration* if it has the homotopy lifting property\nwith respect to all cubes $I^n$, $n \\ge 0$: for every continuous `f : Iⁿ → E` and every homotopy\n`H : I × Iⁿ → B` starting at `p ∘ f`, there is a homotopy `H' : I × Iⁿ → E` starting at `f` that\nlifts `H`, i.e. `p ∘ H' = H`. -/\ndef IsSerreFibration {E B : Type*} [TopologicalSpace E] [TopologicalSpace B] (p : C(E, B)) :\n    Prop :=\n  ∀ (n : ℕ) (f : C(Fin n → I, E)) (H : C(I × (Fin n → I), B)), (∀ y, H (0, y) = p (f y)) →\n    ∃ H' : C(I × (Fin n → I), E), (∀ y, H' (0, y) = f y) ∧ ∀ z, p (H' z) = H z\n\n/-- The inclusion $j \\colon F = p^{-1}(b) \\to E$ of the fibre of `p : E → B` over `b : B`. -/\nabbrev fibreInclusion {E B : Type*} [TopologicalSpace E] [TopologicalSpace B] (p : C(E, B))\n    (b : B) : C(p ⁻¹' {b}, E) :=\n  ⟨Subtype.val, continuous_subtype_val⟩\n\n/-- A rationally elliptic space is of finite rational type. -/\n@[category API, AMS 55]\ntheorem IsRationallyElliptic.isFiniteRationalType {X : Type} [TopologicalSpace X]\n    (hX : IsRationallyElliptic X) : IsFiniteRationalType X := fun n =>\n  have := hX.1\n  Module.Finite.of_surjective (DirectSum.component ℚ ℕ (fun n => rationalHomology X n) n)\n    fun x => ⟨DirectSum.lof ℚ ℕ _ n x, DirectSum.component.lof_self ..⟩\n\n/-- The Euler characteristic of a point is `1`. -/\n@[category test, AMS 55]\ntheorem eulerCharacteristic_unit : eulerCharacteristic Unit = 1 := by\n  have h0 : Module.finrank ℚ (rationalHomology Unit 0) = 1 := by\n    have e : rationalHomology Unit 0 ≅ ModuleCat.of ℚ (⨁ _ : Unit, ℚ) :=\n      singularHomologyFunctorZeroOfTotallyDisconnectedSpace (ModuleCat ℚ) (ModuleCat.of ℚ ℚ)\n        (TopCat.of Unit) ≪≫ ModuleCat.coprodIsoDirectSum _\n    rw [e.toLinearEquiv.finrank_eq]\n    simp\n  have hn (n : ℕ) (hn : n ≠ 0) : Module.finrank ℚ (rationalHomology Unit n) = 0 := by\n    have : Subsingleton (rationalHomology Unit n) :=\n      ModuleCat.isZero_iff_subsingleton.mp <|\n        isZero_singularHomologyFunctor_of_totallyDisconnectedSpace (ModuleCat ℚ) n\n          (ModuleCat.of ℚ ℚ) (TopCat.of Unit) hn\n    exact Module.finrank_zero_of_subsingleton\n  rw [eulerCharacteristic, finsum_eq_single _ 0 fun n hn' => by simp [hn n hn'], h0]\n  simp\n\n/-- The identity map is a Serre fibration. -/\n@[category API, AMS 55]\ntheorem isSerreFibration_id (B : Type*) [TopologicalSpace B] :\n    IsSerreFibration (ContinuousMap.id B) :=\n  fun _ _ H hH => ⟨H, fun y => hH y, fun _ => rfl⟩\n\n/-- The projection of a product onto one of its factors is a Serre fibration. -/\n@[category API, AMS 55]\ntheorem isSerreFibration_fst (B F : Type*) [TopologicalSpace B] [TopologicalSpace F] :\n    IsSerreFibration (ContinuousMap.fst : C(B × F, B)) :=\n  fun _ f H hH =>\n    ⟨H.prodMk (ContinuousMap.snd.comp (f.comp ContinuousMap.snd)),\n      fun y => Prod.ext (hH y) rfl, fun _ => rfl⟩\n\n/--\n**Halperin conjecture.** Let $F \\to E \\xrightarrow{p} B$ be a (Serre) fibration of simply\nconnected spaces of finite rational type, with fibre $F = p^{-1}(b)$. If $F$ is rationally\nelliptic with Euler characteristic $\\chi(F) \\neq 0$, then the rational cohomology Serre spectral\nsequence of the fibration collapses at the $E_2$ page. Equivalently, the fibration is TNCZ: the\nfibre inclusion $j \\colon F \\to E$ induces a surjection $H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$,\ni.e. (dually, over the field $\\mathbb{Q}$) an injection\n$j_* \\colon H_n(F; \\mathbb{Q}) \\to H_n(E; \\mathbb{Q})$ in every degree $n$.\n-/\n@[category research open, AMS 55]\ntheorem halperin_conjecture {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    [SimplyConnectedSpace E] [SimplyConnectedSpace B]\n    (hE : IsFiniteRationalType E) (hB : IsFiniteRationalType B)\n    (p : C(E, B)) (hp : IsSerreFibration p) (b : B) [SimplyConnectedSpace (p ⁻¹' {b})]\n    (hF : IsRationallyElliptic (p ⁻¹' {b})) (hχ : eulerCharacteristic (p ⁻¹' {b}) ≠ 0) (n : ℕ) :\n    Function.Injective (rationalHomologyMap (fibreInclusion p b) n).hom := by\n  sorry\n\nend\n\nend HalperinConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's single slot and its notes (TNCZ reformulation; implicit finite rational type; χ ≠ 0 vs > 0 equivalence for elliptic spaces) match the primary source (Lupton, arXiv:math/0010124, Conjecture 1.1 and §1) and were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Conclusion: 'Serre spectral sequence collapses at E_2' is formalized as TNCZ (Lupton §1, citing McCleary Thm 5.9), and TNCZ (j^* : H^*(E;ℚ) → H^*(F;ℚ) surjective) is further rephrased as injectivity of j_* : H_n(F;ℚ) → H_n(E;ℚ) in every degree. Over the field ℚ, H^n(-;ℚ) is naturally the linear dual of H_n(-;ℚ) (universal coefficients) and a linear map between vector spaces is injective iff its transpose is surjective, so this is an exact equivalence with no finiteness needed. Mathlib has singular homology but neither singular cohomology nor spectral sequences.",
+    "Rational homology is Mathlib's `singularHomologyFunctor (ModuleCat ℚ) n` with coefficient object `ModuleCat.of ℚ ℚ`; the chain complex is then ℚ[Sing_n X] (checked by `rfl` in a scratch file), i.e. genuine singular homology with ℚ coefficients. Because this coefficient object lives in `Type`, all spaces in the main statement are taken in `Type` (universe 0), as in other files of the collection (e.g. BingBorsuk).",
+    "'Fibration' is taken to mean Serre fibration (homotopy lifting property for all cubes I^n, n ≥ 0), the convention of Félix–Halperin–Thomas and the setting in which the Serre spectral sequence exists; this is the most general reading and implies the Hurewicz-fibration version. Bespoke `IsSerreFibration` defined on `C(E, B)`.",
+    "The fibre is F = p⁻¹(b) for a chosen point b : B (with the subspace topology); since B is simply connected (hence path connected) the choice of b is immaterial for a Serre fibration. Hypotheses on F (simply connected, rationally elliptic, χ ≠ 0) are imposed on this literal fibre.",
+    "Following Lupton's standing convention ('all spaces are simply connected ... of finite type over ℚ') and the decomposition notes, E and B are assumed of finite rational type (`IsFiniteRationalType`: each H_n(-;ℚ) finite-dimensional). The hypothesis on E is redundant (follows from B and F via the Serre spectral sequence) and F's is implied by ellipticity (proved as the API lemma `IsRationallyElliptic.isFiniteRationalType`); the conjecture is also believed equivalent without these (pullback from the finite-type classifying space Baut_1(F)), so they are harmless but a reviewer may prefer to drop them to match Wikipedia literally.",
+    "Spaces are arbitrary topological spaces rather than CW complexes; this is equivalent up to CW approximation since all invariants used are weak-homotopy invariants and a pullback of a Serre fibration along a weak equivalence of bases is a weak equivalence on total spaces with the same fibre.",
+    "`IsRationallyElliptic X` := the total rational homology ⨁_n H_n(X;ℚ) is a finite-dimensional ℚ-module, and for every basepoint x the total rational homotopy ⨁_{n≥0} ℚ ⊗[ℤ] Additive(π_{n+2}(X,x)) is finite-dimensional. Only π_n for n ≥ 2 is used, which is correct for simply connected X (π_1 = 0, π_0 a point); the definition is only meant for simply connected spaces, as documented. Quantifying over all basepoints is equivalent to a single one for path-connected X.",
+    "`eulerCharacteristic X` := ∑ᶠ n, (-1)^n · finrank_ℚ H_n(X;ℚ) : ℤ, using homology Betti numbers (equal to cohomology Betti numbers over ℚ). It is the true Euler characteristic whenever total rational homology is finite-dimensional, which is guaranteed by the ellipticity hypothesis on F; elsewhere it is a junk value (documented). Tested: `eulerCharacteristic Unit = 1`.",
+    "The hypothesis χ(F) ≠ 0 is taken literally as in Wikipedia (equivalent to χ(F) > 0 for elliptic F by Halperin's theorem, but the literal form is used).",
+    "The conclusion is stated for a universally quantified degree `n : ℕ` as a theorem parameter, i.e. injectivity in every degree, which is the full TNCZ condition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`AlgebraicTopology.singularHomologyFunctor` (used directly; it is a functor with generic coefficients, no specialization to ℚ exists).",
+     "name": "HalperinConjecture.rationalHomology",
+     "why_needed": "Convenient abbreviation for H_n(X;ℚ) as a ℚ-module, `((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).obj (TopCat.of X)`, used in several hypotheses and the conclusion."
+    },
+    {
+     "closest_existing_considered": "`Functor.map` of `singularHomologyFunctor` applied to `TopCat.ofHom f` (this is exactly what it abbreviates).",
+     "name": "HalperinConjecture.rationalHomologyMap",
+     "why_needed": "The induced map f_* on H_n(-;ℚ) of a continuous map, needed to state injectivity of the fibre inclusion on homology."
+    },
+    {
+     "closest_existing_considered": "`Module.Finite ℚ` applied degreewise (this is the definition); no Mathlib notion of finite (rational) type for spaces.",
+     "name": "HalperinConjecture.IsFiniteRationalType",
+     "why_needed": "Lupton's standing hypothesis 'finite type over ℚ' (each H_n(X;ℚ) finite-dimensional) for E and B."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib for `eulerChar`/`EulerCharacteristic`; only unrelated notions exist (none for spaces or chain complexes).",
+     "name": "HalperinConjecture.eulerCharacteristic",
+     "why_needed": "χ(F) = Σ (-1)^n dim H_n(F;ℚ); Mathlib has no Euler characteristic of a topological space."
+    },
+    {
+     "closest_existing_considered": "`HomotopyGroup`/`π_` notation and `Module.Finite ℚ` on `ℚ ⊗[ℤ] Additive (π_ (n+2) X x)` and on direct sums, combined into the definition.",
+     "name": "HalperinConjecture.IsRationallyElliptic",
+     "why_needed": "Rational ellipticity (dim H_*(X;ℚ) < ∞ and dim π_*(X)⊗ℚ < ∞) is absent from Mathlib and the repo."
+    },
+    {
+     "closest_existing_considered": "`IsCoveringMap` (too restrictive), `CategoryTheory.HasLiftingProperty`, `SSet` Kan fibrations (simplicial, not topological).",
+     "name": "HalperinConjecture.IsSerreFibration",
+     "why_needed": "Mathlib has no Serre or Hurewicz fibrations for topological spaces (only covering maps have a homotopy lifting theorem; `HasLiftingProperty` is categorical and would still need the cube inclusions)."
+    },
+    {
+     "closest_existing_considered": "`ContinuousMap.restrict (p ⁻¹' {b}) (ContinuousMap.id E)` (equivalent; the explicit `⟨Subtype.val, continuous_subtype_val⟩` is clearer).",
+     "name": "HalperinConjecture.fibreInclusion",
+     "why_needed": "The continuous inclusion p⁻¹(b) → E as a `ContinuousMap`, to apply the homology functor."
+    }
+   ],
+   "per_slot": {
+    "halperin_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `HalperinConjecture.halperin_conjecture`: for a Serre fibration p : E → B of simply connected spaces of finite rational type with fibre F = p⁻¹(b) simply connected, rationally elliptic and χ(F) ≠ 0, the fibre inclusion induces an injection H_n(F;ℚ) → H_n(E;ℚ) for every n (equivalently TNCZ, equivalently E_2-collapse of the rational cohomology Serre spectral sequence). Mathlib provides singular homology (`AlgebraicTopology.singularHomologyFunctor`), homotopy groups and `SimplyConnectedSpace`, but no singular cohomology, Serre fibrations, Euler characteristic or rational ellipticity, so bespoke definitions were added in the problem file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "halperin_conjecture": "/--\n**Halperin conjecture.** Let $F \\to E \\xrightarrow{p} B$ be a (Serre) fibration of simply\nconnected spaces of finite rational type, with fibre $F = p^{-1}(b)$. If $F$ is rationally\nelliptic with Euler characteristic $\\chi(F) \\neq 0$, then the rational cohomology Serre spectral\nsequence of the fibration collapses at the $E_2$ page. Equivalently, the fibration is TNCZ: the\nfibre inclusion $j \\colon F \\to E$ induces a surjection $H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$,\ni.e. (dually, over the field $\\mathbb{Q}$) an injection\n$j_* \\colon H_n(F; \\mathbb{Q}) \\to H_n(E; \\mathbb{Q})$ in every degree $n$.\n-/\n@[category research open, AMS 55]\ntheorem halperin_conjecture {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    [SimplyConnectedSpace E] [SimplyConnectedSpace B]\n    (hE : IsFiniteRationalType E) (hB : IsFiniteRationalType B)\n    (p : C(E, B)) (hp : IsSerreFibration p) (b : B) [SimplyConnectedSpace (p ⁻¹' {b})]\n    (hF : IsRationallyElliptic (p ⁻¹' {b})) (hχ : eulerCharacteristic (p ⁻¹' {b}) ≠ 0) (n : ℕ) :\n    Function.Injective (rationalHomologyMap (fibreInclusion p b) n).hom := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Halperin conjecture\n\nLet $F \\to E \\to B$ be a (Serre) fibration of simply connected spaces such that the fibre $F$ is\nrationally elliptic (i.e. $\\dim H_*(F; \\mathbb{Q}) < \\infty$ and\n$\\dim \\pi_*(F) \\otimes \\mathbb{Q} < \\infty$) with non-zero Euler characteristic $\\chi(F) \\neq 0$.\nThe Halperin conjecture asserts that the rational cohomology Serre spectral sequence of the\nfibration collapses at the $E_2$ page.\n\nCollapse at $E_2$ is equivalent to the fibration being *totally non-cohomologous to zero* (TNCZ),\ni.e. to the restriction $H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$ being surjective (see\n[Lu97, §1]). Since rational cohomology is the linear dual of rational homology, this is in turn\nequivalent to the fibre inclusion inducing an injection $H_*(F; \\mathbb{Q}) \\to H_*(E; \\mathbb{Q})$\nin every degree, which is the form in which the conjecture is stated below.\n\nNote that a rationally elliptic space has non-negative Euler characteristic, so the hypothesis\n$\\chi(F) \\neq 0$ is the same as $\\chi(F) > 0$.\n\n*References:*\n- [Wikipedia, Halperin conjecture](https://en.wikipedia.org/wiki/Halperin_conjecture)\n- [Lu97] Lupton, G., *Variations on a conjecture of Halperin*, Homotopy and Geometry (Warsaw, 1997),\n  Banach Center Publ. 45 (1998), 115–135. [arXiv:math/0010124](https://arxiv.org/abs/math/0010124)\n- [FHT93] Félix, Y., Halperin, S. and Thomas, J.-C., *Elliptic spaces II*, L'Enseignement\n  Mathématique 39 (1993), 25–32.\n-/\n\nopen CategoryTheory AlgebraicTopology Topology unitInterval\n\nopen scoped TensorProduct DirectSum\n\nnamespace HalperinConjecture\n\n/-- A continuous map `p : E → B` is a *Serre fibration* if it has the homotopy lifting property\nwith respect to every cube $I^n$, $n \\geq 0$: for every continuous `f : I^n → E` and every\nhomotopy `H : I × I^n → B` starting at `p ∘ f`, there is a homotopy `H' : I × I^n → E` lifting\n`H` (that is `p ∘ H' = H`) and starting at `f`. -/\ndef IsSerreFibration {E B : Type*} [TopologicalSpace E] [TopologicalSpace B] (p : C(E, B)) :\n    Prop :=\n  ∀ (n : ℕ) (f : C(Fin n → I, E)) (H : C(I × (Fin n → I), B)), (∀ x, H (0, x) = p (f x)) →\n    ∃ H' : C(I × (Fin n → I), E), (∀ y, p (H' y) = H y) ∧ ∀ x, H' (0, x) = f x\n\n/-- The `n`-th singular homology group $H_n(X; \\mathbb{Q})$ of a topological space `X` with\nrational coefficients, as an object of `ModuleCat ℚ`. -/\nnoncomputable def rationalHomology (X : Type) [TopologicalSpace X] (n : ℕ) : ModuleCat ℚ :=\n  ((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).obj (TopCat.of X)\n\n/-- The map $H_n(X; \\mathbb{Q}) \\to H_n(Y; \\mathbb{Q})$ induced by a continuous map `f : X → Y`. -/\nnoncomputable def rationalHomologyMap {X Y : Type} [TopologicalSpace X] [TopologicalSpace Y]\n    (f : C(X, Y)) (n : ℕ) : rationalHomology X n ⟶ rationalHomology Y n :=\n  ((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).map (TopCat.ofHom f)\n\n/-- A topological space `X` is *rationally elliptic* if it is simply connected, its total\nrational homology $H_*(X; \\mathbb{Q}) = \\bigoplus_n H_n(X; \\mathbb{Q})$ is finite-dimensional,\nand its total rational homotopy\n$\\pi_*(X) \\otimes \\mathbb{Q} = \\bigoplus_n \\pi_n(X) \\otimes \\mathbb{Q}$ is finite-dimensional.\nSince `X` is simply connected, $\\pi_0$ and $\\pi_1$ are trivial, so it suffices to consider the\n(abelian) homotopy groups $\\pi_{n+2}(X, x)$ for `n : ℕ`. -/\nstructure IsRationallyElliptic (X : Type) [TopologicalSpace X] : Prop where\n  simplyConnected : SimplyConnectedSpace X\n  finite_rationalHomology : Module.Finite ℚ (⨁ n, rationalHomology X n)\n  finite_rationalHomotopy : ∀ x : X, Module.Finite ℚ (⨁ n : ℕ, ℚ ⊗[ℤ] Additive (π_ (n + 2) X x))\n\n/-- The (rational) Euler characteristic\n$\\chi(X) = \\sum_n (-1)^n \\dim_{\\mathbb{Q}} H_n(X; \\mathbb{Q})$ of a topological space `X`.\nThe sum is a `finsum`, so it is the usual Euler characteristic whenever only finitely many\nrational homology groups are non-zero (e.g. for a rationally elliptic space). -/\nnoncomputable def eulerCharacteristic (X : Type) [TopologicalSpace X] : ℤ :=\n  ∑ᶠ n : ℕ, (-1) ^ n * (Module.finrank ℚ (rationalHomology X n) : ℤ)\n\n/-- **Halperin conjecture.** Let $F \\to E \\xrightarrow{p} B$ be a (Serre) fibration of simply\nconnected spaces, where $F = p^{-1}(b)$ is the fibre over a point $b \\in B$. Suppose that $F$ is\nrationally elliptic (this includes $F$ being simply connected) and that $\\chi(F) \\neq 0$. Then\nthe rational cohomology Serre spectral sequence of the fibration collapses at the $E_2$ page.\nEquivalently, the fibration is TNCZ: $H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$ is surjective,\nor dually, the fibre inclusion $F \\hookrightarrow E$ is injective on rational homology\n$H_n(F; \\mathbb{Q}) \\to H_n(E; \\mathbb{Q})$ in every degree $n$, which is the form stated here. -/\n@[category research open, AMS 55]\ntheorem halperin_conjecture {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    [SimplyConnectedSpace E] [SimplyConnectedSpace B] (p : C(E, B)) (hp : IsSerreFibration p)\n    (b : B) (hF : IsRationallyElliptic (p ⁻¹' {b})) (hχ : eulerCharacteristic (p ⁻¹' {b}) ≠ 0)\n    (n : ℕ) :\n    Function.Injective\n      (rationalHomologyMap (⟨Subtype.val, continuous_subtype_val⟩ : C(p ⁻¹' {b}, E)) n).hom := by\n  sorry\n\n/-- The identity map is a Serre fibration. -/\n@[category test, AMS 55]\ntheorem isSerreFibration_id (E : Type*) [TopologicalSpace E] :\n    IsSerreFibration (ContinuousMap.id E) := by\n  intro n f H hH\n  exact ⟨H, fun _ => rfl, fun x => hH x⟩\n\n/-- The projection of a product onto a factor is a Serre fibration. -/\n@[category test, AMS 55]\ntheorem isSerreFibration_snd (F B : Type*) [TopologicalSpace F] [TopologicalSpace B] :\n    IsSerreFibration (ContinuousMap.snd : C(F × B, B)) := by\n  intro n f H hH\n  refine ⟨⟨fun y => ((f y.2).1, H y), by fun_prop⟩, fun _ => rfl, fun x => ?_⟩\n  ext\n  · rfl\n  · exact hH x\n\nend HalperinConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate; Lupton's formality reformulation is a status note and was not formalized as a separate slot.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Fibration' is read as Serre fibration (homotopy lifting property with respect to all cubes I^n, n ≥ 0), the standard convention in rational homotopy theory (FHT, Lupton). Hurewicz fibrations are Serre fibrations, so the stated conjecture covers them.",
+    "The fibre F is taken to be the literal fibre p⁻¹{b} over an arbitrary point b : B (as a subtype of E); since B is simply connected, all fibres are weakly equivalent, so quantifying over all b is harmless.",
+    "'Collapse of the rational Serre spectral sequence at E_2' is formalized in its standard equivalent form: the fibre inclusion is injective on rational singular homology in every degree. This is the linear dual of the TNCZ condition (H^*(E;ℚ) → H^*(F;ℚ) onto), equivalent to it because over a field cohomology is naturally the dual of homology and dualisation is exact; TNCZ ⇔ collapse at E_2 is the standard equivalence cited in Lupton §1 (Leray–Hirsch). Mathlib has singular homology but no singular cohomology, hence the homology phrasing.",
+    "Rational ellipticity follows FHT: X simply connected, Module.Finite ℚ (⨁ n, H_n(X;ℚ)) and Module.Finite ℚ (⨁ n, ℚ ⊗[ℤ] Additive (π_{n+2}(X,x))) for every basepoint x. Only π_{n+2} (n : ℕ) are used since Mathlib's CommGroup instance on homotopy groups needs degree ≥ 2 and π_0, π_1 are trivial for simply connected X. Simple connectivity of F is part of IsRationallyElliptic rather than a separate hypothesis.",
+    "The Euler characteristic is ∑ᶠ n, (-1)^n · finrank ℚ H_n(X;ℚ) using singular homology (same dimensions as cohomology over ℚ); the finsum agrees with the usual sum under the ellipticity hypothesis, which forces finitely many nonzero groups. The hypothesis is χ(F) ≠ 0 exactly as in the statement (equivalent to χ(F) > 0 for elliptic spaces, not imposed).",
+    "No finite-rational-type hypothesis is imposed on E or B, following the Wikipedia statement literally ('fibration of simply connected spaces'). Lupton's blanket finite-type/CW assumption is a convention; the general statement is equivalent to the finite-type one via CW approximation and pulling back along finite simply connected subcomplexes, and omitting it keeps the formal statement closest to the source text.",
+    "Spaces E, B are restricted to universe `Type` because Mathlib's `singularHomologyFunctor (ModuleCat.{u} ℚ)` requires the coefficient module ℚ to live in the same universe as the spaces; this is a purely technical restriction with no mathematical content.",
+    "Rational homology uses Mathlib's `AlgebraicTopology.singularHomologyFunctor` with C := ModuleCat ℚ and coefficient object ModuleCat.of ℚ ℚ, i.e. the (unnormalised) singular chain complex with ℚ coefficients."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "IsCoveringMap / IsCoveringMap.liftHomotopy (too restrictive: covering maps only); ContinuousMap.Homotopy (used as inspiration for the I × X convention).",
+     "name": "HalperinConjecture.IsSerreFibration",
+     "why_needed": "Mathlib has no notion of (Serre or Hurewicz) fibration; only covering maps have a homotopy lifting lemma (`IsCoveringMap.liftHomotopy`). Defined as the homotopy lifting property with respect to all cubes `Fin n → I`."
+    },
+    {
+     "closest_existing_considered": "AlgebraicTopology.singularHomologyFunctor (used directly; the def is just its instantiation).",
+     "name": "HalperinConjecture.rationalHomology",
+     "why_needed": "Convenient name for H_n(X;ℚ) as an object of ModuleCat ℚ, instantiating Mathlib's `AlgebraicTopology.singularHomologyFunctor` at C := ModuleCat ℚ, coefficients ℚ, space TopCat.of X."
+    },
+    {
+     "closest_existing_considered": "((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).map (TopCat.ofHom f) (used directly).",
+     "name": "HalperinConjecture.rationalHomologyMap",
+     "why_needed": "The map H_n(X;ℚ) → H_n(Y;ℚ) induced by a continuous map, i.e. the functorial action of the singular homology functor; needed for the fibre inclusion."
+    },
+    {
+     "closest_existing_considered": "SimplyConnectedSpace, HomotopyGroup (π_), Module.Finite, DirectSum, TensorProduct — combined to express the two finiteness conditions.",
+     "name": "HalperinConjecture.IsRationallyElliptic",
+     "why_needed": "Rational ellipticity (simply connected with finite-dimensional total rational homology and total rational homotopy) is not in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Module.finrank on the singular homology modules; no existing Euler characteristic for spaces (searched Mathlib for `eulerChar`).",
+     "name": "HalperinConjecture.eulerCharacteristic",
+     "why_needed": "Mathlib has no Euler characteristic of a topological space; defined as the finsum of (-1)^n · finrank ℚ H_n(X;ℚ)."
+    }
+   ],
+   "per_slot": {
+    "halperin_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every Serre fibration p : E → B of simply connected spaces (E, B : Type) and every b : B, if the fibre p⁻¹{b} is rationally elliptic (simply connected, finite-dimensional total rational singular homology and total rational homotopy) with nonzero Euler characteristic, then for every n the fibre inclusion induces an injection H_n(F;ℚ) → H_n(E;ℚ). Injectivity in rational homology is equivalent (dualising over the field ℚ) to surjectivity of H^*(E;ℚ) → H^*(F;ℚ) (TNCZ), which is equivalent to collapse of the rational Serre spectral sequence at E_2 (Lupton §1, as the decomposition notes indicate). Mathlib has no Serre fibrations, singular cohomology, Euler characteristic of spaces, or rational ellipticity, so bespoke definitions were added on top of Mathlib's singular homology and homotopy groups."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "halperin_conjecture": "/-- **Halperin conjecture.** Let $F \\to E \\xrightarrow{p} B$ be a (Serre) fibration of simply\nconnected spaces, where $F = p^{-1}(b)$ is the fibre over a point $b \\in B$. Suppose that $F$ is\nrationally elliptic (this includes $F$ being simply connected) and that $\\chi(F) \\neq 0$. Then\nthe rational cohomology Serre spectral sequence of the fibration collapses at the $E_2$ page.\nEquivalently, the fibration is TNCZ: $H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$ is surjective,\nor dually, the fibre inclusion $F \\hookrightarrow E$ is injective on rational homology\n$H_n(F; \\mathbb{Q}) \\to H_n(E; \\mathbb{Q})$ in every degree $n$, which is the form stated here. -/\n@[category research open, AMS 55]\ntheorem halperin_conjecture {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    [SimplyConnectedSpace E] [SimplyConnectedSpace B] (p : C(E, B)) (hp : IsSerreFibration p)\n    (b : B) (hF : IsRationallyElliptic (p ⁻¹' {b})) (hχ : eulerCharacteristic (p ⁻¹' {b}) ≠ 0)\n    (n : ℕ) :\n    Function.Injective\n      (rationalHomologyMap (⟨Subtype.val, continuous_subtype_val⟩ : C(p ⁻¹' {b}, E)) n).hom := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Halperin conjecture\n\nThe Halperin conjecture concerns rational Serre spectral sequences of fibrations whose fiber is\nrationally elliptic and has nonzero Euler characteristic.\n\n*References:*\n- [Wikipedia, *Halperin conjecture*](https://en.wikipedia.org/wiki/Halperin_conjecture)\n- [G. Lupton, *Variations on a conjecture of Halperin*](https://arxiv.org/abs/math/0010124)\n-/\n\nnoncomputable section\n\nnamespace HalperinConjecture\n\nopen AlgebraicTopology CategoryTheory Topology unitInterval\nopen scoped TensorProduct Topology\n\n/-- The degree-`n` singular homology of `X` with rational coefficients. -/\nabbrev RationalHomology (n : ℕ) (X : Type) [TopologicalSpace X] : Type :=\n  (((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).obj (TopCat.of X))\n\n/-- A space is of finite rational type if its rational homology is finite-dimensional in every\n degree. -/\ndef IsOfFiniteRationalType (X : Type) [TopologicalSpace X] : Prop :=\n  ∀ n, Module.Finite ℚ (RationalHomology n X)\n\n/-- The rationalized homotopy group `π_(n+2)(X, x) ⊗ ℚ`. The shift omits `π_0` and `π_1`, which\nare trivial for the simply connected spaces in the conjecture. -/\nabbrev RationalHomotopyGroup (n : ℕ) (X : Type) [TopologicalSpace X] (x : X) : Type :=\n  ℚ ⊗[ℤ] Additive (HomotopyGroup.Pi (n + 2) X x)\n\n/-- The rational homology of `X` has finite total dimension. -/\ndef HasFiniteTotalRationalHomology (X : Type) [TopologicalSpace X] : Prop :=\n  ∃ N, (∀ n, Module.Finite ℚ (RationalHomology n X)) ∧\n    ∀ n, N < n → Subsingleton (RationalHomology n X)\n\n/-- The higher rational homotopy groups of `X`, at `x`, have finite total dimension. -/\ndef HasFiniteTotalRationalHomotopy (X : Type) [TopologicalSpace X] (x : X) : Prop :=\n  ∃ N, (∀ n, Module.Finite ℚ (RationalHomotopyGroup n X x)) ∧\n    ∀ n, N < n → Subsingleton (RationalHomotopyGroup n X x)\n\n/-- A simply connected space is rationally elliptic when both its rational homology and its\nrational homotopy have finite total dimension. Since the spaces used below are simply connected,\nthe choice of base point does not affect this condition. -/\ndef IsRationallyElliptic (X : Type) [TopologicalSpace X] : Prop :=\n  HasFiniteTotalRationalHomology X ∧ ∃ x, HasFiniteTotalRationalHomotopy X x\n\n/-- The rational Euler characteristic, computed through degree `N`. -/\ndef rationalEulerCharacteristic (X : Type) [TopologicalSpace X] (N : ℕ) : ℤ :=\n  ∑ n ∈ Finset.range (N + 1),\n    (-1 : ℤ) ^ n * Module.finrank ℚ (RationalHomology n X)\n\n/-- A space of finite total rational homology has nonzero Euler characteristic if an eventual\nvanishing bound gives a nonzero alternating sum of rational Betti numbers. -/\ndef HasNonzeroEulerCharacteristic (X : Type) [TopologicalSpace X] : Prop :=\n  ∃ N, (∀ n, Module.Finite ℚ (RationalHomology n X)) ∧\n    (∀ n, N < n → Subsingleton (RationalHomology n X)) ∧\n    rationalEulerCharacteristic X N ≠ 0\n\n/-- A continuous map is a Serre fibration if it has the homotopy lifting property for every\nfinite cube. Finite cubes are used here as models of finite-dimensional disks. -/\ndef IsSerreFibration {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    (p : C(E, B)) : Prop :=\n  ∀ (n : ℕ) (H : C(I × (Fin n → I), B)) (f : C((Fin n → I), E)),\n    (∀ a, H (0, a) = p (f a)) →\n      ∃ H' : C(I × (Fin n → I), E),\n        (∀ a, H' (0, a) = f a) ∧ ∀ z, p (H' z) = H z\n\n/-- **Halperin conjecture.** Let `p : E → B` be a Serre fibration of simply connected CW\ncomplexes of finite rational type, and let `F = {e : E // p e = b}` be its fiber. If `F` is\nrationally elliptic and has nonzero Euler characteristic, then its rational cohomology Serre\nspectral sequence collapses at the $E_2$ page. Equivalently, the fibration is TNCZ: the restriction\n`H^*(E; ℚ) → H^*(F; ℚ)` is surjective. Over `ℚ`, this is equivalent to the formulation below,\nthat the fiber inclusion induces an injective map on rational homology in every degree. -/\n@[category research open, AMS 55]\ntheorem halperin_conjecture\n    (E B : Type) [TopologicalSpace E] [TopologicalSpace B]\n    [Topology.CWComplex (Set.univ : Set E)] [Topology.CWComplex (Set.univ : Set B)]\n    [SimplyConnectedSpace E] [SimplyConnectedSpace B]\n    (p : C(E, B)) (b : B)\n    [Topology.CWComplex (Set.univ : Set {e : E // p e = b})]\n    [SimplyConnectedSpace {e : E // p e = b}]\n    (hp : IsSerreFibration p)\n    (hE : IsOfFiniteRationalType E) (hB : IsOfFiniteRationalType B)\n    (hell : IsRationallyElliptic {e : E // p e = b})\n    (hχ : HasNonzeroEulerCharacteristic {e : E // p e = b}) :\n    ∀ n, Function.Injective\n      (((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).map\n        (TopCat.ofHom ⟨Subtype.val, continuous_subtype_val⟩) :\n          RationalHomology n {e : E // p e = b} → RationalHomology n E) := by\n  sorry\n\nend HalperinConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Lupton's precise convention that the spaces are simply connected CW complexes of finite rational type; the theorem assumes CW structures and degreewise finite-dimensional rational homology for E and B, while the fiber's stronger finite-total condition follows from rational ellipticity.",
+    "Modeled F as the actual fiber {e : E // p e = b} of a continuous map p : E → B over a chosen base point b, so the map F → E is the canonical subtype inclusion.",
+    "Modeled a Serre fibration by the homotopy lifting property for every finite cube (Fin n → I); finite cubes are topological models of disks, giving the standard disk-testing formulation of a Serre fibration without strengthening it to a Hurewicz fibration.",
+    "Used the TNCZ reformulation of collapse at E₂. Since Mathlib provides rational singular homology but not singular cohomology or the Serre spectral sequence, stated TNCZ as injectivity of H_n(F; ℚ) → H_n(E; ℚ) for every n. Over ℚ this is equivalent, via universal coefficients/linear duality, to surjectivity of H^n(E; ℚ) → H^n(F; ℚ).",
+    "Encoded finite total dimension of an ℕ-graded rational vector space as finite-dimensionality in every degree together with vanishing above one bound.",
+    "Defined rational ellipticity using finite total rational homology and finite total rationalized higher homotopy. Degrees π₀ and π₁ are omitted because every relevant space is assumed simply connected.",
+    "Computed Euler characteristic as the alternating sum of rational Betti numbers through an eventual-vanishing bound; this is the Euler characteristic used explicitly in Lupton's formulation."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "AlgebraicTopology.singularHomologyFunctor, which is the underlying existing primitive but is highly parameterized.",
+     "name": "RationalHomology",
+     "why_needed": "Provides concise access to Mathlib's singular homology functor with rational coefficients."
+    },
+    {
+     "closest_existing_considered": "Module.Finite applied to each value of AlgebraicTopology.singularHomologyFunctor; no space-level predicate was found.",
+     "name": "IsOfFiniteRationalType",
+     "why_needed": "Expresses the source's standing finite-rational-type convention degree by degree."
+    },
+    {
+     "closest_existing_considered": "HomotopyGroup.Pi and TensorProduct; no rationalized homotopy-group definition was found.",
+     "name": "RationalHomotopyGroup",
+     "why_needed": "Expresses π_(n+2)(X,x) tensor ℚ as a rational vector space."
+    },
+    {
+     "closest_existing_considered": "Module.Finite only handles one module/degree, and no finite-total graded homology predicate was found.",
+     "name": "HasFiniteTotalRationalHomology",
+     "why_needed": "Expresses dim H_*(X;ℚ) < ∞ across all degrees."
+    },
+    {
+     "closest_existing_considered": "Module.Finite on RationalHomotopyGroup degreewise; no finite-total rational homotopy predicate was found.",
+     "name": "HasFiniteTotalRationalHomotopy",
+     "why_needed": "Expresses dim (π_*(X) tensor ℚ) < ∞ across all higher degrees."
+    },
+    {
+     "closest_existing_considered": "No rational ellipticity primitive was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsRationallyElliptic",
+     "why_needed": "Combines the two standard finite-total-dimensionality conditions defining rational ellipticity."
+    },
+    {
+     "closest_existing_considered": "Module.finrank supplies individual Betti numbers; Mathlib's existing eulerChar concerns finite orders, not topological spaces.",
+     "name": "rationalEulerCharacteristic",
+     "why_needed": "Defines the finite alternating sum of rational Betti numbers used by the source."
+    },
+    {
+     "closest_existing_considered": "No topological Euler characteristic predicate was found.",
+     "name": "HasNonzeroEulerCharacteristic",
+     "why_needed": "Packages eventual rational-homology vanishing and nonvanishing of the resulting Euler characteristic."
+    },
+    {
+     "closest_existing_considered": "Mathlib has lifting results for covering maps and categorical model-category fibrations, but no predicate for Serre fibrations of topological spaces.",
+     "name": "IsSerreFibration",
+     "why_needed": "Expresses the Serre homotopy lifting property required by the conjecture."
+    }
+   ],
+   "per_slot": {
+    "halperin_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "halperin_conjecture": "/-- **Halperin conjecture.** Let `p : E → B` be a Serre fibration of simply connected CW\ncomplexes of finite rational type, and let `F = {e : E // p e = b}` be its fiber. If `F` is\nrationally elliptic and has nonzero Euler characteristic, then its rational cohomology Serre\nspectral sequence collapses at the $E_2$ page. Equivalently, the fibration is TNCZ: the restriction\n`H^*(E; ℚ) → H^*(F; ℚ)` is surjective. Over `ℚ`, this is equivalent to the formulation below,\nthat the fiber inclusion induces an injective map on rational homology in every degree. -/\n@[category research open, AMS 55]\ntheorem halperin_conjecture\n    (E B : Type) [TopologicalSpace E] [TopologicalSpace B]\n    [Topology.CWComplex (Set.univ : Set E)] [Topology.CWComplex (Set.univ : Set B)]\n    [SimplyConnectedSpace E] [SimplyConnectedSpace B]\n    (p : C(E, B)) (b : B)\n    [Topology.CWComplex (Set.univ : Set {e : E // p e = b})]\n    [SimplyConnectedSpace {e : E // p e = b}]\n    (hp : IsSerreFibration p)\n    (hE : IsOfFiniteRationalType E) (hB : IsOfFiniteRationalType B)\n    (hell : IsRationallyElliptic {e : E // p e = b})\n    (hχ : HasNonzeroEulerCharacteristic {e : E // p e = b}) :\n    ∀ n, Function.Injective\n      (((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).map\n        (TopCat.ofHom ⟨Subtype.val, continuous_subtype_val⟩) :\n          RationalHomology n {e : E // p e = b} → RationalHomology n E) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The Halperin conjecture\n\nThe Halperin conjecture states that the rational-cohomology Serre spectral sequence of a\nfibration of simply connected spaces collapses at the $E_2$ page when the fibre is rationally\nelliptic and has nonzero Euler characteristic.\n\n*References:*\n- [Wikipedia, Halperin conjecture](https://en.wikipedia.org/wiki/Halperin_conjecture)\n- [Lupton, *Variations on a conjecture of Halperin*](https://arxiv.org/abs/math/0010124)\n-/\n\nnamespace HalperinConjecture\n\nopen CategoryTheory Topology\nopen scoped TensorProduct Topology unitInterval\n\nnoncomputable section\n\n/-- The rational singular homology of `X` in degree `n`. -/\nabbrev RationalHomology (n : ℕ) (X : Type) [TopologicalSpace X] : Type :=\n  ((AlgebraicTopology.singularHomologyFunctor (ModuleCat ℚ) n).obj\n    (ModuleCat.of ℚ ℚ)).obj (TopCat.of X)\n\nprivate instance finSuccSuccNontrivial (n : ℕ) : Nontrivial (Fin n.succ.succ) :=\n  ⟨⟨0, by omega⟩, ⟨1, by omega⟩, by simp⟩\n\n/-- The rationalization of the homotopy group of `X` in degree `n + 2`.\n\nThe shift avoids dimensions zero and one. These are irrelevant to rational ellipticity here\nbecause every space to which the definition is applied in the conjecture is simply connected. -/\nabbrev RationalHigherHomotopy (n : ℕ) (X : Type) [TopologicalSpace X] (x : X) : Type :=\n  ℚ ⊗[ℤ] Additive (HomotopyGroup.Pi n.succ.succ X x)\n\n/-- A space is of finite rational type if its rational homology in every degree is\nfinite-dimensional. -/\ndef IsFiniteRationalType (X : Type) [TopologicalSpace X] : Prop :=\n  ∀ n : ℕ, Module.Finite ℚ (RationalHomology n X)\n\n/-- A pointed simply connected space is rationally elliptic if its total rational homology and\nits total rational homotopy are finite-dimensional. The two bounds express that only finitely\nmany degrees are nonzero; degreewise finiteness expresses finite-dimensionality in each degree. -/\ndef IsRationallyElliptic (X : Type) [TopologicalSpace X] (x : X) : Prop :=\n  (∃ N : ℕ,\n    (∀ n : ℕ, Module.Finite ℚ (RationalHomology n X)) ∧\n    (∀ n > N, Subsingleton (RationalHomology n X))) ∧\n  (∃ N : ℕ,\n    (∀ n : ℕ, Module.Finite ℚ (RationalHigherHomotopy n X x)) ∧\n    (∀ n > N, Subsingleton (RationalHigherHomotopy n X x)))\n\n/-- The rational Euler characteristic of a space. On a rationally elliptic space this is the\nfinite alternating sum of the dimensions of its rational homology groups. -/\ndef rationalEulerCharacteristic (X : Type) [TopologicalSpace X] : ℤ :=\n  ∑ᶠ n : ℕ, if Even n then (Module.finrank ℚ (RationalHomology n X) : ℤ)\n    else -(Module.finrank ℚ (RationalHomology n X) : ℤ)\n\n/-- A map is a Serre fibration if it has the homotopy lifting property with respect to every\nfinite cube. This is the standard cubical characterization of Serre fibrations. -/\ndef IsSerreFibration {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    (p : C(E, B)) : Prop :=\n  ∀ (n : ℕ) (g : C((Fin n → I), E)) (H : C(I × (Fin n → I), B)),\n    (∀ a, p (g a) = H (0, a)) →\n      ∃ G : C(I × (Fin n → I), E),\n        (∀ a, G (0, a) = g a) ∧ ∀ t, p (G t) = H t\n\n/-- The fibre inclusion for `p` over `b`. -/\ndef fibreInclusion {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    (p : C(E, B)) (b : B) : C({e : E // p e = b}, E) :=\n  ⟨Subtype.val, continuous_subtype_val⟩\n\n/-- A fibration is totally non-cohomologous to zero (TNCZ) over `ℚ` if the fibre inclusion is\ninjective on rational homology in every degree. For spaces of finite rational type, this is\nequivalent by duality to surjectivity of $H^*(E;\\mathbb Q) \\to H^*(F;\\mathbb Q)$, the usual\nTNCZ condition. -/\ndef IsTNCZ {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    (p : C(E, B)) (b : B) : Prop :=\n  ∀ n : ℕ, Function.Injective\n    (((AlgebraicTopology.singularHomologyFunctor (ModuleCat ℚ) n).obj\n      (ModuleCat.of ℚ ℚ)).map (TopCat.ofHom (fibreInclusion p b)))\n\n/-- **Halperin conjecture.** Suppose that $F \\to E \\to B$ is a fibration of simply connected\nspaces of finite rational type. If the fibre $F$ is rationally elliptic and has nonzero Euler\ncharacteristic, then its rational-cohomology Serre spectral sequence collapses at the $E_2$\npage. The conclusion is stated in the equivalent TNCZ form: the restriction\n$H^*(E;\\mathbb Q) \\to H^*(F;\\mathbb Q)$ is surjective. -/\n@[category research open, AMS 55]\ntheorem halperin_conjecture\n    (E B : Type) [TopologicalSpace E] [TopologicalSpace B]\n    [SimplyConnectedSpace E] [SimplyConnectedSpace B]\n    (p : C(E, B)) (b : B)\n    [SimplyConnectedSpace {e : E // p e = b}]\n    (x : {e : E // p e = b})\n    (hp : IsSerreFibration p)\n    (hE : IsFiniteRationalType E) (hB : IsFiniteRationalType B)\n    (hF : IsRationallyElliptic {e : E // p e = b} x)\n    (hχ : rationalEulerCharacteristic {e : E // p e = b} ≠ 0) :\n    IsTNCZ p b := by\n  sorry\n\nend\n\nend HalperinConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Lupton's precise context: all spaces are simply connected and of finite rational type. The fibre is represented as the strict fibre `{e : E // p e = b}` of a continuous map over a chosen basepoint.",
+    "Modeled a Serre fibration by the homotopy lifting property with respect to every finite cube, the standard cubical characterization of Serre fibrations, because Mathlib has no topological Serre-fibration predicate.",
+    "Modeled rational ellipticity as bounded, degreewise finite-dimensional rational singular homology together with bounded, degreewise finite-dimensional rationalizations of homotopy groups. Since the conjecture assumes simple connectedness, the rational homotopy sum starts in degree 2; degrees 0 and 1 do not contribute.",
+    "Used an explicit point of the fibre to base its higher homotopy groups. A simply connected fibre is nonempty, and rational homotopy dimensions are independent of the basepoint in this context.",
+    "Defined the Euler characteristic by the alternating `finsum` of rational Betti numbers. The rational-ellipticity hypothesis makes this sum finitely supported, so no behavior of `finsum` outside the intended finite setting affects the theorem.",
+    "Stated collapse at the rational-cohomology `E₂` page through Lupton's equivalent TNCZ condition. Because Mathlib lacks singular cohomology, TNCZ is expressed as injectivity of the fibre inclusion on rational homology in every degree; finite-dimensional fibre homology and vector-space duality make this equivalent to surjectivity of `H^*(E; ℚ) → H^*(F; ℚ)`.",
+    "Required simple connectedness of the total space, base, and strict fibre, matching the article's convention that all spaces in the fibration are simply connected."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`AlgebraicTopology.singularHomologyFunctor`; this abbreviation specializes its coefficient category and coefficient object to `ModuleCat ℚ` and `ℚ`.",
+     "name": "RationalHomology",
+     "why_needed": "Provides the rational singular homology vector space used throughout the statement."
+    },
+    {
+     "closest_existing_considered": "`HomotopyGroup.Pi`; Mathlib provides integral homotopy groups but no rationalization, so the definition tensors their additive form with `ℚ` over `ℤ`.",
+     "name": "RationalHigherHomotopy",
+     "why_needed": "Rational ellipticity requires the rationalized higher homotopy groups."
+    },
+    {
+     "closest_existing_considered": "`Module.Finite` and `RationalHomology`; no existing predicate packages degreewise finite-dimensional rational homology.",
+     "name": "IsFiniteRationalType",
+     "why_needed": "The source literature implicitly restricts all spaces to finite rational type."
+    },
+    {
+     "closest_existing_considered": "`Module.Finite`, `AlgebraicTopology.singularHomologyFunctor`, and `HomotopyGroup.Pi`; these provide components but no rational-ellipticity predicate.",
+     "name": "IsRationallyElliptic",
+     "why_needed": "No Mathlib or repository predicate expresses finite total rational homology and finite total rational homotopy."
+    },
+    {
+     "closest_existing_considered": "`Module.finrank` and `finsum`; the only existing `eulerChar` search hit concerns finite bounded orders, not topological spaces.",
+     "name": "rationalEulerCharacteristic",
+     "why_needed": "Mathlib has no topological Euler characteristic based on rational Betti numbers."
+    },
+    {
+     "closest_existing_considered": "Mathlib's covering-map homotopy lifting results and model-category `Fibration` for simplicial sets; covering maps are far too restrictive, while switching the conjecture from spaces to simplicial sets would alter its domain.",
+     "name": "IsSerreFibration",
+     "why_needed": "Mathlib has no predicate for Serre fibrations of topological spaces."
+    },
+    {
+     "closest_existing_considered": "`Subtype.val` and `continuous_subtype_val`; no existing specialized fibre-inclusion continuous map was found.",
+     "name": "fibreInclusion",
+     "why_needed": "Packages the continuous inclusion of the strict fibre so the induced rational homology map can be formed."
+    },
+    {
+     "closest_existing_considered": "`AlgebraicTopology.singularHomologyFunctor` and `Function.Injective`; Mathlib has no singular-cohomology functor, so the dual homological formulation is used.",
+     "name": "IsTNCZ",
+     "why_needed": "Neither rational Serre spectral sequences nor the TNCZ condition are available in Mathlib; this is the source-backed equivalent conclusion."
+    }
+   ],
+   "per_slot": {
+    "halperin_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "halperin_conjecture": "/-- **Halperin conjecture.** Suppose that $F \\to E \\to B$ is a fibration of simply connected\nspaces of finite rational type. If the fibre $F$ is rationally elliptic and has nonzero Euler\ncharacteristic, then its rational-cohomology Serre spectral sequence collapses at the $E_2$\npage. The conclusion is stated in the equivalent TNCZ form: the restriction\n$H^*(E;\\mathbb Q) \\to H^*(F;\\mathbb Q)$ is surjective. -/\n@[category research open, AMS 55]\ntheorem halperin_conjecture\n    (E B : Type) [TopologicalSpace E] [TopologicalSpace B]\n    [SimplyConnectedSpace E] [SimplyConnectedSpace B]\n    (p : C(E, B)) (b : B)\n    [SimplyConnectedSpace {e : E // p e = b}]\n    (x : {e : E // p e = b})\n    (hp : IsSerreFibration p)\n    (hE : IsFiniteRationalType E) (hB : IsFiniteRationalType B)\n    (hF : IsRationallyElliptic {e : E // p e = b} x)\n    (hχ : rationalEulerCharacteristic {e : E // p e = b} ≠ 0) :\n    IsTNCZ p b := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Halperin conjecture\n\nLet $F \\to E \\to B$ be a fibration of simply connected spaces such that the fibre $F$ is\n*rationally elliptic* (both $H^*(F; \\mathbb{Q})$ and $\\pi_*(F) \\otimes \\mathbb{Q}$ are\nfinite-dimensional) and has non-zero Euler characteristic $\\chi(F) \\neq 0$. The Halperin\nconjecture asserts that the (rational cohomology) Serre spectral sequence of the fibration\ncollapses at the $E_2$ page.\n\nSince Mathlib has no Serre spectral sequence, we use the standard equivalent formulation\n(see [Lupton, §1] and McCleary, *A User's Guide to Spectral Sequences*, Thm. 5.9): the Serre\nspectral sequence collapses at $E_2$ if and only if the fibration is *totally non-cohomologous to\nzero* (TNCZ), i.e. the fibre inclusion $j : F \\to E$ induces a surjection\n$j^* : H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$. Since $\\mathbb{Q}$ is a field,\n$H^n(X; \\mathbb{Q})$ is naturally the dual of $H_n(X; \\mathbb{Q})$, so $j^*$ is surjective in\nevery degree if and only if $j_* : H_n(F; \\mathbb{Q}) \\to H_n(E; \\mathbb{Q})$ is injective in\nevery degree. We state the conjecture in this last form, using Mathlib's singular homology with\nrational coefficients.\n\nHere \"fibration\" means Serre fibration (homotopy lifting property with respect to all cubes),\nand the fibre is $F = p^{-1}(b)$ for a point $b$ of the base. Since $B$ is path connected, all\nfibres are weakly homotopy equivalent, so the choice of $b$ does not matter.\n\n*References:*\n- [Wikipedia, Halperin conjecture](https://en.wikipedia.org/wiki/Halperin_conjecture)\n- [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics#Topology)\n- [Lupton, G., *Variations on a conjecture of Halperin*](https://arxiv.org/abs/math/0010124),\n  Homotopy and Geometry (Warsaw, 1997), Banach Center Publ. 45 (1998), 115–135.\n- Félix, Y., Halperin, S., Thomas, J.-C., *Rational Homotopy Theory*, GTM 205, Springer (2001).\n-/\n\nnamespace HalperinConjecture\n\nopen AlgebraicTopology CategoryTheory DirectSum Topology TensorProduct\nopen scoped unitInterval\n\nuniverse u\n\nvariable {E B : Type u} [TopologicalSpace E] [TopologicalSpace B]\n\n/-- A continuous map `p : E → B` is a *Serre fibration* if it has the homotopy lifting property\nwith respect to every cube `I^n`: for every `f : I^n → E` and every homotopy `H : I × I^n → B`\nstarting at `p ∘ f`, there is a homotopy `H' : I × I^n → E` starting at `f` with\n`p ∘ H' = H`. -/\ndef IsSerreFibration (p : C(E, B)) : Prop :=\n  ∀ (n : ℕ) (f : C(I^Fin n, E)) (H : C(I × I^Fin n, B)),\n    (∀ y, H (0, y) = p (f y)) →\n      ∃ H' : C(I × I^Fin n, E), (∀ z, p (H' z) = H z) ∧ ∀ y, H' (0, y) = f y\n\n/-- The identity map is a Serre fibration. -/\n@[category test, AMS 55]\ntheorem isSerreFibration_id : IsSerreFibration (ContinuousMap.id E) :=\n  fun _ _ H hH => ⟨H, fun _ => rfl, fun y => hH y⟩\n\n/-- Any continuous map to a subsingleton (e.g. a one-point space) is a Serre fibration. -/\n@[category test, AMS 55]\ntheorem isSerreFibration_of_subsingleton [Subsingleton B] (p : C(E, B)) : IsSerreFibration p :=\n  fun _ f _ _ =>\n    ⟨f.comp ⟨Prod.snd, continuous_snd⟩, fun _ => Subsingleton.elim _ _, fun _ => rfl⟩\n\n/-- The inclusion `j : p⁻¹(b) → E` of the fibre of `p : E → B` over `b : B` into the total\nspace. -/\ndef fibreInclusion (p : C(E, B)) (b : B) : C(p ⁻¹' {b}, E) :=\n  ⟨Subtype.val, continuous_subtype_val⟩\n\n/-- The `n`-th singular homology functor with rational coefficients, `X ↦ H_n(X; ℚ)`, as a\nfunctor from topological spaces to `ℚ`-vector spaces. (The coefficient module `ULift ℚ` is just\n`ℚ` lifted to the universe of the spaces.) -/\nnoncomputable abbrev rationalHomologyFunctor (n : ℕ) : TopCat.{u} ⥤ ModuleCat.{u} ℚ :=\n  (singularHomologyFunctor (ModuleCat.{u} ℚ) n).obj (ModuleCat.of ℚ (ULift.{u} ℚ))\n\n/-- The `n`-th singular homology `H_n(X; ℚ)` of a topological space `X` with rational\ncoefficients, as a `ℚ`-vector space. -/\nnoncomputable abbrev rationalHomology (X : Type u) [TopologicalSpace X] (n : ℕ) :\n    ModuleCat.{u} ℚ :=\n  (rationalHomologyFunctor n).obj (TopCat.of X)\n\n/-- The (rational) Euler characteristic\n$\\chi(X) = \\sum_i (-1)^i \\dim_{\\mathbb{Q}} H_i(X; \\mathbb{Q})$ of a topological space `X`.\nThis is only meaningful when the total rational homology of `X` is finite-dimensional, which\nis guaranteed for rationally elliptic spaces; otherwise the sum is a `finsum` over an infinite\nsupport and is `0` by convention. -/\nnoncomputable def rationalEulerChar (X : Type u) [TopologicalSpace X] : ℤ :=\n  ∑ᶠ n : ℕ, (-1 : ℤ) ^ n * Module.finrank ℚ (rationalHomology X n)\n\n/-- A topological space `X` is *rationally elliptic* if its total rational homology\n$H_*(X; \\mathbb{Q}) = \\bigoplus_n H_n(X; \\mathbb{Q})$ and its total rational homotopy\n$\\pi_*(X) \\otimes \\mathbb{Q} = \\bigoplus_n \\pi_n(X) \\otimes \\mathbb{Q}$ are both\nfinite-dimensional over `ℚ`.\n\nThis definition is intended for simply connected spaces (for which `π_0` and `π_1` are trivial\nand homotopy groups do not depend on the base point), so only the groups `π_n(X, x)` for\n`n ≥ 2`, which are abelian, are tensored with `ℚ`. Since $\\mathbb{Q}$ is a field,\n$\\dim H_*(X; \\mathbb{Q}) < \\infty$ is equivalent to $\\dim H^*(X; \\mathbb{Q}) < \\infty$. -/\ndef IsRationallyElliptic (X : Type u) [TopologicalSpace X] : Prop :=\n  Module.Finite ℚ (⨁ n : ℕ, rationalHomology X n) ∧\n    ∀ x : X, Module.Finite ℚ (⨁ n : ℕ, ℚ ⊗[ℤ] Additive (π_ (n + 2) X x))\n\n/-- **Halperin conjecture.** Let $F \\to E \\to B$ be a (Serre) fibration of simply connected spaces\nsuch that the fibre $F$ is rationally elliptic and has non-zero Euler characteristic\n$\\chi(F) \\neq 0$. Then the rational Serre spectral sequence of the fibration collapses at the\n$E_2$ page.\n\nEquivalently (see the module docstring), the fibration is totally non-cohomologous to zero: the\nfibre inclusion $j : F \\to E$ induces a surjection $H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$,\ni.e. (dually) an injection $j_* : H_n(F; \\mathbb{Q}) \\to H_n(E; \\mathbb{Q})$ for every `n`.\n\nHere `p : E → B` is the fibration, `b : B` is any point of the base and `F = p ⁻¹' {b}` is the\nfibre over `b`. -/\n@[category research open, AMS 55]\ntheorem halperin_conjecture [SimplyConnectedSpace E] [SimplyConnectedSpace B]\n    (p : C(E, B)) (hp : IsSerreFibration p) (b : B) [SimplyConnectedSpace (p ⁻¹' {b})]\n    (hF : IsRationallyElliptic (p ⁻¹' {b})) (hχ : rationalEulerChar (p ⁻¹' {b}) ≠ 0)\n    (n : ℕ) :\n    Function.Injective\n      ((rationalHomologyFunctor n).map (TopCat.ofHom (fibreInclusion p b))).hom := by\n  sorry\n\nend HalperinConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.82,
+   "decomposition_objections": "None. The single-slot decomposition is correct; the TNCZ reformulation suggested in the notes was used (further dualized to homology injectivity because Mathlib has singular homology but no singular cohomology).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Collapse of the Serre spectral sequence at E_2' is formalized via the standard equivalent TNCZ condition, and TNCZ (surjectivity of j^* on rational cohomology) is in turn stated dually as injectivity of j_* : H_n(F;ℚ) → H_n(E;ℚ) for all n, because Mathlib has singular homology but not cohomology or spectral sequences. The equivalence of collapse and TNCZ uses only that B is simply connected and H*(F;ℚ) is finite-dimensional (part of ellipticity); the homology/cohomology duality is pure linear algebra over the field ℚ.",
+    "'Fibration' is taken to mean Serre fibration (homotopy lifting property for all cubes I^n, n ≥ 0), the usual convention in rational homotopy theory (FHT); this is the most general (strongest) reading and includes Hurewicz fibrations.",
+    "The fibre is taken to be the actual fibre F = p ⁻¹' {b} over a point b : B (quantified over all b); since B is path connected all fibres of a Serre fibration are weakly homotopy equivalent, so this is equivalent to any other choice.",
+    "Following the Wikipedia statement, no finite-type / CW hypotheses are imposed on E and B (Lupton's paper has a blanket 'finite type CW complex' convention). Rational homology and homotopy are weak-homotopy invariants and the TNCZ property pulls back along the classifying map to the (finite-type, simply connected) universal fibration, so this is equivalent to the finite-type version; it is anyway the literal Wikipedia form. Simple connectivity is imposed on all three of F, E, B as in the statement (simple connectivity of E is redundant but harmless).",
+    "Rational ellipticity is defined as: the total rational homology ⨁ₙ H_n(X;ℚ) and the total rational homotopy ⨁ₙ π_{n+2}(X,x) ⊗_ℤ ℚ (for every base point x) are finite-dimensional ℚ-vector spaces. Only π_n for n ≥ 2 is used because π_0, π_1 are trivial for simply connected spaces (and only these are abelian groups in Mathlib); finite-dimensionality of H_* is equivalent to that of H^* over the field ℚ.",
+    "χ(F) is defined as ∑ᶠ n, (-1)^n · dim_ℚ H_n(F;ℚ) (a `finsum`, which is well-defined because the ellipticity hypothesis makes the support finite). The hypothesis is χ(F) ≠ 0 as in Wikipedia (equivalent to χ(F) > 0 for elliptic spaces by Halperin's theorem, which is Lupton's phrasing).",
+    "Rational homology is Mathlib's `singularHomologyFunctor` with coefficients in `ModuleCat.of ℚ (ULift.{u} ℚ)`; `ULift ℚ` is just ℚ lifted to the universe of the spaces so that the statement is universe-polymorphic.",
+    "The homotopy lifting property is stated with homotopies `I × I^n → B` (Mathlib's `I × X` convention) starting at time 0."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`IsCoveringMap` (too restrictive), `HasLiftingProperty` in `CategoryTheory.MorphismProperty` (categorical, no topological fibration class instantiates it), `ContinuousMap.Homotopy`.",
+     "name": "HalperinConjecture.IsSerreFibration",
+     "why_needed": "Mathlib has no notion of (Serre or Hurewicz) fibration of topological spaces; only `IsCoveringMap` and simplicial/model-category fibrations exist."
+    },
+    {
+     "closest_existing_considered": "`ContinuousMap.restrict` applied to `ContinuousMap.id` (equivalent but less readable).",
+     "name": "HalperinConjecture.fibreInclusion",
+     "why_needed": "Named continuous inclusion `p ⁻¹' {b} → E` of the fibre into the total space, to make the statement readable."
+    },
+    {
+     "closest_existing_considered": "`AlgebraicTopology.singularHomologyFunctor` (used directly; no ℚ-coefficient specialization exists).",
+     "name": "HalperinConjecture.rationalHomologyFunctor",
+     "why_needed": "Specialization of Mathlib's `AlgebraicTopology.singularHomologyFunctor` to coefficients ℚ (as `ULift ℚ` in universe u), giving `TopCat ⥤ ModuleCat ℚ`; needed to name the induced map j_*."
+    },
+    {
+     "closest_existing_considered": "`AlgebraicTopology.singularHomologyFunctor` (functorial version, used to build it).",
+     "name": "HalperinConjecture.rationalHomology",
+     "why_needed": "H_n(X;ℚ) as a ℚ-module for a topological space X; used in the definitions of ellipticity and Euler characteristic."
+    },
+    {
+     "closest_existing_considered": "No topological Euler characteristic exists in Mathlib or FormalConjecturesForMathlib (searched for `eulerChar`).",
+     "name": "HalperinConjecture.rationalEulerChar",
+     "why_needed": "Mathlib has no Euler characteristic of a topological space; defined as ∑ᶠ n, (-1)^n dim_ℚ H_n(X;ℚ)."
+    },
+    {
+     "closest_existing_considered": "`HomotopyGroup`/`π_` and `singularHomologyFunctor` (used as ingredients); no rational homotopy theory exists in Mathlib.",
+     "name": "HalperinConjecture.IsRationallyElliptic",
+     "why_needed": "Rational ellipticity (finite-dimensional total rational homology and rational homotopy) is absent from Mathlib and the repo."
+    }
+   ],
+   "per_slot": {
+    "halperin_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `halperin_conjecture`: for a Serre fibration `p : E → B` of simply connected spaces with simply connected fibre `F = p ⁻¹' {b}` that is rationally elliptic and has χ(F) ≠ 0, the fibre inclusion induces an injection H_n(F;ℚ) → H_n(E;ℚ) for every n. This is the standard equivalent form of 'the rational Serre spectral sequence collapses at E_2' (⟺ TNCZ, i.e. H*(E;ℚ) → H*(F;ℚ) surjective, Lupton §1 / McCleary Thm 5.9; ⟺ injectivity on rational homology because ℚ is a field so H^n(-;ℚ) is the dual of H_n(-;ℚ)). Mathlib has singular homology with coefficients but no spectral sequences, no singular cohomology, and no Serre fibrations, so bespoke definitions were needed for the fibration, rational homology, rational Euler characteristic and rational ellipticity."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "halperin_conjecture": "/-- **Halperin conjecture.** Let $F \\to E \\to B$ be a (Serre) fibration of simply connected spaces\nsuch that the fibre $F$ is rationally elliptic and has non-zero Euler characteristic\n$\\chi(F) \\neq 0$. Then the rational Serre spectral sequence of the fibration collapses at the\n$E_2$ page.\n\nEquivalently (see the module docstring), the fibration is totally non-cohomologous to zero: the\nfibre inclusion $j : F \\to E$ induces a surjection $H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$,\ni.e. (dually) an injection $j_* : H_n(F; \\mathbb{Q}) \\to H_n(E; \\mathbb{Q})$ for every `n`.\n\nHere `p : E → B` is the fibration, `b : B` is any point of the base and `F = p ⁻¹' {b}` is the\nfibre over `b`. -/\n@[category research open, AMS 55]\ntheorem halperin_conjecture [SimplyConnectedSpace E] [SimplyConnectedSpace B]\n    (p : C(E, B)) (hp : IsSerreFibration p) (b : B) [SimplyConnectedSpace (p ⁻¹' {b})]\n    (hF : IsRationallyElliptic (p ⁻¹' {b})) (hχ : rationalEulerChar (p ⁻¹' {b}) ≠ 0)\n    (n : ℕ) :\n    Function.Injective\n      ((rationalHomologyFunctor n).map (TopCat.ofHom (fibreInclusion p b))).hom := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Halperin conjecture\n\nThe Halperin conjecture concerns the rational Serre spectral sequence of certain fibrations.\nSuppose that $F \\to E \\to B$ is a fibration of simply connected spaces such that $F$ is\nrationally elliptic (both $H_*(F; \\mathbb{Q})$ and $\\pi_*(F) \\otimes \\mathbb{Q}$ are\nfinite-dimensional) and $\\chi(F) \\neq 0$. Then the Serre spectral sequence (for cohomology with\nrational coefficients) of the fibration collapses at the $E_2$ page.\n\nCollapse at $E_2$ is equivalent to the fibration being *totally non-cohomologous to zero*\n(TNCZ), i.e. to the restriction $H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$ being surjective\n(see [Lu97], §1). Since $\\mathbb{Q}$ is a field, this is in turn equivalent to the map\n$H_*(F; \\mathbb{Q}) \\to H_*(E; \\mathbb{Q})$ induced by the inclusion of the fibre being\ninjective, which is the form used below (Mathlib has singular homology but not singular\ncohomology).\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Halperin_conjecture)\n- [Lu97] Lupton, G., *Variations on a conjecture of Halperin*, Homotopy and Geometry\n  (Warsaw, 1997), Banach Center Publ. 45 (1998).\n  [arXiv:math/0010124](https://arxiv.org/abs/math/0010124)\n- [FHT93] Félix, Y., Halperin, S. and Thomas, J.-C., *Elliptic spaces II*,\n  L'Enseignement Mathématique 39 (1993).\n-/\n\nopen CategoryTheory Topology unitInterval DirectSum TensorProduct\n\nnamespace HalperinConjecture\n\nuniverse u\n\nvariable {E B : Type u} [TopologicalSpace E] [TopologicalSpace B]\n\n/-- A continuous map `p : E → B` is a *Serre fibration* if it has the homotopy lifting property\nwith respect to all cubes $I^n = [0, 1]^n$: for every `n`, every map `f : I^n → E` and every\nhomotopy `H : I × I^n → B` starting at `p ∘ f`, there is a homotopy `H' : I × I^n → E`\nstarting at `f` and lifting `H`, i.e. `p ∘ H' = H`. -/\ndef IsSerreFibration (p : C(E, B)) : Prop :=\n  ∀ (n : ℕ) (f : C(I^ Fin n, E)) (H : C(I × I^ Fin n, B)), (∀ x, H (0, x) = p (f x)) →\n    ∃ H' : C(I × I^ Fin n, E), (∀ tx, p (H' tx) = H tx) ∧ ∀ x, H' (0, x) = f x\n\n/-- The identity map is a Serre fibration. -/\n@[category test, AMS 55]\ntheorem isSerreFibration_id : IsSerreFibration (ContinuousMap.id B) :=\n  fun _ _ H hH => ⟨H, fun _ => rfl, fun x => hH x⟩\n\n/-- The projection of a product onto a factor (a trivial fibration) is a Serre fibration. -/\n@[category test, AMS 55]\ntheorem isSerreFibration_fst : IsSerreFibration (ContinuousMap.fst : C(B × E, B)) :=\n  fun _ f H hH => ⟨⟨fun tx => (H tx, (f tx.2).2), by fun_prop⟩, fun _ => rfl,\n    fun x => Prod.ext (hH x) rfl⟩\n\n/-- The `n`-th rational singular homology group $H_n(X; \\mathbb{Q})$ of a topological space `X`,\nas a `ℚ`-vector space. It is the `n`-th homology of the singular chain complex of `X` with\ncoefficients in the `ℚ`-module `ULift ℚ` (a copy of `ℚ` in the universe of `X`). -/\nnoncomputable abbrev rationalHomology (X : Type u) [TopologicalSpace X] (n : ℕ) : Type u :=\n  (((AlgebraicTopology.singularHomologyFunctor (ModuleCat.{u} ℚ) n).obj\n    (ModuleCat.of ℚ (ULift.{u} ℚ))).obj (TopCat.of X))\n\n/-- The `ℚ`-linear map $H_n(X; \\mathbb{Q}) \\to H_n(Y; \\mathbb{Q})$ induced by a continuous map\n`f : X → Y`. -/\nnoncomputable def rationalHomologyMap {X Y : Type u} [TopologicalSpace X] [TopologicalSpace Y]\n    (f : C(X, Y)) (n : ℕ) : rationalHomology X n →ₗ[ℚ] rationalHomology Y n :=\n  (((AlgebraicTopology.singularHomologyFunctor (ModuleCat.{u} ℚ) n).obj\n    (ModuleCat.of ℚ (ULift.{u} ℚ))).map (TopCat.ofHom f)).hom\n\n/-- A simply connected topological space `X` is *rationally elliptic* if both its rational\nhomology $H_*(X; \\mathbb{Q}) = \\bigoplus_n H_n(X; \\mathbb{Q})$ and its rational homotopy\n$\\pi_*(X) \\otimes \\mathbb{Q} = \\bigoplus_n \\pi_n(X) \\otimes \\mathbb{Q}$ are finite-dimensional\nover `ℚ`. Since `X` is simply connected, only the (abelian) homotopy groups $\\pi_n(X)$ with\n$n \\geq 2$ contribute to the latter. -/\ndef IsRationallyElliptic (X : Type u) [TopologicalSpace X] [SimplyConnectedSpace X] : Prop :=\n  Module.Finite ℚ (⨁ n, rationalHomology X n) ∧\n    ∀ x : X, Module.Finite ℚ (⨁ n : ℕ, ℚ ⊗[ℤ] Additive (π_ (n + 2) X x))\n\n/-- The Euler characteristic $\\chi(X) = \\sum_n (-1)^n \\dim H_n(X; \\mathbb{Q})$ of a topological\nspace `X`, computed with rational coefficients. When $H_*(X; \\mathbb{Q})$ is finite-dimensional\nthis agrees with the usual Euler characteristic $\\sum_n (-1)^n \\dim H^n(X; \\mathbb{Q})$. -/\nnoncomputable def eulerCharacteristic (X : Type u) [TopologicalSpace X] : ℤ :=\n  ∑ᶠ n, (-1 : ℤ) ^ n * Module.finrank ℚ (rationalHomology X n)\n\n/-- **Halperin conjecture.** Let $F \\to E \\to B$ be a (Serre) fibration of simply connected spaces\nsuch that the fibre $F$ is rationally elliptic and has non-zero Euler characteristic\n$\\chi(F) \\neq 0$. Then the Serre spectral sequence associated to the fibration (for cohomology\nwith rational coefficients) collapses at the $E_2$ page.\n\nCollapse at $E_2$ is equivalent to the fibration being totally non-cohomologous to zero, i.e. to\n$H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$ being surjective, and hence (dualising over the field\n$\\mathbb{Q}$) to the map $H_n(F; \\mathbb{Q}) \\to H_n(E; \\mathbb{Q})$ induced by the inclusion of\nthe fibre being injective for every $n$. The fibre is taken to be $F = p^{-1}(b)$ for a point\n`b : B`. -/\n@[category research open, AMS 55]\ntheorem halperin_conjecture [SimplyConnectedSpace E] [SimplyConnectedSpace B] (p : C(E, B))\n    (hp : IsSerreFibration p) (b : B) [SimplyConnectedSpace (p ⁻¹' {b})]\n    (hF : IsRationallyElliptic (p ⁻¹' {b})) (hχ : eulerCharacteristic (p ⁻¹' {b}) ≠ 0)\n    (n : ℕ) :\n    Function.Injective\n      (rationalHomologyMap (⟨Subtype.val, continuous_subtype_val⟩ : C(p ⁻¹' {b}, E)) n) := by\n  sorry\n\nend HalperinConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition matches the source; the TNCZ reformulation suggested in the notes is what was formalized (in its dual, homological form because Mathlib lacks singular cohomology).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Collapse at E_2' is encoded as TNCZ in homological form: injectivity of H_n(F;ℚ) → H_n(E;ℚ) for all n. Justification: Mathlib has singular homology (`AlgebraicTopology.singularHomologyFunctor`) but no singular cohomology; over the field ℚ, H^n(X;ℚ) ≅ Hom_ℚ(H_n(X;ℚ),ℚ) naturally, and a ℚ-linear map is injective iff its dual is surjective (no finiteness needed). TNCZ ⇔ collapse at E_2 uses only that H^q(F;ℚ) is finite-dimensional (given by ellipticity) and B simply connected (untwisted coefficients), following Lupton §1 / McCleary Thm 5.9.",
+    "'Fibration' is taken to mean Serre fibration (homotopy lifting property w.r.t. all cubes I^n), the class for which the Serre spectral sequence is defined; this is the most general standard reading (Hurewicz fibrations are a special case), and the conjecture is invariant under the usual fibration replacements.",
+    "The fibre is modelled as the subspace p⁻¹({b}) for an arbitrary point b : B, with the inclusion `Subtype.val`; F is required to be simply connected (as an instance), as are E and B, per 'fibration of simply connected spaces'.",
+    "Rational ellipticity is defined as: `⨁ₙ H_n(X;ℚ)` finite-dimensional and, for every base point x, `⨁ₙ ℚ ⊗[ℤ] Additive (π_{n+2}(X,x))` finite-dimensional. Only π_k for k ≥ 2 enter, which is correct for simply connected X (π_0, π_1 trivial); the definition carries a `[SimplyConnectedSpace X]` argument to record that scope, although it is not used in the body. `Module.Finite ℚ` of the direct sum encodes 'total dimension finite'.",
+    "Euler characteristic is defined via rational homology as `∑ᶠ n, (-1)^n * finrank ℚ H_n(X;ℚ)`. Under ellipticity only finitely many H_n are nonzero and each is finite-dimensional, so this equals the usual χ (and dim H^n = dim H_n over ℚ). The `finsum`/`finrank` default values (0 for infinite support / infinite dimension) are unreachable under the hypotheses.",
+    "χ(F) ≠ 0 is used as in the Wikipedia statement (rather than Lupton's χ(F) > 0); the two are equivalent since elliptic spaces have χ ≥ 0.",
+    "No finite-rational-type hypothesis is imposed on E or B (following the Wikipedia statement literally; Lupton assumes finite type globally). This does not change the conjecture: finite-type Halperin ⇒ Der^{<0} H^*(F;ℚ) = 0 (Meier), and the derivation argument on the first nonvanishing differential of the multiplicative Serre spectral sequence with E_2 = H^*(B;ℚ) ⊗ H^*(F;ℚ) then gives collapse for arbitrary simply connected bases.",
+    "Universe polymorphism: spaces live in `Type u`; rational homology is taken with coefficients in the ℚ-module `ULift.{u} ℚ` (a copy of ℚ in universe u) so that `ModuleCat.{u} ℚ` has the required coproducts. `ULift ℚ ≅ ℚ` as ℚ-modules, so this is H_n(X;ℚ)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`IsCoveringMap` (Mathlib/Topology/Covering), `IsCoveringMap.liftHomotopy` (Mathlib/Topology/Homotopy/Lifting.lean), simplicial `Fibration`/Kan fibrations in Mathlib/AlgebraicTopology/SimplicialSet — none applies to continuous maps of spaces.",
+     "name": "HalperinConjecture.IsSerreFibration",
+     "why_needed": "Mathlib has no notion of (Serre or Hurewicz) fibration of topological spaces; only covering maps have a homotopy lifting theorem (`IsCoveringMap.liftHomotopy`). Defined as the homotopy lifting property with respect to all cubes `Fin n → I`. Two `@[category test]` lemmas (identity map, product projection) check the definition."
+    },
+    {
+     "closest_existing_considered": "`AlgebraicTopology.singularHomologyFunctor` (used directly); no singular cohomology exists in Mathlib.",
+     "name": "HalperinConjecture.rationalHomology",
+     "why_needed": "Abbreviation for the carrier of `((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ (ULift ℚ))).obj (TopCat.of X)`, i.e. H_n(X;ℚ) as a ℚ-vector space, to make the statement readable and to allow `Module.Finite`/`finrank`."
+    },
+    {
+     "closest_existing_considered": "`Functor.map` of `singularHomologyFunctor` (used directly).",
+     "name": "HalperinConjecture.rationalHomologyMap",
+     "why_needed": "The ℚ-linear map H_n(X;ℚ) → H_n(Y;ℚ) induced by a continuous map, extracted from the functor via `TopCat.ofHom` and `.hom`."
+    },
+    {
+     "closest_existing_considered": "`HomotopyGroup`/`π_` and `Module.Finite`, `DirectSum`, `TensorProduct` (all used as building blocks).",
+     "name": "HalperinConjecture.IsRationallyElliptic",
+     "why_needed": "Rational ellipticity (dim H_*(X;ℚ) < ∞ and dim π_*(X)⊗ℚ < ∞) does not exist in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`Module.finrank`, `finsum`; searched `eulerChar` in Mathlib (only Combinatorics/Enumerative/IncidenceAlgebra).",
+     "name": "HalperinConjecture.eulerCharacteristic",
+     "why_needed": "No Euler characteristic of a topological space exists in Mathlib (only e.g. incidence-algebra Euler characteristics). Defined as the alternating finsum of rational Betti numbers."
+    }
+   ],
+   "per_slot": {
+    "halperin_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `halperin_conjecture`: for every Serre fibration p : E → B of simply connected spaces (fibre F = p⁻¹(b) also simply connected) with F rationally elliptic and χ(F) ≠ 0, the map H_n(F;ℚ) → H_n(E;ℚ) induced by the fibre inclusion is injective for every n. This is the TNCZ condition (dual, over the field ℚ, to surjectivity of H^*(E;ℚ) → H^*(F;ℚ)), which is equivalent to collapse of the rational cohomology Serre spectral sequence at E_2 (Lupton §1). Needed bespoke definitions since Mathlib has no Serre fibrations, rational (co)homology as a ℚ-vector space, rational ellipticity or Euler characteristic of a space."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "halperin_conjecture": "/-- **Halperin conjecture.** Let $F \\to E \\to B$ be a (Serre) fibration of simply connected spaces\nsuch that the fibre $F$ is rationally elliptic and has non-zero Euler characteristic\n$\\chi(F) \\neq 0$. Then the Serre spectral sequence associated to the fibration (for cohomology\nwith rational coefficients) collapses at the $E_2$ page.\n\nCollapse at $E_2$ is equivalent to the fibration being totally non-cohomologous to zero, i.e. to\n$H^*(E; \\mathbb{Q}) \\to H^*(F; \\mathbb{Q})$ being surjective, and hence (dualising over the field\n$\\mathbb{Q}$) to the map $H_n(F; \\mathbb{Q}) \\to H_n(E; \\mathbb{Q})$ induced by the inclusion of\nthe fibre being injective for every $n$. The fibre is taken to be $F = p^{-1}(b)$ for a point\n`b : B`. -/\n@[category research open, AMS 55]\ntheorem halperin_conjecture [SimplyConnectedSpace E] [SimplyConnectedSpace B] (p : C(E, B))\n    (hp : IsSerreFibration p) (b : B) [SimplyConnectedSpace (p ⁻¹' {b})]\n    (hF : IsRationallyElliptic (p ⁻¹' {b})) (hχ : eulerCharacteristic (p ⁻¹' {b}) ≠ 0)\n    (n : ℕ) :\n    Function.Injective\n      (rationalHomologyMap (⟨Subtype.val, continuous_subtype_val⟩ : C(p ⁻¹' {b}, E)) n) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The Halperin conjecture\n\nThe Halperin conjecture concerns the rational cohomology Serre spectral sequence of a fibration\nwhose fibre is rationally elliptic and has nonzero Euler characteristic.\n\n*References:*\n- [Wikipedia, Halperin conjecture](https://en.wikipedia.org/wiki/Halperin_conjecture)\n- [Lupton, *Variations on a Conjecture of Halperin*](https://arxiv.org/abs/math/0010124)\n-/\n\nnoncomputable section\n\nnamespace HalperinConjecture\n\nopen AlgebraicTopology CategoryTheory Topology\nopen scoped Cardinal Topology unitInterval\n\n/-- Rational singular homology in degree `n`. -/\nabbrev RationalHomology (n : ℕ) (X : Type) [TopologicalSpace X] : Type :=\n  ((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).obj (TopCat.of X)\n\n/-- The map on rational singular homology induced by a continuous map. -/\nabbrev rationalHomologyMap {X Y : Type} [TopologicalSpace X] [TopologicalSpace Y]\n    (f : C(X, Y)) (n : ℕ) : RationalHomology n X →ₗ[ℚ] RationalHomology n Y :=\n  (((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).map\n    (TopCat.ofHom f)).hom\n\n/-- Rational cohomology, represented using the dual of rational singular homology. -/\nabbrev RationalCohomology (n : ℕ) (X : Type) [TopologicalSpace X] : Type :=\n  Module.Dual ℚ (RationalHomology n X)\n\n/-- The contravariant map on rational cohomology induced by a continuous map. -/\nabbrev rationalCohomologyMap {X Y : Type} [TopologicalSpace X] [TopologicalSpace Y]\n    (f : C(X, Y)) (n : ℕ) : RationalCohomology n Y →ₗ[ℚ] RationalCohomology n X :=\n  (rationalHomologyMap f n).dualMap\n\n/-- A space is of finite rational type if its rational homology is finite-dimensional in every\n degree. -/\ndef IsOfFiniteRationalType (X : Type) [TopologicalSpace X] : Prop :=\n  ∀ n : ℕ, Module.Finite ℚ (RationalHomology n X)\n\n/-- A map is a Serre fibration if it has the homotopy lifting property for every disk. -/\ndef IsSerreFibration {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    (p : C(E, B)) : Prop :=\n  ∀ n (f : C(TopCat.disk.{0} n, E))\n      (H : C(unitInterval × TopCat.disk.{0} n, B)),\n    (∀ x, H (0, x) = p (f x)) →\n      ∃ L : C(unitInterval × TopCat.disk.{0} n, E),\n        (∀ x, L (0, x) = f x) ∧ ∀ z, p (L z) = H z\n\n/-- A simply connected space is rationally elliptic if its total rational homology and total\nrational homotopy are finite-dimensional. Since the fundamental group vanishes, the homotopy\ncondition starts in degree two. Integral ranks of the higher homotopy groups give their dimensions\nafter rationalization. -/\ndef IsRationallyElliptic (X : Type) [TopologicalSpace X] [SimplyConnectedSpace X] : Prop :=\n  IsOfFiniteRationalType X ∧\n    (∃ N : ℕ, ∀ n, N ≤ n → Subsingleton (RationalHomology n X)) ∧\n    ∃ x : X, (∀ n : ℕ, Module.rank ℤ (Additive (π_ (n + 2) X x)) < Cardinal.aleph0) ∧\n      ∃ N : ℕ, ∀ n, N ≤ n → Module.rank ℤ (Additive (π_ (n + 2) X x)) = 0\n\n/-- The rational Euler characteristic is nonzero. The cutoff exists because this predicate is\nused for spaces whose total rational homology is finite-dimensional. -/\ndef HasNonzeroRationalEulerCharacteristic (X : Type) [TopologicalSpace X] : Prop :=\n  ∃ N : ℕ, (∀ n, N ≤ n → Subsingleton (RationalHomology n X)) ∧\n    ∑ n ∈ Finset.range N, (-1 : ℤ) ^ n * (Module.finrank ℚ (RationalHomology n X) : ℤ) ≠ 0\n\n/--\n**Halperin conjecture.** If `p : E → B` is a Serre fibration of simply connected spaces of finite\nrational type, and its fibre $F=p^{-1}(b)$ is rationally elliptic with nonzero Euler\ncharacteristic, then its rational-coefficient Serre spectral sequence collapses at $E_2$.\nEquivalently, the fibration is TNCZ: the map $H^*(E;\\mathbb{Q})\\to H^*(F;\\mathbb{Q})$ induced by\nthe fibre inclusion is surjective in every degree.\n-/\n@[category research open, AMS 55]\ntheorem halperin_conjecture :\n    ∀ (E B : Type) [TopologicalSpace E] [TopologicalSpace B]\n      (p : C(E, B)) (b : B)\n      [SimplyConnectedSpace E] [SimplyConnectedSpace B]\n      [SimplyConnectedSpace {e : E // p e = b}],\n      IsOfFiniteRationalType E → IsOfFiniteRationalType B →\n      IsSerreFibration p → IsRationallyElliptic {e : E // p e = b} →\n      HasNonzeroRationalEulerCharacteristic {e : E // p e = b} →\n      ∀ n : ℕ, Function.Surjective\n        (rationalCohomologyMap\n          (ContinuousMap.mk (fun e : {e : E // p e = b} ↦ (e : E)) continuous_subtype_val) n) := by\n  sorry\n\nend HalperinConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used the primary source's equivalent TNCZ formulation: collapse of the rational-coefficient cohomology Serre spectral sequence at E₂ is stated as degreewise surjectivity of the fibre-inclusion map Hⁿ(E; ℚ) → Hⁿ(F; ℚ).",
+    "Represented a fibration F → E → B by a continuous map p : E → B, a chosen point b : B, and the strict fibre {e : E // p e = b}; the fibre inclusion is the subtype inclusion.",
+    "Defined a Serre fibration by the homotopy lifting property for every finite-dimensional disk, the standard disk formulation of a Serre fibration.",
+    "Followed Lupton's standing assumptions by requiring E and B to be of finite rational type; the fibre has finite rational type as part of rational ellipticity.",
+    "Represented rational cohomology naturally as the linear dual of rational singular homology. Over ℚ this agrees with singular cohomology by the universal coefficient theorem, and dualizing the homology map gives the required contravariant restriction map.",
+    "Expressed finite total rational homology by finite-dimensionality in every degree plus eventual vanishing. Expressed finite total rational homotopy, in the simply connected setting, by finite integral rank and eventual rank zero for πₙ in degrees n ≥ 2; these ranks are the dimensions after rationalization.",
+    "Expressed nonzero Euler characteristic as a nonzero finite alternating sum of rational homology dimensions, using an eventual-vanishing cutoff."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's AlgebraicTopology.singularHomologyFunctor; the abbreviation specializes it to ModuleCat ℚ and TopCat.",
+     "name": "RationalHomology",
+     "why_needed": "Provides the rational singular homology vector space underlying finite-type, ellipticity, Euler characteristic, and cohomology definitions."
+    },
+    {
+     "closest_existing_considered": "The morphism produced by AlgebraicTopology.singularHomologyFunctor.map.",
+     "name": "rationalHomologyMap",
+     "why_needed": "Exposes the linear map on rational singular homology induced by a continuous map."
+    },
+    {
+     "closest_existing_considered": "Module.Dual applied to Mathlib's rational singular homology; over ℚ this is naturally singular cohomology.",
+     "name": "RationalCohomology",
+     "why_needed": "Mathlib has no ordinary singular cohomology API suitable for the TNCZ conclusion."
+    },
+    {
+     "closest_existing_considered": "LinearMap.dualMap of the induced rational homology map.",
+     "name": "rationalCohomologyMap",
+     "why_needed": "Defines the contravariant restriction map used in the TNCZ conclusion."
+    },
+    {
+     "closest_existing_considered": "Module.Finite on each value of Mathlib's singular homology functor.",
+     "name": "IsOfFiniteRationalType",
+     "why_needed": "The source assumes spaces have finite-dimensional rational homology in every degree, but no repository predicate packages this condition."
+    },
+    {
+     "closest_existing_considered": "Mathlib's homotopy-lifting APIs in Topology.Homotopy.Lifting and TopCat.disk; the definition uses the standard disk homotopy lifting property.",
+     "name": "IsSerreFibration",
+     "why_needed": "Mathlib has model-category fibrations and covering-map lifting results but no predicate for Serre fibrations of topological spaces."
+    },
+    {
+     "closest_existing_considered": "Mathlib's singular homology, HomotopyGroup.Pi, and Module.rank; the predicate packages finite total rational homology and homotopy.",
+     "name": "IsRationallyElliptic",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines rationally elliptic spaces."
+    },
+    {
+     "closest_existing_considered": "A finite alternating sum of Module.finrank values of Mathlib rational singular homology, justified by the included eventual-vanishing witness.",
+     "name": "HasNonzeroRationalEulerCharacteristic",
+     "why_needed": "Mathlib has no Euler characteristic for general topological spaces computed from rational singular homology."
+    }
+   ],
+   "per_slot": {
+    "halperin_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "halperin_conjecture": "/--\n**Halperin conjecture.** If `p : E → B` is a Serre fibration of simply connected spaces of finite\nrational type, and its fibre $F=p^{-1}(b)$ is rationally elliptic with nonzero Euler\ncharacteristic, then its rational-coefficient Serre spectral sequence collapses at $E_2$.\nEquivalently, the fibration is TNCZ: the map $H^*(E;\\mathbb{Q})\\to H^*(F;\\mathbb{Q})$ induced by\nthe fibre inclusion is surjective in every degree.\n-/\n@[category research open, AMS 55]\ntheorem halperin_conjecture :\n    ∀ (E B : Type) [TopologicalSpace E] [TopologicalSpace B]\n      (p : C(E, B)) (b : B)\n      [SimplyConnectedSpace E] [SimplyConnectedSpace B]\n      [SimplyConnectedSpace {e : E // p e = b}],\n      IsOfFiniteRationalType E → IsOfFiniteRationalType B →\n      IsSerreFibration p → IsRationallyElliptic {e : E // p e = b} →\n      HasNonzeroRationalEulerCharacteristic {e : E // p e = b} →\n      ∀ n : ℕ, Function.Surjective\n        (rationalCohomologyMap\n          (ContinuousMap.mk (fun e : {e : E // p e = b} ↦ (e : E)) continuous_subtype_val) n) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Halperin conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Halperin_conjecture)\n-/\n\nnamespace HalperinConjecture\n\nopen AlgebraicTopology CategoryTheory Function\nopen scoped Topology unitInterval\n\n/-- The fibre of a continuous map `p` over `b`. -/\nabbrev Fiber {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    (p : C(E, B)) (b : B) := {e : E // p e = b}\n\n/-- The `n`-th singular homology of `X` with rational coefficients. -/\nnoncomputable abbrev RationalHomology (X : Type) [TopologicalSpace X] (n : ℕ) :=\n  ((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).obj (TopCat.of X)\n\n/-- A space is of finite rational type when its rational homology is finite-dimensional in every\ndegree. -/\ndef IsFiniteRationalType (X : Type) [TopologicalSpace X] : Prop :=\n  ∀ n, Module.Finite ℚ (RationalHomology X n)\n\n/-- The rationalization of the `(n + 2)`-nd homotopy group of `X` at `x`. -/\nabbrev RationalHomotopy (X : Type) [TopologicalSpace X] (x : X) (n : ℕ) :=\n  TensorProduct ℤ ℚ (Additive (π_ (n + 2) X x))\n\n/-- A space is rationally elliptic when its total rational homology and its total rational\nhomotopy have finite dimension. The homotopy groups are indexed from degree two; degree zero is\nirrelevant for connected spaces, and degree one vanishes for simply connected spaces. -/\ndef IsRationallyElliptic (X : Type) [TopologicalSpace X] (x : X) : Prop :=\n  (∀ n, Module.Finite ℚ (RationalHomology X n)) ∧\n    {n | Nontrivial (RationalHomology X n)}.Finite ∧\n  (∀ n, Module.Finite ℚ (RationalHomotopy X x n)) ∧\n    {n | Nontrivial (RationalHomotopy X x n)}.Finite\n\n/-- The Euler characteristic computed from rational singular homology. -/\nnoncomputable def eulerCharacteristic (X : Type) [TopologicalSpace X] : ℤ :=\n  ∑ᶠ n : ℕ, (-1 : ℤ) ^ n * (Module.finrank ℚ (RationalHomology X n) : ℤ)\n\n/-- A continuous map is a Serre fibration if it has the homotopy lifting property with respect\nto every finite-dimensional disk. -/\ndef IsSerreFibration {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    (p : C(E, B)) : Prop :=\n  ∀ (n : ℕ) (g : C(TopCat.disk.{0} n, E)) (H : C(TopCat.disk.{0} n × unitInterval, B)),\n    (∀ x, H (x, 0) = p (g x)) →\n      ∃ G : C(TopCat.disk.{0} n × unitInterval, E),\n        (∀ x, G (x, 0) = g x) ∧ ∀ z, p (G z) = H z\n\n/-- A fibration is totally non-cohomologous to zero over `ℚ` (TNCZ) when restriction from the\ntotal space to the fibre is onto in rational cohomology. Equivalently, as expressed here, the\nfibre inclusion is injective on rational homology in every degree. -/\ndef IsTNCZ {E B : Type} [TopologicalSpace E] [TopologicalSpace B]\n    (p : C(E, B)) (b : B) : Prop :=\n  ∀ n, Function.Injective\n    (((singularHomologyFunctor (ModuleCat ℚ) n).obj (ModuleCat.of ℚ ℚ)).map\n      (TopCat.ofHom ⟨Subtype.val, continuous_subtype_val⟩) :\n        RationalHomology (Fiber p b) n ⟶ RationalHomology E n)\n\n/--\n**Halperin conjecture.** Suppose that $F \\to E \\to B$ is a Serre fibration of simply connected\nspaces of finite rational type. If the fibre $F$ is rationally elliptic and has nonzero Euler\ncharacteristic, then its rational-coefficient cohomology Serre spectral sequence collapses at\n$E_2$; equivalently, the fibration is TNCZ.\n-/\n@[category research open, AMS 55]\ntheorem halperin_conjecture :\n    ∀ (E B : Type) (_ : TopologicalSpace E) (_ : TopologicalSpace B)\n      (p : C(E, B)) (b : B) (x : Fiber p b),\n      SimplyConnectedSpace E → SimplyConnectedSpace B → SimplyConnectedSpace (Fiber p b) →\n      IsFiniteRationalType E → IsFiniteRationalType B →\n      IsSerreFibration p → IsRationallyElliptic (Fiber p b) x →\n      eulerCharacteristic (Fiber p b) ≠ 0 → IsTNCZ p b := by\n  sorry\n\nend HalperinConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.92,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used the background article and Lupton's formulation to expand the terse list-page entry into the standard statement for a rationally elliptic fibre of nonzero Euler characteristic.",
+    "Represented a fibration by a continuous map together with the disk homotopy-lifting property, the standard characterization of a Serre fibration, and represented its fibre over a chosen basepoint as the corresponding subtype.",
+    "Expressed collapse of the rational cohomology Serre spectral sequence via the equivalent TNCZ condition. Since singular cohomology is unavailable, TNCZ is stated equivalently as injectivity of the fibre inclusion on rational singular homology in every degree (dual to surjectivity on rational cohomology over a field).",
+    "Interpreted rational ellipticity as finite total dimension of rational singular homology and of the rationalized homotopy groups in degrees at least two. Degree one is omitted because all spaces in the theorem are simply connected.",
+    "Included finite rational type for the total and base spaces, following the decomposition note and the primary source's standing finite-type convention; the fibre has finite rational type from rational ellipticity.",
+    "Computed Euler characteristic as the finite alternating sum of rational homology dimensions. The `finsum` agrees with this sum under the ellipticity hypothesis.",
+    "Treated the displayed fibre in `F → E → B` as the strict fibre of the Serre fibration over a chosen point, with its canonical inclusion into the total space."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has categorical pullbacks in `TopCat`, but no direct topological-fibre abbreviation suited to the statement.",
+     "name": "Fiber",
+     "why_needed": "Provides the strict topological fibre of a continuous map over a chosen basepoint."
+    },
+    {
+     "closest_existing_considered": "`AlgebraicTopology.singularHomologyFunctor` is generic in the coefficient category and coefficient object.",
+     "name": "RationalHomology",
+     "why_needed": "Specializes Mathlib's generic singular homology functor to rational coefficients."
+    },
+    {
+     "closest_existing_considered": "No finite-rational-type predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsFiniteRationalType",
+     "why_needed": "Records the standing finite-dimensionality assumption degree by degree."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `HomotopyGroup.Pi` and tensor products, but no rational homotopy group wrapper.",
+     "name": "RationalHomotopy",
+     "why_needed": "Models the rationalization of higher homotopy groups as `ℚ ⊗[ℤ] π_n`."
+    },
+    {
+     "closest_existing_considered": "No rational ellipticity predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsRationallyElliptic",
+     "why_needed": "Captures finite total rational homology and rational homotopy dimension."
+    },
+    {
+     "closest_existing_considered": "Mathlib has algebraic alternating constructions but no Euler characteristic for topological spaces.",
+     "name": "eulerCharacteristic",
+     "why_needed": "Defines the Euler characteristic of a space from rational singular homology dimensions."
+    },
+    {
+     "closest_existing_considered": "Mathlib has fibrations for simplicial sets/model categories and homotopy lifting for covering maps, but no topological Serre-fibration predicate.",
+     "name": "IsSerreFibration",
+     "why_needed": "States the disk homotopy-lifting property for continuous maps."
+    },
+    {
+     "closest_existing_considered": "Neither TNCZ nor singular cohomology was found; rational singular homology is available, so the equivalent injectivity formulation was used.",
+     "name": "IsTNCZ",
+     "why_needed": "States the conclusion equivalent to rational Serre spectral-sequence collapse."
+    }
+   ],
+   "per_slot": {
+    "halperin_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "halperin_conjecture": "/--\n**Halperin conjecture.** Suppose that $F \\to E \\to B$ is a Serre fibration of simply connected\nspaces of finite rational type. If the fibre $F$ is rationally elliptic and has nonzero Euler\ncharacteristic, then its rational-coefficient cohomology Serre spectral sequence collapses at\n$E_2$; equivalently, the fibration is TNCZ.\n-/\n@[category research open, AMS 55]\ntheorem halperin_conjecture :\n    ∀ (E B : Type) (_ : TopologicalSpace E) (_ : TopologicalSpace B)\n      (p : C(E, B)) (b : B) (x : Fiber p b),\n      SimplyConnectedSpace E → SimplyConnectedSpace B → SimplyConnectedSpace (Fiber p b) →\n      IsFiniteRationalType E → IsFiniteRationalType B →\n      IsSerreFibration p → IsRationallyElliptic (Fiber p b) x →\n      eulerCharacteristic (Fiber p b) ≠ 0 → IsTNCZ p b := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "halperin_conjecture": "c01"
+ },
+ "id": "wp-halperin-conjecture",
+ "main_attempt": "c01"
+}

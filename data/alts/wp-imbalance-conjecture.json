@@ -1,0 +1,369 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Imbalance conjecture\n\n*References:*\n- [Wikipedia, Imbalance conjecture](https://en.wikipedia.org/wiki/imbalance_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [KS14] S. Kozerenko, V. Skochko, *On graphs with graphic imbalance sequences*,\n  Algebra and Discrete Mathematics **18** (2014), no. 1, 97–108.\n\nFor a finite simple undirected graph $G$, the *imbalance* of an edge $e = uv$ is\n$\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)|$. The *imbalance sequence* $M_G$ is the multiset of the\nimbalances of all edges of $G$ (each edge counted once). A multiset of natural numbers is\n*graphic* if it is the degree sequence of some finite simple graph (not a multigraph or\npseudograph: allowing pseudographs would trivialise the problem, since the sum of all\nimbalances is always even).\n\nThe imbalance conjecture (Kozerenko–Skochko, 2014) asks whether $M_G$ is graphic whenever\nevery edge of $G$ has imbalance at least $1$, i.e. whenever no edge of $G$ joins two vertices\nof the same degree.\n-/\n\nnamespace ImbalanceConjecture\n\nopen SimpleGraph\n\nvariable {V : Type*} [Fintype V]\n\n/-- The imbalance $\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)|$ of an edge $e = uv$ of a finite simple\ngraph $G$. -/\ndef edgeImbalance (G : SimpleGraph V) [DecidableRel G.Adj] (e : Sym2 V) : ℕ :=\n  Sym2.lift ⟨fun u v => Nat.dist (G.degree u) (G.degree v), fun _ _ => Nat.dist_comm _ _⟩ e\n\n/-- The imbalance sequence $M_G$ of a finite simple graph $G$: the multiset of the imbalances\nof all edges of $G$, each edge counted once. -/\ndef imbalanceMultiset (G : SimpleGraph V) [DecidableRel G.Adj] : Multiset ℕ :=\n  G.edgeFinset.val.map (edgeImbalance G)\n\n/-- A multiset `M` of natural numbers is *graphic* if it is the degree sequence (as a multiset)\nof some finite simple graph, i.e. of a `SimpleGraph (Fin n)` for some `n`. -/\ndef IsGraphic (M : Multiset ℕ) : Prop :=\n  ∃ (n : ℕ) (H : SimpleGraph (Fin n)) (_ : DecidableRel H.Adj), H.degreeMultiset = M\n\n/--\n**The imbalance conjecture** (Kozerenko–Skochko, 2014).\n\nIf the imbalance $\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)|$ of every edge $e = uv$ of a finite\nsimple undirected graph $G$ is at least $1$, is the multiset $M_G$ of all edge imbalances of\n$G$ always graphic, i.e. the degree sequence of some finite simple graph?\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ (V : Type) [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj],\n        (∀ e ∈ G.edgeSet, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry\n\n/-- The imbalance of the edge $uv$ is $|\\deg(u) - \\deg(v)|$. -/\n@[category API, AMS 5]\nlemma edgeImbalance_mk (G : SimpleGraph V) [DecidableRel G.Adj] (u v : V) :\n    edgeImbalance G s(u, v) = ((G.degree u : ℤ) - G.degree v).natAbs := by\n  simp only [edgeImbalance, Sym2.lift_mk, Nat.dist]\n  omega\n\n/-- The empty multiset is graphic: it is the degree sequence of the graph with no vertices. -/\n@[category test, AMS 5]\nlemma isGraphic_zero : IsGraphic 0 :=\n  ⟨0, ⊥, inferInstance, by decide⟩\n\n/-- The multiset $\\{1\\}$ is not graphic, by the handshake lemma. -/\n@[category test, AMS 5]\nlemma not_isGraphic_one : ¬ IsGraphic {1} := by\n  rintro ⟨n, H, _, h⟩\n  have h1 : H.degreeMultiset.sum = ∑ v, H.degree v := rfl\n  rw [h, H.sum_degrees_eq_twice_card_edges] at h1\n  simp at h1\n  omega\n\n/-- The imbalance sequence of an edgeless graph is empty. -/\n@[category test, AMS 5]\nlemma imbalanceMultiset_bot : imbalanceMultiset (⊥ : SimpleGraph V) = 0 := by\n  simp [imbalanceMultiset]\n\n/-- The path $P_3$ on the vertices $0, 1, 2$. -/\nprivate abbrev path3 : SimpleGraph (Fin 3) := fromRel fun a b => a.val + 1 = b.val\n\n/-- The star $K_{1,3}$ with centre $0$ on the vertices $0, 1, 2, 3$. -/\nprivate abbrev star3 : SimpleGraph (Fin 4) := fromRel fun a b => a = 0 ∧ b ≠ 0\n\n/-- Both edges of the path $P_3$ have imbalance $1$. -/\n@[category test, AMS 5]\nlemma edgeImbalance_path3 : ∀ e ∈ path3.edgeSet, 1 ≤ edgeImbalance path3 e := by\n  decide\n\n/-- The imbalance sequence of the path $P_3$ is $\\{1, 1\\}$. -/\n@[category test, AMS 5]\nlemma imbalanceMultiset_path3 : imbalanceMultiset path3 = {1, 1} := by\n  decide\n\n/-- The imbalance sequence $\\{1, 1\\}$ of the path $P_3$ is graphic: it is the degree sequence\nof $K_2$. -/\n@[category test, AMS 5]\nlemma isGraphic_imbalanceMultiset_path3 : IsGraphic (imbalanceMultiset path3) :=\n  ⟨2, ⊤, inferInstance, by decide⟩\n\n/-- The imbalance sequence of the star $K_{1,3}$ is $\\{2, 2, 2\\}$. -/\n@[category test, AMS 5]\nlemma imbalanceMultiset_star3 : imbalanceMultiset star3 = {2, 2, 2} := by\n  decide\n\n/-- The imbalance sequence $\\{2, 2, 2\\}$ of the star $K_{1,3}$ is graphic: it is the degree\nsequence of $K_3$. -/\n@[category test, AMS 5]\nlemma isGraphic_imbalanceMultiset_star3 : IsGraphic (imbalanceMultiset star3) :=\n  ⟨3, ⊤, inferInstance, by decide⟩\n\nend ImbalanceConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (simple graphs, |deg u − deg v|, each edge counted once, simple-graph 'graphic', no nonemptiness restriction) match the article and were followed exactly.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple undirected graphs: `SimpleGraph V` with `[Fintype V]`, following the article's Definitions section (the list entry just says 'a graph').",
+    "The vertex type is quantified over `Type` (universe 0). Every finite graph is isomorphic to one on `Fin n : Type`, and the imbalance multiset is an isomorphism invariant, so this loses nothing; it avoids a universe parameter on the theorem.",
+    "`imb(uv) = |deg u − deg v|` is implemented as `Nat.dist (G.degree u) (G.degree v)` lifted to `Sym2 V`; the API lemma `edgeImbalance_mk` confirms agreement with the integer absolute difference.",
+    "'At least 1' is formalized literally as `1 ≤ edgeImbalance G e` for all `e ∈ G.edgeSet`; on ℕ this coincides with the article's `imb(e) > 0`.",
+    "M_G is a `Multiset ℕ` indexed by `G.edgeFinset`, so each undirected edge is counted exactly once, matching 'the multiset of all edge imbalances'.",
+    "'Graphic' means degree multiset of a finite *simple* graph (`SimpleGraph (Fin n)`), as the article explicitly requires; realizing graphs may have isolated vertices (degree 0), which is the standard convention for graphic sequences of non-negative integers. Sequences are compared as multisets, i.e. up to reordering.",
+    "No nonemptiness/connectivity restriction is imposed: edgeless graphs satisfy the hypothesis vacuously and their empty imbalance multiset is graphic (test lemma `isGraphic_zero`), so the conjecture is unaffected.",
+    "The related mean-imbalance, bicyclic, and block-graph conjectures from the article are not formalized, per the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.degree` (Mathlib) and `Nat.dist` (Mathlib); `Int.natAbs` of the ℤ difference (as used ad hoc in Wikipedia/GracefulLabeling.lean).",
+     "name": "ImbalanceConjecture.edgeImbalance",
+     "why_needed": "No notion of edge imbalance |deg u − deg v| (Albertson) exists in Mathlib or FormalConjecturesForMathlib. Defined on `Sym2 V` via `Sym2.lift` with `Nat.dist`, well-defined by `Nat.dist_comm`; API lemma `edgeImbalance_mk` shows it equals `((deg u : ℤ) − deg v).natAbs`."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.edgeFinset` (Mathlib) and `SimpleGraph.degreeMultiset` (FormalConjecturesForMathlib/Combinatorics/SimpleGraph/Degrees.lean), which is the analogous multiset over vertices.",
+     "name": "ImbalanceConjecture.imbalanceMultiset",
+     "why_needed": "The imbalance sequence M_G, i.e. the multiset of imbalances over all (undirected) edges, each edge counted once: `G.edgeFinset.val.map (edgeImbalance G)`. Nothing comparable exists."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.degreeMultiset` / `degreeSequence` (FormalConjecturesForMathlib) and `havelHakimiStep`/`residue` (FormalConjecturesForMathlib/Combinatorics/SimpleGraph/Residue.lean); the latter is a reduction procedure, not a realizability predicate, and no Erdős–Gallai/Havel–Hakimi characterization is available.",
+     "name": "ImbalanceConjecture.IsGraphic",
+     "why_needed": "No 'graphic sequence' predicate exists in Mathlib or FormalConjecturesForMathlib. Defined as `∃ (n : ℕ) (H : SimpleGraph (Fin n)) (_ : DecidableRel H.Adj), H.degreeMultiset = M`, i.e. M is the degree multiset of a finite *simple* graph (not a multigraph/pseudograph, which would trivialise the conjecture). Tests: `IsGraphic 0` and `¬ IsGraphic {1}` (handshake lemma)."
+    }
+   ],
+   "per_slot": {
+    "imbalance_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (V : Type) [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj], (∀ e ∈ G.edgeSet, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G)`. Mathlib has `SimpleGraph`, `degree`, `edgeFinset`, and the repo has `SimpleGraph.degreeMultiset`, but no edge-imbalance, imbalance-multiset, or 'graphic multiset' predicate exists, so three small problem-local definitions were added (with API/test lemmas checked by `decide`/handshake lemma)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "imbalance_conjecture": "/--\n**The imbalance conjecture** (Kozerenko–Skochko, 2014).\n\nIf the imbalance $\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)|$ of every edge $e = uv$ of a finite\nsimple undirected graph $G$ is at least $1$, is the multiset $M_G$ of all edge imbalances of\n$G$ always graphic, i.e. the degree sequence of some finite simple graph?\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ (V : Type) [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj],\n        (∀ e ∈ G.edgeSet, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Imbalance conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/imbalance_conjecture)\n-/\n\nnamespace ImbalanceConjecture\n\nopen SimpleGraph\n\n/-- A multiset of natural numbers is graphic if it is the degree multiset of a finite simple\nundirected graph. -/\nnoncomputable def IsGraphic (s : Multiset ℕ) : Prop :=\n  ∃ n : ℕ, ∃ H : SimpleGraph (Fin n),\n    s = @SimpleGraph.degreeMultiset (Fin n) inferInstance H (Classical.decRel H.Adj)\n\nvariable {V : Type*} [Fintype V]\n\n/-- The imbalance of an unordered pair is the absolute difference between the degrees of its\nendpoints. -/\nnoncomputable def edgeImbalance (G : SimpleGraph V) (e : Sym2 V) : ℕ :=\n  letI := Classical.decRel G.Adj\n  Sym2.lift ⟨fun u v => Nat.dist (G.degree u) (G.degree v),\n    fun u v => Nat.dist_comm (G.degree u) (G.degree v)⟩ e\n\n/-- The multiset of the imbalances of all edges, with each undirected edge counted once. -/\nnoncomputable def imbalanceMultiset (G : SimpleGraph V) : Multiset ℕ :=\n  G.edgeFinset.val.map (edgeImbalance G)\n\n/--\nThe imbalance conjecture asks whether, for every finite simple undirected graph, if the imbalance\nof each edge is at least $1$, then the multiset of all edge imbalances is the degree multiset of a\nfinite simple graph.\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔ ∀ (V : Type*) [Fintype V] (G : SimpleGraph V),\n      (∀ e ∈ G.edgeFinset, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry\n\nend ImbalanceConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the input graph as an arbitrary finite simple undirected graph, following the background article and the decomposition table; `SimpleGraph V` supplies simplicity and undirectedness, while `[Fintype V]` supplies finiteness.",
+    "Defined an edge imbalance as `Nat.dist` between endpoint degrees. On natural numbers this is the absolute difference `|deg u - deg v|`; the symmetry proof permits it to descend to the unordered-edge type `Sym2 V`.",
+    "Used `G.edgeFinset.val.map` for the imbalance multiset. Since `edgeFinset` is a finset of unordered pairs, every undirected edge contributes exactly one occurrence, while `Multiset.map` retains repeated imbalance values.",
+    "Interpreted “graphic” as realizability by a finite simple graph, not a multigraph or pseudograph: `IsGraphic s` requires equality with the degree multiset of some `SimpleGraph (Fin n)`.",
+    "Formalized “at least 1” as `1 ≤ edgeImbalance G e`; this is equivalent to the article’s positive-imbalance condition because imbalances are natural numbers.",
+    "Added no nonemptiness hypothesis. Edgeless graphs have an empty edge finset and hence an empty imbalance multiset, which is graphic via the simple graph on `Fin 0`.",
+    "Used `answer(sorry) ↔ ...` because the source states a yes/no question, with `answer(True)` corresponding to a positive answer."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.degreeMultiset` provides the degree multiset of a given finite simple graph, but does not provide the existential realizability predicate needed for “graphic.”",
+     "name": "ImbalanceConjecture.IsGraphic",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides a predicate saying that a multiset of natural numbers is the degree multiset of a finite simple graph."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.degree`, `Nat.dist`, and `Sym2.lift` provide all constituent operations, but there is no existing combined edge-imbalance definition.",
+     "name": "ImbalanceConjecture.edgeImbalance",
+     "why_needed": "The statement requires the absolute degree difference attached invariantly to an unordered edge, and no existing graph edge-imbalance definition was found."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.edgeFinset` enumerates unordered edges exactly once and `Multiset.map` preserves value multiplicities, but no existing definition combines them into the imbalance multiset.",
+     "name": "ImbalanceConjecture.imbalanceMultiset",
+     "why_needed": "The conjecture concerns the multiset of imbalance values over all undirected edges, including multiplicities, and no such construction exists in the searched libraries."
+    }
+   ],
+   "per_slot": {
+    "imbalance_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "imbalance_conjecture": "/--\nThe imbalance conjecture asks whether, for every finite simple undirected graph, if the imbalance\nof each edge is at least $1$, then the multiset of all edge imbalances is the degree multiset of a\nfinite simple graph.\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔ ∀ (V : Type*) [Fintype V] (G : SimpleGraph V),\n      (∀ e ∈ G.edgeFinset, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Imbalance conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/imbalance_conjecture)\n-/\n\nnamespace ImbalanceConjecture\n\nopen SimpleGraph\n\n/-- A multiset of natural numbers is graphic if it is the degree multiset of a finite simple\nundirected graph. -/\ndef IsGraphic (M : Multiset ℕ) : Prop :=\n  ∃ (n : ℕ) (G : SimpleGraph (Fin n)),\n    @SimpleGraph.degreeMultiset (Fin n) inferInstance G (Classical.decRel G.Adj) = M\n\n/-- The imbalance of an undirected edge is the absolute difference between the degrees of its\nendpoints. -/\ndef edgeImbalance {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] (e : Sym2 V) : ℕ :=\n  e.lift ⟨fun u v => Nat.dist (G.degree u) (G.degree v),\n    fun _ _ => Nat.dist_comm _ _⟩\n\n/-- The multiset of edge imbalances, with every undirected edge counted once. -/\ndef imbalanceMultiset {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] : Multiset ℕ :=\n  G.edgeFinset.val.map (edgeImbalance G)\n\n/--\n**Imbalance conjecture.** If the imbalance of every edge of a finite simple undirected graph is at\nleast $1$, is the multiset of all its edge imbalances graphic, meaning the degree multiset of some\nfinite simple graph?\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ {V : Type*} [Fintype V] [DecidableEq V]\n        (G : SimpleGraph V) [DecidableRel G.Adj],\n        (∀ e ∈ G.edgeFinset, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry\n\nend ImbalanceConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “graph” as a finite simple undirected graph, following the background article; represented it by `SimpleGraph V` with `Fintype V`.",
+    "Defined edge imbalance as `Nat.dist (G.degree u) (G.degree v)`, i.e. the absolute difference of endpoint degrees, using `Sym2.lift` so it is independent of endpoint order.",
+    "Represented the imbalance multiset by mapping over `G.edgeFinset.val`, which counts each undirected edge once and preserves multiplicities when distinct edges have equal imbalance.",
+    "Interpreted “graphic” as being exactly the full degree multiset of some finite simple graph. Used a graph on `Fin n` as witness, which is equivalent to allowing an arbitrary finite vertex type and includes isolated vertices and zero entries.",
+    "Kept the source’s “at least 1” as `1 ≤ edgeImbalance G e`; over natural numbers this is equivalent to the article’s positive-imbalance condition.",
+    "Added no graph nonemptiness or edge nonemptiness assumption. Thus edgeless graphs satisfy the hypothesis vacuously, and their empty imbalance multiset is graphic via the simple graph on `Fin 0`.",
+    "Excluded the mean-imbalance, bicyclic, and block-graph conjectures because they are not part of the supplied statement."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.degreeMultiset` records the degree multiset of a given graph but does not express existential realizability by a simple graph.",
+     "name": "ImbalanceConjecture.IsGraphic",
+     "why_needed": "The conjecture requires the graph-theoretic predicate that a multiset is the degree multiset of a finite simple graph, and no such predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.degree` supplies endpoint degrees, and `Nat.dist` supplies their absolute difference, but there is no existing combined definition on `Sym2 V`.",
+     "name": "ImbalanceConjecture.edgeImbalance",
+     "why_needed": "A named endpoint-order-independent edge imbalance is needed to state both the per-edge hypothesis and the imbalance multiset clearly; no existing edge-imbalance definition was found."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.edgeFinset` enumerates undirected edges once, but `Finset.image` would discard repeated imbalance values, so its underlying multiset `edgeFinset.val` is mapped instead.",
+     "name": "ImbalanceConjecture.imbalanceMultiset",
+     "why_needed": "The conclusion concerns the multiset of all edge imbalances with repeated values retained; no existing construction was found."
+    }
+   ],
+   "per_slot": {
+    "imbalance_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "imbalance_conjecture": "/--\n**Imbalance conjecture.** If the imbalance of every edge of a finite simple undirected graph is at\nleast $1$, is the multiset of all its edge imbalances graphic, meaning the degree multiset of some\nfinite simple graph?\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ {V : Type*} [Fintype V] [DecidableEq V]\n        (G : SimpleGraph V) [DecidableRel G.Adj],\n        (∀ e ∈ G.edgeFinset, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Imbalance conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/imbalance_conjecture)\n-/\n\nnamespace ImbalanceConjecture\n\nopen scoped Classical in\n/-- The imbalance of an edge is the absolute difference between the degrees of its endpoints. -/\nnoncomputable def edgeImbalance {V : Type*} [Fintype V] (G : SimpleGraph V) : Sym2 V → ℕ :=\n  Sym2.lift ⟨fun u v ↦ Nat.dist (G.degree u) (G.degree v), fun u v ↦ Nat.dist_comm (G.degree u) (G.degree v)⟩\n\nopen scoped Classical in\n/-- A multiset of natural numbers is graphic if it is the degree multiset of a finite simple graph. -/\nnoncomputable def IsGraphic (s : Multiset ℕ) : Prop :=\n  ∃ (n : ℕ) (G : SimpleGraph (Fin n)),\n    s = (Finset.univ : Finset (Fin n)).val.map fun v ↦ G.degree v\n\nopen scoped Classical in\n/--\n**Imbalance conjecture.** If every edge of a finite simple undirected graph has imbalance at\nleast $1$, is the multiset of all its edge imbalances the degree multiset of a finite simple graph?\nEach undirected edge contributes one entry to the imbalance multiset.\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ (V : Type*) [Fintype V] (G : SimpleGraph V),\n        (∀ e ∈ G.edgeFinset, 1 ≤ edgeImbalance G e) →\n          IsGraphic (G.edgeFinset.val.map (edgeImbalance G)) := by\n  sorry\n\nend ImbalanceConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Graphs are represented by `SimpleGraph V` with `[Fintype V]`, so the quantified graphs are finite, simple, and undirected; no nonemptiness assumption is imposed.",
+    "The imbalance of an undirected edge is represented by `Nat.dist` between endpoint degrees, and the hypothesis uses `1 ≤ edgeImbalance G e`, matching both “at least 1” and positive imbalance.",
+    "The imbalance multiset is `G.edgeFinset.val.map (edgeImbalance G)`: `edgeFinset` contains each undirected edge once, while mapping its underlying multiset preserves repeated imbalance values.",
+    "“Graphic” is interpreted, as specified by the background article, as exact equality with the multiset of all vertex degrees of some finite simple graph. The witness graph is represented on `Fin n`; isolated vertices and the empty graph are allowed.",
+    "The yes/no wording is represented as `answer(sorry) ↔ P`, with a positive answer corresponding to the universal conjecture being true."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Nat.dist`, `SimpleGraph.degree`, and `Sym2.lift` provide the components, but no combined edge-imbalance definition was found.",
+     "name": "ImbalanceConjecture.edgeImbalance",
+     "why_needed": "Names the symmetric absolute degree difference on an undirected edge, making the hypothesis and mapped edge multiset precise and readable."
+    },
+    {
+     "closest_existing_considered": "Searched for graphic/graphical sequences, degree sequences, degree multisets, and graph realization predicates; the closest primitives are `SimpleGraph`, `SimpleGraph.degree`, and finite vertex enumeration via `Finset.univ`.",
+     "name": "ImbalanceConjecture.IsGraphic",
+     "why_needed": "No predicate for a multiset being realizable as the degree multiset of a finite simple graph exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "imbalance_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "imbalance_conjecture": "open scoped Classical in\n/--\n**Imbalance conjecture.** If every edge of a finite simple undirected graph has imbalance at\nleast $1$, is the multiset of all its edge imbalances the degree multiset of a finite simple graph?\nEach undirected edge contributes one entry to the imbalance multiset.\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ (V : Type*) [Fintype V] (G : SimpleGraph V),\n        (∀ e ∈ G.edgeFinset, 1 ≤ edgeImbalance G e) →\n          IsGraphic (G.edgeFinset.val.map (edgeImbalance G)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Imbalance conjecture\n\nFor a finite simple undirected graph $G$, the *imbalance* of an edge $e = uv$ is\n$\\operatorname{imb}(e) = |\\deg(u) - \\deg(v)|$. The *imbalance sequence* $M_G$ is the multiset\nof the imbalances of all edges of $G$. A multiset of natural numbers is *graphic* if it is the\ndegree sequence of some finite simple graph.\n\nThe imbalance conjecture (Kozerenko–Skochko, 2014) asks whether $M_G$ is graphic whenever every\nedge of $G$ has imbalance at least $1$.\n\n*References:*\n* [Wikipedia](https://en.wikipedia.org/wiki/imbalance_conjecture)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics#Graph_theory)\n* [KS14] Kozerenko, S. and Skochko, V. (2014). \"On graphs with graphic imbalance sequences.\"\n  *Algebra and Discrete Mathematics* 18(1), pp. 97--108.\n* [KS23] Kozerenko, S. and Serdiuk, A. (2023). \"New results on imbalance graphic graphs.\"\n  *Opuscula Mathematica* 43(1), pp. 81--100.\n-/\n\nopen SimpleGraph\n\nnamespace ImbalanceConjecture\n\nvariable {V : Type*} [Fintype V]\n\n/-- The imbalance of an edge $e = uv$ of `G` is $|\\deg(u) - \\deg(v)|$. -/\ndef imbalance (G : SimpleGraph V) [DecidableRel G.Adj] (e : Sym2 V) : ℕ :=\n  Sym2.lift ⟨fun u v => ((G.degree u : ℤ) - G.degree v).natAbs,\n    fun u v => by dsimp only; omega⟩ e\n\n@[category API, AMS 5]\nlemma imbalance_mk (G : SimpleGraph V) [DecidableRel G.Adj] (u v : V) :\n    imbalance G s(u, v) = ((G.degree u : ℤ) - G.degree v).natAbs :=\n  rfl\n\n/-- The imbalance sequence $M_G$ of `G`: the multiset of the imbalances of all edges of `G`,\neach (undirected) edge counted once. -/\ndef imbalanceMultiset [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj] : Multiset ℕ :=\n  G.edgeFinset.val.map (imbalance G)\n\n/-- A multiset `M` of natural numbers is *graphic* if it is the degree sequence of some finite\nsimple graph, i.e. `M` is the multiset of vertex degrees of some `SimpleGraph (Fin n)`. -/\ndef IsGraphic (M : Multiset ℕ) : Prop :=\n  ∃ (n : ℕ) (H : SimpleGraph (Fin n)) (_ : DecidableRel H.Adj), H.degreeMultiset = M\n\n/-- The empty multiset is graphic: it is the degree sequence of the graph with no vertices. -/\n@[category test, AMS 5]\nlemma isGraphic_zero : IsGraphic 0 :=\n  ⟨0, ⊥, inferInstance, rfl⟩\n\n/-- The multiset $\\{1, 1\\}$ is graphic: it is the degree sequence of $K_2$. -/\n@[category test, AMS 5]\nlemma isGraphic_pair_one : IsGraphic {1, 1} :=\n  ⟨2, ⊤, inferInstance, by decide⟩\n\n/-- The multiset $\\{1\\}$ is not graphic: a graph on one vertex has no edges. -/\n@[category test, AMS 5]\nlemma not_isGraphic_singleton_one : ¬ IsGraphic {1} := by\n  rintro ⟨n, H, _, h⟩\n  have hn : n = 1 := by\n    simpa [degreeMultiset] using congrArg Multiset.card h\n  subst hn\n  simpa [degreeMultiset] using congrArg Multiset.sum h\n\n/-- The path $P_3$ on three vertices (the complete graph $K_3$ with one edge removed) has\nimbalance sequence $\\{1, 1\\}$. -/\n@[category test, AMS 5]\nlemma imbalanceMultiset_pathThree :\n    imbalanceMultiset ((⊤ : SimpleGraph (Fin 3)).deleteEdges {s(1, 2)}) = {1, 1} := by\n  decide\n\n/-- Every edge of the path $P_3$ has imbalance at least $1$, so $P_3$ satisfies the hypothesis of\nthe imbalance conjecture. -/\n@[category test, AMS 5]\nlemma one_le_imbalance_pathThree :\n    ∀ e ∈ ((⊤ : SimpleGraph (Fin 3)).deleteEdges {s(1, 2)}).edgeSet,\n      1 ≤ imbalance ((⊤ : SimpleGraph (Fin 3)).deleteEdges {s(1, 2)}) e := by\n  decide\n\n/-- The complete graph $K_3$ has three edges, each of imbalance $0$. -/\n@[category test, AMS 5]\nlemma imbalanceMultiset_completeGraph_three :\n    imbalanceMultiset (⊤ : SimpleGraph (Fin 3)) = {0, 0, 0} := by\n  decide\n\n/-- The edgeless graph has empty imbalance sequence. -/\n@[category test, AMS 5]\nlemma imbalanceMultiset_bot [DecidableEq V] : imbalanceMultiset (⊥ : SimpleGraph V) = 0 := by\n  simp [imbalanceMultiset]\n\n/--\n**The imbalance conjecture** (Kozerenko–Skochko, 2014).\n\nLet $G$ be a finite simple undirected graph. If the imbalance\n$\\operatorname{imb}(e) = |\\deg(u) - \\deg(v)|$ of every edge $e = uv$ of $G$ is at least $1$\n(equivalently, no edge joins two vertices of equal degree), is the multiset $M_G$ of all edge\nimbalances always graphic, i.e. the degree sequence of some finite simple graph?\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      (∀ e ∈ G.edgeSet, 1 ≤ imbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry\n\nend ImbalanceConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (simple graph, |deg u − deg v|, edges counted once, graphic = degree sequence of a simple graph, no nonemptiness restriction, related conjectures excluded) match the Wikipedia article and were followed exactly.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Graph' is read as a finite simple undirected graph (`SimpleGraph V` with `[Fintype V]`), as in the Wikipedia article's Definitions section; no nonemptiness restriction is imposed, so edgeless graphs satisfy the hypothesis vacuously and their empty imbalance multiset is graphic (`isGraphic_zero`).",
+    "The imbalance `imb(uv) = |deg u − deg v|` is defined as a natural number `((G.degree u : ℤ) - G.degree v).natAbs`, lifted to `Sym2 V` via `Sym2.lift` (well-definedness proved by `omega`). The hypothesis is written literally as `1 ≤ imbalance G e` for all `e ∈ G.edgeSet`; in ℕ this coincides with the article's `imb(e) > 0`.",
+    "`imbalanceMultiset G` is `G.edgeFinset.val.map (imbalance G)`: the multiset over undirected edges, each counted once (checked by the tests `imbalanceMultiset_completeGraph_three : … = {0, 0, 0}` and `imbalanceMultiset_pathThree : … = {1, 1}`).",
+    "`IsGraphic M` is `∃ n (H : SimpleGraph (Fin n)) (_ : DecidableRel H.Adj), H.degreeMultiset = M`, i.e. M is the degree multiset of a *simple* graph (loopless, no multiple edges), matching the article's explicit convention and its remark that allowing pseudographs trivializes the problem. Restricting the host vertex type to `Fin n` is without loss of generality (any finite graph is isomorphic to one on `Fin n` with the same degree multiset); the `DecidableRel` witness does not affect `degree`. A multiset (rather than a sorted sequence) is used since the statement itself speaks of the multiset and graphicness is permutation-invariant.",
+    "The universally quantified vertex type in the theorem is `V : Type*` (universe-polymorphic), following `SidorenkoConjecture.lean`; `Type` would be equivalent.",
+    "`IsGraphic` is a generic reusable notion that a maintainer may prefer to move to `FormalConjecturesForMathlib/Combinatorics/SimpleGraph/Degrees.lean` (next to `degreeMultiset`); it is kept in the problem file here because the task restricts writes to the single candidate file.",
+    "Related conjectures in the article (mean-imbalance, bicyclic, block-graph) are not part of the statement and are omitted, per the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.degree` (used as the building block); `Nat.dist` was considered for |a − b| but `Int.natAbs` of the ℤ-difference is more transparent. No edge-imbalance/irregularity notion exists (`rg -i 'imbalance|irregularity|Albertson'` finds only an unrelated colouring imbalance in ErdosProblems/1028).",
+     "name": "ImbalanceConjecture.imbalance",
+     "why_needed": "The edge imbalance |deg u − deg v| (Albertson 1997) does not exist in Mathlib or FormalConjecturesForMathlib; needed both for the hypothesis and to build M_G."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.degreeMultiset` in FormalConjecturesForMathlib (multiset over vertices, not edges) served as the model; `SimpleGraph.edgeFinset` supplies the edges.",
+     "name": "ImbalanceConjecture.imbalanceMultiset",
+     "why_needed": "The imbalance sequence M_G, the multiset of imbalances over all edges each counted once, is the object the conjecture asks about."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.degreeMultiset` (FormalConjecturesForMathlib/Combinatorics/SimpleGraph/Degrees.lean), which `IsGraphic` is defined in terms of; `SimpleGraph.degreeSequence` (sorted list) was rejected because the statement is about a multiset.",
+     "name": "ImbalanceConjecture.IsGraphic",
+     "why_needed": "No 'graphic sequence/multiset' predicate (degree sequence of some simple graph) exists in Mathlib or FormalConjecturesForMathlib (searched `IsGraphic|Graphic|ErdosGallai|HavelHakimi|degree sequence`; only the Havel–Hakimi residue helper exists, which is a different notion)."
+    }
+   ],
+   "per_slot": {
+    "imbalance_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj], (∀ e ∈ G.edgeSet, 1 ≤ imbalance G e) → IsGraphic (imbalanceMultiset G)`. Mathlib/FormalConjecturesForMathlib have `SimpleGraph.degreeMultiset` but no edge-imbalance or 'graphic' predicate, so `imbalance`, `imbalanceMultiset` and `IsGraphic` are defined in the file (in the `ImbalanceConjecture` namespace), each exercised by `test`/`API` lemmas."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "imbalance_conjecture": "/--\n**The imbalance conjecture** (Kozerenko–Skochko, 2014).\n\nLet $G$ be a finite simple undirected graph. If the imbalance\n$\\operatorname{imb}(e) = |\\deg(u) - \\deg(v)|$ of every edge $e = uv$ of $G$ is at least $1$\n(equivalently, no edge joins two vertices of equal degree), is the multiset $M_G$ of all edge\nimbalances always graphic, i.e. the degree sequence of some finite simple graph?\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      (∀ e ∈ G.edgeSet, 1 ≤ imbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Imbalance conjecture\n\nFor a finite simple undirected graph $G$, the *imbalance* of an edge $e = uv$ is\n$\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)|$. The *imbalance sequence* $M_G$ is the multiset of the\nimbalances of all edges of $G$ (each edge counted once). A multiset of non-negative integers is\n*graphic* if it is the degree sequence of some simple graph. The imbalance conjecture\n(Kozerenko–Skochko, 2014) asks whether $M_G$ is graphic whenever every edge of $G$ has\nimbalance at least $1$, i.e. whenever no edge of $G$ joins two vertices of the same degree.\n\n*References:*\n- [Wikipedia, *Imbalance conjecture*](https://en.wikipedia.org/wiki/imbalance_conjecture)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [KS14] Kozerenko, S. and Skochko, V., *On graphs with graphic imbalance sequences*,\n  Algebra and Discrete Mathematics 18 (2014), no. 1, 97–108.\n- [KS23] Kozerenko, S. and Serdiuk, A., *New results on imbalance graphic graphs*,\n  Opuscula Mathematica 43 (2023), no. 1, 81–100.\n  [doi:10.7494/OpMath.2023.43.1.81](https://doi.org/10.7494/OpMath.2023.43.1.81)\n-/\n\nnamespace ImbalanceConjecture\n\nopen SimpleGraph\n\nvariable {V : Type*} [Fintype V]\n\n/-- The imbalance of an edge $e = uv$ of a graph $G$, namely\n$\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)|$. -/\ndef edgeImbalance (G : SimpleGraph V) [DecidableRel G.Adj] (e : Sym2 V) : ℕ :=\n  Sym2.lift ⟨fun u v => Nat.dist (G.degree u) (G.degree v), fun _ _ => Nat.dist_comm _ _⟩ e\n\n/-- The imbalance sequence $M_G$ of a graph $G$: the multiset of the imbalances of all edges\nof $G$, each (undirected) edge counted once. -/\ndef imbalanceMultiset [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj] : Multiset ℕ :=\n  G.edgeFinset.val.map (edgeImbalance G)\n\n/-- A multiset of natural numbers is *graphic* if it is the degree sequence of some finite\nsimple graph, i.e. the multiset of the degrees of the vertices of a `SimpleGraph` on some\nfinite vertex type (up to isomorphism, `Fin n` for some `n`). Loops and multiple edges are not\nallowed: allowing pseudographs would trivialise the imbalance conjecture. -/\ndef IsGraphic (M : Multiset ℕ) : Prop :=\n  ∃ (n : ℕ) (H : SimpleGraph (Fin n)) (_ : DecidableRel H.Adj), H.degreeMultiset = M\n\n/-- The imbalance of the edge $uv$ is $|\\deg(u) - \\deg(v)|$. -/\n@[category API, AMS 5]\nlemma edgeImbalance_mk (G : SimpleGraph V) [DecidableRel G.Adj] (u v : V) :\n    edgeImbalance G s(u, v) = Int.natAbs ((G.degree u : ℤ) - G.degree v) := by\n  simp [edgeImbalance, Nat.dist]\n  omega\n\n/-- The empty multiset is graphic: it is the degree sequence of the graph with no vertices. -/\n@[category API, AMS 5]\nlemma isGraphic_zero : IsGraphic 0 :=\n  ⟨0, ⊥, inferInstance, by simp [degreeMultiset]⟩\n\n/-- The multiset $\\{1, 1\\}$ is graphic: it is the degree sequence of $K_2$. -/\n@[category test, AMS 5]\nlemma isGraphic_pair_one : IsGraphic {1, 1} :=\n  ⟨2, ⊤, inferInstance, by decide⟩\n\n/-- The multiset $\\{1\\}$ is not graphic, since the degrees of a graph have even sum. -/\n@[category test, AMS 5]\nlemma not_isGraphic_singleton_one : ¬ IsGraphic {1} := by\n  rintro ⟨n, H, _, h⟩\n  have hsum : (H.degreeMultiset).sum = 2 * H.edgeFinset.card := by\n    simpa [degreeMultiset, Finset.sum] using H.sum_degrees_eq_twice_card_edges\n  rw [h] at hsum\n  simp at hsum\n  omega\n\n/-- The edgeless graph vacuously satisfies the hypothesis of the imbalance conjecture, and its\nimbalance sequence is the (graphic) empty multiset. -/\n@[category test, AMS 5]\nlemma imbalanceMultiset_bot [DecidableEq V] : imbalanceMultiset (⊥ : SimpleGraph V) = 0 := by\n  simp [imbalanceMultiset]\n\n/-- The path $0 - 1 - 2$ on three vertices has imbalance sequence $\\{1, 1\\}$. -/\n@[category test, AMS 5]\nlemma imbalanceMultiset_path_three :\n    imbalanceMultiset (fromRel fun u v : Fin 3 => u.val + 1 = v.val) = {1, 1} := by\n  decide\n\n/-- The complete graph $K_3$ has an edge of imbalance $0$. -/\n@[category test, AMS 5]\nlemma imbalanceMultiset_top_three : imbalanceMultiset (⊤ : SimpleGraph (Fin 3)) = {0, 0, 0} := by\n  decide\n\n/-- **Imbalance conjecture** (Kozerenko–Skochko, 2014).\n\nIs it true that for every finite simple undirected graph $G$ in which every edge $e = uv$ has\nimbalance $\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)| \\geq 1$ (equivalently, no edge of $G$ joins two\nvertices of the same degree), the imbalance sequence $M_G$, i.e. the multiset of all edge\nimbalances of $G$, is graphic, i.e. is the degree sequence of some simple graph? -/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ (V : Type) [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n        (∀ e ∈ G.edgeSet, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry\n\nend ImbalanceConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None; the single-slot decomposition and its notes (simple graphs, |deg u − deg v|, one entry per undirected edge, graphic = degree sequence of a simple graph, no nonemptiness restriction, related conjectures excluded) match the article and were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple undirected graphs: `SimpleGraph V` with `[Fintype V]`, following the Wikipedia article's explicit definition; the vertex type is quantified in `Type` (universe 0), which is harmless since every finite graph is isomorphic to one on `Fin n`.",
+    "Edge imbalance imb(uv) = |deg u − deg v| is defined on `Sym2 V` via `Sym2.lift` with `Nat.dist` (symmetric); the API lemma `edgeImbalance_mk` verifies it equals `Int.natAbs ((deg u : ℤ) - deg v)`. The hypothesis is written as `1 ≤ edgeImbalance G e` for `e ∈ G.edgeSet` (equivalently `> 0`, equivalently no edge joins vertices of equal degree).",
+    "The imbalance sequence M_G is `G.edgeFinset.val.map (edgeImbalance G)`: a `Multiset ℕ` with one entry per undirected edge, preserving multiplicities.",
+    "'Graphic' is `IsGraphic M := ∃ n (H : SimpleGraph (Fin n)) (_ : DecidableRel H.Adj), H.degreeMultiset = M`, i.e. the degree sequence of a *simple* graph (no loops/multi-edges), as the article requires; a multiset is used rather than a sorted list since 'graphic' is invariant under reordering. Isolated vertices (degree 0) are allowed, as is standard.",
+    "No nonemptiness restriction on G or its edge set: edgeless (and empty) graphs satisfy the hypothesis vacuously and their empty imbalance multiset is graphic (`isGraphic_zero`), so they do not affect the truth of the statement. Test lemmas check P_3 ↦ {1,1}, K_3 ↦ {0,0,0}, {1,1} graphic, {1} not graphic.",
+    "Stated as a yes/no question with `answer(sorry) ↔ …`; `answer(True)` corresponds to the conjecture being true. The related conjectures in the article (mean-imbalance, bicyclic, block graph) are not stated, per the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.degree` (used as the building block); `Nat.dist` for the symmetric absolute difference; the ad hoc `Sym2.lift` of |f u − f v| in Wikipedia/GracefulLabeling.lean.",
+     "name": "ImbalanceConjecture.edgeImbalance",
+     "why_needed": "No notion of edge imbalance |deg u − deg v| (Albertson) exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.degreeMultiset` (FormalConjecturesForMathlib/Combinatorics/SimpleGraph/Degrees.lean), which is the analogous multiset over vertices.",
+     "name": "ImbalanceConjecture.imbalanceMultiset",
+     "why_needed": "The multiset M_G of all edge imbalances is not defined anywhere; built from `SimpleGraph.edgeFinset` and `edgeImbalance`."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.degreeMultiset` and `SimpleGraph.degreeSequence` in FormalConjecturesForMathlib (these give the degree sequence of a given graph but no graphicness predicate); the Havel–Hakimi helpers in WrittenOnTheWallII/GraphConjecture291.lean (compute a residue, not graphicness).",
+     "name": "ImbalanceConjecture.IsGraphic",
+     "why_needed": "No 'graphic sequence / degree sequence of a simple graph' predicate exists in Mathlib or FormalConjecturesForMathlib (searched for graphic, degreeSequence, Havel–Hakimi, Erdős–Gallai); defined as the degree multiset of some `SimpleGraph (Fin n)`, reusing `SimpleGraph.degreeMultiset`."
+    }
+   ],
+   "per_slot": {
+    "imbalance_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (V : Type) [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj], (∀ e ∈ G.edgeSet, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G)`. Needed three bespoke definitions (edge imbalance, imbalance multiset, graphic multiset) since neither Mathlib nor FormalConjecturesForMathlib has them; `SimpleGraph.degreeMultiset` from FormalConjecturesForMathlib is reused for the notion of degree sequence."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "imbalance_conjecture": "/-- **Imbalance conjecture** (Kozerenko–Skochko, 2014).\n\nIs it true that for every finite simple undirected graph $G$ in which every edge $e = uv$ has\nimbalance $\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)| \\geq 1$ (equivalently, no edge of $G$ joins two\nvertices of the same degree), the imbalance sequence $M_G$, i.e. the multiset of all edge\nimbalances of $G$, is graphic, i.e. is the degree sequence of some simple graph? -/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ (V : Type) [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n        (∀ e ∈ G.edgeSet, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Imbalance conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/imbalance_conjecture)\n-/\n\nnamespace ImbalanceConjecture\n\nopen SimpleGraph\n\n/-- A multiset of natural numbers is graphic if it is the degree multiset of a finite simple\nundirected graph. -/\ndef IsGraphic (s : Multiset ℕ) : Prop :=\n  ∃ (n : ℕ) (G : SimpleGraph (Fin n)),\n    ∃ _ : DecidableRel G.Adj, G.degreeMultiset = s\n\n/--\nDoes every finite simple undirected graph whose edge imbalances are all at least $1$ have a graphic\nmultiset of edge imbalances? Here the imbalance of an edge $\\{u,v\\}$ is\n$|\\deg(u)-\\deg(v)|$, each undirected edge is counted once, and graphic means realizable as the\ndegree multiset of a finite simple graph.\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ (n : ℕ) (G : SimpleGraph (Fin n)) (_ : DecidableRel G.Adj),\n        (∀ e ∈ G.edgeFinset,\n          1 ≤ e.lift ⟨fun u v => Nat.dist (G.degree u) (G.degree v),\n            fun u v => Nat.dist_comm (G.degree u) (G.degree v)⟩) →\n        IsGraphic (G.edgeFinset.val.map fun e =>\n          e.lift ⟨fun u v => Nat.dist (G.degree u) (G.degree v),\n            fun u v => Nat.dist_comm (G.degree u) (G.degree v)⟩) := by\n  sorry\n\nend ImbalanceConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “graph” as a finite simple undirected graph, following the background article and the fixed decomposition. Quantifying graphs on `Fin n` covers all finite simple graphs up to relabeling and includes the edgeless case.",
+    "Defined an edge’s imbalance as `Nat.dist (G.degree u) (G.degree v)`, which is the absolute difference of endpoint degrees. Used `Sym2.lift` with symmetry from `Nat.dist_comm`, so the value does not depend on an orientation of the undirected edge.",
+    "Constructed the imbalance multiset by mapping over `G.edgeFinset.val`; the underlying multiset of the edge finset counts each undirected edge exactly once and preserves repeated imbalance values.",
+    "Interpreted “graphic” as realizability as the degree multiset of a finite simple graph, not a multigraph or pseudograph. Used the existing `SimpleGraph.degreeMultiset` helper for the realizing graph.",
+    "Used `1 ≤` for “at least 1”; over natural-valued imbalances this is equivalent to the article’s strict positivity condition.",
+    "Added no nonemptiness condition: the empty graph satisfies the edge hypothesis vacuously, and its empty imbalance multiset is realized by the simple graph on `Fin 0`.",
+    "Used `answer(sorry) ↔` because the source states a yes/no question, with the unknown answer scoped over the complete universal claim."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.degreeMultiset` in `FormalConjecturesForMathlib.Combinatorics.SimpleGraph.Degrees` constructs the degree multiset of a given finite simple graph, but does not express existential realizability; `IsGraphic` is defined directly in terms of it.",
+     "name": "ImbalanceConjecture.IsGraphic",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides a predicate saying that a multiset of natural numbers is the degree multiset of some finite simple graph."
+    }
+   ],
+   "per_slot": {
+    "imbalance_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "imbalance_conjecture": "/--\nDoes every finite simple undirected graph whose edge imbalances are all at least $1$ have a graphic\nmultiset of edge imbalances? Here the imbalance of an edge $\\{u,v\\}$ is\n$|\\deg(u)-\\deg(v)|$, each undirected edge is counted once, and graphic means realizable as the\ndegree multiset of a finite simple graph.\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ (n : ℕ) (G : SimpleGraph (Fin n)) (_ : DecidableRel G.Adj),\n        (∀ e ∈ G.edgeFinset,\n          1 ≤ e.lift ⟨fun u v => Nat.dist (G.degree u) (G.degree v),\n            fun u v => Nat.dist_comm (G.degree u) (G.degree v)⟩) →\n        IsGraphic (G.edgeFinset.val.map fun e =>\n          e.lift ⟨fun u v => Nat.dist (G.degree u) (G.degree v),\n            fun u v => Nat.dist_comm (G.degree u) (G.degree v)⟩) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Imbalance conjecture\n\nFor a finite simple undirected graph $G$, the *imbalance* of an edge $e = uv$ is\n$\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)|$. The *imbalance sequence* $M_G$ is the multiset of the\nimbalances of all edges of $G$. A multiset of non-negative integers is *graphic* if it is the\ndegree sequence of some finite simple graph.\n\n**Imbalance conjecture** (Kozerenko–Skochko, 2014): if $\\mathrm{imb}(e) \\ge 1$ for every edge\n$e \\in E(G)$, then $M_G$ is graphic.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/imbalance_conjecture)\n- [KS14] Kozerenko, S., Skochko, V. (2014). \"On graphs with graphic imbalance sequences.\"\n  *Algebra and Discrete Mathematics* 18(1), pp. 97--108.\n- [KS23] Kozerenko, S., Serdiuk, A. (2023). \"New results on imbalance graphic graphs.\"\n  *Opuscula Mathematica* 43(1), pp. 81--100.\n-/\n\nnamespace ImbalanceConjecture\n\nopen SimpleGraph\n\nvariable {α : Type*} [Fintype α] [DecidableEq α]\n\n/-- The imbalance $\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)|$ of an edge $e = uv$ of `G`. -/\ndef edgeImbalance (G : SimpleGraph α) [DecidableRel G.Adj] (e : Sym2 α) : ℕ :=\n  Sym2.lift ⟨fun u v => ((G.degree u : ℤ) - G.degree v).natAbs,\n    fun u v => by dsimp only; omega⟩ e\n\n/-- The imbalance sequence $M_G$ of `G`: the multiset of the imbalances of all edges of `G`,\neach (undirected) edge counted once. -/\ndef imbalanceMultiset (G : SimpleGraph α) [DecidableRel G.Adj] : Multiset ℕ :=\n  G.edgeFinset.val.map (edgeImbalance G)\n\n/-- A multiset `M` of natural numbers is *graphic* if it is the degree sequence (as a multiset) of\nsome finite *simple* graph. Allowing multigraphs or pseudographs here would trivialise the\nconjecture, since the sum of all edge imbalances is always even. -/\ndef IsGraphic (M : Multiset ℕ) : Prop :=\n  ∃ (n : ℕ) (H : SimpleGraph (Fin n)) (_ : DecidableRel H.Adj), H.degreeMultiset = M\n\n/-- The empty multiset is graphic (it is the degree sequence of the empty graph). -/\n@[category test, AMS 5]\ntheorem isGraphic_zero : IsGraphic 0 :=\n  ⟨0, ⊥, inferInstance, by decide⟩\n\n/-- The multiset `{1, 1}` is graphic (it is the degree sequence of $K_2$). -/\n@[category test, AMS 5]\ntheorem isGraphic_pair : IsGraphic {1, 1} :=\n  ⟨2, ⊤, inferInstance, by decide⟩\n\n/-- The multiset `{1}` is not graphic, since the degrees of a simple graph sum to an even number. -/\n@[category test, AMS 5]\ntheorem not_isGraphic_singleton_one : ¬ IsGraphic {1} := by\n  rintro ⟨n, H, _, h⟩\n  have h1 : H.degreeMultiset.sum = 2 * H.edgeFinset.card := by\n    rw [degreeMultiset, ← Finset.sum_eq_multiset_sum, sum_degrees_eq_twice_card_edges]\n  rw [h] at h1\n  simp at h1\n  omega\n\n/-- In the complete graph $K_n$ every edge has imbalance $0$. -/\n@[category test, AMS 5]\ntheorem imbalanceMultiset_top (n : ℕ) : imbalanceMultiset (⊤ : SimpleGraph (Fin n)) =\n    Multiset.replicate (n.choose 2) 0 := by\n  rw [imbalanceMultiset, Multiset.eq_replicate]\n  refine ⟨by rw [Multiset.card_map, Finset.card_val, card_edgeFinset_top_eq_card_choose_two,\n    Fintype.card_fin], ?_⟩\n  intro b hb\n  simp only [Multiset.mem_map, Finset.mem_val] at hb\n  obtain ⟨e, -, rfl⟩ := hb\n  induction e using Sym2.ind with\n  | _ u v => simp [edgeImbalance]\n\n/-- The star $K_{1,2}$ (the path on three vertices, with centre `1`) has imbalance sequence\n$\\{1, 1\\}$: both edges join the centre (degree $2$) to a leaf (degree $1$). -/\n@[category test, AMS 5]\ntheorem imbalanceMultiset_star :\n    imbalanceMultiset (fromRel fun (u _ : Fin 3) => u = 1) = {1, 1} := by\n  decide\n\n/-- The star $K_{1,2}$ satisfies the hypothesis of the conjecture, and its imbalance sequence\n$\\{1, 1\\}$ is graphic. -/\n@[category test, AMS 5]\ntheorem isGraphic_imbalanceMultiset_star :\n    IsGraphic (imbalanceMultiset (fromRel fun (u _ : Fin 3) => u = 1)) := by\n  rw [imbalanceMultiset_star]\n  exact isGraphic_pair\n\n/--\n**Imbalance conjecture** (Kozerenko–Skochko, 2014).\n\nIf the imbalance $\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)|$ of each edge $e = uv$ of a finite simple\ngraph $G$ is at least $1$, is the multiset $M_G$ of all edge imbalances of $G$ always graphic,\ni.e. the degree sequence of some finite simple graph?\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ {α : Type*} [Fintype α] [DecidableEq α] (G : SimpleGraph α) [DecidableRel G.Adj],\n        (∀ e ∈ G.edgeFinset, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry\n\nend ImbalanceConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (finite simple graph, |deg u − deg v|, 'at least 1' ≡ '> 0', per-edge multiset, simple-graph 'graphic', no nonemptiness restriction, related conjectures excluded) match the statement and the article, and the file follows them.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "G is a finite simple undirected graph: `SimpleGraph α` with `[Fintype α] [DecidableEq α] [DecidableRel G.Adj]`, quantified over `α : Type*` inside the statement (after `answer(sorry)`).",
+    "Edge imbalance is `|deg u − deg v|` formalised as `((G.degree u : ℤ) - G.degree v).natAbs`, lifted to `Sym2 α` via `Sym2.lift` (commutativity discharged by `omega`). Values are ℕ so that the multiset can be compared with a degree multiset.",
+    "The hypothesis 'imbalance at least 1 for each edge' is `∀ e ∈ G.edgeFinset, 1 ≤ edgeImbalance G e`, i.e. non-strict `1 ≤`, which for ℕ coincides with the article's `imb(e) > 0`.",
+    "M_G is `G.edgeFinset.val.map (edgeImbalance G) : Multiset ℕ`; `edgeFinset` lists each undirected edge (as a `Sym2`) exactly once, so multiplicities are per edge, not per ordered pair.",
+    "'Graphic' is defined as: there exist `n : ℕ`, a simple graph `H : SimpleGraph (Fin n)` (with a `DecidableRel` witness, as in existing repo files, e.g. `lemma3` of DegreeSequencesTriangleFree) such that `H.degreeMultiset = M`. This is the degree sequence of a *simple* graph (article's explicit convention; multigraphs/pseudographs would trivialise the problem). Using `Fin n` instead of an arbitrary finite type is without loss of generality and avoids universe issues.",
+    "No nonemptiness/connectedness restriction: edgeless graphs satisfy the hypothesis vacuously and their imbalance multiset `0` is graphic (tested by `isGraphic_zero`), agreeing with the source.",
+    "`answer(True)` corresponds to the affirmative answer 'the imbalance sequence is always graphic'; `answer(False)` to the existence of a counterexample.",
+    "The bespoke definitions (`edgeImbalance`, `imbalanceMultiset`, `IsGraphic`) are placed in the problem file rather than FormalConjecturesForMathlib because the task allows writing only the single candidate file; `IsGraphic` is generic and a reviewer may prefer to move it to `FormalConjecturesForMathlib/Combinatorics/SimpleGraph/Degrees.lean`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.degree` (used as the building block); `SimpleGraph.non_edge_neighborhood_card` in FormalConjecturesForMathlib/Degrees.lean is the only similar `Sym2.lift`-style edge statistic but computes something unrelated.",
+     "name": "ImbalanceConjecture.edgeImbalance",
+     "why_needed": "The imbalance |deg u − deg v| of an edge, as a function on `Sym2 α`; no such notion (nor the Albertson irregularity) exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.degreeMultiset` (a multiset over vertices, not edges); no edge-indexed multiset exists.",
+     "name": "ImbalanceConjecture.imbalanceMultiset",
+     "why_needed": "The imbalance sequence M_G, the multiset of edge imbalances over `G.edgeFinset`."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.degreeMultiset` (used to define it); `SimpleGraph.havelHakimiStep`/`residue` in FormalConjecturesForMathlib/Residue.lean (not a graphicality test).",
+     "name": "ImbalanceConjecture.IsGraphic",
+     "why_needed": "The predicate 'is the degree sequence of some finite simple graph' on `Multiset ℕ`; Mathlib has no graphic-sequence / Erdős–Gallai / degree-sequence-realizability notion, and the repo only has `degreeMultiset`, `degreeSequence`, and the Havel–Hakimi `residue` (which computes a residue, not a realizability predicate)."
+    }
+   ],
+   "per_slot": {
+    "imbalance_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ {α : Type*} [Fintype α] [DecidableEq α] (G : SimpleGraph α) [DecidableRel G.Adj], (∀ e ∈ G.edgeFinset, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G)`. No 'graphic multiset' predicate exists in Mathlib or FormalConjecturesForMathlib (checked: no Erdős–Gallai/Havel–Hakimi realizability notion; only `degreeMultiset`/`degreeSequence`/`havelHakimiStep`), and no edge-imbalance notion exists, so three bespoke definitions were added in the problem file with API tests."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "imbalance_conjecture": "/--\n**Imbalance conjecture** (Kozerenko–Skochko, 2014).\n\nIf the imbalance $\\mathrm{imb}(e) = |\\deg(u) - \\deg(v)|$ of each edge $e = uv$ of a finite simple\ngraph $G$ is at least $1$, is the multiset $M_G$ of all edge imbalances of $G$ always graphic,\ni.e. the degree sequence of some finite simple graph?\n-/\n@[category research open, AMS 5]\ntheorem imbalance_conjecture :\n    answer(sorry) ↔\n      ∀ {α : Type*} [Fintype α] [DecidableEq α] (G : SimpleGraph α) [DecidableRel G.Adj],\n        (∀ e ∈ G.edgeFinset, 1 ≤ edgeImbalance G e) → IsGraphic (imbalanceMultiset G) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "imbalance_conjecture": "c05"
+ },
+ "id": "wp-imbalance-conjecture",
+ "main_attempt": "c05"
+}

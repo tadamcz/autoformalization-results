@@ -1,0 +1,552 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vitushkin's conjecture\n\nLet $K \\subset \\mathbb{C}$ be compact. The *analytic capacity* of $K$ is\n$$\\gamma(K) = \\sup\\{|f'(\\infty)| :\\ f \\in \\mathcal{H}^\\infty(\\mathbb{C} \\setminus K),\\\n\\|f\\|_\\infty \\le 1,\\ f(\\infty) = 0\\},$$\nwhere $\\mathcal{H}^\\infty(U)$ is the set of bounded analytic functions $U \\to \\mathbb{C}$,\n$f(\\infty) = \\lim_{z \\to \\infty} f(z)$ and $f'(\\infty) = \\lim_{z \\to \\infty} z (f(z) - f(\\infty))$.\nThe *Favard length* of $K$ is\n$$\\operatorname{Fav}(K) = \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta,$$\nwhere $\\operatorname{proj}_\\theta(x, y) = x \\cos\\theta + y \\sin\\theta$ is the orthogonal\nprojection in direction $\\theta$ and $\\mathcal{H}^1$ is the one-dimensional Hausdorff measure.\n\nVitushkin conjectured that for every compact $K \\subset \\mathbb{C}$\n$$\\gamma(K) = 0 \\iff \\operatorname{Fav}(K) = 0.$$\nMattila [Ma86] showed that this is false in general, without identifying the failing direction.\nJones and Murai [JM88] then constructed a compact set with zero Favard length and positive\nanalytic capacity, disproving the direction $\\operatorname{Fav}(K) = 0 \\Rightarrow \\gamma(K) = 0$.\nThe results of David [Da98] and Tolsa [To03] imply that the conjecture holds when $K$ is\n$\\mathcal{H}^1$-$\\sigma$-finite. The remaining direction, $\\gamma(K) = 0 \\Rightarrow\n\\operatorname{Fav}(K) = 0$ (equivalently, positive Favard length implies positive analytic\ncapacity), is open; see Chang and Tolsa [CT20] for partial progress.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Analytic_capacity%23Vitushkin%27s_conjecture)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ma86] Mattila, P., *Smooth maps, null-sets for integralgeometric measure and analytic\n  capacity*, Ann. of Math. 123 (1986), 303–309.\n- [JM88] Jones, P. W. and Murai, T., *Positive analytic capacity but zero Buffon needle\n  probability*, Pacific J. Math. 133 (1988), 99–114.\n- [Da98] David, G., *Unrectifiable 1-sets have vanishing analytic capacity*,\n  Rev. Mat. Iberoamericana 14 (1998), 369–479.\n- [To03] Tolsa, X., *Painlevé's problem and the semiadditivity of analytic capacity*,\n  Acta Math. 190 (2003), 105–149.\n- [CT20] Chang, A. and Tolsa, X., *Analytic capacity and projections*,\n  J. Eur. Math. Soc. 22 (2020), 4121–4159. [arXiv:1712.00594](https://arxiv.org/abs/1712.00594)\n-/\n\nopen Filter MeasureTheory Topology\nopen scoped ENNReal\n\nnamespace VitushkinsConjecture\n\n/--\nA function `f` is *admissible* for the analytic capacity of `K ⊆ ℂ` if it is analytic on\n`ℂ \\ K`, bounded by `1` there, and satisfies `f(∞) = lim_{z → ∞} f(z) = 0`.\nOnly the values of `f` on `ℂ \\ K` are relevant.\n-/\nstructure IsAdmissible (K : Set ℂ) (f : ℂ → ℂ) : Prop where\n  differentiableOn : DifferentiableOn ℂ f Kᶜ\n  norm_le_one : ∀ z ∈ Kᶜ, ‖f z‖ ≤ 1\n  tendsto_zero : Tendsto f (cocompact ℂ) (𝓝 0)\n\n/--\n`HasDerivAtInfty f a` says that `f'(∞) = a`, i.e. `lim_{z → ∞} z * f(z) = a`.\nThis is the derivative at infinity $f'(\\infty) = \\lim_{z \\to \\infty} z (f(z) - f(\\infty))$\nfor functions with $f(\\infty) = 0$.\n-/\ndef HasDerivAtInfty (f : ℂ → ℂ) (a : ℂ) : Prop :=\n  Tendsto (fun z => z * f z) (cocompact ℂ) (𝓝 a)\n\n/--\nThe *analytic capacity* of `K ⊆ ℂ`:\n$$\\gamma(K) = \\sup\\{|f'(\\infty)| :\\ f \\in \\mathcal{H}^\\infty(\\mathbb{C} \\setminus K),\\\n\\|f\\|_\\infty \\le 1,\\ f(\\infty) = 0\\}.$$\nThe supremum ranges over the values `‖a‖` where `f` is admissible for `K` and `f'(∞) = a`.\n(For admissible `f` the limit defining `f'(∞)` always exists.)\n-/\nnoncomputable def analyticCapacity (K : Set ℂ) : ℝ :=\n  sSup {r | ∃ f a, IsAdmissible K f ∧ HasDerivAtInfty f a ∧ r = ‖a‖}\n\n/-- The orthogonal projection in direction `θ`: `proj θ (x + i y) = x cos θ + y sin θ`. -/\nnoncomputable def proj (θ : ℝ) (z : ℂ) : ℝ :=\n  z.re * Real.cos θ + z.im * Real.sin θ\n\n/--\nThe *Favard length* of `K ⊆ ℂ`:\n$$\\operatorname{Fav}(K) = \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta.$$\n-/\nnoncomputable def favardLength (K : Set ℂ) : ℝ≥0∞ :=\n  ∫⁻ θ in Set.Icc 0 Real.pi, μH[1] (proj θ '' K)\n\n/-- The zero function is admissible for every `K`. -/\n@[category test, AMS 30]\ntheorem isAdmissible_zero (K : Set ℂ) : IsAdmissible K 0 where\n  differentiableOn := differentiableOn_const 0\n  norm_le_one := by simp\n  tendsto_zero := tendsto_const_nhds\n\n/-- Analytic capacity is nonnegative. -/\n@[category API, AMS 30]\ntheorem analyticCapacity_nonneg (K : Set ℂ) : 0 ≤ analyticCapacity K :=\n  Real.sSup_nonneg fun _ ⟨_, _, _, _, hr⟩ => hr ▸ norm_nonneg _\n\n/-- The empty set has zero analytic capacity (by Liouville's theorem). -/\n@[category test, AMS 30]\ntheorem analyticCapacity_empty : analyticCapacity ∅ = 0 := by\n  have : {r | ∃ f a, IsAdmissible ∅ f ∧ HasDerivAtInfty f a ∧ r = ‖a‖} = {0} := by\n    ext r\n    simp only [Set.mem_setOf_eq, Set.mem_singleton_iff]\n    constructor\n    · rintro ⟨f, a, hf, ha, rfl⟩\n      have hdiff : Differentiable ℂ f :=\n        differentiableOn_univ.1 (by simpa using hf.differentiableOn)\n      have hbdd : Bornology.IsBounded (Set.range f) := by\n        refine (Metric.isBounded_iff_subset_closedBall 0).2 ⟨1, ?_⟩\n        rintro _ ⟨z, rfl⟩\n        simpa using hf.norm_le_one z (by simp)\n      have hconst : ∀ z, f z = f 0 := fun z => hdiff.apply_eq_apply_of_bounded hbdd z 0\n      have hf0 : f 0 = 0 :=\n        tendsto_nhds_unique (tendsto_const_nhds.congr fun z => (hconst z).symm) hf.tendsto_zero\n      have hzero : ∀ z, f z = 0 := fun z => (hconst z).trans hf0\n      have ha' : Tendsto (fun _ : ℂ => (0 : ℂ)) (cocompact ℂ) (𝓝 a) := by\n        simpa [HasDerivAtInfty, hzero] using ha\n      simp [tendsto_nhds_unique ha' tendsto_const_nhds]\n    · rintro rfl\n      exact ⟨0, 0, isAdmissible_zero ∅, by simp [HasDerivAtInfty], by simp⟩\n  rw [analyticCapacity, this, csSup_singleton]\n\n/-- The empty set has zero Favard length. -/\n@[category test, AMS 28]\ntheorem favardLength_empty : favardLength ∅ = 0 := by\n  simp [favardLength]\n\n/-- A closed disc of positive radius has positive analytic capacity. -/\n@[category test, AMS 30]\ntheorem analyticCapacity_closedBall_pos (c : ℂ) {r : ℝ} (hr : 0 < r) :\n    0 < analyticCapacity (Metric.closedBall c r) := by\n  sorry\n\n/--\n**Vitushkin's conjecture** (original form): for every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis is false: Mattila [Ma86] proved that the conjecture fails for some compact $K$\n(necessarily one which is not $\\mathcal{H}^1$-$\\sigma$-finite).\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/--\nVitushkin's conjecture holds for $\\mathcal{H}^1$-$\\sigma$-finite sets: if the compact set\n$K \\subset \\mathbb{C}$ is a countable union of sets of finite one-dimensional Hausdorff measure,\nthen\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis follows from David's theorem [Da98] (the case $\\mathcal{H}^1(K) < \\infty$) together with\nTolsa's countable semiadditivity of analytic capacity [To03].\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite (K : Set ℂ) (hK : IsCompact K)\n    (hσ : ∃ s : ℕ → Set ℂ, K ⊆ ⋃ n, s n ∧ ∀ n, μH[1] (s n) < ⊤) :\n    analyticCapacity K = 0 ↔ favardLength K = 0 := by\n  sorry\n\n/--\nThe direction \"zero Favard length implies zero analytic capacity\" of Vitushkin's conjecture is\nfalse: Jones and Murai [JM88] constructed a compact set $K \\subset \\mathbb{C}$ with\n$$\\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0 \\quad\\text{and}\\quad\n\\gamma(K) > 0.$$\nBy `vitushkins_conjecture.variants.sigma_finite`, such a set cannot be\n$\\mathcal{H}^1$-$\\sigma$-finite.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry\n\n/--\n**Vitushkin's conjecture** (the open direction): for every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\implies \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nEquivalently, every compact set of positive Favard length has positive analytic capacity.\nPartial progress towards a positive answer was obtained by Chang and Tolsa [CT20].\n-/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture (K : Set ℂ) (hK : IsCompact K)\n    (hγ : analyticCapacity K = 0) : favardLength K = 0 := by\n  sorry\n\nend VitushkinsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The table matches the article: the biconditional is false (Mattila), the direction Fav = 0 ⇒ γ = 0 is refuted (Jones–Murai), the H¹-σ-finite case is settled (David + Tolsa), and γ = 0 ⇒ Fav = 0 is open.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Analytic capacity is ℝ-valued via `sSup`. For compact K the admissible set is nonempty (f = 0) and bounded above (|f'(∞)| ≤ R when K ⊆ closedBall 0 R, by the Schwarz lemma at ∞), so `sSup` is the true supremum; the junk behaviour of `Real.sSup` for unbounded sets is only reachable for non-compact K, which no slot quantifies over. `analyticCapacity_nonneg` is proved unconditionally.",
+    "Admissible functions are total functions f : ℂ → ℂ whose values on K are irrelevant (only DifferentiableOn on Kᶜ, the bound on Kᶜ, and behaviour at infinity are constrained). This is equivalent to functions defined on ℂ ∖ K.",
+    "f(∞) = 0 is encoded as `Tendsto f (cocompact ℂ) (𝓝 0)`, and f'(∞) = a as `Tendsto (fun z => z * f z) (cocompact ℂ) (𝓝 a)`; since f(∞) = 0 is required, z·(f(z) − f(∞)) = z·f(z). The supremum ranges over pairs (f, a) with the limit existing; for admissible f the limit always exists, so no admissible function is lost.",
+    "Favard length is a lower Lebesgue integral (∫⁻) over Set.Icc 0 π in ℝ≥0∞. For compact K the integrand θ ↦ H¹(proj_θ K) is upper semicontinuous, hence Borel measurable, so the lintegral is the genuine integral; the endpoints have measure zero.",
+    "H¹-σ-finiteness of K is spelled out explicitly as ∃ s : ℕ → Set ℂ, K ⊆ ⋃ n, s n ∧ ∀ n, μH[1] (s n) < ⊤ (covering by countably many sets of finite H¹ measure) rather than via `SigmaFinite (μH[1].restrict K)`, for transparency; the two are equivalent for compact (hence measurable) K.",
+    "Slot original_iff is stated as the negation `¬ ∀ K, IsCompact K → (γ K = 0 ↔ Fav K = 0)` (research solved), following CONTRIBUTING's convention for conjectures solved in the negative; slot favard_zero_implies_capacity_zero is stated as the existence of a compact counterexample `∃ K, IsCompact K ∧ Fav K = 0 ∧ 0 < γ K`, as the decomposition notes request (equivalent to the negation of the implication since γ ≥ 0).",
+    "The list-page entry is terse; the precise formulations (definitions of γ, Fav, the four variants and their status) are taken from the Wikipedia article 'Analytic capacity § Vitushkin's conjecture' and Chang–Tolsa (arXiv:1712.00594), which agree.",
+    "Two auxiliary sanity statements are included with `sorry`: `analyticCapacity_closedBall_pos` (test; true via f(z) = r/(z − c), but proving it needs the Schwarz-lemma upper bound), while `analyticCapacity_empty` (Liouville) and `favardLength_empty` are fully proved."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "DifferentiableOn / AnalyticOn plus Bornology.IsBounded; no packaged notion of bounded analytic functions on the complement of a compact set normalised at infinity exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "VitushkinsConjecture.IsAdmissible",
+     "why_needed": "Mathlib has no notion of the admissible class for analytic capacity: f : ℂ → ℂ with DifferentiableOn ℂ f Kᶜ, ‖f z‖ ≤ 1 on Kᶜ, and Tendsto f (cocompact ℂ) (𝓝 0) (i.e. f(∞) = 0)."
+    },
+    {
+     "closest_existing_considered": "Filter.lim / HasDerivAt applied to z ↦ f(1/z) at 0; these were rejected as less transparent and requiring junk-value handling.",
+     "name": "VitushkinsConjecture.HasDerivAtInfty",
+     "why_needed": "The derivative at infinity f'(∞) = lim_{z→∞} z·(f(z) − f(∞)) (with f(∞) = 0) is not in Mathlib; defined as Tendsto (fun z => z * f z) (cocompact ℂ) (𝓝 a). Used as a relation rather than a `lim` to avoid junk values."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjecturesForMathlib for 'capacity' / 'analyticCapacity' — only unrelated hits (tactic internals).",
+     "name": "VitushkinsConjecture.analyticCapacity",
+     "why_needed": "Analytic capacity γ(K) is absent from Mathlib and the repo. Defined as sSup {‖a‖ | ∃ f, IsAdmissible K f ∧ HasDerivAtInfty f a} : ℝ."
+    },
+    {
+     "closest_existing_considered": "Complex.re ∘ (· * exp(-iθ)) or EuclideanGeometry orthogonal projections onto lines; the explicit formula is closest to the source and simplest.",
+     "name": "VitushkinsConjecture.proj",
+     "why_needed": "The direction-θ orthogonal projection proj_θ(x, y) = x cos θ + y sin θ : ℂ → ℝ, as in the article."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.Measure.hausdorffMeasure (μH[1]) and lintegral are used as building blocks; searched for 'Favard' in Mathlib — none.",
+     "name": "VitushkinsConjecture.favardLength",
+     "why_needed": "Favard length Fav(K) = ∫₀^π H¹(proj_θ K) dθ is absent from Mathlib; defined as ∫⁻ θ in Set.Icc 0 π, μH[1] (proj θ '' K) : ℝ≥0∞."
+    }
+   ],
+   "per_slot": {
+    "vitushkins_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "For every compact K ⊆ ℂ, analyticCapacity K = 0 → favardLength K = 0 (the open direction; equivalently positive Favard length implies positive analytic capacity); research open."
+    },
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated, as the decomposition notes request, as the existence of a compact K ⊆ ℂ with favardLength K = 0 ∧ 0 < analyticCapacity K (Jones–Murai 1988); research solved."
+    },
+    "vitushkins_conjecture.variants.original_iff": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0), tagged research solved (Mattila 1986)."
+    },
+    "vitushkins_conjecture.variants.sigma_finite": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "For compact K with an explicit H¹-σ-finiteness hypothesis (∃ s : ℕ → Set ℂ, K ⊆ ⋃ n, s n ∧ ∀ n, μH[1] (s n) < ⊤), γ(K) = 0 ↔ Fav(K) = 0; research solved (David 1998 + Tolsa 2003)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vitushkins_conjecture": "/--\n**Vitushkin's conjecture** (the open direction): for every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\implies \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nEquivalently, every compact set of positive Favard length has positive analytic capacity.\nPartial progress towards a positive answer was obtained by Chang and Tolsa [CT20].\n-/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture (K : Set ℂ) (hK : IsCompact K)\n    (hγ : analyticCapacity K = 0) : favardLength K = 0 := by\n  sorry",
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": "/--\nThe direction \"zero Favard length implies zero analytic capacity\" of Vitushkin's conjecture is\nfalse: Jones and Murai [JM88] constructed a compact set $K \\subset \\mathbb{C}$ with\n$$\\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0 \\quad\\text{and}\\quad\n\\gamma(K) > 0.$$\nBy `vitushkins_conjecture.variants.sigma_finite`, such a set cannot be\n$\\mathcal{H}^1$-$\\sigma$-finite.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry",
+    "vitushkins_conjecture.variants.original_iff": "/--\n**Vitushkin's conjecture** (original form): for every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis is false: Mattila [Ma86] proved that the conjecture fails for some compact $K$\n(necessarily one which is not $\\mathcal{H}^1$-$\\sigma$-finite).\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry",
+    "vitushkins_conjecture.variants.sigma_finite": "/--\nVitushkin's conjecture holds for $\\mathcal{H}^1$-$\\sigma$-finite sets: if the compact set\n$K \\subset \\mathbb{C}$ is a countable union of sets of finite one-dimensional Hausdorff measure,\nthen\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis follows from David's theorem [Da98] (the case $\\mathcal{H}^1(K) < \\infty$) together with\nTolsa's countable semiadditivity of analytic capacity [To03].\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite (K : Set ℂ) (hK : IsCompact K)\n    (hσ : ∃ s : ℕ → Set ℂ, K ⊆ ⋃ n, s n ∧ ∀ n, μH[1] (s n) < ⊤) :\n    analyticCapacity K = 0 ↔ favardLength K = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vitushkin's Conjecture\n\nVitushkin's original conjecture characterized compact subsets of the complex plane with zero\nanalytic capacity in terms of the lengths of their orthogonal projections. One implication is\nfalse, while the other remains open.\n\n*References:*\n- [Wikipedia, Analytic capacity: Vitushkin's conjecture](https://en.wikipedia.org/wiki/Analytic_capacity%23Vitushkin%27s_conjecture)\n- [Chang and Tolsa, *Analytic capacity and projections*](https://arxiv.org/abs/1712.00594)\n-/\n\nnamespace VitushkinsConjecture\n\nopen Filter MeasureTheory Set Topology\nopen scoped ENNReal\n\n/-- The orthogonal projection of the complex plane in direction `θ`, identified with the real\nline. -/\nnoncomputable def projection (θ : ℝ) (z : ℂ) : ℝ :=\n  z.re * Real.cos θ + z.im * Real.sin θ\n\n/-- The Favard length of a subset of the complex plane, without a normalization factor. -/\nnoncomputable def favardLength (K : Set ℂ) : ℝ≥0∞ :=\n  ∫⁻ θ in Icc (0 : ℝ) Real.pi, μH[(1 : ℝ)] (projection θ '' K)\n\n/-- A set is $\\mathcal H^1$-sigma-finite if it is a countable union of sets of finite\none-dimensional Hausdorff measure. -/\ndef IsHausdorffOneSigmaFinite (K : Set ℂ) : Prop :=\n  ∃ S : ℕ → Set ℂ, K = ⋃ i, S i ∧ ∀ i, μH[(1 : ℝ)] (S i) < ∞\n\n/-- The analytic capacity of `K`. The conditions in the supremum say that `f` is analytic and\nbounded in `Kᶜ`, has norm at most one there, satisfies `f(∞) = 0`, and has\n`f'(∞) = a = lim_{z → ∞} z f(z)`. -/\nnoncomputable def analyticCapacity (K : Set ℂ) : ℝ :=\n  sSup {r : ℝ | ∃ (f : ℂ → ℂ) (a : ℂ),\n    DifferentiableOn ℂ f Kᶜ ∧\n    (∀ z ∈ Kᶜ, ‖f z‖ ≤ 1) ∧\n    Tendsto f (cocompact ℂ) (𝓝 0) ∧\n    Tendsto (fun z ↦ z * f z) (cocompact ℂ) (𝓝 a) ∧\n    r = ‖a‖}\n\n/-- Vitushkin's original conjecture asserted that, for every compact `K ⊆ ℂ`,\n$\\gamma(K)=0$ if and only if\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nMattila proved that this universal biconditional is false. -/\n@[category research solved, AMS 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/-- David's and Tolsa's theorems imply Vitushkin's biconditional for every compact\n$\\mathcal H^1$-sigma-finite set `K`: its analytic capacity is zero if and only if its Favard\nlength is zero. -/\n@[category research solved, AMS 30]\ntheorem vitushkins_conjecture.variants.sigma_finite :\n    ∀ K : Set ℂ, IsCompact K → IsHausdorffOneSigmaFinite K →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/-- Jones and Murai disproved one direction of Vitushkin's conjecture by constructing a compact\nset `K ⊆ ℂ` with zero Favard length and positive analytic capacity. -/\n@[category research solved, AMS 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry\n\n/-- The remaining open direction of Vitushkin's conjecture: every compact set `K ⊆ ℂ` with zero\nanalytic capacity has zero Favard length. Equivalently, positive Favard length implies positive\nanalytic capacity. -/\n@[category research open, AMS 30]\ntheorem vitushkins_conjecture :\n    ∀ K : Set ℂ, IsCompact K → analyticCapacity K = 0 → favardLength K = 0 := by\n  sorry\n\nend VitushkinsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry was expanded using the supplied Analytic capacity article and Chang–Tolsa: the primary open statement is the remaining implication γ(K) = 0 → Fav(K) = 0, equivalently positive Favard length implies positive analytic capacity.",
+    "Orthogonal projection is represented by the scalar coordinate x cos θ + y sin θ on ℝ, exactly as in the decomposition table; this identification preserves one-dimensional Hausdorff measure.",
+    "Favard length is an ℝ≥0∞ Lebesgue lower integral over Icc 0 π. This accommodates potentially infinite Hausdorff measures; choosing Icc rather than a half-open endpoint convention does not alter the integral.",
+    "A function on ℂ∖K is represented by a total function ℂ → ℂ constrained only on Kᶜ. For compact K, cocompact limits eventually ignore K, so arbitrary values on K do not affect f(∞) or f'(∞).",
+    "Because admissible functions satisfy f(∞) = 0, the derivative at infinity is encoded as Tendsto (fun z ↦ z * f z) (cocompact ℂ) (𝓝 a), matching lim z(f(z) − f(∞)).",
+    "H¹-sigma-finiteness is represented literally as K being a countable union of sets with finite one-dimensional Hausdorff measure, as specified by the decomposition table.",
+    "The false original conjecture is stated as the negation of its universal compact-set biconditional; the specifically refuted direction is stated constructively as a compact counterexample with zero Favard length and strictly positive analytic capacity."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib inner-product orthogonal projections onto submodules; these return points in a projected subspace rather than the source's scalar coordinate and require substantially more setup.",
+     "name": "VitushkinsConjecture.projection",
+     "why_needed": "Defines the exact scalar orthogonal projection used in the Favard-length formula."
+    },
+    {
+     "closest_existing_considered": "Mathlib's MeasureTheory.Measure.hausdorffMeasure and lintegral primitives, which are used to construct this definition.",
+     "name": "VitushkinsConjecture.favardLength",
+     "why_needed": "No Favard-length primitive exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's MeasureTheory.SigmaFinite typeclass and finite spanning sets; those express a global property of a measure rather than the specified countable finite-H¹ cover of K.",
+     "name": "VitushkinsConjecture.IsHausdorffOneSigmaFinite",
+     "why_needed": "The needed property is sigma-finiteness of a particular set with respect to H¹, not a global SigmaFinite instance for the ambient measure."
+    },
+    {
+     "closest_existing_considered": "Mathlib's complex DifferentiableOn predicate, Filter.cocompact limits, and sSup, which are combined directly to reproduce the source definition.",
+     "name": "VitushkinsConjecture.analyticCapacity",
+     "why_needed": "Analytic capacity is absent from Mathlib and FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "vitushkins_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.original_iff": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.sigma_finite": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vitushkins_conjecture": "/-- The remaining open direction of Vitushkin's conjecture: every compact set `K ⊆ ℂ` with zero\nanalytic capacity has zero Favard length. Equivalently, positive Favard length implies positive\nanalytic capacity. -/\n@[category research open, AMS 30]\ntheorem vitushkins_conjecture :\n    ∀ K : Set ℂ, IsCompact K → analyticCapacity K = 0 → favardLength K = 0 := by\n  sorry",
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": "/-- Jones and Murai disproved one direction of Vitushkin's conjecture by constructing a compact\nset `K ⊆ ℂ` with zero Favard length and positive analytic capacity. -/\n@[category research solved, AMS 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry",
+    "vitushkins_conjecture.variants.original_iff": "/-- Vitushkin's original conjecture asserted that, for every compact `K ⊆ ℂ`,\n$\\gamma(K)=0$ if and only if\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nMattila proved that this universal biconditional is false. -/\n@[category research solved, AMS 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry",
+    "vitushkins_conjecture.variants.sigma_finite": "/-- David's and Tolsa's theorems imply Vitushkin's biconditional for every compact\n$\\mathcal H^1$-sigma-finite set `K`: its analytic capacity is zero if and only if its Favard\nlength is zero. -/\n@[category research solved, AMS 30]\ntheorem vitushkins_conjecture.variants.sigma_finite :\n    ∀ K : Set ℂ, IsCompact K → IsHausdorffOneSigmaFinite K →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vitushkin's conjecture\n\nVitushkin's conjecture relates the analytic capacity of a compact subset of the complex plane to\nits Favard length. The original biconditional is false, but one implication remains open.\n\n*References:*\n- [Wikipedia, Analytic capacity: Vitushkin's conjecture](https://en.wikipedia.org/wiki/Analytic_capacity%23Vitushkin%27s_conjecture)\n- [Chang and Tolsa, *Analytic capacity and projections*](https://arxiv.org/abs/1712.00594)\n-/\n\nopen Filter MeasureTheory\n\nnamespace VitushkinsConjecture\n\n/-- The orthogonal projection of `z` onto the direction making angle `θ` with the real axis,\nidentified with its real coordinate on that line. -/\nnoncomputable def orthogonalProjection (θ : ℝ) (z : ℂ) : ℝ :=\n  z.re * Real.cos θ + z.im * Real.sin θ\n\n/-- The Favard length of a subset of the complex plane:\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta$. -/\nnoncomputable def favardLength (K : Set ℂ) : ENNReal :=\n  ∫⁻ θ in Set.Icc (0 : ℝ) Real.pi, μH[1] (orthogonalProjection θ '' K)\n\n/-- The analytic capacity of `K`. Functions on $\\mathbb C\\setminus K$ are represented by arbitrary\nextensions to `ℂ`; all analytic and boundedness conditions concern `Kᶜ`. The two cocompact limits\nstate $f(\\infty)=0$ and $f'(\\infty)=\\lim_{z\\to\\infty} zf(z)=L$, respectively. -/\nnoncomputable def analyticCapacity (K : Set ℂ) : ENNReal :=\n  sSup {r : ENNReal | ∃ (f : ℂ → ℂ) (L : ℂ),\n    DifferentiableOn ℂ f Kᶜ ∧\n    (∀ z ∈ Kᶜ, ‖f z‖ ≤ 1) ∧\n    Tendsto f (cocompact ℂ) (nhds 0) ∧\n    Tendsto (fun z : ℂ ↦ z * f z) (cocompact ℂ) (nhds L) ∧\n    r = ENNReal.ofReal ‖L‖}\n\n/-- **Vitushkin's original conjecture (disproved by Mattila).** It is false that every compact\n$K\\subseteq\\mathbb C$ satisfies\n$\\gamma(K)=0 \\iff \\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$. -/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/-- **David--Tolsa sigma-finite case.** If a compact $K\\subseteq\\mathbb C$ is\n$\\mathcal H^1$-sigma-finite, then\n$\\gamma(K)=0 \\iff \\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nSigma-finiteness is expressed by restricting one-dimensional Hausdorff measure to `K`. -/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite :\n    ∀ K : Set ℂ, IsCompact K → SigmaFinite ((μH[1] : Measure ℂ).restrict K) →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/-- **Jones--Murai counterexample.** There is a compact $K\\subseteq\\mathbb C$ of zero Favard\nlength and positive analytic capacity. Thus zero Favard length does not imply zero analytic\ncapacity. -/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry\n\n/-- **Vitushkin's conjecture, surviving open direction.** For every compact\n$K\\subseteq\\mathbb C$, zero analytic capacity implies zero Favard length:\n$\\gamma(K)=0 \\Rightarrow \\int_0^\\pi\n\\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nEquivalently, positive Favard length should imply positive analytic capacity. -/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture :\n    ∀ K : Set ℂ, IsCompact K → analyticCapacity K = 0 → favardLength K = 0 := by\n  sorry\n\nend VitushkinsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry was expanded using the linked Analytic capacity article and Chang–Tolsa: the currently open direction is gamma(K) = 0 implying zero Favard length, equivalently positive Favard length implying positive analytic capacity.",
+    "Functions on ℂ \\ K are represented as total functions ℂ → ℂ with differentiability and norm bounds imposed only on Kᶜ. Since every K quantified in the declarations is compact, changing an extension on K does not affect either cocompact limit.",
+    "The conditions f(∞) = 0 and f'(∞) = L are modeled by cocompact convergence of f to 0 and of z ↦ z * f z to L. Analytic capacity is the ENNReal supremum of ENNReal.ofReal ‖L‖ over such functions.",
+    "The projection onto the line at angle θ is identified isometrically with its scalar coordinate z.re * cos θ + z.im * sin θ, exactly as in the decomposition table.",
+    "Favard length is represented as a nonnegative Lebesgue integral over Set.Icc 0 Real.pi. Using Icc rather than a half-open interval does not change the integral because the endpoints form a Lebesgue-null set.",
+    "H¹-sigma-finiteness of K is represented by Mathlib's SigmaFinite predicate for the restricted measure (μH[1] : Measure ℂ).restrict K.",
+    "The Jones–Murai declaration states the requested compact counterexample but does not redundantly include failure of H¹-sigma-finiteness, which follows from the separately stated David–Tolsa theorem."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib real/complex linear maps and inner products; no existing angle-parameterized projection with the exact scalar codomain and formula was found.",
+     "name": "VitushkinsConjecture.orthogonalProjection",
+     "why_needed": "Provides the angle-dependent scalar orthogonal projection used in the Favard-length formula."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.Measure.hausdorffMeasure (notation μH[d]) and MeasureTheory.lintegral, which are used directly in the definition.",
+     "name": "VitushkinsConjecture.favardLength",
+     "why_needed": "Mathlib has Hausdorff measure and lower integration but no packaged Favard length."
+    },
+    {
+     "closest_existing_considered": "Mathlib's DifferentiableOn, Filter.cocompact/Tendsto, norm, and complete-lattice supremum primitives; these suffice to build the definition but no existing combined capacity notion was found.",
+     "name": "VitushkinsConjecture.analyticCapacity",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines analytic capacity."
+    }
+   ],
+   "per_slot": {
+    "vitushkins_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.original_iff": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.sigma_finite": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vitushkins_conjecture": "/-- **Vitushkin's conjecture, surviving open direction.** For every compact\n$K\\subseteq\\mathbb C$, zero analytic capacity implies zero Favard length:\n$\\gamma(K)=0 \\Rightarrow \\int_0^\\pi\n\\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nEquivalently, positive Favard length should imply positive analytic capacity. -/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture :\n    ∀ K : Set ℂ, IsCompact K → analyticCapacity K = 0 → favardLength K = 0 := by\n  sorry",
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": "/-- **Jones--Murai counterexample.** There is a compact $K\\subseteq\\mathbb C$ of zero Favard\nlength and positive analytic capacity. Thus zero Favard length does not imply zero analytic\ncapacity. -/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry",
+    "vitushkins_conjecture.variants.original_iff": "/-- **Vitushkin's original conjecture (disproved by Mattila).** It is false that every compact\n$K\\subseteq\\mathbb C$ satisfies\n$\\gamma(K)=0 \\iff \\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$. -/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry",
+    "vitushkins_conjecture.variants.sigma_finite": "/-- **David--Tolsa sigma-finite case.** If a compact $K\\subseteq\\mathbb C$ is\n$\\mathcal H^1$-sigma-finite, then\n$\\gamma(K)=0 \\iff \\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nSigma-finiteness is expressed by restricting one-dimensional Hausdorff measure to `K`. -/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite :\n    ∀ K : Set ℂ, IsCompact K → SigmaFinite ((μH[1] : Measure ℂ).restrict K) →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vitushkin's conjecture\n\nVitushkin conjectured that a compact set $K \\subset \\mathbb{C}$ has analytic capacity zero\nif and only if it has Favard length zero, that is\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThe full equivalence is false (Mattila 1986); the implication\n\"zero Favard length implies zero analytic capacity\" is false (Jones–Murai 1988); the\nremaining implication \"zero analytic capacity implies zero Favard length\" is open.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Analytic_capacity%23Vitushkin%27s_conjecture)\n- [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ma86] Mattila, P., *Smooth maps, null-sets for integralgeometric measure and analytic\n  capacity*, Ann. of Math. (2) 123 (1986), no. 2, 303–309.\n- [JM88] Jones, P. W. and Murai, T., *Positive analytic capacity but zero Buffon needle\n  probability*, Pacific J. Math. 133 (1988), no. 1, 99–114.\n- [Da98] David, G., *Unrectifiable 1-sets have vanishing analytic capacity*,\n  Rev. Mat. Iberoamericana 14 (1998), no. 2, 369–479.\n- [To03] Tolsa, X., *Painlevé's problem and the semiadditivity of analytic capacity*,\n  Acta Math. 190 (2003), no. 1, 105–149.\n- [CT20] Chang, A. and Tolsa, X., *Analytic capacity and projections*,\n  J. Eur. Math. Soc. 22 (2020), no. 12, 4121–4159.\n  [arXiv:1712.00594](https://arxiv.org/abs/1712.00594)\n-/\n\nopen Filter MeasureTheory Topology\nopen scoped ENNReal Real\n\nnamespace VitushkinsConjecture\n\n/--\n`IsAdmissible K f` says that `f` is a competitor in the definition of the analytic capacity of\n`K`: it is holomorphic on $\\mathbb{C} \\setminus K$, bounded by $1$ there, and satisfies\n$f(\\infty) := \\lim_{z \\to \\infty} f(z) = 0$.\n-/\nstructure IsAdmissible (K : Set ℂ) (f : ℂ → ℂ) : Prop where\n  differentiableOn : DifferentiableOn ℂ f Kᶜ\n  norm_le_one : ∀ z ∈ Kᶜ, ‖f z‖ ≤ 1\n  tendsto_zero : Tendsto f (cocompact ℂ) (𝓝 0)\n\n/--\nThe **analytic capacity** of a set $K \\subset \\mathbb{C}$:\n$$\\gamma(K) = \\sup\\{|f'(\\infty)| : f \\in \\mathcal{H}^\\infty(\\mathbb{C} \\setminus K),\\\n\\|f\\|_\\infty \\le 1,\\ f(\\infty) = 0\\},$$\nwhere $f'(\\infty) := \\lim_{z \\to \\infty} z (f(z) - f(\\infty)) = \\lim_{z \\to \\infty} z f(z)$.\nThe supremum is taken over the values $\\|a\\|$ for which some admissible `f` satisfies\n$z f(z) \\to a$ as $z \\to \\infty$ (for `K` compact this limit always exists).\n-/\nnoncomputable def analyticCapacity (K : Set ℂ) : ℝ :=\n  sSup {r : ℝ | ∃ (f : ℂ → ℂ) (a : ℂ), IsAdmissible K f ∧\n    Tendsto (fun z => z * f z) (cocompact ℂ) (𝓝 a) ∧ r = ‖a‖}\n\n/--\nThe orthogonal projection $\\operatorname{proj}_\\theta(x, y) = x \\cos \\theta + y \\sin \\theta$ of\nthe plane onto the line through the origin in direction $\\theta$, identified with $\\mathbb{R}$.\n-/\nnoncomputable def proj (θ : ℝ) (z : ℂ) : ℝ := z.re * Real.cos θ + z.im * Real.sin θ\n\n/--\nThe **Favard length** of a set $K \\subset \\mathbb{C}$:\n$$\\operatorname{Fav}(K) = \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta,$$\nwhere $\\mathcal{H}^1$ is the one-dimensional Hausdorff measure on $\\mathbb{R}$.\n-/\nnoncomputable def favardLength (K : Set ℂ) : ℝ≥0∞ :=\n  ∫⁻ θ in Set.Ioc 0 π, μH[1] (proj θ '' K)\n\n@[category API, AMS 30]\ntheorem analyticCapacity_nonneg (K : Set ℂ) : 0 ≤ analyticCapacity K := by\n  refine Real.sSup_nonneg fun r ⟨f, a, _, _, hr⟩ => ?_\n  rw [hr]\n  exact norm_nonneg a\n\n@[category test, AMS 28]\ntheorem favardLength_empty : favardLength ∅ = 0 := by\n  simp [favardLength]\n\n/-- The analytic capacity of a closed disc is its radius; the extremal function is $r / z$. -/\n@[category test, AMS 30]\ntheorem analyticCapacity_closedBall (r : ℝ) (hr : 0 ≤ r) :\n    analyticCapacity (Metric.closedBall 0 r) = r := by\n  sorry\n\n/--\n**Vitushkin's conjecture** (original form): for every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis equivalence is **false**: Mattila [Ma86] showed that having zero Favard length is not\ninvariant under conformal maps, whereas having zero analytic capacity is.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/--\nVitushkin's conjecture holds for $\\mathcal{H}^1$-σ-finite sets: if a compact $K \\subset \\mathbb{C}$\nis a countable union of sets of finite one-dimensional Hausdorff measure, then\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis follows from David's theorem [Da98] (the case $\\mathcal{H}^1(K) < \\infty$) together with\nTolsa's countable semiadditivity of analytic capacity [To03].\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite (K : Set ℂ) (hK : IsCompact K)\n    (hσ : ∃ s : ℕ → Set ℂ, K = ⋃ i, s i ∧ ∀ i, μH[1] (s i) < ⊤) :\n    analyticCapacity K = 0 ↔ favardLength K = 0 := by\n  sorry\n\n/--\nThe refuted direction of Vitushkin's conjecture: it is **not** true that every compact\n$K \\subset \\mathbb{C}$ with zero Favard length has zero analytic capacity. Jones and Murai [JM88]\nconstructed a compact set with\n$$\\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0 \\quad\\text{and}\\quad\n\\gamma(K) > 0.$$\nSuch a set is necessarily not $\\mathcal{H}^1$-σ-finite.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry\n\n/--\n**Vitushkin's conjecture** (the open direction): for every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\implies \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0,$$\nthat is, every compact set of positive Favard length has positive analytic capacity.\nChang and Tolsa [CT20] proved partial results towards a positive answer.\n-/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture (K : Set ℂ) (hK : IsCompact K)\n    (hγ : analyticCapacity K = 0) : favardLength K = 0 := by\n  sorry\n\nend VitushkinsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The four slots (false full equivalence, settled σ-finite case, refuted direction Fav=0 ⇒ γ=0, and open direction γ=0 ⇒ Fav=0) faithfully partition the article's account and agree with the Chang–Tolsa introduction.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list-page entry is terse; the precise formulations were taken from the 'Vitushkin's conjecture' section of the Wikipedia article on analytic capacity (and the Chang–Tolsa introduction), as instructed by the decomposition table.",
+    "Analytic capacity is a real-valued sSup. For compact K the competitor set is nonempty (f = 0) and bounded above (γ(K) ≤ diam K), so sSup is the genuine supremum; all four statements quantify only over compact K. For non-compact K the Lean value may be a junk 0, which never arises here.",
+    "'Analytic on ℂ∖K' is rendered as DifferentiableOn ℂ f Kᶜ; for compact (hence closed) K, Kᶜ is open and this is equivalent to AnalyticOnNhd. The bound ‖f z‖ ≤ 1 is imposed only on Kᶜ; values of f on K are irrelevant, as in the informal definition.",
+    "f(∞)=0 is Tendsto f (cocompact ℂ) (𝓝 0) and f'(∞) is the limit a of z·f(z) along cocompact ℂ. The definition ranges over pairs (f, a) with this limit; for bounded analytic f on the complement of a compact set with f(∞)=0 the limit always exists, so nothing is lost.",
+    "Favard length uses μH[1] on ℝ (equal to Lebesgue measure by hausdorffMeasure_real) integrated as a lower Lebesgue integral over Set.Ioc 0 π; the endpoint choice is immaterial (measure zero) and the lintegral does not require a measurability side condition (θ ↦ H¹(proj_θ K) is upper semicontinuous for compact K anyway).",
+    "H¹-σ-finiteness is spelled out as ∃ s : ℕ → Set ℂ, K = ⋃ i, s i ∧ ∀ i, μH[1] (s i) < ⊤ rather than via SigmaFinite (μH[1].restrict K); the two are equivalent for compact K, the explicit form is more readable.",
+    "Slot original_iff is stated negated (¬ ∀ K compact, γ(K)=0 ↔ Fav(K)=0) per the table notes; slot favard_zero_implies_capacity_zero is stated as the existence of a compact counterexample (Fav K = 0 ∧ 0 < γ K) per the table notes.",
+    "Added two provable sanity statements (analyticCapacity_nonneg as API, favardLength_empty as test) and one sorry'd test (γ of the closed disc of radius r ≥ 0 equals r) to validate the normalization of the capacity definition.",
+    "AMS tags 28 (measure and integration) and 30 (functions of a complex variable) were chosen for all problem statements."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "DifferentiableOn / AnalyticOnNhd and Filter.cocompact from Mathlib, which are used as the building blocks; no Mathlib or FormalConjecturesForMathlib definition of analytic capacity or of H^∞(ℂ∖K) exists (rg for 'capacity', 'removable' found nothing relevant).",
+     "name": "VitushkinsConjecture.IsAdmissible",
+     "why_needed": "Bundles the competitor class in the definition of analytic capacity: f holomorphic on ℂ \\ K (DifferentiableOn ℂ f Kᶜ), ‖f‖ ≤ 1 on Kᶜ, and f(∞) = lim_{z→∞} f(z) = 0 (Tendsto f (cocompact ℂ) (𝓝 0)). Mathlib has no notion of analytic capacity or bounded analytic functions normalized at infinity."
+    },
+    {
+     "closest_existing_considered": "No capacity notion in Mathlib (searched 'capacity' in Mathlib and repo). Considered ℝ≥0∞ iSup with limUnder; chose an explicit real sSup with an existential limit for transparency.",
+     "name": "VitushkinsConjecture.analyticCapacity",
+     "why_needed": "Analytic capacity γ(K) = sup{|f'(∞)| : f admissible}, with f'(∞) = lim_{z→∞} z f(z) (since f(∞)=0). Defined as sSup over ℝ of {‖a‖ | ∃ f admissible, z·f(z) → a}. Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's orthogonalProjection onto a submodule of EuclideanSpace ℝ (Fin 2); rejected as far more cumbersome and further from the article's explicit formula.",
+     "name": "VitushkinsConjecture.proj",
+     "why_needed": "The orthogonal projection proj_θ(x,y) = x cos θ + y sin θ from ℂ to ℝ used in the Favard length, exactly as in the article."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.Measure.hausdorffMeasure (μH[1]) and lintegral from Mathlib are used as building blocks; no Favard length / integralgeometric measure exists in Mathlib or the repo.",
+     "name": "VitushkinsConjecture.favardLength",
+     "why_needed": "Favard length Fav(K) = ∫₀^π H¹(proj_θ K) dθ, formalized as ∫⁻ θ in Set.Ioc 0 π, μH[1] (proj θ '' K) in ℝ≥0∞. Not in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "vitushkins_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "For every compact K ⊆ ℂ, analyticCapacity K = 0 → favardLength K = 0 (equivalently positive Favard length implies positive analytic capacity); category research open."
+    },
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as the existence of a compact K ⊆ ℂ with favardLength K = 0 ∧ 0 < analyticCapacity K (Jones–Murai 1988), i.e. the refutation of 'Fav(K)=0 → γ(K)=0'; category research solved."
+    },
+    "vitushkins_conjecture.variants.original_iff": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0), category research solved (Mattila 1986)."
+    },
+    "vitushkins_conjecture.variants.sigma_finite": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "For compact K with K = ⋃ i, s i and μH[1] (s i) < ⊤ for all i (H¹-σ-finite), analyticCapacity K = 0 ↔ favardLength K = 0; category research solved (David 1998 + Tolsa 2003)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vitushkins_conjecture": "/--\n**Vitushkin's conjecture** (the open direction): for every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\implies \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0,$$\nthat is, every compact set of positive Favard length has positive analytic capacity.\nChang and Tolsa [CT20] proved partial results towards a positive answer.\n-/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture (K : Set ℂ) (hK : IsCompact K)\n    (hγ : analyticCapacity K = 0) : favardLength K = 0 := by\n  sorry",
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": "/--\nThe refuted direction of Vitushkin's conjecture: it is **not** true that every compact\n$K \\subset \\mathbb{C}$ with zero Favard length has zero analytic capacity. Jones and Murai [JM88]\nconstructed a compact set with\n$$\\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0 \\quad\\text{and}\\quad\n\\gamma(K) > 0.$$\nSuch a set is necessarily not $\\mathcal{H}^1$-σ-finite.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry",
+    "vitushkins_conjecture.variants.original_iff": "/--\n**Vitushkin's conjecture** (original form): for every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis equivalence is **false**: Mattila [Ma86] showed that having zero Favard length is not\ninvariant under conformal maps, whereas having zero analytic capacity is.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry",
+    "vitushkins_conjecture.variants.sigma_finite": "/--\nVitushkin's conjecture holds for $\\mathcal{H}^1$-σ-finite sets: if a compact $K \\subset \\mathbb{C}$\nis a countable union of sets of finite one-dimensional Hausdorff measure, then\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis follows from David's theorem [Da98] (the case $\\mathcal{H}^1(K) < \\infty$) together with\nTolsa's countable semiadditivity of analytic capacity [To03].\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite (K : Set ℂ) (hK : IsCompact K)\n    (hσ : ∃ s : ℕ → Set ℂ, K = ⋃ i, s i ∧ ∀ i, μH[1] (s i) < ⊤) :\n    analyticCapacity K = 0 ↔ favardLength K = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vitushkin's conjecture\n\nVitushkin conjectured that a compact set $K \\subset \\mathbb{C}$ has analytic capacity\n$\\gamma(K) = 0$ if and only if it has Favard length\n$\\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0$.\nThe biconditional is false (Mattila 1986); the direction\n\"zero Favard length implies zero analytic capacity\" fails (Jones–Murai 1988), while the\nconverse direction \"zero analytic capacity implies zero Favard length\" is open.\nThe conjecture holds for $\\mathcal{H}^1$-$\\sigma$-finite compact sets (David 1998, Tolsa 2002).\n\n*References:*\n- [Wikipedia, Analytic capacity](https://en.wikipedia.org/wiki/Analytic_capacity%23Vitushkin%27s_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [arXiv:1712.00594](https://arxiv.org/abs/1712.00594) Chang, A., Tolsa, X.,\n  *Analytic capacity and projections*.\n- [Ma86] Mattila, P., *Smooth maps, null-sets for integralgeometric measure and analytic capacity*.\n  Ann. of Math. 123 (1986), 303–309.\n- [JM88] Jones, P. W., Murai, T., *Positive analytic capacity but zero Buffon needle probability*.\n  Pacific J. Math. 133 (1988), 89–114.\n- [Da98] David, G., *Unrectifiable 1-sets have vanishing analytic capacity*.\n  Rev. Mat. Iberoamericana 14 (1998), 369–479.\n- [To03] Tolsa, X., *Painlevé's problem and the semiadditivity of analytic capacity*.\n  Acta Math. 190 (2003), 105–149.\n-/\n\nopen Filter MeasureTheory Topology\nopen scoped ENNReal\n\nnamespace VitushkinsConjecture\n\n/--\nA function $f : \\mathbb{C} \\to \\mathbb{C}$ is *admissible* for the set $K$ with derivative at\ninfinity $a$ if $f$ is holomorphic on $\\mathbb{C} \\setminus K$, satisfies $|f| \\le 1$ on\n$\\mathbb{C} \\setminus K$, has $f(\\infty) := \\lim_{z \\to \\infty} f(z) = 0$ and\n$f'(\\infty) := \\lim_{z \\to \\infty} z\\,(f(z) - f(\\infty)) = \\lim_{z \\to \\infty} z\\,f(z) = a$.\nThe values of $f$ on $K$ play no role.\n-/\nstructure IsAdmissible (K : Set ℂ) (f : ℂ → ℂ) (a : ℂ) : Prop where\n  differentiableOn : DifferentiableOn ℂ f Kᶜ\n  norm_le_one : ∀ z ∈ Kᶜ, ‖f z‖ ≤ 1\n  tendsto_zero : Tendsto f (cocompact ℂ) (𝓝 0)\n  tendsto_derivAtInfty : Tendsto (fun z ↦ z * f z) (cocompact ℂ) (𝓝 a)\n\n/--\nThe **analytic capacity** of a set $K \\subset \\mathbb{C}$ (intended for compact $K$):\n$$\\gamma(K) = \\sup\\{|f'(\\infty)| : f \\in \\mathcal{H}^\\infty(\\mathbb{C} \\setminus K),\\\n\\|f\\|_\\infty \\le 1,\\ f(\\infty) = 0\\},$$\nwhere $f'(\\infty) = \\lim_{z \\to \\infty} z\\,(f(z) - f(\\infty))$.\nThe value is taken in `ℝ≥0∞`; for compact `K` it is finite.\n-/\nnoncomputable def analyticCapacity (K : Set ℂ) : ℝ≥0∞ :=\n  sSup {r | ∃ (f : ℂ → ℂ) (a : ℂ), IsAdmissible K f a ∧ r = ‖a‖ₑ}\n\n/-- The orthogonal projection $\\operatorname{proj}_\\theta(x, y) = x\\cos\\theta + y\\sin\\theta$ of\nthe plane onto the line in direction $\\theta$. -/\nnoncomputable def proj (θ : ℝ) (z : ℂ) : ℝ := z.re * Real.cos θ + z.im * Real.sin θ\n\n/--\nThe **Favard length** of a set $K \\subset \\mathbb{C}$:\n$$\\operatorname{Fav}(K) = \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta,$$\nwhere $\\mathcal{H}^1$ is the one-dimensional Hausdorff measure.\n-/\nnoncomputable def favardLength (K : Set ℂ) : ℝ≥0∞ :=\n  ∫⁻ θ in Set.Ioc 0 Real.pi, μH[1] (proj θ '' K)\n\n/-- A set $K \\subset \\mathbb{C}$ is $\\mathcal{H}^1$-$\\sigma$-finite if it is a countable union\nof sets of finite one-dimensional Hausdorff measure. -/\ndef IsH1SigmaFinite (K : Set ℂ) : Prop :=\n  ∃ s : ℕ → Set ℂ, K = ⋃ n, s n ∧ ∀ n, μH[1] (s n) < ⊤\n\n/-- The zero function is admissible for every set, with $f'(\\infty) = 0$. -/\n@[category test, AMS 30]\ntheorem isAdmissible_zero (K : Set ℂ) : IsAdmissible K 0 0 where\n  differentiableOn := differentiableOn_const 0\n  norm_le_one _ _ := by simp\n  tendsto_zero := tendsto_const_nhds\n  tendsto_derivAtInfty := by simp\n\n/-- The empty set has analytic capacity zero, by Liouville's theorem. -/\n@[category test, AMS 30]\ntheorem analyticCapacity_empty : analyticCapacity ∅ = 0 := by\n  refine le_antisymm (sSup_le ?_) (zero_le _)\n  rintro r ⟨f, a, hf, rfl⟩\n  have hdiff : Differentiable ℂ f := by\n    simpa [differentiableOn_univ] using hf.differentiableOn\n  obtain ⟨c, hc⟩ := hdiff.exists_eq_const_of_bounded\n    (Metric.isBounded_iff_subset_closedBall 0 |>.2 ⟨1, by\n      rintro _ ⟨z, rfl⟩\n      simpa using hf.norm_le_one z (by simp)⟩)\n  have hc0 : c = 0 := by\n    have := hf.tendsto_zero\n    rw [hc] at this\n    exact tendsto_const_nhds_iff.1 this\n  have ha : a = 0 := by\n    have := hf.tendsto_derivAtInfty\n    simp only [hc, hc0, Function.const_apply, mul_zero] at this\n    exact (tendsto_const_nhds_iff.1 this).symm\n  simp [ha]\n\n/-- The empty set has Favard length zero. -/\n@[category test, AMS 28]\ntheorem favardLength_empty : favardLength ∅ = 0 := by\n  simp [favardLength]\n\n/--\n**Vitushkin's conjecture** (the open direction). For every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\implies \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0,$$\ni.e. a compact set of zero analytic capacity has zero Favard length. Equivalently, positive\nFavard length implies positive analytic capacity. This is the direction of Vitushkin's original\nbiconditional that remains open; the other direction is false (Jones–Murai).\n-/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture (K : Set ℂ) (hK : IsCompact K) (h : analyticCapacity K = 0) :\n    favardLength K = 0 := by\n  sorry\n\n/--\n**Vitushkin's original conjecture**: for every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis is false: Mattila [Ma86] showed that the property of having zero Favard length is not\nconformally invariant, whereas having zero analytic capacity is.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/--\nVitushkin's conjecture holds for $\\mathcal{H}^1$-$\\sigma$-finite compact sets: if the compact set\n$K \\subset \\mathbb{C}$ is a countable union of sets of finite $\\mathcal{H}^1$-measure, then\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis follows from David's theorem [Da98] (the case $\\mathcal{H}^1(K) < \\infty$) together with\nTolsa's countable semiadditivity of analytic capacity [To03].\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite (K : Set ℂ) (hK : IsCompact K)\n    (hσ : IsH1SigmaFinite K) :\n    analyticCapacity K = 0 ↔ favardLength K = 0 := by\n  sorry\n\n/--\nThe refuted direction of Vitushkin's conjecture. Jones and Murai [JM88] constructed a compact set\n$K \\subset \\mathbb{C}$ with zero Favard length,\n$\\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0$, but positive analytic\ncapacity $\\gamma(K) > 0$. Hence it is not the case that every compact set of zero Favard length\nhas zero analytic capacity.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry\n\nend VitushkinsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.88,
+   "decomposition_objections": "None. The table's four slots (negated original biconditional, σ-finite special case, refuted direction as an existence statement, open direction) match the article and Chang–Tolsa. One nit: the slot name 'favard_zero_implies_capacity_zero' names the refuted implication while its notes ask for the existence of a counterexample; I followed the notes.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list-page entry is terse; the precise formulation (γ(K)=0 ⟺ Fav(K)=0, definitions of γ, proj_θ, Fav) is taken from the Wikipedia article 'Analytic capacity' § Vitushkin's conjecture and Chang–Tolsa arXiv:1712.00594.",
+    "Analytic capacity is valued in ℝ≥0∞ (sSup of ‖a‖ₑ). Mathematically γ(K) is a finite real for compact K, so this agrees with the real-valued sup; ℝ≥0∞ avoids the junk value sSup = 0 for unbounded sets that a real-valued sSup would have if finiteness were in doubt. Only γ(K) = 0 vs γ(K) > 0 matters for all four slots.",
+    "Competitors f are total functions ℂ → ℂ with conditions imposed only on Kᶜ (values on K are irrelevant); 'f ∈ H^∞(ℂ∖K), ‖f‖∞ ≤ 1' is encoded as DifferentiableOn ℂ f Kᶜ ∧ ∀ z ∈ Kᶜ, ‖f z‖ ≤ 1.",
+    "f(∞) = 0 and f'(∞) = a are encoded as Tendsto along Filter.cocompact ℂ of f and of z ↦ z * f z respectively (the latter uses f(∞) = 0 to simplify z (f z − f(∞)) to z f z). For compact K every bounded holomorphic f on Kᶜ has these limits (removable singularity at ∞), so requiring them excludes no competitor; a is unique by uniqueness of limits.",
+    "Favard length uses the lower Lebesgue integral (lintegral) over Set.Ioc 0 π against Lebesgue measure. For compact K the integrand θ ↦ H¹(proj_θ K) is measurable, so this equals the Lebesgue integral; in particular Fav(K)=0 ⟺ H¹(proj_θ K)=0 for a.e. θ. Choice of Ioc vs Icc is measure-zero irrelevant. Mathlib's μH[1] on ℝ equals Lebesgue measure (hausdorffMeasure_real).",
+    "The refuted direction is stated positively as the existence of a compact counterexample (∃ K, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K), following the table notes, rather than as ¬ ∀; the two are equivalent. The consequence that such K is not H¹-σ-finite is not included as a conjunct.",
+    "H¹-σ-finiteness is stated as K = ⋃ n, s n with μH[1] (s n) < ⊤ for arbitrary (not necessarily measurable) sets s n; this is equivalent to SigmaFinite (μH[1].restrict K).",
+    "Definitions take K : Set ℂ with compactness imposed in the theorem hypotheses, not in the definitions. Test lemmas (isAdmissible_zero, analyticCapacity_empty via Liouville, favardLength_empty) check the definitions on the smallest input."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "DifferentiableOn ℂ / Bornology.IsBounded / Filter.Tendsto with Filter.cocompact (all used inside); no Mathlib notion of f(∞), f'(∞) or H^∞(U) exists.",
+     "name": "VitushkinsConjecture.IsAdmissible",
+     "why_needed": "Predicate packaging the competitors in the definition of analytic capacity: f holomorphic on ℂ∖K, |f| ≤ 1 on ℂ∖K, f(∞) = lim_{z→∞} f(z) = 0 and f'(∞) = lim_{z→∞} z·f(z) = a (limits along Filter.cocompact ℂ). Analytic capacity is not in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and the repo for 'analyticCapacity', 'analytic capacity', 'Ahlfors'; nothing found. Considered ℝ-valued sSup but chose ℝ≥0∞ to avoid relying on the (true but unformalized) finiteness of γ(K).",
+     "name": "VitushkinsConjecture.analyticCapacity",
+     "why_needed": "γ(K) = sup{|f'(∞)| : f admissible for K}, defined as an sSup in ℝ≥0∞ over the set {‖a‖ₑ | ∃ f, IsAdmissible K f a}. Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "EuclideanGeometry.orthogonalProjection / Submodule.orthogonalProjection (would land in a subspace of ℂ rather than ℝ, and complicate the H¹ computation); Complex.re of z * exp(-iθ) is equal but less literal.",
+     "name": "VitushkinsConjecture.proj",
+     "why_needed": "The orthogonal projection proj_θ(x,y) = x cos θ + y sin θ : ℂ → ℝ, exactly as in the Wikipedia article."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.Measure.hausdorffMeasure (μH[1]) and lintegral are used as building blocks; no Favard length / integralgeometric measure exists.",
+     "name": "VitushkinsConjecture.favardLength",
+     "why_needed": "Fav(K) = ∫₀^π H¹(proj_θ K) dθ, defined as the lintegral over Set.Ioc 0 π of μH[1] (proj θ '' K). Not in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.SigmaFinite (μH[1].restrict K) is equivalent for compact K, but the explicit countable-union form is more transparent and matches the article's phrasing.",
+     "name": "VitushkinsConjecture.IsH1SigmaFinite",
+     "why_needed": "K is a countable union of sets of finite H¹-measure, the hypothesis of the sigma_finite slot."
+    }
+   ],
+   "per_slot": {
+    "vitushkins_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Open direction: ∀ compact K ⊂ ℂ, analyticCapacity K = 0 → favardLength K = 0 (contrapositive of Chang–Tolsa's 'positive Favard length implies positive analytic capacity'); research open."
+    },
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated per the table notes as the existence of a compact K with favardLength K = 0 ∧ 0 < analyticCapacity K (Jones–Murai 1988); research solved. The remark that such K is not H¹-σ-finite is a consequence of the sigma_finite slot and is not added as a conjunct."
+    },
+    "vitushkins_conjecture.variants.original_iff": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0), tagged research solved (Mattila 1986), using the bespoke analyticCapacity and favardLength definitions."
+    },
+    "vitushkins_conjecture.variants.sigma_finite": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "For compact K with IsH1SigmaFinite K (K = ⋃ n, s n with μH[1] (s n) < ⊤), analyticCapacity K = 0 ↔ favardLength K = 0; research solved (David 1998 + Tolsa 2002)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vitushkins_conjecture": "/--\n**Vitushkin's conjecture** (the open direction). For every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\implies \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0,$$\ni.e. a compact set of zero analytic capacity has zero Favard length. Equivalently, positive\nFavard length implies positive analytic capacity. This is the direction of Vitushkin's original\nbiconditional that remains open; the other direction is false (Jones–Murai).\n-/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture (K : Set ℂ) (hK : IsCompact K) (h : analyticCapacity K = 0) :\n    favardLength K = 0 := by\n  sorry",
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": "/--\nThe refuted direction of Vitushkin's conjecture. Jones and Murai [JM88] constructed a compact set\n$K \\subset \\mathbb{C}$ with zero Favard length,\n$\\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0$, but positive analytic\ncapacity $\\gamma(K) > 0$. Hence it is not the case that every compact set of zero Favard length\nhas zero analytic capacity.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry",
+    "vitushkins_conjecture.variants.original_iff": "/--\n**Vitushkin's original conjecture**: for every compact $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis is false: Mattila [Ma86] showed that the property of having zero Favard length is not\nconformally invariant, whereas having zero analytic capacity is.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry",
+    "vitushkins_conjecture.variants.sigma_finite": "/--\nVitushkin's conjecture holds for $\\mathcal{H}^1$-$\\sigma$-finite compact sets: if the compact set\n$K \\subset \\mathbb{C}$ is a countable union of sets of finite $\\mathcal{H}^1$-measure, then\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis follows from David's theorem [Da98] (the case $\\mathcal{H}^1(K) < \\infty$) together with\nTolsa's countable semiadditivity of analytic capacity [To03].\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite (K : Set ℂ) (hK : IsCompact K)\n    (hσ : IsH1SigmaFinite K) :\n    analyticCapacity K = 0 ↔ favardLength K = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vitushkin's conjecture\n\n*References:*\n- [Wikipedia, Analytic capacity: Vitushkin's conjecture](https://en.wikipedia.org/wiki/Analytic_capacity%23Vitushkin%27s_conjecture)\n- [Chang and Tolsa, *Analytic capacity and projections*](https://arxiv.org/abs/1712.00594)\n-/\n\nnamespace VitushkinsConjecture\n\nopen Complex Filter MeasureTheory Set Topology\nopen scoped ENNReal\n\n/-- The orthogonal projection of the complex plane in direction `θ`, expressed as a real\ncoordinate on the line in that direction. -/\nnoncomputable def projection (θ : ℝ) (z : ℂ) : ℝ :=\n  z.re * Real.cos θ + z.im * Real.sin θ\n\n/-- The Favard length of a subset of the complex plane. -/\nnoncomputable def favardLength (K : Set ℂ) : ℝ≥0∞ :=\n  ∫⁻ θ in Ioc 0 Real.pi, μH[1] (projection θ '' K)\n\n/-- A function admissible in the definition of analytic capacity, together with the value of\nits derivative at infinity. The two limits say respectively that `f(∞) = 0` and\n`f'(∞) = a`. -/\ndef IsAdmissibleForAnalyticCapacity (K : Set ℂ) (f : ℂ → ℂ) (a : ℂ) : Prop :=\n  AnalyticOn ℂ f Kᶜ ∧\n    (∀ z ∈ Kᶜ, ‖f z‖ ≤ 1) ∧\n    Tendsto f (cocompact ℂ) (𝓝 0) ∧\n    Tendsto (fun z => z * f z) (cocompact ℂ) (𝓝 a)\n\n/-- The analytic capacity of `K`: the supremum of `|f'(∞)|` over bounded analytic functions\non `ℂ ∖ K` with bound one and value zero at infinity. -/\nnoncomputable def analyticCapacity (K : Set ℂ) : ℝ :=\n  sSup {r : ℝ | ∃ (f : ℂ → ℂ) (a : ℂ), IsAdmissibleForAnalyticCapacity K f a ∧ r = ‖a‖}\n\nnamespace vitushkins_conjecture.variants\n\n/-- Vitushkin's original conjecture asserted that for every compact $K \\subset \\mathbb C$,\n$\\gamma(K)=0$ if and only if\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nMattila disproved this universal biconditional in 1986. -/\n@[category research solved, AMS 30 42]\ntheorem original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/-- David's and Tolsa's theorems imply that for every compact $K \\subset \\mathbb C$ that is\na countable union of sets of finite $\\mathcal H^1$-measure,\n$\\gamma(K)=0$ if and only if its Favard length is zero. -/\n@[category research solved, AMS 30 42]\ntheorem sigma_finite :\n    ∀ K : Set ℂ, IsCompact K →\n      (∃ S : ℕ → Set ℂ, (K = ⋃ n, S n) ∧ ∀ n, μH[1] (S n) < ∞) →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/-- Jones and Murai constructed a compact set $K \\subset \\mathbb C$ with zero Favard length\nbut positive analytic capacity, disproving the implication from zero Favard length to zero\nanalytic capacity. -/\n@[category research solved, AMS 30 42]\ntheorem favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry\n\nend vitushkins_conjecture.variants\n\n/-- The open direction of Vitushkin's conjecture: for every compact $K \\subset \\mathbb C$,\nzero analytic capacity implies zero Favard length, i.e.\n$\\gamma(K)=0 \\Rightarrow \\int_0^\\pi\n\\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$. -/\n@[category research open, AMS 30 42]\ntheorem vitushkins_conjecture :\n    ∀ K : Set ℂ, IsCompact K → analyticCapacity K = 0 → favardLength K = 0 := by\n  sorry\n\nend VitushkinsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry was expanded using the linked Analytic capacity article and Chang–Tolsa: the primary open statement is the direction γ(K) = 0 → Fav(K) = 0, equivalently positive Favard length implies positive analytic capacity.",
+    "Analytic functions on ℂ ∖ K are represented by total functions ℂ → ℂ satisfying `AnalyticOn ℂ f Kᶜ`. For compact K, arbitrary values on K do not affect analyticity on the open complement or either cocompact limit.",
+    "The value f(∞) = 0 is represented by convergence along `Filter.cocompact ℂ`; under that condition f'(∞) = a is represented by convergence of z ↦ z * f z to a along the same filter.",
+    "Analytic capacity is real-valued and defined as the real supremum of ‖a‖ over admissible pairs (f, a), matching the source definition.",
+    "Favard length is represented as an `ℝ≥0∞` lintegral over `Set.Ioc 0 Real.pi`. This permits infinite values and differs from [0, π] only on measure-zero endpoints. The projection uses the source's scalar coordinate x cos θ + y sin θ, and Mathlib's one-dimensional Hausdorff measure on ℝ has the standard normalization.",
+    "H¹-sigma-finiteness of K is expanded literally as an equality between K and a countable union of sets, each having finite one-dimensional Hausdorff measure.",
+    "The disproved original biconditional is stated as the negation of its universal closure, while the specifically refuted Favard-zero-to-capacity-zero direction is stated by a compact counterexample with zero Favard length and strictly positive analytic capacity."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib orthogonal projections onto submodules; these return a point on a line rather than the source's scalar coordinate and require substantially more setup.",
+     "name": "VitushkinsConjecture.projection",
+     "why_needed": "The conjecture uses the scalar orthogonal projection in a direction, and no existing repository definition matched the required complex-plane coordinate formula."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `MeasureTheory.Measure.hausdorffMeasure` and `lintegral`, which are used directly to construct it.",
+     "name": "VitushkinsConjecture.favardLength",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines Favard length."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `AnalyticOn`, `Filter.Tendsto`, and `Filter.cocompact`, which supply the constituent notions.",
+     "name": "VitushkinsConjecture.IsAdmissibleForAnalyticCapacity",
+     "why_needed": "No primitive packages the bounded analyticity and the two limits at infinity required in the analytic-capacity supremum."
+    },
+    {
+     "closest_existing_considered": "No existing capacity definition matched; the definition is built from `sSup`, `AnalyticOn`, norm bounds, and cocompact limits exactly as in the cited source.",
+     "name": "VitushkinsConjecture.analyticCapacity",
+     "why_needed": "Analytic capacity is absent from Mathlib and FormalConjecturesForMathlib and is explicitly required by every slot."
+    }
+   ],
+   "per_slot": {
+    "vitushkins_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.original_iff": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.sigma_finite": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vitushkins_conjecture": "/-- The open direction of Vitushkin's conjecture: for every compact $K \\subset \\mathbb C$,\nzero analytic capacity implies zero Favard length, i.e.\n$\\gamma(K)=0 \\Rightarrow \\int_0^\\pi\n\\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$. -/\n@[category research open, AMS 30 42]\ntheorem vitushkins_conjecture :\n    ∀ K : Set ℂ, IsCompact K → analyticCapacity K = 0 → favardLength K = 0 := by\n  sorry",
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": "/-- Jones and Murai constructed a compact set $K \\subset \\mathbb C$ with zero Favard length\nbut positive analytic capacity, disproving the implication from zero Favard length to zero\nanalytic capacity. -/\n@[category research solved, AMS 30 42]\ntheorem favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry",
+    "vitushkins_conjecture.variants.original_iff": "/-- Vitushkin's original conjecture asserted that for every compact $K \\subset \\mathbb C$,\n$\\gamma(K)=0$ if and only if\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nMattila disproved this universal biconditional in 1986. -/\n@[category research solved, AMS 30 42]\ntheorem original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry",
+    "vitushkins_conjecture.variants.sigma_finite": "/-- David's and Tolsa's theorems imply that for every compact $K \\subset \\mathbb C$ that is\na countable union of sets of finite $\\mathcal H^1$-measure,\n$\\gamma(K)=0$ if and only if its Favard length is zero. -/\n@[category research solved, AMS 30 42]\ntheorem sigma_finite :\n    ∀ K : Set ℂ, IsCompact K →\n      (∃ S : ℕ → Set ℂ, (K = ⋃ n, S n) ∧ ∀ n, μH[1] (S n) < ∞) →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vitushkin's conjecture\n\nVitushkin conjectured that a compact set $K \\subset \\mathbb{C}$ has analytic capacity zero\nif and only if it has Favard length zero, i.e.\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThe conjecture is false in general (Mattila, 1986): Jones and Murai constructed a compact set\nwith zero Favard length and positive analytic capacity. Whether the other implication\n($\\gamma(K) = 0 \\implies$ Favard length zero) holds is open. The conjecture is true for\n$\\mathcal{H}^1$-$\\sigma$-finite sets by the work of David and Tolsa.\n\n*References:*\n- [Wikipedia, Analytic capacity](https://en.wikipedia.org/wiki/Analytic_capacity%23Vitushkin%27s_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ma86] Mattila, P., _Smooth Maps, Null-Sets for Integralgeometric Measure and Analytic\n  Capacity_. Ann. of Math. 123 (1986), 303–309.\n- [JM88] Jones, P. W. and Murai, T., _Positive analytic capacity but zero Buffon needle\n  probability_. Pacific J. Math. 133 (1988), 99–114.\n- [Da98] David, G., _Unrectifiable 1-sets have vanishing analytic capacity_. Rev. Mat.\n  Iberoamericana 14 (1998), 369–479.\n- [To03] Tolsa, X., _Painlevé's problem and the semiadditivity of analytic capacity_. Acta Math.\n  190 (2003), 105–149.\n- [CT20] Chang, A. and Tolsa, X., _Analytic capacity and projections_. J. Eur. Math. Soc. 22\n  (2020), 4121–4159. [arXiv:1712.00594](https://arxiv.org/abs/1712.00594)\n-/\n\nopen Filter MeasureTheory Set Topology\nopen scoped ENNReal\n\nnamespace VitushkinsConjecture\n\n/--\nA function `f : ℂ → ℂ` is *admissible* for the set `K ⊂ ℂ` if it is analytic on `ℂ ∖ K`,\nbounded by `1` there, and satisfies `f(∞) = 0`, i.e. `f(z) → 0` as `z → ∞`.\nThe values of `f` on `K` play no role. These are the functions over which the supremum\ndefining the analytic capacity of `K` is taken.\n-/\nstructure IsAdmissible (K : Set ℂ) (f : ℂ → ℂ) : Prop where\n  differentiableOn : DifferentiableOn ℂ f Kᶜ\n  norm_le_one : ∀ z ∈ Kᶜ, ‖f z‖ ≤ 1\n  tendsto_zero : Tendsto f (cocompact ℂ) (𝓝 0)\n\n/--\nThe *analytic capacity* of a compact set `K ⊂ ℂ`:\n$$\\gamma(K) = \\sup\\{|f'(\\infty)| : f \\in \\mathcal{H}^\\infty(\\mathbb{C} \\setminus K),\\\n\\|f\\|_\\infty \\le 1,\\ f(\\infty) = 0\\},$$\nwhere $f'(\\infty) = \\lim_{z \\to \\infty} z\\,(f(z) - f(\\infty)) = \\lim_{z \\to \\infty} z\\,f(z)$.\nFor every admissible `f` this limit exists (since `f` extends analytically to a neighbourhood of\n`∞` and vanishes there), so requiring its existence in the definition below imposes no\nadditional restriction. The value is taken in `ℝ≥0∞`; for compact `K` it is finite.\nThis definition is only used for compact `K`.\n-/\nnoncomputable def analyticCapacity (K : Set ℂ) : ℝ≥0∞ :=\n  sSup {r | ∃ (f : ℂ → ℂ) (a : ℂ), IsAdmissible K f ∧\n    Tendsto (fun z => z * f z) (cocompact ℂ) (𝓝 a) ∧ r = ‖a‖₊}\n\n/--\nThe orthogonal projection of the plane `ℂ ≃ ℝ²` onto the line in direction `θ`, identified with\n`ℝ`: $\\operatorname{proj}_\\theta(x, y) = x \\cos \\theta + y \\sin \\theta$.\n-/\nnoncomputable def proj (θ : ℝ) (z : ℂ) : ℝ :=\n  z.re * Real.cos θ + z.im * Real.sin θ\n\n/--\nThe *Favard length* of a set `K ⊂ ℂ`:\n$$\\operatorname{Fav}(K) = \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta,$$\nwhere $\\mathcal{H}^1$ is the one-dimensional Hausdorff measure (on `ℝ`, this is Lebesgue\nmeasure).\n-/\nnoncomputable def favardLength (K : Set ℂ) : ℝ≥0∞ :=\n  ∫⁻ θ in Icc 0 Real.pi, μH[1] (proj θ '' K)\n\n@[category API, AMS 28 30]\ntheorem analyticCapacity_mono {K L : Set ℂ} (h : K ⊆ L) :\n    analyticCapacity K ≤ analyticCapacity L := by\n  refine sSup_le_sSup ?_\n  rintro r ⟨f, a, ⟨hf, hb, h0⟩, ha, rfl⟩\n  exact ⟨f, a, ⟨hf.mono (compl_subset_compl.mpr h), fun z hz => hb z (compl_subset_compl.mpr h hz),\n    h0⟩, ha, rfl⟩\n\n@[category API, AMS 28 30]\ntheorem favardLength_mono {K L : Set ℂ} (h : K ⊆ L) :\n    favardLength K ≤ favardLength L :=\n  lintegral_mono fun _ => measure_mono (image_mono h)\n\n@[category test, AMS 28 30]\ntheorem favardLength_empty : favardLength ∅ = 0 := by\n  simp [favardLength]\n\n/-- The empty set has analytic capacity zero (a consequence of Liouville's theorem). -/\n@[category test, AMS 28 30]\ntheorem analyticCapacity_empty : analyticCapacity ∅ = 0 := by\n  refine le_antisymm (sSup_le ?_) bot_le\n  rintro r ⟨f, a, ⟨hf, hb, h0⟩, ha, rfl⟩\n  rw [compl_empty, differentiableOn_univ] at hf\n  have hbd : Bornology.IsBounded (range f) := by\n    refine (Metric.isBounded_iff_subset_closedBall 0).mpr ⟨1, ?_⟩\n    rintro _ ⟨z, rfl⟩\n    simpa using hb z (by simp)\n  obtain ⟨c, hc⟩ := hf.exists_const_forall_eq_of_bounded hbd\n  have hfc : f = fun _ => c := funext hc\n  subst hfc\n  have hc0 : c = 0 := tendsto_nhds_unique tendsto_const_nhds h0\n  have ha0 : a = 0 := tendsto_nhds_unique ha (by simp [hc0])\n  simp [ha0]\n\n/--\n**Vitushkin's conjecture** (original form). Vitushkin conjectured that for every compact set\n$K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis is false: Mattila [Ma86] proved that the conjecture fails in general.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/--\nVitushkin's conjecture holds for $\\mathcal{H}^1$-$\\sigma$-finite sets: if the compact set\n$K \\subset \\mathbb{C}$ is a countable union of sets of finite one-dimensional Hausdorff measure,\nthen\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis follows from David's theorem [Da98] (the case $\\mathcal{H}^1(K) < \\infty$) together with\nTolsa's theorem [To03] that analytic capacity is countably semiadditive.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite (K : Set ℂ) (hK : IsCompact K)\n    (hσ : ∃ s : ℕ → Set ℂ, K = ⋃ i, s i ∧ ∀ i, μH[1] (s i) < ∞) :\n    analyticCapacity K = 0 ↔ favardLength K = 0 := by\n  sorry\n\n/--\nThe refuted direction of Vitushkin's conjecture. Jones and Murai [JM88] constructed a compact set\n$K \\subset \\mathbb{C}$ with zero Favard length,\n$$\\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0,$$\nbut positive analytic capacity $\\gamma(K) > 0$. Hence zero Favard length does not imply zero\nanalytic capacity.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry\n\n/--\n**Vitushkin's conjecture** (the open direction). For every compact set $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\implies \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nEquivalently, every compact set of positive Favard length has positive analytic capacity.\nAs of 2023 this is open; partial progress was made by Chang and Tolsa [CT20].\n-/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture (K : Set ℂ) (hK : IsCompact K)\n    (h : analyticCapacity K = 0) : favardLength K = 0 := by\n  sorry\n\nend VitushkinsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. One naming note: the slot `favard_zero_implies_capacity_zero` is named after the (false) implication but, per its own notes, is stated as the existence of the Jones–Murai counterexample; the docstring makes this explicit.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list-page entry is terse; all four slots are derived from the 'Vitushkin's conjecture' section of the Wikipedia 'Analytic capacity' article (and the Chang–Tolsa introduction), following the fixed decomposition table.",
+    "Analytic capacity is defined for arbitrary K : Set ℂ by the compact-set formula and takes values in ℝ≥0∞ (sSup, so no junk value from unbounded sets; for compact K it is in fact finite, ≤ the radius of any disc containing K). All four slots quantify only over compact K, so the fact that Wikipedia defines γ of non-compact sets differently (sup over compact subsets) does not matter. A Liouville-based test `analyticCapacity ∅ = 0` and monotonicity API are included and proved.",
+    "Functions in H^∞(ℂ∖K) are modelled as total functions f : ℂ → ℂ with `DifferentiableOn ℂ f Kᶜ` (equivalent to holomorphy on the open set ℂ∖K for compact K); values on K are irrelevant. ‖f‖∞ ≤ 1 is modelled pointwise on Kᶜ. f(∞)=0 is `Tendsto f (cocompact ℂ) (𝓝 0)`, and f'(∞) is the limit a of z·f(z) along `cocompact ℂ`; the existence of this limit is included as a condition in the sup set (it always holds for admissible f, so this is not a restriction; it avoids using `limUnder` junk values).",
+    "Favard length uses the lower Lebesgue integral `∫⁻` over Icc 0 π of μH[1] on ℝ applied to the projected set. For compact K the integrand θ ↦ H¹(proj_θ K) is Borel measurable (upper semicontinuous), so this is the genuine integral; μH[1] on ℝ equals Lebesgue measure, matching the article's H¹.",
+    "H¹-σ-finiteness is spelled out explicitly as K = ⋃ i, s i with μH[1] (s i) < ∞ for all i : ℕ, rather than via `MeasureTheory.SigmaFinite (μH[1].restrict K)`; the two are equivalent for measurable (e.g. compact) K.",
+    "The refuted-direction slot is stated as existence of a counterexample (∃ compact K with Fav K = 0 ∧ 0 < γ K), as the table notes request, rather than as ¬ ∀; the original-iff slot is stated as ¬ ∀ K compact, (γ K = 0 ↔ Fav K = 0). The open slot is the implication γ K = 0 → Fav K = 0, which is the contrapositive of Chang–Tolsa's 'positive Favard length ⇒ positive analytic capacity'.",
+    "AMS tags 28 (measure and integration) and 30 (functions of a complex variable) are used for every declaration."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib bounded-analytic-function notions (e.g. `Differentiable` + `Bornology.IsBounded (range f)` used in Liouville); no notion of H^∞(ℂ∖K) with normalization at ∞ exists.",
+     "name": "VitushkinsConjecture.IsAdmissible",
+     "why_needed": "Predicate for the functions f : ℂ → ℂ over which the analytic-capacity supremum is taken: DifferentiableOn ℂ f Kᶜ (holomorphic on ℂ∖K, an open set for compact K), ‖f z‖ ≤ 1 on Kᶜ, and Tendsto f (cocompact ℂ) (𝓝 0) (f(∞) = 0). Nothing of this shape exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjecturesForMathlib for 'analytic capacity', 'analyticCapacity', 'capacity' — nothing relevant (no potential-theoretic or analytic capacities exist).",
+     "name": "VitushkinsConjecture.analyticCapacity",
+     "why_needed": "Analytic capacity γ(K) = sup{|f'(∞)| : f admissible} is not in Mathlib or the repo. Defined as sSup (in ℝ≥0∞) of ‖a‖₊ over admissible f and a with z·f(z) → a along cocompact ℂ (this is f'(∞) = lim z(f(z) − f(∞)) with f(∞)=0). The limit always exists for admissible f on the complement of a compact set (removable singularity at ∞), so requiring its existence adds no restriction."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `orthogonalProjection` onto a submodule of an inner product space; this would require EuclideanSpace/line submodules and identification with ℝ, obscuring the elementary formula in the source.",
+     "name": "VitushkinsConjecture.proj",
+     "why_needed": "The orthogonal projection proj_θ(x,y) = x cos θ + y sin θ : ℂ → ℝ, exactly as in the Wikipedia statement."
+    },
+    {
+     "closest_existing_considered": "Searched for 'favard', 'Buffon', 'integralgeometric' in Mathlib and the repo — nothing. Mathlib's μH[1] on ℝ (equal to Lebesgue measure by `hausdorffMeasure_real`) is used for H¹.",
+     "name": "VitushkinsConjecture.favardLength",
+     "why_needed": "Favard length Fav(K) = ∫₀^π H¹(proj_θ K) dθ is not in Mathlib or the repo. Defined as the lower Lebesgue integral ∫⁻ θ in Icc 0 π, μH[1] (proj θ '' K) with values in ℝ≥0∞."
+    }
+   ],
+   "per_slot": {
+    "vitushkins_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "For every compact K ⊂ ℂ, analyticCapacity K = 0 → favardLength K = 0 (the surviving, open direction; contrapositive of Chang–Tolsa's 'positive Favard length implies positive analytic capacity'); tagged research open."
+    },
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated in the existence form the notes ask for: ∃ K, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K (Jones–Murai 1988); tagged research solved. Classically equivalent to the negation of 'Fav = 0 → γ = 0 for all compact K'."
+    },
+    "vitushkins_conjecture.variants.original_iff": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated negated, as the notes require: ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0); tagged research solved (false by Mattila 1986)."
+    },
+    "vitushkins_conjecture.variants.sigma_finite": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "For compact K with K = ⋃ i, s i and μH[1] (s i) < ∞ for every i (H¹-σ-finite), the biconditional analyticCapacity K = 0 ↔ favardLength K = 0; tagged research solved (David 1998 + Tolsa 2003)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vitushkins_conjecture": "/--\n**Vitushkin's conjecture** (the open direction). For every compact set $K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\implies \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nEquivalently, every compact set of positive Favard length has positive analytic capacity.\nAs of 2023 this is open; partial progress was made by Chang and Tolsa [CT20].\n-/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture (K : Set ℂ) (hK : IsCompact K)\n    (h : analyticCapacity K = 0) : favardLength K = 0 := by\n  sorry",
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": "/--\nThe refuted direction of Vitushkin's conjecture. Jones and Murai [JM88] constructed a compact set\n$K \\subset \\mathbb{C}$ with zero Favard length,\n$$\\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0,$$\nbut positive analytic capacity $\\gamma(K) > 0$. Hence zero Favard length does not imply zero\nanalytic capacity.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry",
+    "vitushkins_conjecture.variants.original_iff": "/--\n**Vitushkin's conjecture** (original form). Vitushkin conjectured that for every compact set\n$K \\subset \\mathbb{C}$,\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis is false: Mattila [Ma86] proved that the conjecture fails in general.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K → (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry",
+    "vitushkins_conjecture.variants.sigma_finite": "/--\nVitushkin's conjecture holds for $\\mathcal{H}^1$-$\\sigma$-finite sets: if the compact set\n$K \\subset \\mathbb{C}$ is a countable union of sets of finite one-dimensional Hausdorff measure,\nthen\n$$\\gamma(K) = 0 \\iff \\int_0^\\pi \\mathcal{H}^1(\\operatorname{proj}_\\theta(K))\\,d\\theta = 0.$$\nThis follows from David's theorem [Da98] (the case $\\mathcal{H}^1(K) < \\infty$) together with\nTolsa's theorem [To03] that analytic capacity is countably semiadditive.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite (K : Set ℂ) (hK : IsCompact K)\n    (hσ : ∃ s : ℕ → Set ℂ, K = ⋃ i, s i ∧ ∀ i, μH[1] (s i) < ∞) :\n    analyticCapacity K = 0 ↔ favardLength K = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vitushkin's conjecture\n\nVitushkin's conjecture concerns the relation between analytic capacity and the average\none-dimensional Hausdorff measure of orthogonal projections of compact subsets of the\ncomplex plane.\n\n*References:*\n- [Wikipedia, *Analytic capacity: Vitushkin's conjecture*](https://en.wikipedia.org/wiki/Analytic_capacity%23Vitushkin%27s_conjecture)\n- [Chang and Tolsa, *Analytic capacity and projections*](https://arxiv.org/abs/1712.00594)\n-/\n\nnamespace VitushkinsConjecture\n\nopen Complex Filter MeasureTheory Set Topology\n\n/-- The scalar coordinate of the orthogonal projection onto the line in direction `θ`. -/\nnoncomputable def projection (θ : ℝ) (z : ℂ) : ℝ :=\n  z.re * Real.cos θ + z.im * Real.sin θ\n\n/--\nThe analytic capacity $\\gamma(K)$. The two limits say respectively that $f(\\infty)=0$ and\n$f'(\\infty)=d=\\lim_{z\\to\\infty}z f(z)$.\n-/\nnoncomputable def analyticCapacity (K : Set ℂ) : ℝ :=\n  sSup {r : ℝ | ∃ (f : ℂ → ℂ) (d : ℂ),\n    DifferentiableOn ℂ f Kᶜ ∧\n    (∀ z ∈ Kᶜ, ‖f z‖ ≤ 1) ∧\n    Tendsto f (cocompact ℂ) (𝓝 0) ∧\n    Tendsto (fun z ↦ z * f z) (cocompact ℂ) (𝓝 d) ∧\n    r = ‖d‖}\n\n/--\nThe Favard length $\\operatorname{Fav}(K)=\\int_0^\\pi\n\\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta$.\n-/\nnoncomputable def favardLength (K : Set ℂ) : ENNReal :=\n  ∫⁻ θ in Ioc 0 Real.pi, μH[1] (projection θ '' K)\n\n/--\nVitushkin's original conjecture asserted that every compact $K\\subseteq\\mathbb C$ satisfies\n$\\gamma(K)=0$ if and only if\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nMattila disproved this universal biconditional in 1986.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/--\nDavid's and Tolsa's theorems imply that if a compact $K\\subseteq\\mathbb C$ is a countable\nunion of sets of finite $\\mathcal H^1$-measure, then\n$\\gamma(K)=0$ if and only if\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite :\n    ∀ K : Set ℂ, IsCompact K →\n      (∃ E : ℕ → Set ℂ, K = ⋃ n, E n ∧ ∀ n, μH[1] (E n) < ⊤) →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry\n\n/--\nJones and Murai constructed a compact $K\\subseteq\\mathbb C$ with\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$ but\n$\\gamma(K)>0$, disproving the implication from zero Favard length to zero analytic capacity.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry\n\n/--\nThe remaining open direction of Vitushkin's conjecture: for every compact\n$K\\subseteq\\mathbb C$, if $\\gamma(K)=0$, then\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nEquivalently, positive Favard length should imply positive analytic capacity.\n-/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture :\n    ∀ K : Set ℂ, IsCompact K → analyticCapacity K = 0 → favardLength K = 0 := by\n  sorry\n\nend VitushkinsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry was expanded using the supplied Wikipedia analytic-capacity article and Chang–Tolsa paper: the primary open statement is the remaining implication gamma(K) = 0 -> Fav(K) = 0, not the direction refuted by Jones and Murai.",
+    "A function on C \\ K is represented by a total function C -> C whose complex differentiability and unit norm bound are required only on Kᶜ. For compact K, arbitrary values on K do not affect either cocompact limit.",
+    "The limit z -> infinity is modeled by Mathlib's cocompact filter. The conditions Tendsto f ... 0 and Tendsto (fun z => z * f z) ... d encode f(infinity) = 0 and f'(infinity) = d.",
+    "Favard length is an ENNReal-valued Lebesgue lintegral over Ioc 0 pi. The endpoint choice is immaterial because the endpoints have Lebesgue measure zero, and ENNReal naturally accommodates Hausdorff measure before using compactness-derived finiteness.",
+    "Orthogonal projection is represented by its scalar coordinate x cos(theta) + y sin(theta), exactly as specified in the decomposition; this has the same one-dimensional Hausdorff measure as the corresponding subset of the projection line.",
+    "H¹-sigma-finiteness is stated explicitly as equality with a countable union of sets having finite one-dimensional Hausdorff measure, matching the decomposition rather than packaging it as a typeclass on a restricted measure.",
+    "The false original universal biconditional is stated under negation, while the Jones–Murai result is stated directly as existence of a compact counterexample with zero Favard length and strictly positive analytic capacity."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's inner-product-space orthogonalProjection onto a complete submodule; using it would return a point on a varying line rather than the explicitly requested scalar coordinate.",
+     "name": "VitushkinsConjecture.projection",
+     "why_needed": "The statement specifies the scalar orthogonal projection of the complex plane in direction theta."
+    },
+    {
+     "closest_existing_considered": "Mathlib has complex DifferentiableOn, cocompact limits, and sSup, but no bundled H-infinity function space or analytic-capacity definition.",
+     "name": "VitushkinsConjecture.analyticCapacity",
+     "why_needed": "Analytic capacity is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides hausdorffMeasure and lintegral, but no definition integrating lengths of directional projections.",
+     "name": "VitushkinsConjecture.favardLength",
+     "why_needed": "Favard length is absent from Mathlib and FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "vitushkins_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.original_iff": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "vitushkins_conjecture.variants.sigma_finite": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vitushkins_conjecture": "/--\nThe remaining open direction of Vitushkin's conjecture: for every compact\n$K\\subseteq\\mathbb C$, if $\\gamma(K)=0$, then\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nEquivalently, positive Favard length should imply positive analytic capacity.\n-/\n@[category research open, AMS 28 30]\ntheorem vitushkins_conjecture :\n    ∀ K : Set ℂ, IsCompact K → analyticCapacity K = 0 → favardLength K = 0 := by\n  sorry",
+    "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": "/--\nJones and Murai constructed a compact $K\\subseteq\\mathbb C$ with\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$ but\n$\\gamma(K)>0$, disproving the implication from zero Favard length to zero analytic capacity.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.favard_zero_implies_capacity_zero :\n    ∃ K : Set ℂ, IsCompact K ∧ favardLength K = 0 ∧ 0 < analyticCapacity K := by\n  sorry",
+    "vitushkins_conjecture.variants.original_iff": "/--\nVitushkin's original conjecture asserted that every compact $K\\subseteq\\mathbb C$ satisfies\n$\\gamma(K)=0$ if and only if\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\nMattila disproved this universal biconditional in 1986.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.original_iff :\n    ¬ ∀ K : Set ℂ, IsCompact K →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry",
+    "vitushkins_conjecture.variants.sigma_finite": "/--\nDavid's and Tolsa's theorems imply that if a compact $K\\subseteq\\mathbb C$ is a countable\nunion of sets of finite $\\mathcal H^1$-measure, then\n$\\gamma(K)=0$ if and only if\n$\\int_0^\\pi \\mathcal H^1(\\operatorname{proj}_\\theta(K))\\,d\\theta=0$.\n-/\n@[category research solved, AMS 28 30]\ntheorem vitushkins_conjecture.variants.sigma_finite :\n    ∀ K : Set ℂ, IsCompact K →\n      (∃ E : ℕ → Set ℂ, K = ⋃ n, E n ∧ ∀ n, μH[1] (E n) < ⊤) →\n      (analyticCapacity K = 0 ↔ favardLength K = 0) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "vitushkins_conjecture": "c04",
+  "vitushkins_conjecture.variants.favard_zero_implies_capacity_zero": "c04",
+  "vitushkins_conjecture.variants.original_iff": "c04",
+  "vitushkins_conjecture.variants.sigma_finite": "c04"
+ },
+ "id": "wp-vitushkins-conjecture",
+ "main_attempt": "c04"
+}

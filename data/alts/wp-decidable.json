@@ -1,0 +1,447 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Decidability of the theories of $\\mathbb{F}_p((t))$ and $\\mathbb{C}(t)$\n\nWikipedia's list of unsolved problems in mathematics asks (model theory and formal languages):\n\"Is the theory of the field of Laurent series over $\\mathbb{Z}_p$ decidable? of the field of\npolynomials over $\\mathbb{C}$?\"\n\nA first-order theory $T$ is *decidable* if there is an algorithm which, given a sentence\n$\\varphi$ of the language, decides whether $\\varphi \\in T$. The theory of a field $K$ is its\ncomplete theory $\\mathrm{Th}(K)$ in the language of rings $\\{+, \\cdot, -, 0, 1\\}$, i.e. the set\nof all first-order sentences true in $K$. No constant symbols for elements of $K$ are added.\n\nWe formalise decidability of a theory `T` as the existence of a computable function\n`f : ℕ → Bool` which decides membership in `T` on Gödel numbers of sentences. Gödel numbers\nare given by an explicit `Encodable` instance built from Mathlib's list encoding of\nfirst-order formulas (`FirstOrder.Language.BoundedFormula.listEncode`) and the standard\nencodings of lists, sums and sigma types.\n\nThe two fields in the question are:\n\n- $\\mathbb{F}_p((t))$, the field of formal Laurent series over the prime field\n  $\\mathbb{F}_p = \\mathbb{Z}/p\\mathbb{Z}$ (`LaurentSeries (ZMod p)`). Here $\\mathbb{Z}_p$ is read as\n  $\\mathbb{Z}/p\\mathbb{Z}$: Laurent series over the $p$-adic integers do not form a field. The prime\n  $p$ is an implicit parameter of the question. The existential theory of $\\mathbb{F}_p((t))$ is\n  known to be decidable (Anscombe–Fehm), but the full first-order theory is open.\n- $\\mathbb{C}(t)$, the field of rational functions in one variable over $\\mathbb{C}$\n  (`RatFunc ℂ`), the field of fractions of the polynomial ring $\\mathbb{C}[t]$. The polynomial\n  ring itself is not a field, and its existential theory is already undecidable (Denef). Even\n  Hilbert's tenth problem for $\\mathbb{C}(t)$ is open (Kollár, Poonen).\n\n*References:*\n\n- [Wikipedia, Decidability (logic)](https://en.wikipedia.org/wiki/Decidability_%28logic%29)\n- [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- S. Anscombe, A. Fehm, *The existential theory of equicharacteristic henselian valued fields*,\n  Algebra & Number Theory 10 (2016), 665–683. [arXiv:1509.05880](https://arxiv.org/abs/1509.05880)\n- J. Denef, *The Diophantine problem for polynomial rings and fields of rational functions*,\n  Trans. Amer. Math. Soc. 242 (1978), 391–399.\n- B. Poonen, *Undecidable problems: a sampler*, [arXiv:1204.0299](https://arxiv.org/abs/1204.0299)\n-/\n\nopen FirstOrder FirstOrder.Language\n\nnamespace Decidable\n\n/- ### Gödel numbering of first-order sentences -/\n\n/-- A code for a function symbol of the language of rings. -/\ndef ringFuncToNat : ∀ {n : ℕ}, ringFunc n → ℕ\n  | _, .add => 0\n  | _, .mul => 1\n  | _, .neg => 2\n  | _, .zero => 3\n  | _, .one => 4\n\n/-- A left inverse of `ringFuncToNat`. -/\ndef ringFuncOfNat : ∀ n : ℕ, ℕ → Option (ringFunc n)\n  | 2, 0 => some .add\n  | 2, 1 => some .mul\n  | 1, 2 => some .neg\n  | 0, 3 => some .zero\n  | 0, 4 => some .one\n  | _, _ => none\n\n/-- The function symbols of the language of rings are (explicitly) encodable. -/\ninstance instEncodableRingFunctions (n : ℕ) : Encodable (Language.ring.Functions n) :=\n  Encodable.ofLeftInjection ringFuncToNat (ringFuncOfNat n) (by\n    rintro (_ | _ | _ | _ | _) <;> rfl)\n\n/-- The language of rings has no relation symbols. -/\ninstance instEncodableRingRelations (n : ℕ) : Encodable (Language.ring.Relations n) :=\n  inferInstanceAs (Encodable Empty)\n\n/-- Gödel numbering of bounded formulas: a formula is encoded by the code of its list\nencoding `FirstOrder.Language.BoundedFormula.listEncode`. -/\ninstance instEncodableSigmaBoundedFormula {L : Language} {α : Type*} [Encodable α]\n    [Encodable (Σ i, L.Functions i)] [Encodable (Σ i, L.Relations i)] :\n    Encodable (Σ n, L.BoundedFormula α n) :=\n  Encodable.ofLeftInjection (fun φ => φ.2.listEncode)\n    (fun l => (BoundedFormula.listDecode l)[0]?) BoundedFormula.encoding.decode_encode\n\n/-- Gödel numbering of bounded formulas with a fixed number of bound variables. In particular\nthis gives a Gödel numbering of the sentences `L.Sentence = L.BoundedFormula Empty 0`. -/\ninstance instEncodableBoundedFormula {L : Language} {α : Type*} [Encodable α]\n    [Encodable (Σ i, L.Functions i)] [Encodable (Σ i, L.Relations i)] (n : ℕ) :\n    Encodable (L.BoundedFormula α n) :=\n  Encodable.ofLeftInjection (fun φ => (⟨n, φ⟩ : Σ n, L.BoundedFormula α n))\n    (fun φ => if h : φ.1 = n then some (h ▸ φ.2) else none) (by simp)\n\n/- ### Decidable theories -/\n\n/-- A theory `T` in a language `L` with Gödel-numbered sentences is *decidable* if there is a\ncomputable function `f : ℕ → Bool` such that, for every sentence `φ`, `f` applied to the\nGödel number of `φ` is `true` if and only if `φ ∈ T`. -/\ndef IsDecidableTheory {L : Language} [Encodable L.Sentence] (T : L.Theory) : Prop :=\n  ∃ f : ℕ → Bool, Computable f ∧\n    ∀ φ : L.Sentence, (f (Encodable.encode φ) = true ↔ φ ∈ T)\n\n/-- The empty theory is decidable. -/\n@[category test, AMS 3]\ntheorem isDecidableTheory_empty {L : Language} [Encodable L.Sentence] :\n    IsDecidableTheory (∅ : L.Theory) :=\n  ⟨fun _ => false, Computable.const _, by simp⟩\n\n/-- The theory of all sentences is decidable. -/\n@[category test, AMS 3]\ntheorem isDecidableTheory_univ {L : Language} [Encodable L.Sentence] :\n    IsDecidableTheory (Set.univ : L.Theory) :=\n  ⟨fun _ => true, Computable.const _, by simp⟩\n\n/-- The complete first-order theory $\\mathrm{Th}(R)$ of a ring `R` in the language of rings\n$\\{+, \\cdot, -, 0, 1\\}$: the set of all sentences of the language of rings true in `R`. -/\ndef ringCompleteTheory (R : Type*) [Add R] [Mul R] [Neg R] [Zero R] [One R] :\n    Language.ring.Theory :=\n  letI := Ring.compatibleRingOfRing R\n  Language.ring.completeTheory R\n\n/-- A sentence lies in `ringCompleteTheory R` if and only if it holds in `R`. -/\n@[category API, AMS 3]\ntheorem mem_ringCompleteTheory {R : Type*} [Add R] [Mul R] [Neg R] [Zero R] [One R]\n    (φ : Language.ring.Sentence) :\n    φ ∈ ringCompleteTheory R ↔ (letI := Ring.compatibleRingOfRing R; R ⊨ φ) :=\n  Iff.rfl\n\n/-- The complete theory of a field contains the axioms of fields. -/\n@[category API, AMS 3 12]\ntheorem field_subset_ringCompleteTheory (K : Type*) [Field K] :\n    Theory.field ⊆ ringCompleteTheory K := by\n  letI := Ring.compatibleRingOfRing K\n  exact Theory.model_iff_subset_completeTheory.1 inferInstance\n\n/- ### The problems -/\n\n/--\n**Decidability of the theory of $\\mathbb{F}_p((t))$.**\nIs the first-order theory, in the language of rings, of the field $\\mathbb{F}_p((t))$ of formal\nLaurent series over the prime field $\\mathbb{F}_p = \\mathbb{Z}/p\\mathbb{Z}$ decidable? The prime\n$p$ is an implicit parameter of the question; the statement asks whether\n$\\mathrm{Th}(\\mathbb{F}_p((t)))$ is decidable for every prime $p$.\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.i :\n    answer(sorry) ↔ ∀ p : ℕ, p.Prime →\n      IsDecidableTheory (ringCompleteTheory (LaurentSeries (ZMod p))) := by\n  sorry\n\n/--\n**Decidability of the theory of $\\mathbb{C}(t)$.**\nIs the first-order theory, in the language of rings, of the field $\\mathbb{C}(t)$ of rational\nfunctions in one variable over $\\mathbb{C}$ decidable? The list entry says \"the field of\npolynomials over $\\mathbb{C}$\"; the polynomial ring $\\mathbb{C}[t]$ is not a field, so this is\nread as its field of fractions $\\mathbb{C}(t)$.\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.ii :\n    answer(sorry) ↔ IsDecidableTheory (ringCompleteTheory (RatFunc ℂ)) := by\n  sorry\n\nend Decidable\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "Slot (ii): the table (and the Wikipedia entry) treats decidability of the *full* first-order theory Th(ℂ(t)) as open. To my knowledge, J.-L. Duret (\"Sur la théorie élémentaire des corps de fonctions\", J. Symbolic Logic 51 (1986)) proved that the elementary theory of the rational function field over an algebraically closed field of characteristic zero is undecidable, and the surveys of Pheidas–Zahidi and Koenigsmann list Th(ℂ(t)) as undecidable, with only the *existential* theory (Hilbert's tenth problem for ℂ(t); Kollár, Poonen) genuinely open. If this is right, the entry is really about Hilbert's tenth problem for ℂ(t), and the full-theory version should be `research solved` with `answer(False)`. I conformed to the table (full theory, `research open`, `answer(sorry)`) and flag this for review. Slot (i): no objection; the reading ℤ_p = F_p and the open status of the full theory of F_p((t)) (existential fragment decidable by Anscombe–Fehm 2016) agree with the literature.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "`ℤ_p` in the list entry is read as the prime field F_p = ZMod p (per the decomposition table); the field is `LaurentSeries (ZMod p)` (= `HahnSeries ℤ (ZMod p)`), which is a field exactly when p is prime; the hypothesis `p.Prime` excludes `ZMod 0 = ℤ` and composite moduli.",
+    "The prime p is quantified universally *after* `answer(sorry)` (`answer(sorry) ↔ ∀ p, p.Prime → …`), because the repository's AnswerLinter forbids theorem arguments before `answer(sorry) ↔`. So `answer(True)` means Th(F_p((t))) is decidable for every prime p; a p-dependent answer would be recorded as `answer(False)`. The table allows either 'fix arbitrary p' or 'quantify over all primes'.",
+    "'The field of polynomials over ℂ' is read as the rational function field ℂ(t) = `RatFunc ℂ` (its field of fractions), per the decomposition table.",
+    "'Theory of the field' = complete theory `Language.ring.completeTheory K` in Mathlib's language of rings {+, ·, −, 0, 1} with the ring-compatible structure `FirstOrder.Ring.compatibleRingOfRing K`; no constant symbols for field elements, no inverse symbol (division is definable, so decidability is unaffected).",
+    "Decidability of a theory T is formalised as `∃ f : ℕ → Bool, Computable f ∧ ∀ φ, (f (encode φ) = true ↔ φ ∈ T)`, i.e. a total computable function decides membership on Gödel numbers. `f` is unconstrained off the range of `encode`; this is equivalent to 'the set of Gödel numbers of T is computable' because the range of the explicit encoding is decidable. Mathlib's `ComputablePred` on `L.Sentence` could not be used because a `Primcodable` instance for formulas is not available in Mathlib (only `Encodable` for terms and `Countable` for formulas).",
+    "The Gödel numbering is the explicit `Encodable` instance obtained by `Encodable.ofLeftInjection` from Mathlib's `BoundedFormula.listEncode`/`listDecode` (Mathlib's `BoundedFormula.encoding`) together with the standard `Encodable` instances for lists, sums, sigma types and Mathlib's `Encodable (L.Term α)`; function symbols of the ring language are coded by an explicit 5-element table. This numbering is effective (it evaluates with `#eval`); a choice-based `Encodable.ofCountable` numbering was deliberately avoided since it would make the statement's truth value depend on an unspecified bijection.",
+    "The Encodable instances and `IsDecidableTheory` are generic in the language and would normally belong in `FormalConjecturesForMathlib/`; they are placed in the problem file only because the task restricts all output to the single candidate file. A reviewer may wish to move them.",
+    "Category tag `research open` follows the given status; see decomposition_objections regarding slot (ii).",
+    "Both slots use AMS 3 (logic) and AMS 12 (field theory); tests/API lemmas for the bespoke definitions are included with short proofs (`isDecidableTheory_empty`, `isDecidableTheory_univ`, `mem_ringCompleteTheory`, `field_subset_ringCompleteTheory`)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Ring.instFintypeSymbolsRing` + `Fintype.toEncodable`; `Encodable.ofCountable` (rejected: encoding not explicit).",
+     "name": "Decidable.ringFuncToNat / Decidable.ringFuncOfNat",
+     "why_needed": "Explicit code and left inverse for the function symbols `ringFunc n` of Mathlib's language of rings, to build an effective `Encodable (Language.ring.Functions n)` instance (Mathlib only provides `DecidableEq` and a `Fintype` on `Language.ring.Symbols`, and `Fintype.toEncodable` is a noncomputable, non-explicit choice)."
+    },
+    {
+     "closest_existing_considered": "`IsEmpty.toEncodable`, which does apply for relations but is not found automatically for `Language.ring.Relations n`.",
+     "name": "Decidable.instEncodableRingFunctions, Decidable.instEncodableRingRelations",
+     "why_needed": "`Encodable` instances for `Language.ring.Functions n` (via the table above) and `Language.ring.Relations n` (= Empty); instance search does not see through the `def Language.ring`, so they must be stated for the ring language directly."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.encoding : Computability.Encoding (Σ n, L.BoundedFormula α n)` (an `Encoding` into lists, not an `Encodable` into ℕ) and the `Countable` instances in Mathlib.ModelTheory.Encoding.",
+     "name": "Decidable.instEncodableSigmaBoundedFormula, Decidable.instEncodableBoundedFormula",
+     "why_needed": "Gödel numbering of first-order (bounded) formulas and hence of sentences `L.Sentence = L.BoundedFormula Empty 0`, built from Mathlib's `BoundedFormula.listEncode`/`listDecode` via `Encodable.ofLeftInjection`. Mathlib provides `Encodable (L.Term α)` but only `Countable` for formulas."
+    },
+    {
+     "closest_existing_considered": "`ComputablePred` (requires a `Primcodable` instance on `L.Sentence`, which does not exist in Mathlib and would need a large primitive-recursiveness proof); `REPred`; `FirstOrder.Language.Theory.IsComplete`/`IsMaximal` (different notions).",
+     "name": "Decidable.IsDecidableTheory",
+     "why_needed": "Mathlib has no notion of a decidable first-order theory. Defined as existence of a `Computable` function `ℕ → Bool` deciding membership on Gödel numbers of sentences."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.completeTheory` (used directly, but needs a `Language.ring.Structure R` instance).",
+     "name": "Decidable.ringCompleteTheory",
+     "why_needed": "The complete theory `Language.ring.completeTheory R` of a ring `R` with the ring-compatible structure; needed because `FirstOrder.Ring.compatibleRingOfRing` is a `def` rather than an instance, so the structure must be supplied with `letI`."
+    }
+   ],
+   "per_slot": {
+    "decidable.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ p : ℕ, p.Prime → IsDecidableTheory (ringCompleteTheory (LaurentSeries (ZMod p)))`: the complete first-order theory of F_p((t)) = `LaurentSeries (ZMod p)` in the language of rings is a computable set of (Gödel numbers of) sentences. Needed bespoke definitions for the Gödel numbering of sentences, for decidability of a theory, and for the complete ring-theory of a ring."
+    },
+    "decidable.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ IsDecidableTheory (ringCompleteTheory (RatFunc ℂ))`: the complete first-order theory of C(t) = `RatFunc ℂ` in the language of rings (no constants for elements of ℂ) is decidable. Same bespoke definitions as slot (i)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "decidable.parts.i": "/--\n**Decidability of the theory of $\\mathbb{F}_p((t))$.**\nIs the first-order theory, in the language of rings, of the field $\\mathbb{F}_p((t))$ of formal\nLaurent series over the prime field $\\mathbb{F}_p = \\mathbb{Z}/p\\mathbb{Z}$ decidable? The prime\n$p$ is an implicit parameter of the question; the statement asks whether\n$\\mathrm{Th}(\\mathbb{F}_p((t)))$ is decidable for every prime $p$.\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.i :\n    answer(sorry) ↔ ∀ p : ℕ, p.Prime →\n      IsDecidableTheory (ringCompleteTheory (LaurentSeries (ZMod p))) := by\n  sorry",
+    "decidable.parts.ii": "/--\n**Decidability of the theory of $\\mathbb{C}(t)$.**\nIs the first-order theory, in the language of rings, of the field $\\mathbb{C}(t)$ of rational\nfunctions in one variable over $\\mathbb{C}$ decidable? The list entry says \"the field of\npolynomials over $\\mathbb{C}$\"; the polynomial ring $\\mathbb{C}[t]$ is not a field, so this is\nread as its field of fractions $\\mathbb{C}(t)$.\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.ii :\n    answer(sorry) ↔ IsDecidableTheory (ringCompleteTheory (RatFunc ℂ)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\nimport Mathlib.Computability.Halting\nimport Mathlib.RingTheory.LaurentSeries\n\n/-!\n# Decidability of theories of function fields\n\nThis file asks whether the complete first-order theories of two fields are decidable in the\nlanguage of rings.\n\n*Reference:*\n- [Wikipedia: Decidability (logic)](https://en.wikipedia.org/wiki/Decidability_%28logic%29)\n-/\n\nnamespace Decidable\n\n/-- Parses a prefix code for a ring-language term with variables below `depth`.\n\nThe tags `0` through `5` denote a variable, zero, one, negation, addition, and multiplication,\nrespectively. The resulting function evaluates the term in an environment whose newest bound\nvariable comes first. -/\ndef decodeRingTerm (R : Type*) [Ring R] (depth : ℕ) :\n    ℕ → List ℕ → Option ((List R → R) × List ℕ)\n  | 0, _ => none\n  | _ + 1, 0 :: n :: code =>\n      if n < depth then some (fun v => v.getD n 0, code) else none\n  | _ + 1, 1 :: code => some (fun _ => 0, code)\n  | _ + 1, 2 :: code => some (fun _ => 1, code)\n  | fuel + 1, 3 :: code => do\n      let (t, rest) ← decodeRingTerm R depth fuel code\n      pure (fun v => -t v, rest)\n  | fuel + 1, 4 :: code => do\n      let (t, rest) ← decodeRingTerm R depth fuel code\n      let (u, rest') ← decodeRingTerm R depth fuel rest\n      pure (fun v => t v + u v, rest')\n  | fuel + 1, 5 :: code => do\n      let (t, rest) ← decodeRingTerm R depth fuel code\n      let (u, rest') ← decodeRingTerm R depth fuel rest\n      pure (fun v => t v * u v, rest')\n  | _ + 1, _ => none\n\n/-- Parses a prefix code for a first-order formula in the language of rings.\n\nThe tags `0` through `3` denote falsity, equality, implication, and universal quantification.\nTogether with the term constructors in `decodeRingTerm`, these form a functionally complete syntax\nfor first-order ring-language formulas. -/\ndef decodeRingFormula (R : Type*) [Ring R] (depth : ℕ) :\n    ℕ → List ℕ → Option ((List R → Prop) × List ℕ)\n  | 0, _ => none\n  | _ + 1, 0 :: code => some (fun _ => False, code)\n  | fuel + 1, 1 :: code => do\n      let (t, rest) ← decodeRingTerm R depth fuel code\n      let (u, rest') ← decodeRingTerm R depth fuel rest\n      pure (fun v => t v = u v, rest')\n  | fuel + 1, 2 :: code => do\n      let (φ, rest) ← decodeRingFormula R depth fuel code\n      let (ψ, rest') ← decodeRingFormula R depth fuel rest\n      pure (fun v => φ v → ψ v, rest')\n  | fuel + 1, 3 :: code => do\n      let (φ, rest) ← decodeRingFormula R (depth + 1) fuel code\n      pure (fun v => ∀ x : R, φ (x :: v), rest)\n  | _ + 1, _ => none\n\n/-- A list of natural numbers codes a true ring-language sentence in `R` when it parses completely\nas a closed formula and that formula holds in `R`. Ill-formed codes are false. -/\ndef RingSentenceHolds (R : Type*) [Ring R] (code : List ℕ) : Prop :=\n  match decodeRingFormula R 0 (code.length + 1) code with\n  | some (φ, []) => φ []\n  | _ => False\n\n/-- The complete first-order theory of `R` in the language of rings is decidable when truth of\nclosed ring-language sentences, under the effective prefix coding above, is a computable\npredicate. -/\ndef HasDecidableRingTheory (R : Type*) [Ring R] : Prop :=\n  ComputablePred (RingSentenceHolds R)\n\n/--\nFor every prime $p$, is the complete first-order theory of the Laurent series field\n$\\mathbb{F}_p((t))$ decidable in the language of rings?\n\nHere $\\mathbb{F}_p$ is represented by `ZMod p`; the original notation $\\mathbb{Z}_p$ is read as the\nprime field because Laurent series over the $p$-adic integers do not form a field.\n-/\n@[category research open, AMS 3]\ntheorem parts.i :\n    answer(sorry) ↔ ∀ p : ℕ, p.Prime → HasDecidableRingTheory (LaurentSeries (ZMod p)) := by\n  sorry\n\n/--\nIs the complete first-order theory of the rational function field $\\mathbb{C}(t)$ decidable in the\nlanguage of rings, without constants for elements of $\\mathbb{C}$?\n\nThe phrase “field of polynomials over $\\mathbb{C}$” is read as the field of fractions of\n$\\mathbb{C}[t]$, since the polynomial ring itself is not a field.\n-/\n@[category research open, AMS 3]\ntheorem parts.ii : answer(sorry) ↔ HasDecidableRingTheory (RatFunc ℂ) := by\n  sorry\n\nend Decidable\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Read the source's Z_p as the prime field F_p = ZMod p, because Laurent series over the p-adic integers do not form a field.",
+    "Quantified over all primes p inside answer(sorry), rather than fixing p as an external theorem parameter; this is one of the readings explicitly permitted by the decomposition and satisfies the repository's answer-scope convention.",
+    "Read the source's 'field of polynomials over C' as the rational function field RatFunc ℂ = ℂ(t), the field of fractions of ℂ[t].",
+    "Used the pure first-order language of rings: term constructors are variables, 0, 1, negation, addition, and multiplication; formula constructors are falsity, equality, implication, and universal quantification. These connectives are functionally complete, and no constants for elements of ℂ are included.",
+    "Defined decidability as Mathlib ComputablePred on an explicit effective prefix coding by List ℕ. Ill-formed and non-closed codes are false. This avoids the non-effective Lean notion DecidablePred and avoids relying on a classical Countable.toEncodable numbering.",
+    "For part i, the positive answer means that every prime p has decidable complete theory; it does not assert one algorithm uniform in p."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FirstOrder.Language.Term and FirstOrder.Language.Term.encoding in Mathlib.ModelTheory; Mathlib.ModelTheory.Encoding explicitly lists Primcodable term/formula syntax as a TODO and does not provide the instance needed by ComputablePred.",
+     "name": "Decidable.decodeRingTerm",
+     "why_needed": "Provides an explicit effective prefix parser and semantics for terms in the pure language of rings, with a depth check for bound variables."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.BoundedFormula, Sentence, and BoundedFormula.encoding in Mathlib.ModelTheory; no Primcodable sentence instance exists.",
+     "name": "Decidable.decodeRingFormula",
+     "why_needed": "Provides an explicit effective prefix parser and semantics for first-order ring formulas, including quantification and closedness tracking."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.completeTheory and Sentence.Realize; these provide semantics but their sentence type lacks the primitive-recursive coding required to state computability faithfully.",
+     "name": "Decidable.RingSentenceHolds",
+     "why_needed": "Defines the truth predicate on the explicit codes of closed ring-language sentences, assigning false to malformed codes."
+    },
+    {
+     "closest_existing_considered": "Mathlib ComputablePred and FirstOrder.Language.completeTheory; neither directly combines computability with coded first-order ring sentences.",
+     "name": "Decidable.HasDecidableRingTheory",
+     "why_needed": "Packages decidability of the complete ring theory as ComputablePred on the explicit sentence coding."
+    }
+   ],
+   "per_slot": {
+    "decidable.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Faithfully stated for every prime p using ZMod p as F_p, LaurentSeries (ZMod p) as F_p((t)), and an effective coding of complete first-order ring theory."
+    },
+    "decidable.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Faithfully stated for RatFunc ℂ, i.e. ℂ(t), in the pure language of rings with no constants for complex elements, using an effective coding of complete first-order ring theory."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Decidability of the theories of $\\mathbb{F}_p((t))$ and $\\mathbb{C}(t)$\n\nWikipedia's list of unsolved problems in mathematics asks:\n\n> Is the theory of the field of Laurent series over $\\mathbb{Z}_p$ decidable?\n> of the field of polynomials over $\\mathbb{C}$?\n\nHere \"the theory\" of a field $K$ is its complete first-order theory $\\mathrm{Th}(K)$ in the\nlanguage of rings $\\{+, \\cdot, -, 0, 1\\}$, i.e. the set of all first-order ring sentences that\nare true in $K$. It is *decidable* if there is an algorithm which, given a sentence, decides\nwhether it belongs to $\\mathrm{Th}(K)$; equivalently, the set of Gödel numbers of the sentences\nin $\\mathrm{Th}(K)$ is a computable set of natural numbers.\n\nThe two fields in question are:\n\n* the field $\\mathbb{F}_p((t))$ of formal Laurent series over the prime field\n  $\\mathbb{F}_p = \\mathbb{Z}/p\\mathbb{Z}$ (written $\\mathbb{Z}_p$ in the list entry; Laurent\n  series over the $p$-adic integers do not form a field), for a prime $p$;\n* the field $\\mathbb{C}(t)$ of rational functions over $\\mathbb{C}$, the field of fractions of the\n  polynomial ring $\\mathbb{C}[t]$ (the polynomial ring itself is not a field, and already its\n  existential theory is undecidable by Denef).\n\nFor $\\mathbb{F}_p((t))$ the existential theory is known to be decidable (Anscombe–Fehm), but the\ndecidability of the full first-order theory is open. For $\\mathbb{C}(t)$ even Hilbert's tenth\nproblem, i.e. the decidability of the existential theory, is open.\n\n*References:*\n* [Wikipedia, Decidability (logic)](https://en.wikipedia.org/wiki/Decidability_%28logic%29)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* [S. Anscombe, A. Fehm, *The existential theory of equicharacteristic henselian valued fields*,\n  Algebra & Number Theory 10 (2016)](https://arxiv.org/abs/1509.05555)\n* J. Denef, *The Diophantine problem for polynomial rings and fields of rational functions*,\n  Trans. Amer. Math. Soc. 242 (1978), 391–399\n* [B. Poonen, *Undecidable problems: a sampler*](https://arxiv.org/abs/1204.0299), section on\n  algebraic geometry\n* J. Kollár, *Diophantine subsets of function fields of curves*, Algebra & Number Theory 2 (2008),\n  299–311\n-/\n\nopen FirstOrder FirstOrder.Language\n\nnamespace Decidable\n\n/-- An explicit (computable) encoding of the five function symbols `+, ·, -, 0, 1` of the\nlanguage of rings as natural numbers. -/\ndef ringFunctionsEncodable : Encodable (Σ i, Language.ring.Functions i) :=\n  Encodable.ofLeftInjection\n    (fun\n      | ⟨_, .add⟩ => 0\n      | ⟨_, .mul⟩ => 1\n      | ⟨_, .neg⟩ => 2\n      | ⟨_, .zero⟩ => 3\n      | ⟨_, .one⟩ => 4)\n    (fun\n      | 0 => some ⟨2, .add⟩\n      | 1 => some ⟨2, .mul⟩\n      | 2 => some ⟨1, .neg⟩\n      | 3 => some ⟨0, .zero⟩\n      | 4 => some ⟨0, .one⟩\n      | _ => none)\n    (by rintro ⟨_, f⟩; cases f <;> rfl)\n\nattribute [local instance] ringFunctionsEncodable\n\n/-- A Gödel numbering of the sentences of the language of rings.\n\nA sentence `φ` is first written as a list of symbols by\n`FirstOrder.Language.BoundedFormula.listEncode`, and this list is then encoded as a natural\nnumber by the standard `Encodable` encoding of lists. Both steps are given by explicit\nstructurally recursive functions, so this is a computable, computably invertible, injective\nnumbering of sentences (see `godelNumber_injective`). -/\ndef godelNumber (φ : Language.ring.Sentence) : ℕ :=\n  Encodable.encode φ.listEncode\n\n/-- The Gödel numbering `godelNumber` is injective. -/\n@[category API, AMS 3]\ntheorem godelNumber_injective : Function.Injective godelNumber := by\n  intro φ ψ h\n  have := BoundedFormula.listEncode_sigma_injective\n    (Encodable.encode_injective h :\n      (⟨0, φ⟩ : Σ n, Language.ring.BoundedFormula Empty n).2.listEncode =\n        (⟨0, ψ⟩ : Σ n, Language.ring.BoundedFormula Empty n).2.listEncode)\n  simpa using this\n\n/-- The first-order theory of a ring `R` is *decidable* if the complete theory\n$\\mathrm{Th}(R)$ of `R` in the language of rings $\\{+, \\cdot, -, 0, 1\\}$ (the set of all\nring sentences true in `R`, `FirstOrder.Language.completeTheory`) is a computable set of\nsentences. Concretely: the set of Gödel numbers `godelNumber φ` of the sentences `φ` true in `R`\nis a computable set of natural numbers (`ComputablePred`).\n\nThe ring structure on `R` used to interpret the ring sentences is the one given by the\n`Add`, `Mul`, `Neg`, `Zero` and `One` instances on `R`. -/\ndef HasDecidableTheory (R : Type*) [Add R] [Mul R] [Neg R] [Zero R] [One R] : Prop :=\n  letI := Ring.compatibleRingOfRing R\n  ComputablePred fun n : ℕ => ∃ φ : Language.ring.Sentence,\n    godelNumber φ = n ∧ φ ∈ Language.ring.completeTheory R\n\n/-- Is the first-order theory of the field $\\mathbb{F}_p((t))$ of formal Laurent series over the\nprime field $\\mathbb{F}_p$ decidable?\n\nFor a prime `p`, `ZMod p` is the prime field $\\mathbb{F}_p$ and `LaurentSeries (ZMod p)` is the\nfield $\\mathbb{F}_p((t))$. The question is asked for every prime $p$: a positive answer means that\n$\\mathrm{Th}(\\mathbb{F}_p((t)))$, in the language of rings, is decidable for every prime $p$. -/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.i :\n    answer(sorry) ↔ ∀ p : ℕ, p.Prime → HasDecidableTheory (LaurentSeries (ZMod p)) := by\n  sorry\n\n/-- Is the first-order theory of the field $\\mathbb{C}(t)$ of rational functions over\n$\\mathbb{C}$ decidable?\n\n`RatFunc ℂ` is the field $\\mathbb{C}(t)$, the field of fractions of the polynomial ring\n$\\mathbb{C}[t]$. The theory is taken in the language of rings, without constant symbols for the\nelements of $\\mathbb{C}$. -/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.ii : answer(sorry) ↔ HasDecidableTheory (RatFunc ℂ) := by\n  sorry\n\nend Decidable\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None substantive. The table's readings (ℤ_p as F_p; ℂ[t] replaced by its field of fractions ℂ(t)) are the standard expert readings and are consistent with the background literature (Poonen's sampler: Hilbert's tenth problem for ℂ(t) is open; Denef 1978: undecidable for ℂ[t]). One minor remark: the table describes p as 'an implicit parameter' and permits either fixing p or quantifying over all primes; I chose to quantify over all primes inside the statement (after `answer(sorry)`) to comply with the repository's quantifier convention, which slightly changes the meaning of a negative answer (undecidable for some p rather than for a fixed p).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Following the decomposition table, ℤ_p in the list entry is read as the prime field F_p = ZMod p (p prime), and 'the field of polynomials over ℂ' is read as the rational function field ℂ(t) = RatFunc ℂ. Both readings are recorded in the module docstring.",
+    "'Decidable theory' is formalized as: the set of Gödel numbers of the sentences true in the structure is a computable set of naturals (`ComputablePred` on ℕ). Mathlib has no `Primcodable` instance for first-order formulas (explicit TODO in Mathlib.ModelTheory.Encoding), so `ComputablePred` cannot be applied directly to `Language.ring.Sentence`. Instead a concrete Gödel numbering `godelNumber := Encodable.encode ∘ BoundedFormula.listEncode` is defined; it is injective (proved as `godelNumber_injective`) and given by explicit structurally recursive functions (it `#eval`s), so under Church's thesis the set {godelNumber φ | R ⊨ φ} is recursive iff Th(R) is decidable in the usual sense. A reviewer should check they accept this Gödel numbering as 'standard'.",
+    "The encoding of the five ring function symbols is an explicit local `Encodable` instance (`ringFunctionsEncodable`, made a local instance rather than global to avoid future instance diamonds with Mathlib). Mathlib's `Fintype.toEncodable` was not used because it is noncomputable, which would make the numbering meaningless for computability.",
+    "The theory is the complete theory `Language.ring.completeTheory R` of the structure in the language of rings {+, ·, −, 0, 1}, with the `Language.ring.Structure` given by `FirstOrder.Ring.compatibleRingOfRing R`, i.e. the usual ring operations of `LaurentSeries (ZMod p)` and `RatFunc ℂ`. No constant symbols for elements of ℂ or for the variable t are added (as prescribed by the table).",
+    "For slot (i) the prime p is quantified after `answer(sorry)` (repository convention: all quantifiers after `answer`): a positive answer means Th(F_p((t))) is decidable for every prime p, a negative answer means it is undecidable for some prime p. The alternative (fixing p as a theorem parameter) would force a uniform answer in p and could make the theorem false for every answer if decidability depended on p.",
+    "The hypothesis `p.Prime` is stated as a plain Prop hypothesis rather than a `Fact` instance; `LaurentSeries (ZMod p)` has the needed `Add/Mul/Neg/Zero/One` instances for every p, and primality is only needed for the mathematical meaning (F_p((t)) being the intended field), so no degenerate p (0 or 1) reaches the statement."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Fintype.toEncodable` / `Encodable.ofCountable` (both noncomputable); `FirstOrder.Ring.instFintypeSymbolsRing` (Fintype only).",
+     "name": "Decidable.ringFunctionsEncodable",
+     "why_needed": "A computable `Encodable (Σ i, Language.ring.Functions i)` instance is needed to use Mathlib's `Encodable (L.Term α)` instance for the language of rings; Mathlib only provides a `Fintype` instance (and `Fintype.toEncodable` is noncomputable, which would not give a meaningful Gödel numbering)."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.encoding` (a `Computability.Encoding` whose alphabet Γ contains terms and is not Primcodable), `FirstOrder.Language.BoundedFormula.listEncode` (used as the first step), `Encodable.encode` on lists (used as the second step).",
+     "name": "Decidable.godelNumber",
+     "why_needed": "A computable injective numbering `Language.ring.Sentence → ℕ` is needed to express decidability of a set of sentences via `ComputablePred` on ℕ, since Mathlib has no `Primcodable`/`Encodable` instance for bounded formulas (only `Countable`, and a `Computability.Encoding` with a non-`Primcodable` alphabet)."
+    },
+    {
+     "closest_existing_considered": "`ComputablePred` (Mathlib.Computability.Halting) applied directly to sentences — impossible since `Language.ring.Sentence` has no `Primcodable` instance; `FirstOrder.Language.completeTheory` (used to define the theory); `FirstOrder.Ring.compatibleRingOfRing` (used to give the ring structure).",
+     "name": "Decidable.HasDecidableTheory",
+     "why_needed": "Expresses 'the first-order theory of the ring R in the language of rings is decidable': the set of Gödel numbers of the sentences in `Language.ring.completeTheory R` is a `ComputablePred`. No notion of decidable theory exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "decidable.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ p : ℕ, p.Prime → HasDecidableTheory (LaurentSeries (ZMod p))`, where `HasDecidableTheory R` says the set of Gödel numbers of ring sentences in `Language.ring.completeTheory R` is `ComputablePred`. `ZMod p` for prime `p` is F_p and `LaurentSeries (ZMod p)` is F_p((t)) with its usual ring operations (`compatibleRingOfRing`). Needed bespoke definitions because Mathlib has no computable encoding/`Primcodable` instance for first-order sentences."
+    },
+    "decidable.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ HasDecidableTheory (RatFunc ℂ)`; `RatFunc ℂ` is the field ℂ(t) (field of fractions of ℂ[t]), theory taken in the pure language of rings (no constants for elements of ℂ or for t), as prescribed by the decomposition table."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "decidable.parts.i": "/-- Is the first-order theory of the field $\\mathbb{F}_p((t))$ of formal Laurent series over the\nprime field $\\mathbb{F}_p$ decidable?\n\nFor a prime `p`, `ZMod p` is the prime field $\\mathbb{F}_p$ and `LaurentSeries (ZMod p)` is the\nfield $\\mathbb{F}_p((t))$. The question is asked for every prime $p$: a positive answer means that\n$\\mathrm{Th}(\\mathbb{F}_p((t)))$, in the language of rings, is decidable for every prime $p$. -/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.i :\n    answer(sorry) ↔ ∀ p : ℕ, p.Prime → HasDecidableTheory (LaurentSeries (ZMod p)) := by\n  sorry",
+    "decidable.parts.ii": "/-- Is the first-order theory of the field $\\mathbb{C}(t)$ of rational functions over\n$\\mathbb{C}$ decidable?\n\n`RatFunc ℂ` is the field $\\mathbb{C}(t)$, the field of fractions of the polynomial ring\n$\\mathbb{C}[t]$. The theory is taken in the language of rings, without constant symbols for the\nelements of $\\mathbb{C}$. -/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.ii : answer(sorry) ↔ HasDecidableTheory (RatFunc ℂ) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Decidability of the theories of $\\mathbb{F}_p((t))$ and $\\mathbb{C}(t)$\n\nIs the first-order theory of the field of Laurent series over $\\mathbb{F}_p$ decidable?\nIs the first-order theory of the field of rational functions over $\\mathbb{C}$ decidable?\n\nBoth questions concern the *complete theory* of a field $K$ in the first-order language of rings\n$\\{+, \\cdot, -, 0, 1\\}$: the set $\\mathrm{Th}(K)$ of all sentences true in $K$. The theory is\n*decidable* if there is an algorithm which decides, given a sentence, whether it lies in\n$\\mathrm{Th}(K)$. Since Mathlib has no computability structure on first-order sentences, this\nfile fixes a Gödel numbering of sentences (`Decidable.sentenceCode`, built from Mathlib's\n`FirstOrder.Language.BoundedFormula.listEncode`) and defines a theory to be decidable\n(`Decidable.IsDecidableTheory`) if some computable function `ℕ → Bool` decides membership on\nGödel numbers.\n\n*References:*\n- [Wikipedia, Decidability (logic)](https://en.wikipedia.org/wiki/Decidability_%28logic%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [B. Poonen, *Undecidable problems: a sampler*](https://arxiv.org/abs/1204.0299)\n- S. Anscombe, A. Fehm, *The existential theory of equicharacteristic henselian valued fields*,\n  Algebra & Number Theory 10 (2016), 665–683.\n- J. Denef, *The Diophantine problem for polynomial rings and fields of rational functions*,\n  Trans. Amer. Math. Soc. 242 (1978), 391–399.\n-/\n\nnamespace Decidable\n\nopen FirstOrder Language\n\nsection Theory\n\nvariable {L : Language} [Encodable (Σ n, L.Functions n)] [Encodable (Σ n, L.Relations n)]\n\n/--\nA Gödel numbering of the `L`-sentences, for a language `L` with encodable symbols: the code of a\nsentence `φ` is the code of its list of symbols `φ.listEncode`\n(see `FirstOrder.Language.BoundedFormula.listEncode`).\n-/\ndef sentenceCode (φ : L.Sentence) : ℕ :=\n  Encodable.encode (BoundedFormula.listEncode φ)\n\n/--\nAn `L`-theory `T` (a set of `L`-sentences) is *decidable* if there is an algorithm which, given a\nsentence `φ` (as its Gödel number `sentenceCode φ`), decides whether `φ ∈ T`.\n-/\ndef IsDecidableTheory (T : L.Theory) : Prop :=\n  ∃ f : ℕ → Bool, Computable f ∧ ∀ φ : L.Sentence, f (sentenceCode φ) = true ↔ φ ∈ T\n\n/-- The Gödel numbering `sentenceCode` is injective. -/\n@[category API, AMS 3]\ntheorem sentenceCode_injective : Function.Injective (sentenceCode (L := L)) := by\n  intro φ ψ h\n  have := BoundedFormula.listEncode_sigma_injective (L := L) (α := Empty)\n    (a₁ := ⟨0, φ⟩) (a₂ := ⟨0, ψ⟩) (Encodable.encode_injective h)\n  simpa using this\n\n/-- The empty theory is decidable. -/\n@[category API, AMS 3]\ntheorem isDecidableTheory_empty : IsDecidableTheory (∅ : L.Theory) :=\n  ⟨fun _ => false, Computable.const _, by simp⟩\n\n/-- The theory of all sentences is decidable. -/\n@[category API, AMS 3]\ntheorem isDecidableTheory_univ : IsDecidableTheory (Set.univ : L.Theory) :=\n  ⟨fun _ => true, Computable.const _, by simp⟩\n\nend Theory\n\n/-- The five function symbols `+`, `*`, `-`, `0`, `1` of the language of rings are encodable. -/\ninstance : Encodable (Σ n, Language.ring.Functions n) :=\n  Encodable.ofEquiv (Fin 5)\n    { toFun := fun f => match f with\n        | ⟨_, .add⟩ => 0\n        | ⟨_, .mul⟩ => 1\n        | ⟨_, .neg⟩ => 2\n        | ⟨_, .zero⟩ => 3\n        | ⟨_, .one⟩ => 4\n      invFun := ![⟨2, Ring.addFunc⟩, ⟨2, Ring.mulFunc⟩, ⟨1, Ring.negFunc⟩, ⟨0, Ring.zeroFunc⟩,\n        ⟨0, Ring.oneFunc⟩]\n      left_inv := fun ⟨_, f⟩ => by cases f <;> rfl\n      right_inv := fun i => by fin_cases i <;> rfl }\n\n/--\nIs the first-order theory of the field $\\mathbb{F}_p((t))$ of formal Laurent series over the\nprime field $\\mathbb{F}_p = \\mathbb{Z}/p\\mathbb{Z}$ (written $\\mathbb{Z}_p$ in the Wikipedia list)\ndecidable? That is, is the complete theory $\\mathrm{Th}(\\mathbb{F}_p((t)))$ of\n$\\mathbb{F}_p((t))$ in the language of rings $\\{+, \\cdot, -, 0, 1\\}$ a computable set of\nsentences?\n\nThe prime $p$ is an implicit parameter of the question; the formalization asks whether the\nanswer is positive for every prime $p$. The existential theory of $\\mathbb{F}_p((t))$ is known to\nbe decidable (Anscombe–Fehm, 2016), but the decidability of the full first-order theory is open.\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.i :\n    answer(sorry) ↔ ∀ (p : ℕ) [Fact p.Prime],\n      letI := Ring.compatibleRingOfRing (LaurentSeries (ZMod p))\n      IsDecidableTheory (Language.ring.completeTheory (LaurentSeries (ZMod p))) := by\n  sorry\n\n/--\nIs the first-order theory of the field $\\mathbb{C}(t)$ of rational functions in one variable\nover $\\mathbb{C}$ decidable? That is, is the complete theory $\\mathrm{Th}(\\mathbb{C}(t))$ of\n$\\mathbb{C}(t)$ in the language of rings $\\{+, \\cdot, -, 0, 1\\}$ (with no constant symbols for the\nelements of $\\mathbb{C}$) a computable set of sentences?\n\nThe Wikipedia list speaks of \"the field of polynomials over $\\mathbb{C}$\"; the polynomial ring\n$\\mathbb{C}[t]$ is not a field, and its existential theory is already undecidable (Denef, 1978),\nso the intended object is its field of fractions $\\mathbb{C}(t)$. Even Hilbert's tenth problem\nfor $\\mathbb{C}(t)$ is open (Kollár; see Poonen's survey).\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.ii :\n    answer(sorry) ↔\n      letI := Ring.compatibleRingOfRing (RatFunc ℂ)\n      IsDecidableTheory (Language.ring.completeTheory (RatFunc ℂ)) := by\n  sorry\n\nend Decidable\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None of substance. The table's readings (Z_p → F_p, 'field of polynomials over ℂ' → ℂ(t), language of rings without constants) are followed. One remark: the table says the prime p may be 'fixed arbitrary or quantified over all primes'; because the repository convention requires all quantifiers after `answer(sorry)`, the file quantifies over all primes, which turns the family of per-p questions into a single yes/no question (a negative answer would only mean failure for some prime).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Decidability of a theory is not available in Mathlib (there is no `Primcodable`/`Encodable` instance on first-order sentences). It is formalized via a Gödel numbering `sentenceCode φ := Encodable.encode (BoundedFormula.listEncode φ)`, composed entirely of standard Mathlib encodings (`List`, `Sum`, `Sigma`, `Fin`, `Empty`, `ℕ`, and Mathlib's `listEncode`-based `Encodable` instance for terms) plus an explicit finite encoding of the five ring function symbols. `IsDecidableTheory T := ∃ f : ℕ → Bool, Computable f ∧ ∀ φ, f (sentenceCode φ) = true ↔ φ ∈ T` (Mathlib's `Computable`, i.e. `Nat.Partrec`-based). This is the 'decision procedure on codes' formulation; it does not require the set of valid codes to be decidable and is equivalent to computability of `T` under any natural Primcodable structure on sentences. A reviewer should check they accept this as 'the theory is a computable set of sentences'.",
+    "The theory is `Language.ring.completeTheory K` = {φ | K ⊨ φ} in Mathlib's language of rings {+, *, -, 0, 1}; no constant symbol for the uniformizer t (in 𝔽_p((t))) nor for elements of ℂ (in ℂ(t)) is included, following the decomposition table. The structure is `Ring.compatibleRingOfRing K`, interpreting the symbols by the field operations.",
+    "Slot i: the source's 𝔽_p((t)) (written Z_p on Wikipedia) is `LaurentSeries (ZMod p)` (= `HahnSeries ℤ (ZMod p)`) with `[Fact p.Prime]`. Since the prime p is an implicit parameter and the repository's `answer(sorry) ↔ ...` convention (enforced by a linter) requires all quantifiers after `answer(sorry)`, the statement quantifies over all primes: `answer(True)` means Th(𝔽_p((t))) is decidable for every prime p, `answer(False)` means it is undecidable for at least one prime. This packages the per-p question into a single yes/no question, as permitted by the table's notes.",
+    "Slot ii: 'the field of polynomials over ℂ' is read as the field of rational functions ℂ(t) = `RatFunc ℂ` (per the table; ℂ[t] is not a field and its existential theory is undecidable by Denef 1978).",
+    "Both statements use `letI := Ring.compatibleRingOfRing K` inside the Prop to supply the `Language.ring.Structure`; the elaborated term is `@completeTheory Language.ring K (CompatibleRing.toStructure (compatibleRingOfRing K))`.",
+    "The generic definitions `sentenceCode`/`IsDecidableTheory` (for any language with encodable function and relation symbols) and the `Encodable (Σ n, Language.ring.Functions n)` instance are kept in the problem file (the sandbox only allows writing this file); they are reusable and could be moved to `FormalConjecturesForMathlib/ModelTheory/`. Three short `category API` lemmas (injectivity of `sentenceCode`, decidability of the empty and full theories) test the definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.encoding` (a `Computability.Encoding` with a non-finite alphabet, not usable with `Computable`/`ComputablePred`); `FirstOrder.Language.Term.instEncodableOfSigmaNatFunctions` (terms only); `Fintype.toEncodable`/`Encodable.ofCountable` (noncomputable choice-based encodings, unsuitable for a faithful computability notion).",
+     "name": "Decidable.sentenceCode",
+     "why_needed": "Mathlib provides only a `Computability.Encoding` and a `Countable` instance for bounded formulas, no `Encodable`/`Primcodable` instance on `L.Sentence`, so there is no way to speak of computable sets of sentences. `sentenceCode φ := Encodable.encode (BoundedFormula.listEncode φ)` is an explicit Gödel numbering built from Mathlib's own `listEncode` and standard `Encodable` instances."
+    },
+    {
+     "closest_existing_considered": "`ComputablePred` (requires a `Primcodable` instance on `L.Sentence`, which does not exist and would need a primitive-recursive decoder for formulas to construct faithfully); `FirstOrder.Language.Theory.IsComplete`/`IsSatisfiable` (semantic notions, not computability).",
+     "name": "Decidable.IsDecidableTheory",
+     "why_needed": "There is no notion of a decidable first-order theory in Mathlib or FormalConjecturesForMathlib. Defined as `∃ f : ℕ → Bool, Computable f ∧ ∀ φ, f (sentenceCode φ) = true ↔ φ ∈ T`."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Ring.instFintypeSymbolsRing` together with `Fintype.toEncodable` (noncomputable, so less transparent); `Sigma.encodable` (needs per-arity instances that do not exist).",
+     "name": "Decidable.instEncodableSigmaNatFunctionsRing (instance : Encodable (Σ n, Language.ring.Functions n))",
+     "why_needed": "Mathlib's `Encodable` instance for terms requires `Encodable (Σ n, L.Functions n)`, which Mathlib does not provide for `Language.ring` (it only has `Fintype Language.ring.Symbols` and `DecidableEq`). Given as an explicit equivalence with `Fin 5`."
+    }
+   ],
+   "per_slot": {
+    "decidable.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (p : ℕ) [Fact p.Prime], IsDecidableTheory (Language.ring.completeTheory (LaurentSeries (ZMod p)))`, where the ring-language structure on 𝔽_p((t)) = `LaurentSeries (ZMod p)` is `Ring.compatibleRingOfRing`, and `IsDecidableTheory T` says a computable `f : ℕ → Bool` decides membership in `T` on Gödel numbers of sentences. 'Z_p' read as F_p per the decomposition table."
+    },
+    "decidable.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ IsDecidableTheory (Language.ring.completeTheory (RatFunc ℂ))` with the ring-language structure from `Ring.compatibleRingOfRing`; the language of rings has no constants for elements of ℂ. 'Field of polynomials over ℂ' read as the field ℂ(t) = `RatFunc ℂ` per the decomposition table."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "decidable.parts.i": "/--\nIs the first-order theory of the field $\\mathbb{F}_p((t))$ of formal Laurent series over the\nprime field $\\mathbb{F}_p = \\mathbb{Z}/p\\mathbb{Z}$ (written $\\mathbb{Z}_p$ in the Wikipedia list)\ndecidable? That is, is the complete theory $\\mathrm{Th}(\\mathbb{F}_p((t)))$ of\n$\\mathbb{F}_p((t))$ in the language of rings $\\{+, \\cdot, -, 0, 1\\}$ a computable set of\nsentences?\n\nThe prime $p$ is an implicit parameter of the question; the formalization asks whether the\nanswer is positive for every prime $p$. The existential theory of $\\mathbb{F}_p((t))$ is known to\nbe decidable (Anscombe–Fehm, 2016), but the decidability of the full first-order theory is open.\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.i :\n    answer(sorry) ↔ ∀ (p : ℕ) [Fact p.Prime],\n      letI := Ring.compatibleRingOfRing (LaurentSeries (ZMod p))\n      IsDecidableTheory (Language.ring.completeTheory (LaurentSeries (ZMod p))) := by\n  sorry",
+    "decidable.parts.ii": "/--\nIs the first-order theory of the field $\\mathbb{C}(t)$ of rational functions in one variable\nover $\\mathbb{C}$ decidable? That is, is the complete theory $\\mathrm{Th}(\\mathbb{C}(t))$ of\n$\\mathbb{C}(t)$ in the language of rings $\\{+, \\cdot, -, 0, 1\\}$ (with no constant symbols for the\nelements of $\\mathbb{C}$) a computable set of sentences?\n\nThe Wikipedia list speaks of \"the field of polynomials over $\\mathbb{C}$\"; the polynomial ring\n$\\mathbb{C}[t]$ is not a field, and its existential theory is already undecidable (Denef, 1978),\nso the intended object is its field of fractions $\\mathbb{C}(t)$. Even Hilbert's tenth problem\nfor $\\mathbb{C}(t)$ is open (Kollár; see Poonen's survey).\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.ii :\n    answer(sorry) ↔\n      letI := Ring.compatibleRingOfRing (RatFunc ℂ)\n      IsDecidableTheory (Language.ring.completeTheory (RatFunc ℂ)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Decidability of the theories of $\\mathbb{F}_p((t))$ and $\\mathbb{C}(t)$\n\nWikipedia's list of unsolved problems in mathematics asks:\n\"Is the theory of the field of Laurent series over $\\mathbb{Z}_p$ decidable?\nof the field of polynomials over $\\mathbb{C}$?\"\n\nThe *theory* of a field $K$ is its complete first-order theory $\\mathrm{Th}(K)$, the set of all\nsentences in the language of rings $\\{+, \\cdot, -, 0, 1\\}$ that hold in $K$. It is *decidable* if\nthere is an algorithm which, given a sentence, decides whether the sentence belongs to\n$\\mathrm{Th}(K)$. Formally, sentences are Gödel numbered and the algorithm is a computable function\n$\\mathbb{N} \\to \\{\\mathrm{true}, \\mathrm{false}\\}$.\n\nThe two fields in the question are:\n- $\\mathbb{F}_p((t))$, the field of formal Laurent series over the prime field\n  $\\mathbb{F}_p = \\mathbb{Z}/p\\mathbb{Z}$, for a prime $p$. (Laurent series over the $p$-adic\n  integers do not form a field.) The existential theory of $\\mathbb{F}_p((t))$ in the language of\n  rings is decidable (Anscombe–Fehm), but the decidability of the full theory is open.\n- $\\mathbb{C}(t)$, the field of rational functions over $\\mathbb{C}$, that is, the field of\n  fractions of the polynomial ring $\\mathbb{C}[t]$ (which is not itself a field). Even the\n  existential theory of $\\mathbb{C}(t)$, i.e. Hilbert's tenth problem for $\\mathbb{C}(t)$, is open.\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Decidability (logic)](https://en.wikipedia.org/wiki/Decidability_%28logic%29)\n- [S. Anscombe, A. Fehm, *The existential theory of equicharacteristic henselian valued fields*, Algebra & Number Theory 10 (2016)](https://doi.org/10.2140/ant.2016.10.665)\n- [B. Poonen, *Undecidable problems: a sampler*](https://arxiv.org/abs/1204.0299)\n-/\n\nopen FirstOrder FirstOrder.Language\n\nnamespace Decidable\n\n/-- The five function symbols `+`, `*`, `-`, `0`, `1` of the language of rings, enumerated by\n`Fin 5`. -/\ndef ringFunctionsEquivFin : (Σ i, Language.ring.Functions i) ≃ Fin 5 where\n  toFun\n    | ⟨_, .add⟩ => 0\n    | ⟨_, .mul⟩ => 1\n    | ⟨_, .neg⟩ => 2\n    | ⟨_, .zero⟩ => 3\n    | ⟨_, .one⟩ => 4\n  invFun := ![⟨2, .add⟩, ⟨2, .mul⟩, ⟨1, .neg⟩, ⟨0, .zero⟩, ⟨0, .one⟩]\n  left_inv := by rintro ⟨_, f⟩; cases f <;> rfl\n  right_inv := by decide\n\n/-- An explicit encoding of the function symbols of the language of rings, so that the sentences\nof the language of rings can be Gödel numbered. -/\ninstance : Encodable (Σ i, Language.ring.Functions i) := .ofEquiv _ ringFunctionsEquivFin\n\nvariable {L : Language} [Encodable (Σ i, L.Functions i)] [Encodable (Σ i, L.Relations i)]\n\n/-- The Gödel number of an `L`-sentence `φ`: the natural number encoding the list\n`φ.listEncode` of symbols of `φ` (see `FirstOrder.Language.BoundedFormula.listEncode`). -/\ndef godelNumber (φ : L.Sentence) : ℕ :=\n  Encodable.encode φ.listEncode\n\n/-- An `L`-theory `T` (a set of `L`-sentences) is *decidable* if there is a computable function\n`f : ℕ → Bool` which, applied to the Gödel number of any sentence `φ`, returns `true` if and only\nif `φ ∈ T`. -/\ndef IsDecidableTheory (T : L.Theory) : Prop :=\n  ∃ f : ℕ → Bool, Computable f ∧ ∀ φ : L.Sentence, (f (godelNumber φ) = true ↔ φ ∈ T)\n\n/-- Gödel numbering is injective on sentences. -/\n@[category API, AMS 3]\ntheorem godelNumber_injective : Function.Injective (godelNumber (L := L)) := by\n  intro φ ψ h\n  have := BoundedFormula.listEncode_sigma_injective (Encodable.encode_injective h :\n    (⟨0, φ⟩ : Σ n, L.BoundedFormula Empty n).2.listEncode =\n      (⟨0, ψ⟩ : Σ n, L.BoundedFormula Empty n).2.listEncode)\n  simpa using this\n\n/-- The empty theory is decidable. -/\n@[category test, AMS 3]\ntheorem isDecidableTheory_empty : IsDecidableTheory (∅ : L.Theory) :=\n  ⟨fun _ => false, Computable.const _, by simp⟩\n\nattribute [local instance] FirstOrder.Ring.compatibleRingOfRing\n\n/--\nIs the complete first-order theory $\\mathrm{Th}(\\mathbb{F}_p((t)))$ of the field of formal Laurent\nseries over $\\mathbb{F}_p = \\mathbb{Z}/p\\mathbb{Z}$, in the language of rings, decidable? That is,\nis there an algorithm which, given a sentence $\\varphi$ in the language of rings, decides whether\n$\\mathbb{F}_p((t)) \\models \\varphi$?\n\nHere $p$ is an arbitrary prime, so the question is whether $\\mathrm{Th}(\\mathbb{F}_p((t)))$ is\ndecidable for every prime $p$.\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.i :\n    answer(sorry) ↔ ∀ (p : ℕ) [Fact p.Prime],\n      IsDecidableTheory (Language.ring.completeTheory (LaurentSeries (ZMod p))) := by\n  sorry\n\n/--\nIs the complete first-order theory $\\mathrm{Th}(\\mathbb{C}(t))$ of the field of rational functions\nover $\\mathbb{C}$ (the field of fractions of the polynomial ring $\\mathbb{C}[t]$), in the language of\nrings, decidable? That is, is there an algorithm which, given a sentence $\\varphi$ in the language\nof rings, decides whether $\\mathbb{C}(t) \\models \\varphi$?\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.ii :\n    answer(sorry) ↔ IsDecidableTheory (Language.ring.completeTheory (RatFunc ℂ)) := by\n  sorry\n\nend Decidable\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's readings (𝔽_p((t)) rather than ℤ_p((t)), and ℂ(t) rather than ℂ[t], both in the pure language of rings) are the standard ones and are confirmed by the cited Poonen survey (open status of Hilbert's tenth problem for ℂ(t)).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Read \"Laurent series over ℤ_p\" as 𝔽_p((t)) = `LaurentSeries (ZMod p)` with `[Fact p.Prime]`, following the decomposition table (ℤ_p((t)) for the p-adic integers is not a field).",
+    "Read \"field of polynomials over ℂ\" as the rational function field ℂ(t) = `RatFunc ℂ`, following the decomposition table (ℂ[t] is not a field).",
+    "The language is Mathlib's `Language.ring` = {+, *, -, 0, 1} with no extra constants (in particular no constant for t and no constants for elements of ℂ). Note that for 𝔽_p((t)) the existential theory in this language is decidable (Anscombe–Fehm) while with a constant for t it is open; the full theory is open in both languages, and the table prescribes the pure ring language.",
+    "Decidability is formalized as: ∃ computable f : ℕ → Bool such that for every sentence φ, f(⌜φ⌝) = true ↔ φ ∈ Th(K), where ⌜φ⌝ = `Encodable.encode φ.listEncode` uses Mathlib's list encoding of formulas together with an explicit `Encodable` instance on the five ring function symbols (via an equivalence with `Fin 5`). Mathlib has no `Primcodable`/`Encodable` instance for sentences, so `ComputablePred` on sentences could not be used directly; the ℕ → Bool formulation is the standard definition relative to an effective Gödel numbering and is independent of the choice of effective numbering. Injectivity of the numbering is proved as an API lemma.",
+    "The prime p is quantified inside the `answer(sorry) ↔ ...` (\"is Th(𝔽_p((t))) decidable for every prime p?\"), as permitted by the decomposition notes and required by the repository's answer linter (which rejects theorem parameters before `answer(sorry) ↔`). A per-prime variant with p as a parameter would have to disable that linter, so it was not added.",
+    "The theory of K is `Language.ring.completeTheory K = {φ | K ⊨ φ}` with the local instance `compatibleRingOfRing`, so `K ⊨ φ` is evaluated with the actual field operations of K (checked by printing the elaborated statement).",
+    "AMS tags 3 (mathematical logic) and 12 (field theory and polynomials)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Ring.instFintypeSymbolsRing` (a `Fintype` on all symbols, but it gives no computable `Encodable` on the sigma type of function symbols); `Encodable.ofCountable` (noncomputable, non-canonical encoding).",
+     "name": "Decidable.ringFunctionsEquivFin",
+     "why_needed": "An explicit enumeration of the five function symbols of `Language.ring` by `Fin 5`, used to build a computable `Encodable (Σ i, Language.ring.Functions i)` instance, which Mathlib lacks and which is needed for Mathlib's `Encodable (L.Term α)` instance and hence for numbering formulas."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Fintype Language.ring.Symbols`; no `Encodable`/`Primcodable` instance for ring symbols exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Decidable.instEncodableSigmaNatFunctionsRing",
+     "why_needed": "`Encodable` instance on the function symbols of the language of rings, obtained by `Encodable.ofEquiv` from `ringFunctionsEquivFin`; required so that Mathlib's term/formula encodings apply to `Language.ring`."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.encoding`, `BoundedFormula.listEncode`, `Encodable (L.Term α)` (used as building blocks).",
+     "name": "Decidable.godelNumber",
+     "why_needed": "A Gödel numbering `L.Sentence → ℕ` (`Encodable.encode φ.listEncode`) for languages with encodable symbols; Mathlib's `BoundedFormula.encoding` only encodes into lists over an alphabet and provides no `Encodable`/`Primcodable` instance for formulas (an explicit TODO in Mathlib.ModelTheory.Encoding)."
+    },
+    {
+     "closest_existing_considered": "`ComputablePred` (requires a `Primcodable` instance on sentences, which does not exist); `FirstOrder.Language.Theory.IsComplete`/`IsSatisfiable` (different notions).",
+     "name": "Decidable.IsDecidableTheory",
+     "why_needed": "The notion of a decidable first-order theory (a computable `ℕ → Bool` deciding membership via Gödel numbers) is absent from Mathlib and the repository."
+    }
+   ],
+   "per_slot": {
+    "decidable.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (p : ℕ) [Fact p.Prime], IsDecidableTheory (Language.ring.completeTheory (LaurentSeries (ZMod p)))`, where `LaurentSeries (ZMod p)` is Mathlib's field 𝔽_p((t)) (HahnSeries over ℤ with coefficients in ZMod p), the ring-language structure is Mathlib's `compatibleRingOfRing` (interpreting +, *, -, 0, 1 by the field operations), and `IsDecidableTheory` is a bespoke definition: there is a computable `f : ℕ → Bool` deciding membership in the theory via a Gödel numbering of sentences built from Mathlib's `BoundedFormula.listEncode`."
+    },
+    "decidable.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ IsDecidableTheory (Language.ring.completeTheory (RatFunc ℂ))`, i.e. the complete first-order theory of ℂ(t) in the pure language of rings (no constants for elements of ℂ) is decidable, using the same bespoke decidability definition."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "decidable.parts.i": "/--\nIs the complete first-order theory $\\mathrm{Th}(\\mathbb{F}_p((t)))$ of the field of formal Laurent\nseries over $\\mathbb{F}_p = \\mathbb{Z}/p\\mathbb{Z}$, in the language of rings, decidable? That is,\nis there an algorithm which, given a sentence $\\varphi$ in the language of rings, decides whether\n$\\mathbb{F}_p((t)) \\models \\varphi$?\n\nHere $p$ is an arbitrary prime, so the question is whether $\\mathrm{Th}(\\mathbb{F}_p((t)))$ is\ndecidable for every prime $p$.\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.i :\n    answer(sorry) ↔ ∀ (p : ℕ) [Fact p.Prime],\n      IsDecidableTheory (Language.ring.completeTheory (LaurentSeries (ZMod p))) := by\n  sorry",
+    "decidable.parts.ii": "/--\nIs the complete first-order theory $\\mathrm{Th}(\\mathbb{C}(t))$ of the field of rational functions\nover $\\mathbb{C}$ (the field of fractions of the polynomial ring $\\mathbb{C}[t]$), in the language of\nrings, decidable? That is, is there an algorithm which, given a sentence $\\varphi$ in the language\nof rings, decides whether $\\mathbb{C}(t) \\models \\varphi$?\n-/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.ii :\n    answer(sorry) ↔ IsDecidableTheory (Language.ring.completeTheory (RatFunc ℂ)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Decidability of theories of function fields\n\nThis file asks whether the complete first-order theories of two fields are decidable in the\nlanguage of rings.\n\n*References:*\n- [Wikipedia, *Decidability (logic)*](https://en.wikipedia.org/wiki/Decidability_%28logic%29)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace Decidable\n\nopen FirstOrder\n\n/-- A fixed numerical code for a function symbol in the language of rings. -/\nprivate def ringFuncCode : {n : ℕ} → ringFunc n → ℕ\n  | _, .add => 0\n  | _, .mul => 1\n  | _, .neg => 2\n  | _, .zero => 3\n  | _, .one => 4\n\n/-- A fixed Gödel numbering of terms in the language of rings. -/\nprivate def ringTermCode {α : Type*} (varCode : α → ℕ) : Language.ring.Term α → ℕ\n  | .var x => Nat.pair 0 (varCode x)\n  | .func f ts => Nat.pair 1 <| Nat.pair (ringFuncCode f) <|\n      Encodable.encode ((List.finRange _).map fun i ↦ ringTermCode varCode (ts i))\n\n/-- A fixed Gödel numbering of bounded formulas in the language of rings. -/\nprivate def ringFormulaCode {α : Type*} (varCode : α → ℕ) {n : ℕ} :\n    Language.ring.BoundedFormula α n → ℕ\n  | .falsum => Nat.pair 0 0\n  | .equal t u => Nat.pair 1 <| Nat.pair\n      (ringTermCode (Sum.elim varCode Fin.val) t)\n      (ringTermCode (Sum.elim varCode Fin.val) u)\n  | .rel r _ => Empty.elim r\n  | .imp φ ψ => Nat.pair 2 <| Nat.pair (ringFormulaCode varCode φ) (ringFormulaCode varCode ψ)\n  | .all φ => Nat.pair 3 (ringFormulaCode varCode φ)\n\n/-- The fixed Gödel numbering of sentences in the language of rings used in this file. -/\nprivate def ringSentenceCode (φ : Language.ring.Sentence) : ℕ :=\n  ringFormulaCode Empty.elim φ\n\n/-- The complete first-order theory of a ring is decidable if a total computable Boolean function\ncorrectly decides, from the fixed Gödel code above, whether every ring-language sentence is true. -/\ndef IsDecidableRingTheory (R : Type*) [Ring R] : Prop :=\n  letI := Ring.compatibleRingOfRing R\n  ∃ decideTruth : ℕ → Bool, Computable decideTruth ∧\n    ∀ φ : Language.ring.Sentence, decideTruth (ringSentenceCode φ) = true ↔ R ⊨ φ\n\nnamespace parts\n\n/--\nIs the complete first-order theory of the Laurent-series field\n$\\mathbb{F}_p((t))$ decidable in the language of rings, for every prime $p$?\nHere $\\mathbb{F}_p$ is represented by `ZMod p`.\n-/\n@[category research open, AMS 3]\ntheorem i : answer(sorry) ↔ ∀ p : ℕ, p.Prime →\n    IsDecidableRingTheory (LaurentSeries (ZMod p)) := by\n  sorry\n\n/--\nIs the complete first-order theory of the rational-function field $\\mathbb{C}(t)$ decidable in the\nlanguage of rings, without constants naming elements of $\\mathbb{C}$?\n-/\n@[category research open, AMS 3]\ntheorem ii : answer(sorry) ↔ IsDecidableRingTheory (RatFunc ℂ) := by\n  sorry\n\nend parts\n\nend Decidable\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Read the source's `Z_p` as the prime field `F_p = ZMod p`, and formalized the first question using `LaurentSeries (ZMod p)`.",
+    "Used the decomposition's all-primes reading for part i: the unknown answer is positive exactly when the theory is decidable for every natural prime p.",
+    "Read the source's terse 'field of polynomials over C' as the rational-function field `RatFunc ℂ`, i.e. C(t), rather than the non-field polynomial ring C[t].",
+    "Used `FirstOrder.Language.ring`, which has only the ring operations and therefore adds no constants naming elements of ℂ.",
+    "Defined decidability by agreement of a total `Computable` Boolean function with semantic truth on every sentence under a fixed transparent Gödel numbering. The function is unconstrained on natural numbers that do not code sentences."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.completeTheory`, `FirstOrder.Language.Sentence.Realize`, and `ComputablePred`; the latter cannot be applied because Mathlib explicitly lacks a `Primcodable` instance for first-order formulas.",
+     "name": "Decidable.IsDecidableRingTheory",
+     "why_needed": "Mathlib has complete first-order theories and computable functions, but no predicate saying that the complete theory of a ring structure is a computable set of sentences."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.ringFunc` has `DecidableEq` and the ring language has a `Fintype` of symbols, but no canonical `Primcodable` coding suitable for `ComputablePred`.",
+     "name": "Decidable.ringFuncCode",
+     "why_needed": "Provides the function-symbol component of a fixed effective Gödel numbering for the finite ring language."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Term.encoding` and `Term.listEncode`; Mathlib's ModelTheory.Encoding file notes `Primcodable` instances for terms as a TODO.",
+     "name": "Decidable.ringTermCode",
+     "why_needed": "Provides a fixed constructor-tagged numerical coding of ring-language terms used in sentence codes."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.encoding` and `BoundedFormula.listEncode`; these yield `Encodable` only under symbol encodings and do not provide the `Primcodable` interface required by Mathlib computability predicates.",
+     "name": "Decidable.ringFormulaCode / Decidable.ringSentenceCode",
+     "why_needed": "Provides a fixed constructor-tagged Gödel numbering of bounded ring formulas and, in particular, closed ring sentences."
+    }
+   ],
+   "per_slot": {
+    "decidable.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "decidable.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Decidability of theories of function fields\n\n*Reference:* [Wikipedia, Decidability (logic)](https://en.wikipedia.org/wiki/Decidability_%28logic%29)\n-/\n\nnamespace Decidable\n\n/-- The complete first-order theory of a ring in the language of rings is decidable if, for some\n`Primcodable` Gödel coding of ring sentences, truth in the ring is a computable predicate. -/\ndef IsDecidableRingTheory (R : Type*) [Ring R] : Prop :=\n  let _ := FirstOrder.Ring.compatibleRingOfRing R\n  ∃ coding : Primcodable FirstOrder.Language.ring.Sentence,\n    @ComputablePred FirstOrder.Language.ring.Sentence coding fun φ ↦ R ⊨ φ\n\n/-- For every prime $p$, is the complete first-order theory of the Laurent series field\n$\\mathbb{F}_p((t))$ decidable in the language of rings? -/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.i :\n    answer(sorry) ↔ ∀ᵉ (p : ℕ) (_ : p.Prime),\n      IsDecidableRingTheory (LaurentSeries (ZMod p)) := by\n  sorry\n\n/-- Is the complete first-order theory of the rational function field $\\mathbb{C}(t)$ decidable\nin the language of rings, without constants for elements of $\\mathbb{C}$? -/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.ii :\n    answer(sorry) ↔ IsDecidableRingTheory (RatFunc ℂ) := by\n  sorry\n\nend Decidable\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Read the source's `Z_p` as the prime field `F_p = ZMod p`, not the p-adic integers.",
+    "Formalized part (i) as one yes-or-no question asserting decidability for every prime p; this follows the decomposition table's permitted all-primes quantification and avoids treating the implicit p as a fixed global constant.",
+    "Read the source's terse 'field of polynomials over C' as the rational function field `RatFunc ℂ`, since `ℂ[t]` is not a field.",
+    "Used Mathlib's pure language of rings, so the theory of `RatFunc ℂ` has no constant symbols naming elements of ℂ.",
+    "Defined decidability as computability of semantic truth for all ring-language sentences under an existentially supplied `Primcodable` Gödel coding. Mathlib's formula encoding currently gives only `Encodable`/`Countable` syntax and explicitly lacks the `Primcodable` instance required by `ComputablePred`.",
+    "Used the canonical ring-language structure supplied by `FirstOrder.Ring.compatibleRingOfRing`, ensuring the interpreted symbols are exactly 0, 1, addition, multiplication, and negation."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.completeTheory` represents semantic truth as a set of sentences, and `ComputablePred` represents computable predicates, but `ComputablePred` requires `Primcodable` syntax while `FirstOrder.Language.BoundedFormula.encoding` currently supplies only an `Encoding`/`Encodable` route and Mathlib lists formula `Primcodable` instances as a TODO.",
+     "name": "Decidable.IsDecidableRingTheory",
+     "why_needed": "To state that the complete first-order ring theory of a concrete ring is a computable set of sentences despite the absence of a Mathlib `Primcodable` instance for first-order sentences."
+    }
+   ],
+   "per_slot": {
+    "decidable.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "decidable.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "decidable.parts.i": "/-- For every prime $p$, is the complete first-order theory of the Laurent series field\n$\\mathbb{F}_p((t))$ decidable in the language of rings? -/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.i :\n    answer(sorry) ↔ ∀ᵉ (p : ℕ) (_ : p.Prime),\n      IsDecidableRingTheory (LaurentSeries (ZMod p)) := by\n  sorry",
+    "decidable.parts.ii": "/-- Is the complete first-order theory of the rational function field $\\mathbb{C}(t)$ decidable\nin the language of rings, without constants for elements of $\\mathbb{C}$? -/\n@[category research open, AMS 3 12]\ntheorem decidable.parts.ii :\n    answer(sorry) ↔ IsDecidableRingTheory (RatFunc ℂ) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Decidability of two field theories\n\nThis file asks whether the complete first-order theories of two function fields are decidable.\nThe language used is the language of rings, without named elements of the coefficient fields.\n\n*Reference:*\n\n- [Wikipedia, Decidability (logic)](https://en.wikipedia.org/wiki/Decidability_%28logic%29)\n-/\n\nnamespace Decidable\n\n/-- Terms in the first-order language of rings with `n` de Bruijn variables. -/\ninductive RingTerm : ℕ → Type\n  | var {n : ℕ} : Fin n → RingTerm n\n  | zero {n : ℕ} : RingTerm n\n  | one {n : ℕ} : RingTerm n\n  | neg {n : ℕ} : RingTerm n → RingTerm n\n  | add {n : ℕ} : RingTerm n → RingTerm n → RingTerm n\n  | mul {n : ℕ} : RingTerm n → RingTerm n → RingTerm n\n\n/-- Formulas in the first-order language of rings with `n` de Bruijn variables. -/\ninductive RingFormula : ℕ → Type\n  | falsum {n : ℕ} : RingFormula n\n  | equal {n : ℕ} : RingTerm n → RingTerm n → RingFormula n\n  | imp {n : ℕ} : RingFormula n → RingFormula n → RingFormula n\n  | all {n : ℕ} : RingFormula (n + 1) → RingFormula n\n\n/-- The value of a term in a commutative ring under a variable assignment. -/\ndef RingTerm.realize {K : Type*} [CommRing K] {n : ℕ} (v : Fin n → K) : RingTerm n → K\n  | .var i => v i\n  | .zero => 0\n  | .one => 1\n  | .neg t => -t.realize v\n  | .add t u => t.realize v + u.realize v\n  | .mul t u => t.realize v * u.realize v\n\n/-- Truth of a ring-language formula under a variable assignment. -/\ndef RingFormula.Realize {K : Type*} [CommRing K] {n : ℕ} (v : Fin n → K) :\n    RingFormula n → Prop\n  | .falsum => False\n  | .equal t u => t.realize v = u.realize v\n  | .imp φ ψ => φ.Realize v → ψ.Realize v\n  | .all φ => ∀ x, φ.Realize (Fin.cases x v)\n\n/-- The effective Gödel coding of ring-language terms used in this file. -/\ninductive RingTerm.Code : {n : ℕ} → ℕ → RingTerm n → Prop\n  | var {n : ℕ} (i : Fin n) : Code (6 * (i : ℕ)) (.var i)\n  | zero {n : ℕ} : Code (n := n) 1 .zero\n  | one {n : ℕ} : Code (n := n) 2 .one\n  | neg {n t c} : Code (n := n) c t → Code (6 * c + 3) (.neg t)\n  | add {n t u c d} : Code (n := n) c t → Code d u →\n      Code (6 * Nat.pair c d + 4) (.add t u)\n  | mul {n t u c d} : Code (n := n) c t → Code d u →\n      Code (6 * Nat.pair c d + 5) (.mul t u)\n\n/-- The effective Gödel coding of ring-language formulas used in this file. -/\ninductive RingFormula.Code : {n : ℕ} → ℕ → RingFormula n → Prop\n  | falsum {n : ℕ} : Code (n := n) 0 .falsum\n  | equal {n t u c d} : RingTerm.Code (n := n) c t → RingTerm.Code d u →\n      Code (4 * Nat.pair c d + 1) (.equal t u)\n  | imp {n φ ψ c d} : Code (n := n) c φ → Code d ψ →\n      Code (4 * Nat.pair c d + 2) (.imp φ ψ)\n  | all {n φ c} : Code (n := n + 1) c φ → Code (4 * c + 3) (.all φ)\n\n/-- The complete ring-language theory of `K` is decidable when truth of its coded sentences is a\ncomputable predicate. Codes which do not represent a sentence are rejected. -/\ndef RingTheoryIsDecidable (K : Type*) [CommRing K] : Prop :=\n  ComputablePred fun c : ℕ ↦\n    ∃ φ : RingFormula 0, RingFormula.Code c φ ∧ φ.Realize (fun i : Fin 0 ↦ (i.elim0 : K))\n\nnamespace parts\n\n/--\nIs the complete first-order theory of the Laurent series field\n$\\mathbb{F}_p((t))$ decidable in the language of rings, for every prime $p$?\n-/\n@[category research open, AMS 3]\ntheorem i : answer(sorry) ↔ ∀ p : ℕ, p.Prime → RingTheoryIsDecidable (LaurentSeries (ZMod p)) := by\n  sorry\n\n/--\nIs the complete first-order theory of the rational function field $\\mathbb{C}(t)$ decidable in the\nlanguage of rings, with no constants naming elements of $\\mathbb{C}$?\n-/\n@[category research open, AMS 3]\ntheorem ii : answer(sorry) ↔ RingTheoryIsDecidable (RatFunc ℂ) := by\n  sorry\n\nend parts\n\nend Decidable\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the source's `\\mathbb{Z}_p` as the prime field `\\mathbb{F}_p = ZMod p`, as required by the decomposition; `p.Prime` excludes the degenerate moduli 0 and 1.",
+    "Quantified over all prime `p`. The quantifier lies outside each individual `ComputablePred` witness, so this asks that every fixed prime's theory be decidable and does not impose an unintended single algorithm uniform in `p`.",
+    "Interpreted the source's terse 'field of polynomials over C' as the rational function field `RatFunc ℂ = ℂ(t)`, since `ℂ[t]` is not a field.",
+    "Used the pure language of rings: terms have 0, 1, negation, addition, and multiplication; formulas have equality, falsity, implication, and universal quantification. Other Boolean connectives and existential quantification are effective abbreviations, so this presents the full first-order theory, not only an existential fragment.",
+    "Used explicit natural-number Gödel codes and made malformed codes false. This avoids relying on a non-effective arbitrary enumeration; Mathlib's `ModelTheory.Encoding` explicitly lists `Primcodable` instances for terms and formulas as a TODO.",
+    "Wrapped both yes/no questions as `answer(sorry) ↔ ...`, following the repository convention. A positive answer means the corresponding complete theory is a computable predicate on coded sentences."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FirstOrder.Language.ring.Term`; Mathlib has its abstract syntax but no `Primcodable` instance for it.",
+     "name": "Decidable.RingTerm",
+     "why_needed": "Provides an effectively presentable syntax of terms in the pure ring language, indexed by the number of in-scope de Bruijn variables."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.ring.BoundedFormula` and `Sentence`; `Mathlib.ModelTheory.Encoding` explicitly leaves their `Primcodable` instances as a TODO.",
+     "name": "Decidable.RingFormula",
+     "why_needed": "Provides full first-order ring formulas and closed sentences with de Bruijn-indexed bound variables."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Term.realize`; it applies to Mathlib's abstract syntax rather than the effective local presentation.",
+     "name": "Decidable.RingTerm.realize",
+     "why_needed": "Interprets the bespoke ring terms in a commutative ring."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.Realize` and `Sentence.Realize`; these apply to Mathlib's syntax, for which the required effective coding is absent.",
+     "name": "Decidable.RingFormula.Realize",
+     "why_needed": "Defines standard first-order truth for the bespoke formulas, including arbitrary universal quantification."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Term.encoding`; this is a general list encoding, but Mathlib explicitly does not provide the computability/`Primcodable` infrastructure needed to state `ComputablePred` on those terms.",
+     "name": "Decidable.RingTerm.Code",
+     "why_needed": "Gives an explicit effective Gödel numbering of ring terms by natural numbers, with disjoint constructor tags and `Nat.pair` for binary nodes."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.BoundedFormula.encoding`; its file lists formula `Primcodable` instances and computability facts as TODOs.",
+     "name": "Decidable.RingFormula.Code",
+     "why_needed": "Gives an explicit effective Gödel numbering of formulas and ensures only codes of closed formulas enter the complete theory predicate."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.completeTheory` together with `ComputablePred`; these cannot be directly combined because Mathlib lacks a `Primcodable` instance for first-order sentences.",
+     "name": "Decidable.RingTheoryIsDecidable",
+     "why_needed": "Packages decidability of a structure's complete pure ring-language theory as `ComputablePred` on the explicit sentence codes, rejecting malformed codes."
+    }
+   ],
+   "per_slot": {
+    "decidable.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "decidable.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  }
+ ],
+ "chosen": {
+  "decidable.parts.i": "c05",
+  "decidable.parts.ii": null
+ },
+ "id": "wp-decidable",
+ "main_attempt": "c05"
+}

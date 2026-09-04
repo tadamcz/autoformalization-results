@@ -1,0 +1,588 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Unknotting problem\n\nThe unknotting problem asks whether a finite representation of a knot can be recognized as\nrepresenting the unknot in deterministic polynomial time.\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Unknotting_problem)\n-/\n\nopen Computability Turing\n\nnamespace UnknottingProblem\n\n/-- A point in three-dimensional real space. -/\nabbrev Point := Fin 3 → ℝ\n\n/-- Parses a self-delimiting bit string into binary words. A data bit is prefixed by `true`,\nwhile `false` separates consecutive words. -/\ndef decodeBinaryWordsAux : List Bool → List Bool → Option (List (List Bool))\n  | [], word => some [word.reverse]\n  | false :: code, word =>\n      (decodeBinaryWordsAux code []).map fun words => word.reverse :: words\n  | true :: bit :: code, word => decodeBinaryWordsAux code (bit :: word)\n  | [true], _ => none\n\n/-- Parses a bit string as a list of binary natural numbers. -/\ndef decodeNumbers (code : List Bool) : Option (List ℕ) :=\n  (decodeBinaryWordsAux code []).map fun words => words.map Computability.decodeNat\n\n/-- Groups a list of natural numbers into points in three-dimensional real space. -/\ndef numbersToVertices : List ℕ → Option (List Point)\n  | [] => some []\n  | x :: y :: z :: ns =>\n      (numbersToVertices ns).map fun vertices => ![(x : ℝ), (y : ℝ), (z : ℝ)] :: vertices\n  | _ => none\n\n/-- Decodes a bit string as the vertices of a closed polygonal curve in real three-space. -/\ndef decodePolygon (code : List Bool) : Option (List Point) :=\n  (decodeNumbers code).bind numbersToVertices\n\n/-- The geometric image of the closed polygonal curve through the listed vertices, in order. -/\ndef polygonImage (vertices : List Point) : Set Point :=\n  {p | ∃ i : ℕ, i + 1 < vertices.length ∧\n      p ∈ segment ℝ (vertices.getD i 0) (vertices.getD (i + 1) 0)} ∪\n    segment ℝ (vertices.getD (vertices.length - 1) 0) (vertices.getD 0 0)\n\n/-- A fixed triangular polygonal representative of the unknot. -/\ndef standardUnknot : Set Point :=\n  polygonImage [![0, 0, 0], ![1, 0, 0], ![0, 1, 0]]\n\n/-- A polygon represents the unknot when an ambient homeomorphism of real three-space carries its\ngeometric image to the fixed triangular unknot. -/\ndef RepresentsUnknot (vertices : List Point) : Prop :=\n  ∃ h : Point ≃ₜ Point, h '' polygonImage vertices = standardUnknot\n\n/-- The decision problem on bit strings which accepts exactly encodings of polygonal unknots.\nMalformed encodings and encodings not representing the unknot are rejected. -/\nnoncomputable def unknotLanguage (code : List Bool) : Bool :=\n  match decodePolygon code with\n  | none => false\n  | some vertices => @ite Bool (RepresentsUnknot vertices) (Classical.propDecidable _) true false\n\n/--\n**Unknotting problem.** Can unknots, given by a finite polygonal-knot representation, be\nrecognized by a deterministic Turing machine in time polynomial in the representation size?\n\nHere bit strings encode closed polygonal curves in $\\mathbb{R}^3$, and `unknotLanguage` accepts\nexactly those whose geometric image is ambiently homeomorphic to a fixed triangular unknot. The\nright-hand side says precisely that this decision problem belongs to the complexity class P.\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem : answer(sorry) ↔\n    Nonempty (TM2ComputableInPolyTime finEncodingListBool finEncodingBoolBool unknotLanguage) := by\n  sorry\n\nend UnknottingProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used a concrete finite PL-knot representation: bit strings encode ordered vertices of a closed polygonal curve in ℝ³ with nonnegative integer coordinates. Every tame knot has such a lattice-polygon representative after scaling and translation.",
+    "Used a self-delimiting binary serialization: each coordinate bit is prefixed by `true`, and `false` separates coordinates. Thus serialization has constant-factor overhead relative to the coordinate bit lengths, and the Mathlib Turing-machine bound is measured in the actual input length.",
+    "Defined unknottedness by existence of an ambient homeomorphism of ℝ³ carrying the polygonal image to a fixed triangular circle. For polygonal (tame) knots this is the standard unknot condition; using homeomorphism rather than ambient isotopy does not change whether a knot is the unknot.",
+    "The language returns false on malformed codes and on polygonal images that are not ambiently homeomorphic to the standard unknot, including degenerate and self-intersecting images.",
+    "Expressed class-P membership directly as nonemptiness of Mathlib's `TM2ComputableInPolyTime` structure using the repository's identity encoding of `List Bool` and Mathlib's Boolean output encoding. A positive `answer(sorry)` therefore means that unknot recognition is in P."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "The underlying type `Fin 3 → ℝ` already has all needed Mathlib topology and affine structure; the abbreviation only makes the statement readable.",
+     "name": "UnknottingProblem.Point",
+     "why_needed": "Provides the concrete ambient space for polygonal knot representatives."
+    },
+    {
+     "closest_existing_considered": "Mathlib and FormalConjecturesForMathlib provide finite encodings and list splitting, but no parser for a variable-length sequence of binary naturals with constant-overhead delimiters.",
+     "name": "UnknottingProblem.decodeBinaryWordsAux",
+     "why_needed": "Parses a concrete self-delimiting binary serialization into coordinate words while detecting a truncated escape prefix."
+    },
+    {
+     "closest_existing_considered": "Uses `Computability.decodeNat`; only the sequence framing is bespoke.",
+     "name": "UnknottingProblem.decodeNumbers",
+     "why_needed": "Turns the parsed binary words into natural-number coordinates using Mathlib's binary natural decoder."
+    },
+    {
+     "closest_existing_considered": "No existing knot or polygon serialization primitive was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "UnknottingProblem.numbersToVertices",
+     "why_needed": "Groups the decoded coordinate sequence into triples and rejects a non-multiple-of-three sequence."
+    },
+    {
+     "closest_existing_considered": "No existing finite knot-diagram or PL-knot decoder was found.",
+     "name": "UnknottingProblem.decodePolygon",
+     "why_needed": "Combines syntax parsing and coordinate grouping into the concrete partial decoder used by the decision language."
+    },
+    {
+     "closest_existing_considered": "Built from Mathlib's `segment`; no existing closed-polygon realization for a list was found.",
+     "name": "UnknottingProblem.polygonImage",
+     "why_needed": "Defines the geometric realization of an ordered vertex list as consecutive line segments plus the closing segment."
+    },
+    {
+     "closest_existing_considered": "No standard unknot object exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "UnknottingProblem.standardUnknot",
+     "why_needed": "Fixes a concrete triangular polygonal representative against which unknottedness is tested."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Homeomorph` and basic quandle theory, but no knot, knot-diagram, ambient-isotopy, or unknot predicate.",
+     "name": "UnknottingProblem.RepresentsUnknot",
+     "why_needed": "Defines the topological semantics of a polygonal unknot via an ambient homeomorphism."
+    },
+    {
+     "closest_existing_considered": "The repository's P-vs-NP file abstracts arbitrary Boolean decision problems, but there was no existing unknot language.",
+     "name": "UnknottingProblem.unknotLanguage",
+     "why_needed": "Forms the Boolean characteristic function of valid encoded polygonal unknots required by `TM2ComputableInPolyTime`."
+    }
+   ],
+   "per_slot": {
+    "unknotting_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "unknotting_problem": "/--\n**Unknotting problem.** Can unknots, given by a finite polygonal-knot representation, be\nrecognized by a deterministic Turing machine in time polynomial in the representation size?\n\nHere bit strings encode closed polygonal curves in $\\mathbb{R}^3$, and `unknotLanguage` accepts\nexactly those whose geometric image is ambiently homeomorphic to a fixed triangular unknot. The\nright-hand side says precisely that this decision problem belongs to the complexity class P.\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem : answer(sorry) ↔\n    Nonempty (TM2ComputableInPolyTime finEncodingListBool finEncodingBoolBool unknotLanguage) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\nimport FormalConjectures.Millenium.PvsNP\n\n/-!\n# The unknotting problem\n\nThe unknotting problem asks whether unknots can be recognized in polynomial time: given a\nfinite description of a knot, decide in time polynomial in the size of the description whether\nthe knot is the trivial knot. In other words, is the unknotting problem in the complexity\nclass `P`?\n\nThe problem is known to be in `NP` (Hass, Lagarias and Pippenger) and in `co-NP` (Lackenby;\nKuperberg assuming GRH). Membership in `P` is open; Lackenby has announced a quasi-polynomial\ntime algorithm.\n\nWe follow Hass, Lagarias and Pippenger and represent a knot by a *polygonal representation*:\nthe list of the vertices of a closed polygon in `ℝ³`, in cyclic order, with integer\ncoordinates written in binary. They show that this representation is polynomial-time equivalent\nto knot diagrams (with the crossing number as size). Since `P` is closed under complement, it\ndoes not matter whether one asks to recognize unknottedness or knottedness.\n\nA polygon is the unknot when some homeomorphism of `ℝ³` maps it onto the standard round\ncircle. An input that does not describe a simple closed curve is never an unknot. The\ndecision problem is formalised as a language over `{0, 1}`: a bit string is in the language when\nit is the code of a polygon that is the unknot. This language is in `P` if and only if the\nunknot can be recognized in polynomial time.\n\n*References:*\n- [Wikipedia, Unknotting problem](https://en.wikipedia.org/wiki/Unknotting_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- J. Hass, J. C. Lagarias, N. Pippenger, *The computational complexity of knot and link\n  problems*, J. ACM 46 (1999), 185–211. [arXiv:math/9807016](https://arxiv.org/abs/math/9807016)\n- M. Lackenby, *The efficient certification of knottedness and Thurston norm*, Adv. Math. 387\n  (2021). [arXiv:1604.00290](https://arxiv.org/abs/1604.00290)\n-/\n\nopen Computability ComplexityTheory\n\nnamespace UnknottingProblem\n\n/-- The point of `ℝ³` with integer coordinates `v 0, v 1, v 2`. -/\ndef toPoint (v : Fin 3 → ℤ) : EuclideanSpace ℝ (Fin 3) :=\n  WithLp.toLp 2 fun i => (v i : ℝ)\n\n/-- The closed polygon in `ℝ³` with vertices `v₀, v₁, …, vₙ₋₁` (in this cyclic order): the union\nof the straight segments `[vᵢ, vᵢ₊₁]`, indices taken modulo `n`. -/\ndef polygon (v : List (Fin 3 → ℤ)) : Set (EuclideanSpace ℝ (Fin 3)) :=\n  ⋃ e ∈ v.zip (v.rotate 1), segment ℝ (toPoint e.1) (toPoint e.2)\n\n/-- The standard unknot: the unit circle in the coordinate plane `x₂ = 0` of `ℝ³`. -/\ndef standardCircle : Set (EuclideanSpace ℝ (Fin 3)) :=\n  {x | ‖x‖ = 1 ∧ x 2 = 0}\n\n/-- A subset `K ⊆ ℝ³` is an unknot (a trivial knot) if some homeomorphism of `ℝ³` maps `K` onto\nthe standard circle. In particular `K` is then a simple closed curve. -/\ndef IsUnknot (K : Set (EuclideanSpace ℝ (Fin 3))) : Prop :=\n  ∃ h : EuclideanSpace ℝ (Fin 3) ≃ₜ EuclideanSpace ℝ (Fin 3), h '' K = standardCircle\n\n/-- The binary code of an integer: a sign bit followed by the binary digits of its absolute\nvalue. -/\ndef encodeInt (z : ℤ) : List Bool :=\n  decide (z < 0) :: encodeNat z.natAbs\n\n/-- Decoding of `encodeInt`. -/\ndef decodeInt : List Bool → ℤ\n  | [] => 0\n  | s :: l => if s then -(decodeNat l : ℤ) else decodeNat l\n\nlemma decodeInt_encodeInt (z : ℤ) : decodeInt (encodeInt z) = z := by\n  simp only [encodeInt, decodeInt, decode_encodeNat]\n  split_ifs with h <;> simp only [decide_eq_true_eq] at h <;> omega\n\n/-- Groups a list of integers into consecutive triples. Fails if the length is not a multiple\nof three. -/\ndef groupTriples : List ℤ → Option (List (Fin 3 → ℤ))\n  | [] => some []\n  | a :: b :: c :: l => (groupTriples l).map (![a, b, c] :: ·)\n  | _ => none\n\nlemma groupTriples_flatMap_ofFn (v : List (Fin 3 → ℤ)) :\n    groupTriples (v.flatMap List.ofFn) = some v := by\n  induction v with\n  | nil => rfl\n  | cons p v ih =>\n    have hp : ![p 0, p 1, p 2] = p := by\n      funext i\n      fin_cases i <;> rfl\n    simp [List.ofFn_succ, groupTriples, ih, hp]\n\n/-- The code of a polygon over the alphabet `Option Bool`: each coordinate, in order, is written\nas the separator `none` followed by its binary code. -/\ndef encodePolygon (v : List (Fin 3 → ℤ)) : List (Option Bool) :=\n  ((v.flatMap List.ofFn).map fun z => (encodeInt z).map some).flatMap (none :: ·)\n\n/-- Decoding of `encodePolygon`. -/\ndef decodePolygon (w : List (Option Bool)) : Option (List (Fin 3 → ℤ)) :=\n  match w.splitOnP Option.isNone with\n  | [] :: chunks => groupTriples (chunks.map fun c => decodeInt (c.map (·.getD false)))\n  | _ => none\n\nlemma splitOnP_isNone_append_flatMap_cons (cs : List (List (Option Bool)))\n    (h : ∀ c ∈ cs, none ∉ c) (c : List (Option Bool)) (hc : none ∉ c) :\n    (c ++ cs.flatMap (none :: ·)).splitOnP Option.isNone = c :: cs := by\n  induction cs generalizing c with\n  | nil =>\n    rw [List.flatMap_nil, List.append_nil]\n    exact List.splitOnP_eq_single _ _ fun x hx hx' =>\n      hc (Option.isNone_iff_eq_none.mp hx' ▸ hx)\n  | cons c' cs ih =>\n    rw [List.flatMap_cons, List.cons_append,\n      List.splitOnP_first _ _ (fun x hx hx' => hc (Option.isNone_iff_eq_none.mp hx' ▸ hx))\n        none rfl,\n      ih (fun d hd => h d (List.mem_cons_of_mem _ hd)) c' (h c' List.mem_cons_self)]\n\nlemma decodePolygon_encodePolygon (v : List (Fin 3 → ℤ)) :\n    decodePolygon (encodePolygon v) = some v := by\n  rw [decodePolygon, encodePolygon, ← List.nil_append (List.flatMap _ _),\n    splitOnP_isNone_append_flatMap_cons _ (fun c hc => by\n      obtain ⟨z, -, rfl⟩ := List.mem_map.mp hc\n      simp) [] (by simp)]\n  simp [Function.comp_def, decodeInt_encodeInt, groupTriples_flatMap_ofFn]\n\n/-- The two-bit code of a symbol of the alphabet `Option Bool`. -/\ndef encodeSymbol : Option Bool → List Bool\n  | some b => [true, b]\n  | none => [false, false]\n\n/-- Decoding of a string of two-bit symbol codes. -/\ndef decodeSymbols : List Bool → Option (List (Option Bool))\n  | [] => some []\n  | true :: b :: l => (decodeSymbols l).map (some b :: ·)\n  | false :: _ :: l => (decodeSymbols l).map (none :: ·)\n  | [_] => none\n\nlemma decodeSymbols_flatMap_encodeSymbol (w : List (Option Bool)) :\n    decodeSymbols (w.flatMap encodeSymbol) = some w := by\n  induction w with\n  | nil => rfl\n  | cons s w ih => cases s <;> simp [encodeSymbol, decodeSymbols, ih]\n\n/-- The binary encoding of polygons with integer vertices. -/\ndef polygonEncoding : FinEncoding (List (Fin 3 → ℤ)) where\n  Γ := Bool\n  encode v := (encodePolygon v).flatMap encodeSymbol\n  decode w := (decodeSymbols w).bind decodePolygon\n  decode_encode v := by\n    simp [decodeSymbols_flatMap_encodeSymbol, decodePolygon_encodePolygon]\n  ΓFin := Bool.fintype\n\n/-- The code of the one-vertex polygon `(1, -1, 0)`: the three coordinates are written as\n`none, some false, some true`, `none, some true, some true`, `none, some false`, then each\nsymbol as two bits. -/\n@[category test, AMS 68]\ntheorem polygonEncoding_encode_example :\n    polygonEncoding.encode [![1, -1, 0]] =\n      [false, false, true, false, true, true, false, false, true, true, true, true, false, false,\n        true, false] := by\n  simp [polygonEncoding, encodePolygon, encodeInt, encodeNat, encodeNum, encodePosNum, encodeSymbol,\n    List.ofFn_succ]\n\n/-- The empty list of vertices describes the empty set. -/\n@[category test, AMS 57]\ntheorem polygon_nil : polygon [] = ∅ := by\n  simp [polygon]\n\n/-- The empty set is not a knot, so it is not the unknot. -/\n@[category test, AMS 57]\ntheorem not_isUnknot_empty : ¬ IsUnknot ∅ := by\n  rintro ⟨h, hh⟩\n  have : EuclideanSpace.single (0 : Fin 3) (1 : ℝ) ∈ standardCircle := by\n    simp [standardCircle]\n  rw [← hh] at this\n  simp at this\n\nopen scoped Classical in\n/-- Unknot recognition as a language over `{0, 1}`: a bit string is accepted exactly when it is\nthe code of a polygon (with integer vertices) that is the unknot. -/\nnoncomputable def unknotRecognition : DecisionProblem := fun w =>\n  decide (∃ v, polygonEncoding.decode w = some v ∧ IsUnknot (polygon v))\n\n/-- The empty bit string is the code of the empty polygon, which is not a knot. -/\n@[category test, AMS 57 68]\ntheorem unknotRecognition_nil : unknotRecognition [] = false := by\n  have : polygonEncoding.decode [] = some [] := rfl\n  simp [unknotRecognition, this, polygon_nil, not_isUnknot_empty]\n\n/--\n**The unknotting problem.** Can unknots be recognized in polynomial time? That is, is the\nunknotting problem — given a knot, described as a closed polygon in `ℝ³` with integer vertices\nwritten in binary, decide whether it is the unknot — in the complexity class `P`?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem : answer(sorry) ↔ unknotRecognition ∈ P := by\n  sorry\n\nend UnknottingProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition is correct: the entry is one yes/no question, and the NP/co-NP/quasi-polynomial results are background only (mentioned in the module docstring, not stated as slots).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Knot representation: following Hass–Lagarias–Pippenger (the primary source cited by the article), a knot is given by the list of vertices (in cyclic order, type `List (Fin 3 → ℤ)`) of a closed polygon in ℝ³ with integer coordinates; HLP state this representation is polynomial-time equivalent to knot diagrams with crossing number as size, and the decomposition notes allow any standard representation. `polygon v` is the union of segments between cyclically consecutive vertices (`v.zip (v.rotate 1)`).",
+    "Input size: coordinates are written in binary (sign bit + binary digits, Mathlib's `encodeNat`), separated by a separator symbol, then the 4-letter alphabet `Option Bool` is block-coded into 2 bits, so the code length is linear in the number of bits needed to write the vertices — HLP's 'input length'. The `FinEncoding` field `decode_encode` is proved, so every polygon has a code. Decoding is lenient (e.g. leading zeros accepted), which does not affect P-membership since decoding is polynomial-time.",
+    "Unknot: `IsUnknot K := ∃ h : ℝ³ ≃ₜ ℝ³, h '' K = standardCircle` (standard round unit circle in the plane x₂ = 0). This is the textbook definition of knot equivalence via an ambient homeomorphism; orientation-preservation is not required because the standard circle is invariant under the reflection x₂ ↦ −x₂, and for polygonal (tame) knots this coincides with PL ambient isotopy as used by HLP. Homeomorphisms of ℝ³ rather than S³ are used (equivalent for tame knots).",
+    "Language vs promise problem: inputs that are not simple closed curves (or are not valid codes) are rejected, mirroring HLP's formulation 'Is D a knot diagram that represents the trivial knot?'. Since simplicity of an integer polygon is checkable in polynomial time, P-membership of this language is equivalent to polynomial-time unknot recognition on genuine knots.",
+    "Complexity class: the statement uses the repository's existing `ComplexityTheory.P` (imported from `FormalConjectures.Millenium.PvsNP`, an idiom already used by several Wikipedia files importing other problem files), whose model is Mathlib's TM2 stack machine with polynomial step bound in the input length. Since P is closed under complement, asking for unknottedness rather than knottedness is immaterial.",
+    "The decision function `unknotRecognition` is defined with classical `decide` (noncomputable), as in the repo's treatment of languages as arbitrary `List Bool → Bool`.",
+    "Copyright year 2026 taken from the sandbox's system date."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`WithLp.toLp` with coordinatewise `Int.cast` (used inside; no bundled map exists).",
+     "name": "UnknottingProblem.toPoint",
+     "why_needed": "Embeds an integer vertex `Fin 3 → ℤ` into `EuclideanSpace ℝ (Fin 3)`."
+    },
+    {
+     "closest_existing_considered": "`segment ℝ x y` (used); `Polygon`/`Knot` do not exist in Mathlib or FormalConjecturesForMathlib.",
+     "name": "UnknottingProblem.polygon",
+     "why_needed": "Mathlib has no notion of a polygonal curve/knot; defines the closed polygon through the listed vertices as a union of `segment`s."
+    },
+    {
+     "closest_existing_considered": "`Metric.sphere` (2-sphere in ℝ³, not a circle); `Circle` (lives in ℂ, not embedded in ℝ³).",
+     "name": "UnknottingProblem.standardCircle",
+     "why_needed": "The standard (trivial) knot in ℝ³: unit circle in the plane x₂ = 0."
+    },
+    {
+     "closest_existing_considered": "`Homeomorph` (used); no notion of ambient isotopy or knot equivalence exists in Mathlib.",
+     "name": "UnknottingProblem.IsUnknot",
+     "why_needed": "Mathlib has no knot equivalence; defines 'K is the trivial knot' as being carried onto the standard circle by a homeomorphism of ℝ³."
+    },
+    {
+     "closest_existing_considered": "`Computability.finEncodingNatBool`/`encodeNat` (reused for the digits); `finEncodingListBool`, `finEncodingListBoolProdListBool` in FormalConjecturesForMathlib (only for `List Bool` and pairs thereof).",
+     "name": "UnknottingProblem.encodeInt / decodeInt / groupTriples / encodePolygon / decodePolygon / encodeSymbol / decodeSymbols / polygonEncoding",
+     "why_needed": "A `Computability.FinEncoding (List (Fin 3 → ℤ))` over the alphabet `Bool` with polynomially (linearly) faithful size, needed to state P-membership; Mathlib's `Encodable`-based codes via `Nat.pair` are exponentially long for lists and no product/list FinEncoding combinators exist."
+    },
+    {
+     "closest_existing_considered": "`ComplexityTheory.DecisionProblem`/`P` from Millenium/PvsNP.lean (used as the ambient framework).",
+     "name": "UnknottingProblem.unknotRecognition",
+     "why_needed": "The unknotting problem as a language over {0,1} (`ComplexityTheory.DecisionProblem`): accepts exactly codes of polygons that are the unknot."
+    }
+   ],
+   "per_slot": {
+    "unknotting_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ unknotRecognition ∈ ComplexityTheory.P`, where `unknotRecognition : List Bool → Bool` accepts exactly the binary codes of closed polygons in ℝ³ with integer vertices that are the unknot. `P` is the repo's existing class (Millenium/PvsNP.lean, built on Mathlib's `Turing.TM2ComputableInPolyTime`). Mathlib has no knot theory, so the polygonal-knot representation (the one used by Hass–Lagarias–Pippenger, polynomial-time equivalent to knot diagrams), the unknot predicate, and a binary FinEncoding of polygons had to be defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "unknotting_problem": "/--\n**The unknotting problem.** Can unknots be recognized in polynomial time? That is, is the\nunknotting problem — given a knot, described as a closed polygon in `ℝ³` with integer vertices\nwritten in binary, decide whether it is the unknot — in the complexity class `P`?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem : answer(sorry) ↔ unknotRecognition ∈ P := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Unknotting problem\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Unknotting_problem)\n-/\n\nopen Computability Turing\n\nnamespace UnknottingProblem\n\n/-- A step of the cubic lattice: a coordinate axis and a choice of positive or negative\ndirection. -/\nabbrev LatticeStep := Fin 3 × Bool\n\n/-- Decode three-bit blocks `000`, ..., `101` as the six directed coordinate steps.\nThe other blocks, and a final block of fewer than three bits, are invalid. -/\ndef decodeSteps : List Bool → Option (List LatticeStep)\n  | [] => some []\n  | false :: false :: false :: bs => (⟨0, false⟩ :: ·) <$> decodeSteps bs\n  | false :: false :: true :: bs => (⟨0, true⟩ :: ·) <$> decodeSteps bs\n  | false :: true :: false :: bs => (⟨1, false⟩ :: ·) <$> decodeSteps bs\n  | false :: true :: true :: bs => (⟨1, true⟩ :: ·) <$> decodeSteps bs\n  | true :: false :: false :: bs => (⟨2, false⟩ :: ·) <$> decodeSteps bs\n  | true :: false :: true :: bs => (⟨2, true⟩ :: ·) <$> decodeSteps bs\n  | _ => none\n\n/-- The displacement in `ℤ³` represented by one lattice step. -/\ndef displacement (s : LatticeStep) : Fin 3 → ℤ :=\n  fun i => if i = s.1 then if s.2 then -1 else 1 else 0\n\n/-- Successive vertices of the lattice walk, including its initial vertex. -/\ndef vertices : List LatticeStep → List (Fin 3 → ℤ)\n  | [] => [0]\n  | s :: ss => 0 :: (vertices ss).map (displacement s + ·)\n\n/-- A bit string is a cubic-lattice knot code when it describes a closed self-avoiding polygon.\nThe lower bound excludes degenerate polygons. -/\ndef IsKnotCode (bits : List Bool) : Prop :=\n  ∃ ss, decodeSteps bits = some ss ∧ 4 ≤ ss.length ∧\n    (vertices ss).getLast? = some 0 ∧ (vertices ss).dropLast.Nodup\n\n/-- The polygonal trace of a lattice walk. -/\ndef trace : List LatticeStep → Set (Fin 3 → ℝ)\n  | [] => ∅\n  | s :: ss => segment ℝ 0 (fun i => (displacement s i : ℝ)) ∪\n      (fun x => (fun i => (displacement s i : ℝ)) + x) '' trace ss\n\n/-- A fixed square lattice polygon representing the unknot. -/\ndef standardUnknot : List LatticeStep :=\n  [(⟨0, false⟩), (⟨1, false⟩), (⟨0, true⟩), (⟨1, true⟩)]\n\n/-- A lattice knot code represents the unknot if an ambient isotopy of `ℝ³` carries its\npolygonal trace to the standard square. -/\ndef IsUnknotCode (bits : List Bool) : Prop :=\n  IsKnotCode bits ∧ ∃ (H : Set.Icc (0 : ℝ) 1 × (Fin 3 → ℝ) → (Fin 3 → ℝ)),\n    Continuous H ∧\n    (∀ t, IsHomeomorph (fun x => H (t, x))) ∧\n    (∀ x, H (⟨0, by norm_num⟩, x) = x) ∧\n    ∃ ss, decodeSteps bits = some ss ∧\n      (fun x => H (⟨1, by norm_num⟩, x)) '' trace ss = trace standardUnknot\n\n/-- The Boolean language of valid cubic-lattice encodings of unknots. Malformed strings and\ncodes of non-knots are rejected. -/\nnoncomputable def unknotLanguage (bits : List Bool) : Bool :=\n  @ite Bool (IsUnknotCode bits) (Classical.propDecidable _) true false\n\n/--\nCan unknots be recognized in polynomial time? Precisely: is the language of finite\ncubic-lattice polygon encodings that represent the unknot decidable by a deterministic Turing\nmachine in time polynomial in the bit length of the encoding?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem :\n    answer(sorry) ↔ Nonempty (TM2ComputableInPolyTime finEncodingListBool\n      finEncodingBoolBool unknotLanguage) := by\n  sorry\n\nend UnknottingProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used cubic-lattice polygons as the finite knot representation. This is a standard polygonal representation explicitly discussed in the primary literature: a knot is encoded as a closed self-avoiding walk using the six unit coordinate moves.",
+    "Encoded each lattice move by one of the three-bit blocks 000 through 101. Runtime is therefore measured in the bit length of this concrete encoding; malformed blocks, non-closed walks, self-intersecting/repeated-vertex walks, and degenerate walks are rejected.",
+    "Defined unknottedness geometrically: there must be a jointly continuous family of self-homeomorphisms of ℝ³, starting at the identity, whose final map carries the polygonal trace onto a fixed square. This is ambient isotopy to a standard representative of the unknot.",
+    "Expressed membership in P directly with Mathlib's `TM2ComputableInPolyTime`, `finEncodingListBool`, and `finEncodingBoolBool`. The characteristic function is Boolean-valued and total, with invalid encodings mapped to false.",
+    "Used `answer(sorry) ↔ ...` because the source asks a yes/no question. Included AMS 57 for knot topology and AMS 68 for computational complexity."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "No knot, lattice-knot, knot-diagram, or suitable directed cubic-step type exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "LatticeStep",
+     "why_needed": "Represents one of the six directed unit steps in the cubic lattice."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FinEncoding` supplies generic encoding infrastructure but no knot-specific decoder.",
+     "name": "decodeSteps",
+     "why_needed": "Gives a concrete finite binary encoding of cubic-lattice polygonal knots and rejects malformed bit strings."
+    },
+    {
+     "closest_existing_considered": "Standard basis vectors exist for modules, but there is no existing function interpreting this knot-specific axis/sign representation.",
+     "name": "displacement",
+     "why_needed": "Interprets a decoded lattice step as its displacement vector in ℤ³."
+    },
+    {
+     "closest_existing_considered": "List scans and generic walks were considered; no existing primitive directly gives vertices for this bespoke step encoding.",
+     "name": "vertices",
+     "why_needed": "Computes all successive lattice vertices, needed to state closure and self-avoidance of an encoded polygon."
+    },
+    {
+     "closest_existing_considered": "No knot-diagram, polygonal-knot, or lattice-knot validity predicate exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsKnotCode",
+     "why_needed": "Identifies exactly the valid closed self-avoiding cubic-lattice polygon inputs among all bit strings."
+    },
+    {
+     "closest_existing_considered": "Mathlib's existing `segment ℝ` is used for each edge, but no primitive constructs the polygonal trace of this encoded walk.",
+     "name": "trace",
+     "why_needed": "Interprets a valid lattice walk as the union of its real line-segment edges in ℝ³."
+    },
+    {
+     "closest_existing_considered": "No standard unknot representative exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "standardUnknot",
+     "why_needed": "Provides a fixed four-edge square representative of the unknot against which ambient isotopy is stated."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `Continuous` and `IsHomeomorph`, but has no ambient-isotopy or unknot predicate.",
+     "name": "IsUnknotCode",
+     "why_needed": "States that a valid finite code's polygonal trace is ambient isotopic to the standard unknot."
+    },
+    {
+     "closest_existing_considered": "The repository's generic decision-problem and finite-encoding infrastructure has no characteristic language for unknots.",
+     "name": "unknotLanguage",
+     "why_needed": "Turns geometric unknottedness of valid encodings into the total Boolean decision problem required by the Turing-machine complexity API."
+    }
+   ],
+   "per_slot": {
+    "unknotting_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "unknotting_problem": "/--\nCan unknots be recognized in polynomial time? Precisely: is the language of finite\ncubic-lattice polygon encodings that represent the unknot decidable by a deterministic Turing\nmachine in time polynomial in the bit length of the encoding?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem :\n    answer(sorry) ↔ Nonempty (TM2ComputableInPolyTime finEncodingListBool\n      finEncodingBoolBool unknotLanguage) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Unknotting problem\n\nThe unknotting problem asks whether a finite representation of a knot can be recognized as the\nunknot in deterministic polynomial time. We use cubic-lattice polygons, encoded with three bits\nper directed edge, as a standard finite representation of piecewise-linear knots.\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Unknotting_problem)\n-/\n\nopen Computability Turing\n\nnamespace UnknottingProblem\n\n/-- The six directed unit steps in the cubic lattice. -/\ninductive LatticeDirection\n  | posX | negX | posY | negY | posZ | negZ\n  deriving DecidableEq\n\n/-- The integer displacement represented by a cubic-lattice direction. -/\ndef LatticeDirection.step : LatticeDirection → ℤ × ℤ × ℤ\n  | .posX => (1, 0, 0)\n  | .negX => (-1, 0, 0)\n  | .posY => (0, 1, 0)\n  | .negY => (0, -1, 0)\n  | .posZ => (0, 0, 1)\n  | .negZ => (0, 0, -1)\n\n/-- Decode a three-bit block as one of the six cubic-lattice directions. -/\ndef decodeDirection : Bool → Bool → Bool → Option LatticeDirection\n  | false, false, false => some .posX\n  | false, false, true => some .negX\n  | false, true, false => some .posY\n  | false, true, true => some .negY\n  | true, false, false => some .posZ\n  | true, false, true => some .negZ\n  | true, true, _ => none\n\n/-- Decode a bitstring in three-bit blocks as a cubic-lattice walk. -/\ndef decodeWalk : List Bool → Option (List LatticeDirection)\n  | [] => some []\n  | a :: b :: c :: rest => do\n      let d ← decodeDirection a b c\n      let ds ← decodeWalk rest\n      pure (d :: ds)\n  | _ => none\n\n/-- The successive vertices of a cubic-lattice walk, starting at the origin. -/\ndef latticeVertices (ds : List LatticeDirection) : List (ℤ × ℤ × ℤ) :=\n  ds.map LatticeDirection.step |>.scanl (· + ·) 0\n\n/-- A walk is a cubic-lattice polygon when it is a closed self-avoiding walk with at least four\nedges. -/\ndef IsLatticePolygon (ds : List LatticeDirection) : Prop :=\n  4 ≤ ds.length ∧ (latticeVertices ds).getLast? = some 0 ∧\n    (latticeVertices ds).dropLast.Pairwise (· ≠ ·)\n\n/-- Regard an integer lattice point as a point of Euclidean three-space. -/\ndef latticePointToReal (p : ℤ × ℤ × ℤ) : ℝ × ℝ × ℝ :=\n  (p.1, p.2.1, p.2.2)\n\n/-- The polygonal trace of a cubic-lattice walk starting at `p`. -/\ndef latticeTraceFrom : (ℤ × ℤ × ℤ) → List LatticeDirection → Set (ℝ × ℝ × ℝ)\n  | _, [] => ∅\n  | p, d :: ds =>\n      segment ℝ (latticePointToReal p) (latticePointToReal (p + d.step)) ∪\n        latticeTraceFrom (p + d.step) ds\n\n/-- The polygonal trace of a cubic-lattice walk starting at the origin. -/\ndef latticeTrace (ds : List LatticeDirection) : Set (ℝ × ℝ × ℝ) :=\n  latticeTraceFrom 0 ds\n\n/-- A fixed square polygon representing the unknot. -/\ndef standardUnknot : List LatticeDirection :=\n  [.posX, .posY, .negX, .negY]\n\n/-- A cubic-lattice polygon is unknotted when an ambient homeomorphism of three-space carries its\ntrace to the fixed square unknot. -/\ndef IsUnknot (ds : List LatticeDirection) : Prop :=\n  IsLatticePolygon ds ∧ ∃ h : (ℝ × ℝ × ℝ) ≃ₜ (ℝ × ℝ × ℝ),\n    h '' latticeTrace ds = latticeTrace standardUnknot\n\nopen scoped Classical in\n/-- The Boolean language of encodings of unknotted cubic-lattice polygons. Invalid encodings are\nrejected. -/\nnoncomputable def unknotLanguage : List Bool → Bool := fun input =>\n  match decodeWalk input with\n  | none => false\n  | some ds => if IsUnknot ds then true else false\n\n/--\nCan unknots be recognized in polynomial time? More precisely, is the language of finite\nthree-bit encodings of unknotted cubic-lattice polygons decidable by a deterministic Turing\nmachine in time polynomial in the input length?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem :\n    answer(sorry) ↔ Nonempty\n      (TM2ComputableInPolyTime finEncodingListBool finEncodingBoolBool unknotLanguage) := by\n  sorry\n\nend UnknottingProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used closed self-avoiding polygons in the cubic integer lattice as the standard finite knot representation. Each directed unit edge is encoded by a three-bit block, so input size is the bitstring length; malformed strings and strings that do not encode knots are rejected.",
+    "Defined an encoded polygon to be unknotted when an ambient homeomorphism of ℝ³ maps its polygonal trace to a fixed square polygon. This captures equivalence to the trivial tame knot; allowing either orientation for the ambient homeomorphism does not alter unknot recognition.",
+    "Formalized membership in deterministic polynomial time directly with Mathlib's finite multi-tape deterministic Turing-machine structure `TM2ComputableInPolyTime`, using the repository's Boolean-list and Boolean encodings. The unknown yes/no answer is marked with `answer(sorry)`.",
+    "Included both topology and theoretical computer science MSC areas (`AMS 57 68`) because the question is specifically the complexity of a knot decision problem."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "No knot, knot-diagram, or cubic-lattice direction type was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "LatticeDirection",
+     "why_needed": "Provides a finite alphabet for directed unit edges of cubic-lattice polygonal knots."
+    },
+    {
+     "closest_existing_considered": "Product addition exists in Mathlib, but there is no existing six-direction cubic-lattice interpretation.",
+     "name": "LatticeDirection.step",
+     "why_needed": "Interprets each finite direction symbol as an integer displacement in three-space."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FinEncoding` is generic, but no existing knot-walk decoder supplies this concrete representation.",
+     "name": "decodeDirection",
+     "why_needed": "Gives the fixed three-bit code for each of the six lattice directions and rejects the two unused codes."
+    },
+    {
+     "closest_existing_considered": "Existing `FinEncoding` machinery does not define this problem-specific three-bit block format.",
+     "name": "decodeWalk",
+     "why_needed": "Parses the decision problem's raw bitstring input into a finite lattice walk and rejects malformed lengths or blocks."
+    },
+    {
+     "closest_existing_considered": "Uses Mathlib's `List.scanl`; no existing specialized lattice-polygon vertex function was found.",
+     "name": "latticeVertices",
+     "why_needed": "Computes the successive integer vertices needed to state closure and self-avoidance of the represented polygon."
+    },
+    {
+     "closest_existing_considered": "No polygonal-knot or knot-diagram validity predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsLatticePolygon",
+     "why_needed": "Distinguishes valid finite knot representations from arbitrary bitstrings by requiring at least four edges, closure, and distinct vertices before closure."
+    },
+    {
+     "closest_existing_considered": "Coordinate coercions exist individually, but no existing map for this chosen product representation was found.",
+     "name": "latticePointToReal",
+     "why_needed": "Embeds integer lattice vertices into topological Euclidean three-space for the ambient-equivalence definition."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `segment`, but no polygonal-knot trace constructor was found.",
+     "name": "latticeTraceFrom",
+     "why_needed": "Defines the geometric union of line segments traversed by a lattice walk from a specified starting vertex."
+    },
+    {
+     "closest_existing_considered": "No existing polygonal-knot trace primitive was found.",
+     "name": "latticeTrace",
+     "why_needed": "Specializes the polygonal trace to walks based at the origin, as used by the encoding."
+    },
+    {
+     "closest_existing_considered": "No standard unknot object exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "standardUnknot",
+     "why_needed": "Supplies a concrete square representative of the trivial knot in the same lattice encoding."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Homeomorph` and `segment`, but no ambient knot-equivalence or unknot predicate.",
+     "name": "IsUnknot",
+     "why_needed": "Expresses triviality of the represented tame knot via an ambient homeomorphism carrying its trace to the standard square."
+    },
+    {
+     "closest_existing_considered": "The repository's P-vs-NP file defines generic decision problems and class P, but no unknot language exists; the reusable `TM2ComputableInPolyTime` primitive is used directly rather than duplicated.",
+     "name": "unknotLanguage",
+     "why_needed": "Forms the total Boolean decision language on raw finite bitstrings required by the polynomial-time Turing-machine API."
+    }
+   ],
+   "per_slot": {
+    "unknotting_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "unknotting_problem": "/--\nCan unknots be recognized in polynomial time? More precisely, is the language of finite\nthree-bit encodings of unknotted cubic-lattice polygons decidable by a deterministic Turing\nmachine in time polynomial in the input length?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem :\n    answer(sorry) ↔ Nonempty\n      (TM2ComputableInPolyTime finEncodingListBool finEncodingBoolBool unknotLanguage) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\nimport FormalConjectures.Millenium.PvsNP\n\n/-!\n# Unknotting problem\n\nThe unknotting problem asks for an algorithm that decides, given a finite description of a knot\n(for example a knot diagram or a closed polygon in $\\mathbb{R}^3$), whether the knot is the\nunknot. Haken (1961) showed that the problem is decidable, Hass, Lagarias and Pippenger (1999)\nshowed that it is in NP, and Lackenby (2016) showed that it is in co-NP. It is open whether the\nproblem is in P, i.e. whether unknots can be recognized in polynomial time. In 2021 Lackenby\nannounced a quasi-polynomial time algorithm; this does not settle the question.\n\nWe represent a knot as a closed polygon in $\\mathbb{R}^3$, given by the list of its vertices,\nwhich have integer coordinates. The input size is the number of symbols in the binary encoding\nof the coordinates. Hass, Lagarias and Pippenger (Section 1 and Section 7) show that this\nrepresentation is polynomial-time equivalent to knot diagrams, with the input length\npolynomially related to the number of crossings. For polynomial time we use the Turing machine\nmodel `Turing.TM2ComputableInPolyTime` of Mathlib, as in `FormalConjectures.Millenium.PvsNP`.\n\n*References:*\n- [Wikipedia, Unknotting problem](https://en.wikipedia.org/wiki/Unknotting_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [J. Hass, J. C. Lagarias, N. Pippenger, *The computational complexity of knot and link\n  problems*, J. ACM 46 (1999)](https://arxiv.org/abs/math/9807016)\n- [M. Lackenby, *The efficient certification of knottedness and Thurston norm*,\n  Adv. Math. 387 (2021)](https://arxiv.org/abs/1604.00290)\n-/\n\nopen Computability\n\nnamespace UnknottingProblem\n\nlocal notation \"ℝ³\" => EuclideanSpace ℝ (Fin 3)\n\n/- ### Knots and the unknot -/\n\n/-- The point of $\\mathbb{R}^3$ with the given integer coordinates. -/\ndef toPoint (p : ℤ × ℤ × ℤ) : ℝ³ := !₂[(p.1 : ℝ), (p.2.1 : ℝ), (p.2.2 : ℝ)]\n\n/-- The closed polygon in $\\mathbb{R}^3$ with the vertices `v` (listed in cyclic order): the union\nof the closed segments from each vertex to the next one, and from the last vertex back to the\nfirst one. -/\ndef polygon (v : List (ℤ × ℤ × ℤ)) : Set ℝ³ :=\n  ⋃ e ∈ v.zip (v.rotate 1), segment ℝ (toPoint e.1) (toPoint e.2)\n\n/-- A subset of $\\mathbb{R}^3$ is a knot if it is homeomorphic to the circle $S^1$.\nFor a closed polygon this says that the polygon is simple (it does not intersect itself). -/\ndef IsKnot (K : Set ℝ³) : Prop := Nonempty (K ≃ₜ Circle)\n\n/-- The standard unknot: the unit circle in the $xy$-plane of $\\mathbb{R}^3$. -/\ndef standardUnknot : Set ℝ³ := {x | x 0 ^ 2 + x 1 ^ 2 = 1 ∧ x 2 = 0}\n\n/-- A subset $K$ of $\\mathbb{R}^3$ is an unknot (a trivial knot) if it is equivalent to the standard\nunknot, i.e. some homeomorphism of $\\mathbb{R}^3$ maps $K$ onto the standard unknot.\n\nThe standard unknot is preserved by the reflection $(x, y, z) \\mapsto (x, y, -z)$, so this is\nthe same as requiring an orientation preserving homeomorphism, or an ambient isotopy. -/\ndef IsUnknot (K : Set ℝ³) : Prop := ∃ h : ℝ³ ≃ₜ ℝ³, h '' K = standardUnknot\n\n/-- The polygon with no vertices is empty. -/\n@[category API, AMS 57]\ntheorem polygon_nil : polygon [] = ∅ := by\n  simp [polygon]\n\n/-- A triangle is a knot. -/\n@[category test, AMS 57]\ntheorem isKnot_triangle : IsKnot (polygon [(0, 0, 0), (1, 0, 0), (0, 1, 0)]) := by\n  sorry\n\n/-- A triangle is an unknot. -/\n@[category test, AMS 57]\ntheorem isUnknot_triangle : IsUnknot (polygon [(0, 0, 0), (1, 0, 0), (0, 1, 0)]) := by\n  sorry\n\n/-- An unknot is a knot. -/\n@[category API, AMS 57]\ntheorem IsUnknot.isKnot {K : Set ℝ³} (hK : IsUnknot K) : IsKnot K := by\n  sorry\n\n/- ### Binary encoding of a list of vertices\n\nThe input of the algorithm is the list of vertices of a polygon. It is encoded as a word over a\nthree letter alphabet: each coordinate is written in binary (a sign bit followed by the binary\ndigits of its absolute value), and consecutive coordinates are separated by a separator symbol.\nThe length of the encoding of a polygon is therefore proportional to the number of bits needed to\nwrite down its vertices in binary. -/\n\n/-- The alphabet of the encoding: the two binary digits and a separator. -/\ninductive Symbol\n  | bit (b : Bool)\n  | sep\n  deriving DecidableEq, Fintype\n\n/-- The bit carried by a symbol, if any. -/\ndef Symbol.toBit : Symbol → Option Bool\n  | bit b => some b\n  | sep => none\n\n/-- Binary encoding of an integer: a sign bit (`true` for nonnegative integers) followed by the\nbinary digits of its absolute value. -/\ndef encodeInt (z : ℤ) : List Bool := decide (0 ≤ z) :: encodeNat z.natAbs\n\n/-- Decoding of an integer from a list of bits, the inverse of `encodeInt`. -/\ndef decodeInt : List Bool → ℤ\n  | [] => 0\n  | b :: l => if b then (decodeNat l : ℤ) else -(decodeNat l : ℤ)\n\n@[category API, AMS 68]\ntheorem decodeInt_encodeInt (z : ℤ) : decodeInt (encodeInt z) = z := by\n  rcases le_or_gt 0 z with h | h\n  · simp [encodeInt, decodeInt, h]\n  · simp [encodeInt, decodeInt, h.not_ge, abs_of_neg h]\n\n/-- The list of all coordinates of a list of vertices. -/\ndef coords (v : List (ℤ × ℤ × ℤ)) : List ℤ := v.flatMap fun p => [p.1, p.2.1, p.2.2]\n\n/-- Groups a list of coordinates into vertices, the inverse of `coords`. -/\ndef groupCoords : List ℤ → Option (List (ℤ × ℤ × ℤ))\n  | [] => some []\n  | x :: y :: z :: l => (groupCoords l).map ((x, y, z) :: ·)\n  | _ => none\n\n@[category API, AMS 68]\ntheorem groupCoords_coords (v : List (ℤ × ℤ × ℤ)) : groupCoords (coords v) = some v := by\n  induction v with\n  | nil => rfl\n  | cons p v ih => simpa [coords, groupCoords] using ih\n\n/-- The encoding of a list of vertices: the binary encodings of the coordinates, separated by\n`Symbol.sep`. -/\ndef encodeVertices (v : List (ℤ × ℤ × ℤ)) : List Symbol :=\n  [Symbol.sep].intercalate ((coords v).map fun z => (encodeInt z).map Symbol.bit)\n\n/-- The decoding of a list of vertices from a word, the inverse of `encodeVertices`. -/\ndef decodeVertices (w : List Symbol) : Option (List (ℤ × ℤ × ℤ)) :=\n  groupCoords (((w.splitOn Symbol.sep).filter (· ≠ [])).map fun b =>\n    decodeInt (b.filterMap Symbol.toBit))\n\n@[category API, AMS 68]\ntheorem decodeVertices_encodeVertices (v : List (ℤ × ℤ × ℤ)) :\n    decodeVertices (encodeVertices v) = some v := by\n  rcases v with _ | ⟨p, v⟩\n  · rfl\n  · have h1 : (encodeVertices (p :: v)).splitOn Symbol.sep =\n        (coords (p :: v)).map fun z => (encodeInt z).map Symbol.bit :=\n      List.splitOn_intercalate ((coords (p :: v)).map fun z => (encodeInt z).map Symbol.bit)\n        Symbol.sep (by simp) (by simp [coords])\n    rw [decodeVertices, h1, List.filter_eq_self.2 (by simp [encodeInt])]\n    simp [Function.comp_def, Symbol.toBit, decodeInt_encodeInt, groupCoords_coords]\n\n/-- The binary encoding of lists of vertices, as a `Computability.FinEncoding`. -/\ndef vertexListEncoding : FinEncoding (List (ℤ × ℤ × ℤ)) where\n  Γ := Symbol\n  encode := encodeVertices\n  decode := decodeVertices\n  decode_encode := decodeVertices_encodeVertices\n  ΓFin := inferInstance\n\n/- ### The unknotting problem -/\n\n/--\n**Unknotting problem**: can unknots be recognized in polynomial time?\n\nThat is, is there an algorithm which, given the list of vertices of a closed polygon in\n$\\mathbb{R}^3$ that is a knot, decides whether the knot is the unknot, and whose running time is\nbounded by a polynomial in the length of the binary encoding of the vertices?\n\nFormally: is there a function `f` from lists of vertices to `Bool` that is computable in\npolynomial time (with respect to `vertexListEncoding`) by a deterministic Turing machine, such\nthat for every list of vertices `v` whose polygon is a knot, `f v = true` if and only if this\nknot is the unknot?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem :\n    answer(sorry) ↔ ∃ f : List (ℤ × ℤ × ℤ) → Bool,\n      ComplexityTheory.IsComputableInPolyTime vertexListEncoding finEncodingBoolBool f ∧\n      ∀ v, IsKnot (polygon v) → (f v = true ↔ IsUnknot (polygon v)) := by\n  sorry\n\nend UnknottingProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition is correct; the notes' remarks (encoding choice is implicit but standard encodings are polynomially equivalent; P is closed under complement; NP/co-NP results and the quasi-polynomial announcement are background) were followed. The one place a reviewer should look is the encoding/representation choice (PL knot with binary integer coordinates, per Hass–Lagarias–Pippenger) since the informal statement leaves it implicit.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Representation of the input: a knot is given as the list of vertices (integer coordinates) of a closed polygon in ℝ³ (`polygon v` = union of the segments between cyclically consecutive vertices). This is the 'polygonal representation' of Hass–Lagarias–Pippenger (Section 1), who prove it polynomial-time equivalent to knot diagrams with input length polynomially related to crossing number. Rational coordinates are reduced to integers by scaling, as in HLP.",
+    "Input size: the length of `encodeVertices v`, a word over a 3-letter alphabet {0, 1, separator} in which each coordinate is written in binary (sign bit + binary digits of |z|); this is linear in the number of bits needed to write the vertices in binary. A `Computability.FinEncoding` with a proved `decode_encode` is provided, so the encoding is injective; it is not padded. (Mathlib's `Encodable` encoding of lists was deliberately avoided because iterated `Nat.pair` gives exponential-size codes.)",
+    "Polynomial time: `ComplexityTheory.IsComputableInPolyTime` (imported from `FormalConjectures.Millenium.PvsNP`), i.e. `Nonempty (Turing.TM2ComputableInPolyTime ea eb f)` — deterministic TM2 machine with a `Polynomial ℕ` time bound in the input length; identical to the notion underlying the repository's class `P`.",
+    "Promise formulation: the decision function must be poly-time on all vertex lists and correct on all lists whose polygon is a knot (`IsKnot (polygon v)`); its value on non-knots is unconstrained. This matches Wikipedia's 'given some representation of a knot'. It is equivalent to membership in P of the language {v | polygon v is a knot and an unknot} because simplicity of an integer polygon is polynomial-time checkable, but the promise form does not depend on that fact.",
+    "`IsKnot K := Nonempty (K ≃ₜ Circle)`: a knot is a subset of ℝ³ homeomorphic to S¹; for a polygon this is exactly simplicity (no self-intersection). Degenerate lists (empty, <3 vertices, collinear, self-intersecting) are not knots and fall outside the promise; lists that traverse a simple polygon redundantly still denote a knot (the set), which is harmless.",
+    "`IsUnknot K := ∃ h : ℝ³ ≃ₜ ℝ³, h '' K = standardUnknot` with `standardUnknot` the unit circle in the xy-plane. This is the standard definition of knot equivalence by a homeomorphism of the ambient space; since the standard circle is fixed by the reflection z ↦ -z, this coincides with equivalence by an orientation-preserving homeomorphism, hence (Fisher) with ambient isotopy; for PL knots topological triviality coincides with PL triviality. Orientation of the knot is irrelevant for the unknot.",
+    "Ambient space is `EuclideanSpace ℝ (Fin 3)` (ℝ³) rather than S³; the two give the same knot theory.",
+    "Complement/knottedness: since P is closed under complement, deciding unknottedness (as stated) is equivalent to deciding knottedness.",
+    "Auxiliary statements: `polygon_nil` (proved), `decodeInt_encodeInt`, `groupCoords_coords`, `decodeVertices_encodeVertices` (proved API for the encoding), and sorry'd `test`/`API` sanity statements `isKnot_triangle`, `isUnknot_triangle`, `IsUnknot.isKnot` documenting intended behaviour of the bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`WithLp.toLp`/`!₂[...]` notation (used in the definition); no Mathlib map from ℤ × ℤ × ℤ.",
+     "name": "UnknottingProblem.toPoint",
+     "why_needed": "Maps an integer triple to the corresponding point of ℝ³ (`EuclideanSpace ℝ (Fin 3)`)."
+    },
+    {
+     "closest_existing_considered": "`segment ℝ` (used); `Set.Icc`-based paths, `Path` (not suitable for a set-valued PL curve).",
+     "name": "UnknottingProblem.polygon",
+     "why_needed": "The closed polygon (union of segments between cyclically consecutive vertices) determined by a vertex list; Mathlib has no notion of polygonal curve/knot."
+    },
+    {
+     "closest_existing_considered": "`Homeomorph`, `Circle`, `Topology.IsEmbedding` (composed into the definition).",
+     "name": "UnknottingProblem.IsKnot",
+     "why_needed": "A subset of ℝ³ homeomorphic to S¹; Mathlib has no knot theory."
+    },
+    {
+     "closest_existing_considered": "`Metric.sphere` in `EuclideanSpace ℝ (Fin 2)` (lives in the wrong space); `Circle` (a subset of ℂ, not of ℝ³).",
+     "name": "UnknottingProblem.standardUnknot",
+     "why_needed": "The unit circle in the xy-plane, the reference trivial knot."
+    },
+    {
+     "closest_existing_considered": "`Homeomorph` (used); no notion of ambient isotopy in Mathlib.",
+     "name": "UnknottingProblem.IsUnknot",
+     "why_needed": "Knot triviality: some homeomorphism of ℝ³ carries the set onto the standard unknot; no Mathlib notion of knot equivalence exists."
+    },
+    {
+     "closest_existing_considered": "`Option Bool` (BEq instance mismatch with Mathlib's lemma), `Computability.Γ'` (has unneeded symbols and no separator semantics).",
+     "name": "UnknottingProblem.Symbol (with Symbol.toBit)",
+     "why_needed": "Three-letter alphabet (two bits and a separator) for the compact encoding; needed so `List.splitOn` uses the `DecidableEq`-derived `BEq` instance required by `List.splitOn_intercalate`."
+    },
+    {
+     "closest_existing_considered": "`Computability.encodeNat`/`decodeNat` (used as building blocks); `Encodable ℤ` (goes through ℕ pairing, not a bit string).",
+     "name": "UnknottingProblem.encodeInt / decodeInt",
+     "why_needed": "Binary encoding of integers (sign bit + `Computability.encodeNat` of the absolute value) with a proved inverse; Mathlib only encodes ℕ."
+    },
+    {
+     "closest_existing_considered": "`List.flatMap` (used), `List.toChunks` (no convenient inverse lemma).",
+     "name": "UnknottingProblem.coords / groupCoords",
+     "why_needed": "Flatten a vertex list to its coordinates and regroup into triples, with a proved inverse lemma, to encode the list."
+    },
+    {
+     "closest_existing_considered": "`Encodable (List (ℤ × ℤ × ℤ))` + `finEncodingNatBool` (exponential blow-up); `finEncodingListBool`, `finEncodingListBoolProdListBool` in FormalConjecturesForMathlib (wrong types); `List.splitOn_intercalate` (used for the inverse proof).",
+     "name": "UnknottingProblem.encodeVertices / decodeVertices / vertexListEncoding",
+     "why_needed": "A compact (linear in the binary size) `Computability.FinEncoding (List (ℤ × ℤ × ℤ))` fixing the input size for the polynomial-time bound. The `Encodable`-derived encoding of lists was rejected because iterated `Nat.pair` gives codes of exponential size, which would distort the complexity question."
+    }
+   ],
+   "per_slot": {
+    "unknotting_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ f : List (ℤ × ℤ × ℤ) → Bool, IsComputableInPolyTime vertexListEncoding finEncodingBoolBool f ∧ ∀ v, IsKnot (polygon v) → (f v = true ↔ IsUnknot (polygon v))`. Knots are closed polygons in ℝ³ with integer vertices (the polygonal representation of Hass–Lagarias–Pippenger, polynomial-time equivalent to knot diagrams), input size is the length of a compact binary encoding of the coordinates, and polynomial time is Mathlib's deterministic `TM2ComputableInPolyTime` exactly as used by the repository's `ComplexityTheory.P`. Mathlib has no knot theory and no encoding of integer lists, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "unknotting_problem": "/--\n**Unknotting problem**: can unknots be recognized in polynomial time?\n\nThat is, is there an algorithm which, given the list of vertices of a closed polygon in\n$\\mathbb{R}^3$ that is a knot, decides whether the knot is the unknot, and whose running time is\nbounded by a polynomial in the length of the binary encoding of the vertices?\n\nFormally: is there a function `f` from lists of vertices to `Bool` that is computable in\npolynomial time (with respect to `vertexListEncoding`) by a deterministic Turing machine, such\nthat for every list of vertices `v` whose polygon is a knot, `f v = true` if and only if this\nknot is the unknot?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem :\n    answer(sorry) ↔ ∃ f : List (ℤ × ℤ × ℤ) → Bool,\n      ComplexityTheory.IsComputableInPolyTime vertexListEncoding finEncodingBoolBool f ∧\n      ∀ v, IsKnot (polygon v) → (f v = true ↔ IsUnknot (polygon v)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Unknotting problem\n\nThe unknotting problem asks whether the unknot can be recognized in polynomial time. We use closed\nbraid words as finite representations of links. By Markov's theorem, two closed braids represent\nthe same link exactly when their braid words are related by braid relations, conjugations, and\nstabilizations.\n\n*References:*\n- [Wikipedia, Unknotting problem](https://en.wikipedia.org/wiki/Unknotting_problem)\n- [Wikipedia, Markov theorem](https://en.wikipedia.org/wiki/Markov_theorem)\n-/\n\nnamespace UnknottingProblem\n\nopen Computability Turing\n\n/-- A braid code consists of a number of strands and a word of signed, zero-based generators.\nThe Boolean sign `true` denotes the positive generator. -/\nabbrev BraidCode := ℕ × List (ℕ × Bool)\n\n/-- A braid code is valid when it has at least one strand and every generator `i` satisfies\n`i + 1 < n`, where `n` is the number of strands. -/\ndef IsValid (b : BraidCode) : Prop :=\n  0 < b.1 ∧ ∀ g ∈ b.2, g.1 + 1 < b.1\n\n/-- One application, in an arbitrary word context, of a defining relation for the braid group.\nThe constructors give inverse cancellation, far commutation, and the Artin braid relation. -/\ninductive BraidStep : BraidCode → BraidCode → Prop\n  | cancel (n i : ℕ) (s : Bool) (u v : List (ℕ × Bool)) (hi : i + 1 < n)\n      (h : IsValid (n, u ++ v)) :\n      BraidStep (n, u ++ (i, s) :: (i, !s) :: v) (n, u ++ v)\n  | commute (n i j : ℕ) (s t : Bool) (u v : List (ℕ × Bool)) (hij : i + 1 < j)\n      (h : IsValid (n, u ++ (i, s) :: (j, t) :: v)) :\n      BraidStep (n, u ++ (i, s) :: (j, t) :: v) (n, u ++ (j, t) :: (i, s) :: v)\n  | braid (n i : ℕ) (u v : List (ℕ × Bool)) (hi : i + 2 < n)\n      (h : IsValid (n, u ++ (i, true) :: (i + 1, true) :: (i, true) :: v)) :\n      BraidStep (n, u ++ (i, true) :: (i + 1, true) :: (i, true) :: v)\n        (n, u ++ (i + 1, true) :: (i, true) :: (i + 1, true) :: v)\n\n/-- One Markov move on braid words: a braid relation, conjugation by a generator, or stabilization\nby one positive or negative crossing. -/\ninductive MarkovStep : BraidCode → BraidCode → Prop\n  | braid {a b : BraidCode} (h : BraidStep a b) : MarkovStep a b\n  | conjugate (n i : ℕ) (s : Bool) (w : List (ℕ × Bool)) (hi : i + 1 < n)\n      (h : IsValid (n, w)) :\n      MarkovStep (n, w) (n, (i, s) :: w ++ [(i, !s)])\n  | stabilize (n : ℕ) (s : Bool) (w : List (ℕ × Bool)) (h : IsValid (n, w)) :\n      MarkovStep (n, w) (n + 1, w ++ [(n - 1, s)])\n\n/-- Markov equivalence is the equivalence relation generated by Markov moves. -/\ndef MarkovEquivalent : BraidCode → BraidCode → Prop :=\n  Relation.EqvGen MarkovStep\n\n/-- Run lengths of `true` bits separated by `false` bits. -/\ndef decodeRuns : List Bool → List ℕ\n  | [] => [0]\n  | true :: bits =>\n      match decodeRuns bits with\n      | n :: ns => (n + 1) :: ns\n      | [] => []\n  | false :: bits => 0 :: decodeRuns bits\n\n/-- Decode a bit string as a braid. The first run gives one less than the strand count. Each later\nrun `k` gives generator `k / 2`, with sign determined by the parity of `k`. -/\ndef decodeBraid (bits : List Bool) : BraidCode :=\n  match decodeRuns bits with\n  | [] => (1, [])\n  | n :: ks => (n + 1, ks.map fun k => (k / 2, k % 2 = 1))\n\n/-- A code represents the unknot when it is valid and Markov equivalent to the trivial one-strand\nbraid. -/\ndef IsUnknotCode (b : BraidCode) : Prop :=\n  IsValid b ∧ MarkovEquivalent b (1, [])\n\nopen scoped Classical in\n/-- The Boolean language of bit strings that decode to closed braid representatives of the unknot.\nInvalid braid codes are rejected. -/\nnoncomputable def unknotLanguage (bits : List Bool) : Bool :=\n  if IsUnknotCode (decodeBraid bits) then true else false\n\n/--\n**Unknotting problem.** Can unknots, given by finite closed-braid representations, be recognized by\na deterministic Turing machine in time polynomial in the representation's bit length?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem :\n    answer(sorry) ↔ Nonempty (TM2ComputableInPolyTime finEncodingListBool finEncodingBoolBool\n      unknotLanguage) := by\n  sorry\n\nend UnknottingProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.91,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used finite closed-braid words as the standard finite representation of knots. By Markov's theorem, a valid closed braid represents the unknot exactly when it is Markov equivalent to the trivial one-strand braid.",
+    "Represented braid-group equality by the equivalence closure of contextual inverse cancellation, far commutation, and the Artin braid relation; represented Markov equivalence by additionally closing under generator conjugation and positive or negative stabilization.",
+    "Used a total unary run-length encoding from `List Bool` to braid codes. The number of strands and generator indices therefore contribute explicitly to bit length; this is polynomially related to standard finite braid/diagram encodings rather than hiding unbounded data in one alphabet symbol.",
+    "Defined the decision language to accept exactly valid codes Markov equivalent to the trivial one-strand braid. Invalid codes and valid braids whose closures are nontrivial knots or links are rejected.",
+    "Expressed deterministic polynomial time using Mathlib's `Turing.TM2ComputableInPolyTime`, with the repository's Boolean-list input and Boolean output encodings. Wrapped existence of such a machine in `Nonempty` to state a proposition.",
+    "Used `answer(sorry) ↔ ...` because the source asks a yes/no question; substituting `True` records the positive answer that unknot recognition lies in P."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has abstract braided monoidal categories and quandles, but no concrete braid words or complete knot representation.",
+     "name": "BraidCode",
+     "why_needed": "Provides a concrete finite closed-braid representation because no knot-diagram or braid-group representation exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "No braid-word validity predicate was found.",
+     "name": "IsValid",
+     "why_needed": "Ensures a braid has at least one strand and all zero-based Artin generators are in range."
+    },
+    {
+     "closest_existing_considered": "`Relation.EqvGen` supplies equivalence closure but not the braid relations themselves.",
+     "name": "BraidStep",
+     "why_needed": "Defines the complete Artin presentation relations on signed braid words in arbitrary contexts."
+    },
+    {
+     "closest_existing_considered": "No Markov-move or ambient-isotopy API was found.",
+     "name": "MarkovStep",
+     "why_needed": "Defines braid equality, conjugation, and stabilization moves whose closure classifies closed braids as links."
+    },
+    {
+     "closest_existing_considered": "Uses Mathlib's existing `Relation.EqvGen`; only the problem-specific relation is new.",
+     "name": "MarkovEquivalent",
+     "why_needed": "Defines equality of represented links as equivalence closure of Markov moves."
+    },
+    {
+     "closest_existing_considered": "Mathlib's binary natural encoding handles one natural, and the repository has Boolean-list encodings, but no encoding/parser for lists of signed braid generators.",
+     "name": "decodeRuns",
+     "why_needed": "Implements a total self-delimiting run-length parser so unbounded strand and generator indices have an explicit finite bit cost."
+    },
+    {
+     "closest_existing_considered": "No braid decoder exists.",
+     "name": "decodeBraid",
+     "why_needed": "Interprets every Boolean input as a concrete finite braid code for the decision language."
+    },
+    {
+     "closest_existing_considered": "No unknot, knot isotopy, or complete knot-equivalence predicate exists.",
+     "name": "IsUnknotCode",
+     "why_needed": "Defines the semantic unknot predicate on braid codes via validity and Markov equivalence to the trivial one-strand braid."
+    },
+    {
+     "closest_existing_considered": "The repository's P-vs-NP file defines generic Boolean decision problems, but no unknot language.",
+     "name": "unknotLanguage",
+     "why_needed": "Packages unknot recognition as a Boolean language suitable for Mathlib's polynomial-time Turing-machine API."
+    }
+   ],
+   "per_slot": {
+    "unknotting_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "unknotting_problem": "/--\n**Unknotting problem.** Can unknots, given by finite closed-braid representations, be recognized by\na deterministic Turing machine in time polynomial in the representation's bit length?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem :\n    answer(sorry) ↔ Nonempty (TM2ComputableInPolyTime finEncodingListBool finEncodingBoolBool\n      unknotLanguage) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\nimport FormalConjectures.Millenium.PvsNP\n\n/-!\n# Unknotting problem\n\nThe unknotting problem asks for an algorithm that recognizes the unknot, given a finite\nrepresentation of a knot. It is decidable (Haken, 1961), it lies in `NP` (Hass, Lagarias and\nPippenger, 1999) and in `co-NP` (Lackenby, 2016). Whether it lies in `P`, that is, whether\nunknots can be recognized in polynomial time, is open.\n\nFollowing Hass, Lagarias and Pippenger, a knot is a simple closed polygon in `ℝ³`, represented by\nthe cyclic list of its vertices, which have integer coordinates. The input length is the number of\nbits needed to write these coordinates in binary. This representation is polynomial-time\nequivalent to knot diagrams (with the crossing number as size), so the choice of representation\ndoes not affect the question. As in Hass, Lagarias and Pippenger, the decision problem is\nformulated as a language: an input is accepted if and only if it is a knot and this knot is\ntrivial.\n\n*References:*\n- [Wikipedia, Unknotting problem](https://en.wikipedia.org/wiki/Unknotting_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- J. Hass, J. C. Lagarias, N. Pippenger, *The computational complexity of knot and link problems*,\n  J. ACM 46 (1999), 185–211. [arXiv:math/9807016](https://arxiv.org/abs/math/9807016)\n- M. Lackenby, *The efficient certification of knottedness and Thurston norm*,\n  Adv. Math. 387 (2021). [arXiv:1604.00290](https://arxiv.org/abs/1604.00290)\n-/\n\nopen Computability\n\nnamespace UnknottingProblem\n\n/-- Euclidean three-space. -/\nlocal notation \"ℝ³\" => EuclideanSpace ℝ (Fin 3)\n\n/- ### Polygonal knots -/\n\n/-- The point of `ℝ³` with integer coordinates `p 0`, `p 1`, `p 2`. -/\ndef toPoint (p : Fin 3 → ℤ) : ℝ³ := WithLp.toLp 2 fun i => (p i : ℝ)\n\n/-- The piecewise-linear parametrisation of the closed polygon with vertex list `v`.\nThe parameter `(k, t)` is sent to the point at fraction `t` along the `k`-th edge, which joins the\nvertex `v[k]` to the cyclically next vertex `v[finRotate v.length k]` (`finRotate` is the cyclic\nshift `k ↦ k + 1` of `Fin v.length`, so the last edge joins the last vertex to the first). -/\nnoncomputable def loop (v : List (Fin 3 → ℤ)) (x : Fin v.length × ℝ) : ℝ³ :=\n  (1 - x.2) • toPoint v[x.1] + x.2 • toPoint v[finRotate v.length x.1]\n\n/-- The closed polygon with vertex list `v`, as a subset of `ℝ³`: the union of the segments\njoining cyclically consecutive vertices (see `polygon_eq_iUnion_segment`). -/\nnoncomputable def polygon (v : List (Fin 3 → ℤ)) : Set ℝ³ :=\n  loop v '' (Set.univ ×ˢ Set.Icc 0 1)\n\n/-- The vertex list `v` is a *polygonal knot*: it has at least three vertices and the closed\npolygon through them is simple, i.e. its parametrisation `loop v` is injective on one period\n`Fin v.length × [0, 1)`. -/\ndef IsPolygonalKnot (v : List (Fin 3 → ℤ)) : Prop :=\n  3 ≤ v.length ∧ Set.InjOn (loop v) (Set.univ ×ˢ Set.Ico 0 1)\n\n/-- The standard unknot: the unit circle in the `xy`-plane. -/\ndef standardCircle : Set ℝ³ := {p | p 0 ^ 2 + p 1 ^ 2 = 1 ∧ p 2 = 0}\n\n/-- A subset `K` of `ℝ³` is an *unknot* (a trivial knot) if some homeomorphism of `ℝ³` maps it\nonto the standard circle. For polygonal knots this is equivalent (by Dehn's lemma) to the\npiecewise-linear notion used by Hass, Lagarias and Pippenger: the knot can be deformed, through\nsimple polygons, to a planar polygon. -/\ndef IsUnknot (K : Set ℝ³) : Prop := ∃ h : ℝ³ ≃ₜ ℝ³, h '' K = standardCircle\n\nopen scoped Classical in\n/-- Unknot recognition as a Boolean function on vertex lists: `isUnknottedPolygon v = true` if and\nonly if `v` is a polygonal knot and this knot is trivial. Vertex lists that do not describe a knot\nare rejected. -/\nnoncomputable def isUnknottedPolygon (v : List (Fin 3 → ℤ)) : Bool :=\n  decide (IsPolygonalKnot v ∧ IsUnknot (polygon v))\n\n@[category API, AMS 57]\nlemma polygon_eq_iUnion_segment (v : List (Fin 3 → ℤ)) :\n    polygon v =\n      ⋃ k : Fin v.length, segment ℝ (toPoint v[k]) (toPoint v[finRotate v.length k]) := by\n  ext p\n  simp [polygon, loop, segment_eq_image]\n\n@[category test, AMS 57]\nlemma polygon_nil : polygon [] = ∅ := by\n  simp [polygon, Set.eq_empty_of_isEmpty]\n\n@[category test, AMS 57]\nlemma not_isPolygonalKnot_nil : ¬ IsPolygonalKnot [] := by\n  simp [IsPolygonalKnot]\n\n@[category test, AMS 57]\nlemma not_isUnknot_empty : ¬ IsUnknot ∅ := by\n  rintro ⟨h, hh⟩\n  have : (WithLp.toLp 2 ![1, 0, 0] : ℝ³) ∈ standardCircle := by simp [standardCircle]\n  rw [← hh] at this\n  simp at this\n\n@[category test, AMS 57]\nlemma isUnknottedPolygon_nil : isUnknottedPolygon [] = false := by\n  simp [isUnknottedPolygon, IsPolygonalKnot]\n\n/- ### Encoding of polygonal representations\n\nA vertex list is written as a word over a four-letter alphabet: the three coordinates of a vertex\nare written in binary and separated by commas, and consecutive vertices are separated by\nsemicolons. Each letter is then written as two bits. The length of the resulting bit string is,\nup to a constant factor, the number of bits of the coordinates: the input length of Hass, Lagarias\nand Pippenger. -/\n\n/-- The input alphabet: binary digits, a separator between the coordinates of a vertex and a\nseparator between consecutive vertices. -/\ninductive Alphabet\n  | digit (b : Bool)\n  | comma\n  | semicolon\n  deriving DecidableEq, Fintype\n\n/-- Each letter is written as two bits. -/\ndef Alphabet.toBits : Alphabet → List Bool\n  | digit b => [false, b]\n  | comma => [true, false]\n  | semicolon => [true, true]\n\n/-- Inverse of `List.flatMap Alphabet.toBits`. -/\ndef Alphabet.ofBits : List Bool → Option (List Alphabet)\n  | [] => some []\n  | [_] => none\n  | false :: b :: s => (digit b :: ·) <$> ofBits s\n  | true :: false :: s => (comma :: ·) <$> ofBits s\n  | true :: true :: s => (semicolon :: ·) <$> ofBits s\n\n/-- The binary expansion (least significant digit first) of the natural number\n`Encodable.encode z`, where `Encodable.encode : ℤ → ℕ` is the bijection `n ↦ 2n`,\n`-(n + 1) ↦ 2n + 1`. -/\ndef encodeInt (z : ℤ) : List Alphabet :=\n  (Nat.digits 2 (Encodable.encode z)).map fun d => .digit (d == 1)\n\n/-- Inverse of `encodeInt`. -/\ndef decodeInt (l : List Alphabet) : ℤ :=\n  Denumerable.ofNat ℤ (Nat.ofDigits 2 (l.map fun s => if s = .digit true then 1 else 0))\n\n/-- The three coordinates of a vertex, separated by commas. -/\ndef encodeVertex (p : Fin 3 → ℤ) : List Alphabet :=\n  [.comma].intercalate ((List.ofFn p).map encodeInt)\n\n/-- Inverse of `encodeVertex`. -/\ndef decodeVertex (l : List Alphabet) : Option (Fin 3 → ℤ) :=\n  match l.splitOn .comma with\n  | [a, b, c] => some ![decodeInt a, decodeInt b, decodeInt c]\n  | _ => none\n\n/-- The vertices, separated by semicolons. -/\ndef encodeVertices (v : List (Fin 3 → ℤ)) : List Alphabet :=\n  [.semicolon].intercalate (v.map encodeVertex)\n\n/-- Inverse of `encodeVertices`. -/\ndef decodeVertices (l : List Alphabet) : Option (List (Fin 3 → ℤ)) :=\n  match l.splitOn .semicolon with\n  | [[]] => some []\n  | parts => parts.mapM decodeVertex\n\n@[category API, AMS 68]\nlemma Alphabet.ofBits_flatMap_toBits (l : List Alphabet) :\n    Alphabet.ofBits (l.flatMap Alphabet.toBits) = some l := by\n  induction l with\n  | nil => rfl\n  | cons a l ih => cases a <;> simp [Alphabet.toBits, Alphabet.ofBits, ih]\n\n@[category API, AMS 68]\nlemma decodeInt_encodeInt (z : ℤ) : decodeInt (encodeInt z) = z := by\n  have h : ∀ d ∈ Nat.digits 2 (Encodable.encode z),\n      (if Alphabet.digit (d == 1) = .digit true then 1 else 0) = d := by\n    intro d hd\n    have := Nat.digits_lt_base (by norm_num) hd\n    interval_cases d <;> simp\n  simp only [decodeInt, encodeInt, List.map_map, Function.comp_def]\n  rw [List.map_congr_left h, List.map_id', Nat.ofDigits_digits, Denumerable.ofNat_encode]\n\n@[category API, AMS 68]\nlemma comma_notMem_encodeInt (z : ℤ) : Alphabet.comma ∉ encodeInt z := by\n  simp [encodeInt]\n\n@[category API, AMS 68]\nlemma semicolon_notMem_encodeInt (z : ℤ) : Alphabet.semicolon ∉ encodeInt z := by\n  simp [encodeInt]\n\n@[category API, AMS 68]\nlemma encodeVertex_eq (p : Fin 3 → ℤ) :\n    encodeVertex p = encodeInt (p 0) ++ .comma :: encodeInt (p 1) ++ .comma :: encodeInt (p 2) := by\n  simp [encodeVertex, List.intercalate, List.ofFn_succ]\n\n@[category API, AMS 68]\nlemma decodeVertex_encodeVertex (p : Fin 3 → ℤ) : decodeVertex (encodeVertex p) = some p := by\n  have h : (encodeVertex p).splitOn .comma =\n      [encodeInt (p 0), encodeInt (p 1), encodeInt (p 2)] := by\n    rw [encodeVertex, List.splitOn_intercalate]\n    · simp [List.ofFn_succ]\n    · simp [comma_notMem_encodeInt]\n    · simp\n  simp only [decodeVertex, h, decodeInt_encodeInt]\n  congr\n  ext i\n  fin_cases i <;> rfl\n\n@[category API, AMS 68]\nlemma semicolon_notMem_encodeVertex (p : Fin 3 → ℤ) :\n    Alphabet.semicolon ∉ encodeVertex p := by\n  simp [encodeVertex_eq, semicolon_notMem_encodeInt]\n\n@[category API, AMS 68]\nlemma encodeVertex_ne_nil (p : Fin 3 → ℤ) : encodeVertex p ≠ [] := by\n  simp [encodeVertex_eq]\n\n@[category API, AMS 68]\nlemma decodeVertices_encodeVertices (v : List (Fin 3 → ℤ)) :\n    decodeVertices (encodeVertices v) = some v := by\n  rcases v with _ | ⟨p, w⟩\n  · rfl\n  · have h : (encodeVertices (p :: w)).splitOn .semicolon = (p :: w).map encodeVertex := by\n      rw [encodeVertices, List.splitOn_intercalate]\n      · simp [semicolon_notMem_encodeVertex]\n      · simp\n    rw [decodeVertices, h]\n    have h2 : ∀ w : List (Fin 3 → ℤ), (w.map encodeVertex).mapM decodeVertex = some w := by\n      intro w\n      induction w with\n      | nil => rfl\n      | cons q w ih => simp [List.mapM_cons, decodeVertex_encodeVertex, ih]\n    simp [encodeVertex_ne_nil, h2, decodeVertex_encodeVertex]\n\n/-- The binary encoding of polygonal representations: the vertex list is written as a word over\n`Alphabet` (coordinates in binary, separated by commas; vertices separated by semicolons) and each\nletter is written as two bits. -/\ndef polygonEncoding : FinEncoding (List (Fin 3 → ℤ)) where\n  Γ := Bool\n  encode v := (encodeVertices v).flatMap Alphabet.toBits\n  decode s := (Alphabet.ofBits s).bind decodeVertices\n  decode_encode v := by simp [Alphabet.ofBits_flatMap_toBits, decodeVertices_encodeVertices]\n  ΓFin := inferInstance\n\n@[category test, AMS 68]\nlemma polygonEncoding_encode_example :\n    polygonEncoding.encode [![0, 0, 0], ![3, -1, 2]] =\n      [true, false, true, false, true, true, false, false, false, true, false, true, true, false,\n        false, true, true, false, false, false, false, false, false, true] := by\n  simp [polygonEncoding, encodeVertices, encodeVertex, encodeInt, List.intercalate, List.ofFn_succ,\n    Alphabet.toBits, show Encodable.encode (0 : ℤ) = 0 from rfl,\n    show Encodable.encode (3 : ℤ) = 6 from rfl, show Encodable.encode (-1 : ℤ) = 1 from rfl,\n    show Encodable.encode (2 : ℤ) = 4 from rfl]\n\n/- ### The problem -/\n\n/-- The unknotting problem as a language over `Bool`: a bit string is accepted if and only if it\ndecodes (`polygonEncoding.decode`) to a vertex list which is a polygonal knot that is trivial.\nBit strings that do not decode to a vertex list are rejected. -/\nnoncomputable def unknotLanguage : ComplexityTheory.DecisionProblem := fun s =>\n  match polygonEncoding.decode s with\n  | some v => isUnknottedPolygon v\n  | none => false\n\n@[category API, AMS 68]\nlemma unknotLanguage_encode (v : List (Fin 3 → ℤ)) :\n    unknotLanguage (polygonEncoding.encode v) = isUnknottedPolygon v := by\n  simp [unknotLanguage, polygonEncoding.decode_encode]\n\n/--\n**Unknotting problem.** Can unknots be recognized in polynomial time?\n\nPrecisely: is there a deterministic Turing machine which, given the binary encoding of a list of\nvertices with integer coordinates, decides whether it is a polygonal knot that is trivial, in a\nnumber of steps bounded by a polynomial in the length of the input? That is, does the unknotting\nproblem `unknotLanguage` lie in the complexity class `P`?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem : answer(sorry) ↔ unknotLanguage ∈ ComplexityTheory.P := by\n  sorry\n\nend UnknottingProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table has a single yes/no slot and its notes (encoding choice immaterial up to polynomial equivalence; complement irrelevant; NP/co-NP/quasi-polynomial results are background) match the source and the primary literature.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Knot representation: following Hass–Lagarias–Pippenger (arXiv:math/9807016, §1, the primary source for the complexity formulation), a knot is a simple closed polygon in ℝ³ given by the cyclic list of its vertices with integer coordinates; input length = bits of the coordinates in binary. HLP prove this is polynomial-time equivalent to knot diagrams (crossing number as size), so membership in P is representation-independent, as the decomposition notes anticipate.",
+    "Decision problem as a language (HLP: 'Instance: a link diagram D. Question: is D a knot diagram that represents the trivial knot?'): `unknotLanguage s = true` iff `s` decodes to a vertex list `v` with `IsPolygonalKnot v ∧ IsUnknot (polygon v)`; non-knot inputs and undecodable strings are rejected. Validity checking is itself polynomial, so this is in P iff the promise version is.",
+    "Complexity notion: the repository's `ComplexityTheory.P` from `FormalConjectures.Millenium.PvsNP` (imported, following precedent such as ArtinPrimitiveRootsConjecture importing RiemannHypothesis). P = languages over `List Bool` computable by a deterministic Mathlib TM2 in time polynomial in input length.",
+    "Unknot: `IsUnknot K := ∃ h : ℝ³ ≃ₜ ℝ³, h '' K = standardCircle` (Armstrong's textbook definition). For polygonal (tame) knots this agrees with HLP's PL notion: a PL-trivial knot is carried to the round circle by a homeomorphism; conversely such a homeomorphism gives π₁(ℝ³∖K) ≅ ℤ, so K is trivial by Dehn's lemma. Orientation-preservation is not required since the round circle is preserved by a reflection; ℝ³ rather than S³ is used, which is equivalent.",
+    "Simplicity: `IsPolygonalKnot v := 3 ≤ v.length ∧ InjOn (loop v) (univ ×ˢ Ico 0 1)` where `loop v (k,t)` is the PL parametrisation of edge k (from `v[k]` to `v[finRotate v.length k]`, the cyclic successor). Injectivity on one period is exactly 'simple closed polygon'; zero-length edges, backtracking and self-intersections are excluded; straight-angle (collinear) vertices are allowed, as they do not change the curve. The condition 3 ≤ length only rules out the vacuous empty list.",
+    "Encoding: coordinates written in binary (little-endian) of the zigzag bijection `Encodable.encode : ℤ → ℕ`, separated by commas, vertices separated by semicolons, each of the 4 letters packed into 2 bits. Length is linear in HLP's input length (unlike Mathlib's `Encodable` for lists, which is exponential and was deliberately avoided). `decode_encode` is proved (so `polygonEncoding : FinEncoding`), and a concrete example test confirms the bit pattern.",
+    "Ambient space is `EuclideanSpace ℝ (Fin 3)`; the standard unknot is the unit circle in the xy-plane."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`segment ℝ a b` (used in the API lemma); `Path`/`Homotopy` are not suitable for a finite combinatorial input.",
+     "name": "UnknottingProblem.toPoint / loop / polygon",
+     "why_needed": "Mathlib has no knot theory; these realize a list of integer vertices as a piecewise-linear closed curve in ℝ³ (polygon = union of the edge segments, proved as `polygon_eq_iUnion_segment`)."
+    },
+    {
+     "closest_existing_considered": "`Set.InjOn` (used); no notion of simple polygon or PL embedding exists in Mathlib.",
+     "name": "UnknottingProblem.IsPolygonalKnot",
+     "why_needed": "Simplicity of the closed polygon (HLP's definition of a PL knot), expressed as injectivity of the parametrisation on one period."
+    },
+    {
+     "closest_existing_considered": "`Homeomorph` (used); Mathlib has no knot equivalence, isotopy or Reidemeister moves.",
+     "name": "UnknottingProblem.standardCircle / IsUnknot",
+     "why_needed": "The unknot: a subset of ℝ³ carried onto the unit circle in the xy-plane by a homeomorphism of ℝ³."
+    },
+    {
+     "closest_existing_considered": "`ComplexityTheory.DecisionProblem` / `ComplexityTheory.P` from PvsNP.lean (reused as the type and the class).",
+     "name": "UnknottingProblem.isUnknottedPolygon / unknotLanguage",
+     "why_needed": "The decision problem as a Boolean function on vertex lists and as a language over `Bool` fitting `ComplexityTheory.P`."
+    },
+    {
+     "closest_existing_considered": "`Computability.FinEncoding`, `finEncodingNatBool`, `finEncodingListBool`, `Encodable`/`Denumerable ℤ` (the latter used for the ℤ↔ℕ zigzag), `Nat.digits`/`Nat.ofDigits` (used).",
+     "name": "UnknottingProblem.Alphabet, Alphabet.toBits/ofBits, encodeInt/decodeInt, encodeVertex/decodeVertex, encodeVertices/decodeVertices, polygonEncoding",
+     "why_needed": "A polynomial-size binary `FinEncoding` of vertex lists; Mathlib has no list/product encodings of polynomial size (its `Encodable` list encoding via `Nat.pair` is exponential) and the repo only has `finEncodingListBool`/`finEncodingListBoolProdListBool`."
+    }
+   ],
+   "per_slot": {
+    "unknotting_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ unknotLanguage ∈ ComplexityTheory.P`, reusing the repository's class P (deterministic poly-time TM2, Mathlib's `TM2ComputableInPolyTime`). `unknotLanguage` accepts a bit string iff it decodes to a list of integer-coordinate vertices forming a simple closed polygon (a PL knot, as in Hass–Lagarias–Pippenger) that is a trivial knot. Mathlib has no knot theory, so knots, the polygon, simplicity, the unknot and a polynomial-size binary encoding are defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "unknotting_problem": "/--\n**Unknotting problem.** Can unknots be recognized in polynomial time?\n\nPrecisely: is there a deterministic Turing machine which, given the binary encoding of a list of\nvertices with integer coordinates, decides whether it is a polygonal knot that is trivial, in a\nnumber of steps bounded by a polynomial in the length of the input? That is, does the unknotting\nproblem `unknotLanguage` lie in the complexity class `P`?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem : answer(sorry) ↔ unknotLanguage ∈ ComplexityTheory.P := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\nimport FormalConjectures.Millenium.PvsNP\n\n/-!\n# Unknotting problem\n\nThe unknotting problem is the problem of algorithmically recognizing the unknot, given some\nfinite representation of a knot. It is open whether this problem admits a polynomial time\nalgorithm, that is, whether it lies in the complexity class `P`. It is known to lie in\n`NP` [HLP99] and in `coNP` [La21].\n\nFollowing [HLP99], an instance is a polygonal knot in $\\mathbb{R}^3$, given by the list of its\nvertices in order; the vertices are integer lattice points, and the input length is the number\nof bits needed to write them in binary. Such a polygon is an unknot if some homeomorphism of\n$\\mathbb{R}^3$ carries it onto a round circle. [HLP99] show that this representation is\npolynomial time equivalent to the representation of a knot by a knot diagram, with the crossing\nnumber as input size, so the question does not depend on this choice.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Unknotting_problem)\n- [HLP99] Hass, J., Lagarias, J. C., Pippenger, N. _The computational complexity of knot and\n  link problems_. Journal of the ACM 46 (1999), 185-211.\n  [arXiv:math/9807016](https://arxiv.org/abs/math/9807016)\n- [La21] Lackenby, M. _The efficient certification of knottedness and Thurston norm_.\n  Advances in Mathematics 387 (2021). [arXiv:1604.00290](https://arxiv.org/abs/1604.00290)\n-/\n\nopen Computability\n\nnamespace UnknottingProblem\n\nlocal notation \"ℝ³\" => EuclideanSpace ℝ (Fin 3)\n\n/-- The binary encoding of an integer `z` as a bit string. Every binary digit `b` of `|z|`\n(least significant digit first, as in `Computability.encodeNat`) is written as the pair\n`[true, b]`, and the number is terminated by the pair `[false, s]`, where `s` is the sign\nbit `decide (z < 0)`. This encoding is self-delimiting, and its length is linear in the number\nof binary digits of `z`. -/\ndef encodeInt (z : ℤ) : List Bool :=\n  (encodeNat z.natAbs).flatMap (fun b => [true, b]) ++ [false, decide (z < 0)]\n\n/-- The encoding of a list of integer lattice points of $\\mathbb{Z}^3$ as a bit string: the three\ncoordinates of each point are written one after another with `encodeInt`. Since `encodeInt` is\nself-delimiting, this encoding is injective, and the length of `encodeVertices p` is linear in\nthe number of bits needed to write the vertices `p` in binary. -/\ndef encodeVertices (p : List (Fin 3 → ℤ)) : List Bool :=\n  p.flatMap fun v => (List.ofFn v).flatMap encodeInt\n\n/-- The point of $\\mathbb{R}^3$ with integer coordinates `v`. -/\ndef toPoint (v : Fin 3 → ℤ) : ℝ³ := WithLp.toLp 2 fun i => (v i : ℝ)\n\n/-- The closed polygon with vertices `p₀, …, pₙ₋₁` (listed in order): the union of the\nclosed segments `[pᵢ, pᵢ₊₁]`, with indices taken modulo `n`, so that the last vertex is\njoined to the first one. -/\ndef polygon (p : List (Fin 3 → ℤ)) : Set ℝ³ :=\n  ⋃ i : Fin p.length, segment ℝ (toPoint (p.get i)) (toPoint (p.get (finRotate _ i)))\n\n/-- The standard round circle in $\\mathbb{R}^3$: the unit circle in the plane $z = 0$. -/\ndef trivialKnot : Set ℝ³ := {x | x 0 ^ 2 + x 1 ^ 2 = 1 ∧ x 2 = 0}\n\n/-- A subset `K` of $\\mathbb{R}^3$ is an *unknot* (or *trivial knot*) if some homeomorphism of\n$\\mathbb{R}^3$ maps `K` onto the standard round circle `trivialKnot`.\n\nIn particular such a `K` is a knot, i.e. it is homeomorphic to a circle. Two knots are\nequivalent if some homeomorphism of $\\mathbb{R}^3$ carries one onto the other; for the unknot\nthis agrees with equivalence by ambient isotopy, since a reflection of $\\mathbb{R}^3$ preserves\n`trivialKnot`, and every orientation preserving homeomorphism of $\\mathbb{R}^3$ is isotopic\nto the identity. -/\ndef IsUnknot (K : Set ℝ³) : Prop :=\n  ∃ h : ℝ³ ≃ₜ ℝ³, h '' K = trivialKnot\n\nopen scoped Classical in\n/-- The unknotting problem as a decision problem on bit strings: a word `w` is accepted if and\nonly if `w` encodes (via `encodeVertices`) a list of integer lattice points whose closed\npolygon is an unknot. A word that does not encode any list of points, or that encodes a polygon\nwhich is not a knot (e.g. a self-intersecting one), is rejected. -/\nnoncomputable def unknotRecognition : ComplexityTheory.DecisionProblem :=\n  fun w => decide (∃ p, encodeVertices p = w ∧ IsUnknot (polygon p))\n\n/-- The standard round circle is an unknot. -/\n@[category API, AMS 57]\ntheorem isUnknot_trivialKnot : IsUnknot trivialKnot :=\n  ⟨Homeomorph.refl _, Set.image_id _⟩\n\n/-- A polygon with no vertices is empty, hence not an unknot. -/\n@[category test, AMS 57]\ntheorem not_isUnknot_polygon_nil : ¬ IsUnknot (polygon []) := by\n  rintro ⟨h, hh⟩\n  have : (WithLp.toLp 2 ![1, 0, 0] : ℝ³) ∈ trivialKnot := by\n    simp [trivialKnot]\n  rw [← hh] at this\n  simp [polygon] at this\n\n/-- The polygon on three vertices is the triangle with these vertices. -/\n@[category test, AMS 57]\ntheorem polygon_triangle (a b c : Fin 3 → ℤ) :\n    polygon [a, b, c] =\n      segment ℝ (toPoint a) (toPoint b) ∪ segment ℝ (toPoint b) (toPoint c) ∪\n        segment ℝ (toPoint c) (toPoint a) := by\n  simp only [polygon, List.length_cons, List.length_nil]\n  rw [Set.iUnion_congr (fun i => by rw [finRotate_succ_apply])]\n  ext x\n  simp only [Set.mem_iUnion, Set.mem_union, Fin.exists_fin_succ, Fin.isValue]\n  simp [List.get]\n  tauto\n\n@[category test, AMS 68]\ntheorem encodeInt_zero : encodeInt 0 = [false, false] := by\n  decide +kernel\n\n@[category test, AMS 68]\ntheorem encodeInt_neg_two : encodeInt (-2) = [true, false, true, true, false, true] := by\n  decide +kernel\n\n/--\n**Unknotting problem**: can unknots be recognized in polynomial time?\n\nThat is, is the following decision problem in the complexity class `P` (decidable by a\ndeterministic Turing machine in time polynomial in the input length): given a polygonal knot in\n$\\mathbb{R}^3$ with integer lattice vertices, encoded in binary, is it the unknot?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem : answer(sorry) ↔ unknotRecognition ∈ ComplexityTheory.P := by\n  sorry\n\nend UnknottingProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition is correct; the notes' remarks (encoding choice is immaterial up to polynomial equivalence; P is closed under complement; NP/coNP results and the quasi-polynomial announcement are background) were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Input representation: a knot is given as a polygonal knot in ℝ³ by the list of its integer-lattice vertices in order (HLP99 §1: 'polygonal representation ... integer lattice point vertices ... input length is the number of bits needed to describe its vertices in binary'). HLP99 prove this is polynomial-time equivalent to the knot-diagram representation with crossing number as size, so membership in P is independent of this choice. A knot-diagram encoding was not used because defining combinatorial diagrams/Reidemeister moves faithfully in Lean is far more error-prone.",
+    "Bit-string encoding: `encodeInt` writes each binary digit b of |z| (via Mathlib's `Computability.encodeNat`) as the pair [true, b] and terminates with [false, sign]; `encodeVertices` concatenates the three coordinates of each vertex. This is self-delimiting (hence injective) and its length is linear in the binary input length of HLP99. Words that are not codewords are rejected; recognizing codewords is trivially polynomial, so this does not affect membership in P. Injectivity is not proved in the file (only illustrated by tests).",
+    "Reuse of `ComplexityTheory.P` from FormalConjectures/Millenium/PvsNP.lean (languages `List Bool → Bool`, poly-time via Mathlib's `Turing.TM2ComputableInPolyTime`); importing another problem file follows existing Wikipedia files (e.g. ArtinPrimitiveRootsConjecture imports Millenium.RiemannHypothesis).",
+    "Unknot definition: `IsUnknot K := ∃ h : ℝ³ ≃ₜ ℝ³, h '' K = trivialKnot` where `trivialKnot` is the unit circle in the plane z = 0. This is the classical 'equivalence of knots by an ambient homeomorphism' (identifying a knot with its image set, as HLP99 do). Orientation-preservation is not required, which is harmless for the unknot because the reflection z ↦ -z preserves `trivialKnot`; agreement with the ambient-isotopy definition used by HLP99/Wikipedia uses the standard fact that orientation-preserving homeomorphisms of ℝ³ are isotopic to the identity. Note `IsUnknot K` implies K is homeomorphic to a circle, so non-knots (self-intersecting or degenerate polygons, e.g. fewer than 3 vertices) are rejected, matching HLP99's question 'Is D a knot diagram that represents the trivial knot?'.",
+    "The polygon of a vertex list is the union of the closed segments between cyclically consecutive vertices (`finRotate`), so a list with < 3 vertices gives ∅, a point, or a segment, none of which is an unknot; a vertex list that traces the same simple polygon several times has the same image set and is treated as that knot (the knot is identified with its image, as in HLP99).",
+    "Category `research open` per the status; Lackenby's announced quasi-polynomial algorithm and the NP/coNP results are recorded in the docstring as background only. AMS tags 57 (knot theory) and 68 (computer science)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Computability.encodeNat / finEncodingNatBool (not self-delimiting, ℕ only); Encodable.encode (Nat.pair-based, exponential blow-up on lists)",
+     "name": "UnknottingProblem.encodeInt",
+     "why_needed": "A self-delimiting binary encoding of integers into `List Bool`, so that vertex coordinates can be written in binary (HLP99's input length) and concatenated injectively. Mathlib has `Computability.encodeNat` for ℕ (used here) but no self-delimiting or signed variant."
+    },
+    {
+     "closest_existing_considered": "finEncodingListBool, finEncodingListBoolProdListBool (FormalConjecturesForMathlib/Computability/Encoding.lean); Encodable (List _) (exponential size)",
+     "name": "UnknottingProblem.encodeVertices",
+     "why_needed": "Encoding of a list of integer lattice points of ℤ³ as a bit string; needed because the repository's class P is defined on languages over `List Bool` and Mathlib has no FinEncoding for lists of integer vectors."
+    },
+    {
+     "closest_existing_considered": "WithLp.toLp with Int.cast (used to define it)",
+     "name": "UnknottingProblem.toPoint",
+     "why_needed": "Embeds an integer lattice point into EuclideanSpace ℝ (Fin 3)."
+    },
+    {
+     "closest_existing_considered": "segment ℝ, finRotate (used to define it)",
+     "name": "UnknottingProblem.polygon",
+     "why_needed": "The closed polygon (union of cyclically consecutive closed segments) of a vertex list; Mathlib has no notion of polygonal/PL knot."
+    },
+    {
+     "closest_existing_considered": "Circle / Metric.sphere (not a subset of ℝ³)",
+     "name": "UnknottingProblem.trivialKnot",
+     "why_needed": "The standard round circle in ℝ³ (unit circle in the plane z = 0), the reference unknot."
+    },
+    {
+     "closest_existing_considered": "Homeomorph (used); no notion of knot, knot equivalence or ambient isotopy in Mathlib or FormalConjecturesForMathlib",
+     "name": "UnknottingProblem.IsUnknot",
+     "why_needed": "Mathlib has no knot theory; defines 'K ⊆ ℝ³ is an unknot' as: some homeomorphism of ℝ³ carries K onto the standard round circle."
+    },
+    {
+     "closest_existing_considered": "ComplexityTheory.DecisionProblem / ComplexityTheory.P (reused, not redefined)",
+     "name": "UnknottingProblem.unknotRecognition",
+     "why_needed": "The unknotting problem as a language `List Bool → Bool` (a `ComplexityTheory.DecisionProblem`), so that membership in `ComplexityTheory.P` can be stated."
+    }
+   ],
+   "per_slot": {
+    "unknotting_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ unknotRecognition ∈ ComplexityTheory.P`, reusing the repository's class P (Millenium/PvsNP.lean, Mathlib's TM2ComputableInPolyTime over List Bool). The instance is a polygonal knot with integer lattice vertices (the representation used by Hass–Lagarias–Pippenger, who prove it polynomial-time equivalent to knot diagrams), encoded in binary by an explicit self-delimiting injective encoding; a word is accepted iff it encodes a vertex list whose closed polygon is carried onto the standard round circle by some homeomorphism of ℝ³. answer(True) = 'yes, unknots can be recognized in polynomial time'."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "unknotting_problem": "/--\n**Unknotting problem**: can unknots be recognized in polynomial time?\n\nThat is, is the following decision problem in the complexity class `P` (decidable by a\ndeterministic Turing machine in time polynomial in the input length): given a polygonal knot in\n$\\mathbb{R}^3$ with integer lattice vertices, encoded in binary, is it the unknot?\n-/\n@[category research open, AMS 57 68]\ntheorem unknotting_problem : answer(sorry) ↔ unknotRecognition ∈ ComplexityTheory.P := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "unknotting_problem": "c07"
+ },
+ "id": "wp-unknotting-problem",
+ "main_attempt": "c07"
+}

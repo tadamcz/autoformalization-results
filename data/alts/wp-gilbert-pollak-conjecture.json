@@ -1,0 +1,397 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Gilbert–Pollak conjecture\n\nThe Gilbert–Pollak conjecture (1968) concerns the *Steiner ratio* of the Euclidean plane:\nthe ratio of the length of a Steiner minimum tree to the length of a Euclidean minimum\nspanning tree, in the worst case over all finite point sets. It asserts that this ratio is\n$\\sqrt{3}/2$, i.e. that for every finite set of points in the plane the Euclidean minimum\nspanning tree is at most $2/\\sqrt{3}$ times as long as the Steiner minimum tree. The bound is\nattained by the three vertices of an equilateral triangle.\n\nA proof announced by Du and Hwang in 1990 was later found to contain a serious gap, and the\nconjecture is considered open.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Gilbert%E2%80%93Pollak_conjecture)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [GiPo68] Gilbert, E. N. and Pollak, H. O., *Steiner minimal trees*.\n  SIAM J. Appl. Math. 16 (1968), 1–29.\n- [DuHw92] Du, D.-Z. and Hwang, F. K., *A proof of the Gilbert–Pollak conjecture on the Steiner\n  ratio*. Algorithmica 7 (1992), 121–135.\n- [IvTu12] Ivanov, A. O. and Tuzhilin, A. A., *The Steiner ratio Gilbert–Pollak conjecture is\n  still open*. Algorithmica 62 (2012), 630–632.\n- [IvTu14] Ivanov, A. O. and Tuzhilin, A. A., *Du–Hwang characteristic area: Catch-22*.\n  [arXiv:1402.6079](https://arxiv.org/abs/1402.6079)\n-/\n\nnamespace GilbertPollakConjecture\n\nopen Finset\nopen scoped EuclideanGeometry\n\nvariable {X : Type*} [MetricSpace X]\n\n/--\nThe **length** of a graph `T` on a finite metric space `V` is the sum, over the edges of `T`, of\nthe distances between the two endpoints of the edge.\n-/\nnoncomputable def length {V : Type*} [Fintype V] [MetricSpace V] (T : SimpleGraph V) : ℝ :=\n  open scoped Classical in\n  ∑ e ∈ T.edgeFinset, Sym2.lift ⟨dist, dist_comm⟩ e\n\n/--\nThe length of a **minimum spanning tree** of a finite set `S` of points of a metric space `X`:\nthe least total length of a tree whose vertex set is exactly `S` (i.e. of a spanning tree of the\ncomplete graph on `S`, with every edge weighted by the distance between its endpoints).\n\nIn the Euclidean plane this is the length of the shortest network of line segments connecting\nthe points of `S` whose endpoints all lie in `S`, i.e. the Euclidean minimum spanning tree.\n-/\nnoncomputable def mstLength (S : Finset X) : ℝ :=\n  sInf {length T | (T : SimpleGraph S) (_ : T.IsTree)}\n\n/--\nThe length of a **Steiner minimum tree** of a finite set `S` of points of a metric space `X`:\nthe infimum of the total length of a tree whose vertex set is a finite set containing `S`.\nThe vertices not in `S` are the *Steiner points*. Equivalently, this is the infimum of\n`mstLength T` over all finite sets `T` of points with `S ⊆ T`.\n-/\nnoncomputable def smtLength (S : Finset X) : ℝ :=\n  sInf {mstLength T | (T : Finset X) (_ : S ⊆ T)}\n\n/--\nThe **Steiner ratio** of a metric space `X`: the infimum, over all finite sets `S` of at least two\npoints of `X`, of the ratio of the length of a Steiner minimum tree of `S` to the length of a\nminimum spanning tree of `S`.\n\nThis is the convention of the Wikipedia list of unsolved problems (a number at most `1`); the\nWikipedia article on the conjecture uses the reciprocal convention (the supremum of the\nratio of the minimum spanning tree length to the Steiner minimum tree length).\n-/\nnoncomputable def steinerRatio (X : Type*) [MetricSpace X] : ℝ :=\n  sInf {smtLength S / mstLength S | (S : Finset X) (_ : 2 ≤ #S)}\n\n/-- The length of a graph is nonnegative. -/\n@[category API, AMS 5 51]\ntheorem length_nonneg {V : Type*} [Fintype V] [MetricSpace V] (T : SimpleGraph V) :\n    0 ≤ length T := by\n  classical\n  refine Finset.sum_nonneg fun e _ => ?_\n  induction e using Sym2.ind with\n  | _ u v => exact dist_nonneg\n\n/-- The length of a minimum spanning tree is nonnegative. -/\n@[category API, AMS 5 51]\ntheorem mstLength_nonneg (S : Finset X) : 0 ≤ mstLength S := by\n  refine Real.sInf_nonneg ?_\n  rintro _ ⟨T, -, rfl⟩\n  exact length_nonneg T\n\n/-- The length of a Steiner minimum tree is nonnegative. -/\n@[category API, AMS 5 51]\ntheorem smtLength_nonneg (S : Finset X) : 0 ≤ smtLength S := by\n  refine Real.sInf_nonneg ?_\n  rintro _ ⟨T, -, rfl⟩\n  exact mstLength_nonneg T\n\n/-- A Steiner minimum tree is no longer than a minimum spanning tree (take no Steiner points). -/\n@[category API, AMS 5 51]\ntheorem smtLength_le_mstLength (S : Finset X) : smtLength S ≤ mstLength S := by\n  refine csInf_le ⟨0, ?_⟩ ⟨S, subset_rfl, rfl⟩\n  rintro _ ⟨T, -, rfl⟩\n  exact mstLength_nonneg T\n\n/--\n**Gilbert–Pollak conjecture.** For every finite set $S$ of points in the Euclidean plane, the\nEuclidean minimum spanning tree of $S$ is no longer than $2/\\sqrt{3}$ times the length of the\nSteiner minimum tree of $S$:\n$$\\operatorname{MST}(S) \\le \\frac{2}{\\sqrt{3}} \\operatorname{SMT}(S).$$\n\nEquivalently, the Steiner ratio of the Euclidean plane is $\\sqrt{3}/2$; the three vertices of an\nequilateral triangle show that the constant $2/\\sqrt{3}$ cannot be improved. For sets with fewer\nthan two points both lengths are $0$ and the inequality is trivial.\n-/\n@[category research open, AMS 5 51 90]\ntheorem gilbert_pollak_conjecture (S : Finset ℝ²) :\n    mstLength S ≤ 2 / √3 * smtLength S := by\n  sorry\n\n/--\n**Gilbert–Pollak conjecture**, stated as in the Wikipedia list of unsolved problems: the Steiner\nratio of the Euclidean plane is $\\sqrt{3}/2$, i.e.\n$$\\inf_{S} \\frac{\\operatorname{SMT}(S)}{\\operatorname{MST}(S)} = \\frac{\\sqrt{3}}{2},$$\nthe infimum being over all finite sets $S$ of at least two points in the plane.\n-/\n@[category research open, AMS 5 51 90]\ntheorem gilbert_pollak_conjecture.variants.steinerRatio_eq :\n    steinerRatio ℝ² = √3 / 2 := by\n  sorry\n\nend GilbertPollakConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The table's reading (single inequality Prop; Steiner tree as inf over finite supersets of MST length; sphere analogue excluded) is the standard one and was followed. The only nuance: the ≥2-point restriction mentioned in the notes is unnecessary for the inequality form (trivially true for smaller sets), so the statement is given for all finite sets; the ratio form (where the restriction matters) is provided as a variant with 2 ≤ #S.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Euclidean plane modelled as EuclideanSpace ℝ (Fin 2) (repo notation ℝ² via `open scoped EuclideanGeometry`); definitions are given for a general MetricSpace and specialised to ℝ² in the theorems.",
+    "Minimum spanning tree = tree (SimpleGraph.IsTree) on the vertex type ↥S, edges weighted by dist; this is exactly a spanning tree of the complete graph on S. mstLength uses sInf over ℝ; for nonempty S the set is finite and nonempty so it is a true minimum. For S = ∅ there are no trees (IsTree needs Nonempty) and sInf ∅ = 0, which is harmless (see next item).",
+    "Steiner minimum tree length defined as inf over finite supersets T ⊇ S of mstLength T (the decomposition table's suggested reading). This equals the minimum length of a tree whose vertex set contains S. The set is nonempty (T = S) and bounded below by 0, so sInf is the genuine infimum.",
+    "The slot is stated for ALL S : Finset ℝ² with no cardinality hypothesis, matching the article's 'for every finite set of points'. For |S| ≤ 1 both lengths are 0 and the inequality is 0 ≤ 0, so this is equivalent to the ≥2-point version noted in the decomposition table; the docstring records this.",
+    "Inequality direction/constant: mstLength S ≤ (2/√3) * smtLength S, i.e. the article's sup MST/SMT = 2/√3 convention. The list entry's inf SMT/MST = √3/2 convention is captured by the additional variant theorem `gilbert_pollak_conjecture.variants.steinerRatio_eq : steinerRatio ℝ² = √3 / 2`, where steinerRatio ranges over sets with 2 ≤ #S (so mstLength S > 0 in a metric space and the quotient is genuine). Both are research open; the variant is not a decomposition slot but is included since it is the verbatim list-entry form.",
+    "Four short API lemmas (length_nonneg, mstLength_nonneg, smtLength_nonneg, smtLength_le_mstLength) are proved (not sorried) to sanity-check the definitions.",
+    "AMS tags 5 (combinatorics/graph theory), 51 (geometry), 90 (operations research; Steiner tree problem) on the open statements; API lemmas tagged 5 51."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.edgeFinset (unweighted count only); FormalConjecturesForMathlib WienerIndex/SzegedIndex use the same Sym2.lift-over-edges idiom but for graph-distance, not metric distance.",
+     "name": "GilbertPollakConjecture.length",
+     "why_needed": "Total length of a graph on a finite metric space: sum over edgeFinset of Sym2.lift ⟨dist, dist_comm⟩. Mathlib has no weighted-graph / edge-length notion."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Ls in FormalConjecturesForMathlib/Combinatorics/SimpleGraph/SpanningTree.lean (max leaves of a spanning tree, not length); SimpleGraph.IsTree, SimpleGraph.Connected.exists_isTree_le.",
+     "name": "GilbertPollakConjecture.mstLength",
+     "why_needed": "Length of a minimum spanning tree of a finite point set S: sInf {length T | T : SimpleGraph S, T.IsTree}. Nothing in Mathlib or the repo defines minimum spanning tree length."
+    },
+    {
+     "closest_existing_considered": "None (searched 'steiner', 'spanning' in Mathlib and repo; only Steiner systems appear).",
+     "name": "GilbertPollakConjecture.smtLength",
+     "why_needed": "Length of a Steiner minimum tree: sInf {mstLength T | S ⊆ T, T finite}. Standard equivalent formulation of the shortest network allowed to use additional Steiner points. Not in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "GilbertPollakConjecture.steinerRatio",
+     "why_needed": "Used only for the extra variant theorem stating the list entry literally: steinerRatio X := sInf {smtLength S / mstLength S | 2 ≤ #S}, the inf SMT/MST convention of the Wikipedia list (so the conjectured value is √3/2)."
+    }
+   ],
+   "per_slot": {
+    "gilbert_pollak_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every S : Finset ℝ², mstLength S ≤ 2 / √3 * smtLength S, where mstLength is the minimum over trees on the vertex set S (SimpleGraph ↥S with IsTree) of the sum of Euclidean edge lengths, and smtLength is the infimum of mstLength T over finite supersets T ⊇ S (Steiner points = extra vertices). No Steiner-tree / Euclidean-MST primitives exist in Mathlib or FormalConjecturesForMathlib, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "gilbert_pollak_conjecture": "/--\n**Gilbert–Pollak conjecture.** For every finite set $S$ of points in the Euclidean plane, the\nEuclidean minimum spanning tree of $S$ is no longer than $2/\\sqrt{3}$ times the length of the\nSteiner minimum tree of $S$:\n$$\\operatorname{MST}(S) \\le \\frac{2}{\\sqrt{3}} \\operatorname{SMT}(S).$$\n\nEquivalently, the Steiner ratio of the Euclidean plane is $\\sqrt{3}/2$; the three vertices of an\nequilateral triangle show that the constant $2/\\sqrt{3}$ cannot be improved. For sets with fewer\nthan two points both lengths are $0$ and the inequality is trivial.\n-/\n@[category research open, AMS 5 51 90]\ntheorem gilbert_pollak_conjecture (S : Finset ℝ²) :\n    mstLength S ≤ 2 / √3 * smtLength S := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Gilbert–Pollak conjecture\n\n*Reference:* [Wikipedia, Gilbert–Pollak conjecture](https://en.wikipedia.org/wiki/Gilbert%E2%80%93Pollak_conjecture)\n-/\n\nnamespace GilbertPollakConjecture\n\n/-- The length of the straight-line tree `G` whose vertices belong to the finite point set `s`. -/\nnoncomputable def treeLength (s : Finset (EuclideanSpace ℝ (Fin 2)))\n    (G : SimpleGraph s) : ℝ :=\n  ∑ e ∈ G.edgeFinset,\n    Sym2.lift ⟨fun x y : s ↦ dist x.1 y.1, fun x y ↦ dist_comm x.1 y.1⟩ e\n\n/-- The length of a Euclidean minimum spanning tree of the finite point set `s`. -/\nnoncomputable def mstLength (s : Finset (EuclideanSpace ℝ (Fin 2))) : ℝ :=\n  sInf {l : ℝ | ∃ G : SimpleGraph s, G.IsTree ∧ l = treeLength s G}\n\n/--\nThe length of a Steiner minimum tree for `s`, defined as the infimum of the minimum spanning\ntree lengths of finite point sets containing `s`. The additional points are the Steiner points.\n-/\nnoncomputable def steinerTreeLength (s : Finset (EuclideanSpace ℝ (Fin 2))) : ℝ :=\n  sInf {l : ℝ | ∃ t : Finset (EuclideanSpace ℝ (Fin 2)), s ⊆ t ∧ l = mstLength t}\n\n/--\nThe Gilbert–Pollak conjecture: for every finite set `s` of at least two points in the Euclidean\nplane, the Euclidean minimum spanning tree has length at most $2/\\sqrt{3}$ times the length of a\nSteiner minimum tree. Equivalently, with the reciprocal convention from the list entry, the\nSteiner ratio is $\\sqrt{3}/2$; the equilateral triangle attains this bound.\n-/\n@[category research open, AMS 5 51]\ntheorem gilbert_pollak_conjecture :\n    ∀ s : Finset (EuclideanSpace ℝ (Fin 2)), 2 ≤ s.card →\n      mstLength s ≤ (2 / Real.sqrt 3) * steinerTreeLength s := by\n  sorry\n\nend GilbertPollakConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled the Euclidean plane as `EuclideanSpace ℝ (Fin 2)` and finite point sets as `Finset (EuclideanSpace ℝ (Fin 2))`.",
+    "Restricted the conjecture to point sets of cardinality at least two, as specified by the decomposition, avoiding degenerate empty and singleton conventions.",
+    "Modeled a straight-line spanning tree on a finite point set `s` as a `SimpleGraph` on the subtype `s` satisfying `SimpleGraph.IsTree`; each unordered edge is weighted by the Euclidean distance of its endpoints.",
+    "Defined Steiner minimum tree length exactly as requested in the decomposition: the infimum of Euclidean MST lengths over finite supersets of the terminal set. Points in the larger finset are the allowed Steiner points.",
+    "Used the article's inequality convention `MST ≤ (2 / √3) * SMT`. The theorem docstring records that this is equivalent, using the equilateral-triangle extremal example, to the list entry's reciprocal Steiner ratio `√3 / 2`.",
+    "Used `sInf` for both optimization quantities. For the theorem's finite sets of at least two points, spanning trees exist and the finite collection of graph lengths has a minimum; the outer infimum represents optimization over all finite Steiner-point supersets."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib provides `SimpleGraph.edgeFinset`, `Sym2.lift`, and metric `dist`, but the hard search found no existing weighted Euclidean graph/tree length definition.",
+     "name": "GilbertPollakConjecture.treeLength",
+     "why_needed": "Needed to assign a total Euclidean length to a finite straight-line graph by summing endpoint distances over unordered edges."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `SimpleGraph.IsTree` and finite edge sets, but neither Mathlib nor `FormalConjecturesForMathlib` contains a Euclidean MST-length primitive.",
+     "name": "GilbertPollakConjecture.mstLength",
+     "why_needed": "Needed the Euclidean minimum spanning tree length of a finite planar point set."
+    },
+    {
+     "closest_existing_considered": "No Steiner-tree or Steiner-ratio primitive was found in Mathlib, `FormalConjecturesForMathlib`, or existing conjecture files; the closest available ingredients were `sInf`, finset inclusion, and the bespoke Euclidean MST length.",
+     "name": "GilbertPollakConjecture.steinerTreeLength",
+     "why_needed": "Needed the Steiner minimum tree length, allowing arbitrary additional finite Steiner points, to state the conjectured ratio."
+    }
+   ],
+   "per_slot": {
+    "gilbert_pollak_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "gilbert_pollak_conjecture": "/--\nThe Gilbert–Pollak conjecture: for every finite set `s` of at least two points in the Euclidean\nplane, the Euclidean minimum spanning tree has length at most $2/\\sqrt{3}$ times the length of a\nSteiner minimum tree. Equivalently, with the reciprocal convention from the list entry, the\nSteiner ratio is $\\sqrt{3}/2$; the equilateral triangle attains this bound.\n-/\n@[category research open, AMS 5 51]\ntheorem gilbert_pollak_conjecture :\n    ∀ s : Finset (EuclideanSpace ℝ (Fin 2)), 2 ≤ s.card →\n      mstLength s ≤ (2 / Real.sqrt 3) * steinerTreeLength s := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Gilbert–Pollak conjecture\n\nFor a finite set $S$ of points in the Euclidean plane, the *Euclidean minimum spanning tree*\nof $S$ is the shortest tree whose vertex set is exactly $S$, with edges the straight\nsegments between its endpoints. A *Steiner minimum tree* of $S$ is the shortest tree whose\nvertex set contains $S$; the extra vertices are called *Steiner points*. Equivalently, its\nlength is the infimum of the minimum spanning tree lengths of all finite supersets of $S$.\n\nThe *Steiner ratio* of the Euclidean plane is the infimum, over all finite point sets with at\nleast two points, of the ratio of the length of a Steiner minimum tree to the length of a\nminimum spanning tree. (The Wikipedia article uses the reciprocal convention, the supremum of\nthe ratio of the minimum spanning tree length to the Steiner minimum tree length, which\nequals $2/\\sqrt{3}$ under the conjecture.)\n\nThe three vertices of an equilateral triangle of unit side length have a minimum spanning\ntree of length $2$ and a Steiner minimum tree of length $\\sqrt{3}$, so the Steiner ratio is\nat most $\\sqrt{3}/2$. The Gilbert–Pollak conjecture (1968) states that this is the worst\ncase: the Steiner ratio of the Euclidean plane is exactly $\\sqrt{3}/2$, i.e. for every finite\npoint set the minimum spanning tree is at most $2/\\sqrt{3}$ times as long as the Steiner\nminimum tree. A proof published by Du and Hwang in 1990 was later found to have a serious\ngap, and the conjecture is regarded as open.\n\n*References:*\n- [Wikipedia, *Gilbert–Pollak conjecture*](https://en.wikipedia.org/wiki/Gilbert%E2%80%93Pollak_conjecture)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [E. N. Gilbert, H. O. Pollak, *Steiner minimal trees*, SIAM J. Appl. Math. **16** (1968),\n  1–29](https://doi.org/10.1137/0116001)\n- [A. O. Ivanov, A. A. Tuzhilin, *The Steiner ratio Gilbert–Pollak conjecture is still open*,\n  Algorithmica **62** (2012), 630–632](https://doi.org/10.1007/s00453-011-9508-3)\n-/\n\nopen scoped EuclideanGeometry\n\nnamespace GilbertPollakConjecture\n\nvariable {P : Type*} [MetricSpace P]\n\nopen scoped Classical in\n/--\nThe total length of a graph `G` on a finite set of points of a metric space: the sum, over\nthe edges of `G`, of the distances between their two endpoints.\n-/\nnoncomputable def totalLength {V : Type*} [Fintype V] [PseudoMetricSpace V]\n    (G : SimpleGraph V) : ℝ :=\n  ∑ e ∈ G.edgeFinset, Sym2.lift ⟨dist, dist_comm⟩ e\n\n/--\nThe length of a minimum spanning tree of a finite set of points `S` in a metric space: the\nleast total length of a tree whose vertex set is exactly `S`.\n-/\nnoncomputable def mstLength (S : Finset P) : ℝ :=\n  ⨅ T : {T : SimpleGraph S // T.IsTree}, totalLength T.1\n\n/--\nThe length of a Steiner minimum tree of a finite set of points `S` in a metric space: the\ninfimum, over all finite sets `S'` containing `S`, of the length of a minimum spanning tree\nof `S'`. The points of `S'` not in `S` are the Steiner points.\n-/\nnoncomputable def steinerLength (S : Finset P) : ℝ :=\n  ⨅ S' : {S' : Finset P // S ⊆ S'}, mstLength S'.1\n\n/--\nThe Steiner ratio of a metric space `P`: the infimum, over all finite sets `S` of at least two\npoints of `P`, of the ratio of the length of a Steiner minimum tree of `S` to the length of a\nminimum spanning tree of `S`.\n-/\nnoncomputable def steinerRatio (P : Type*) [MetricSpace P] : ℝ :=\n  ⨅ S : {S : Finset P // 2 ≤ S.card}, steinerLength S.1 / mstLength S.1\n\n/--\nThe minimum spanning tree of a two-point set consists of the single segment joining the two\npoints.\n-/\n@[category test, AMS 5 52]\ntheorem mstLength_pair [DecidableEq P] {x y : P} (h : x ≠ y) : mstLength {x, y} = dist x y := by\n  sorry\n\n/--\nThe vertices of an equilateral triangle of unit side length have a minimum spanning tree of\nlength $2$: two sides of the triangle.\n-/\n@[category test, AMS 5 52]\ntheorem mstLength_equilateral {x y z : ℝ²}\n    (hxy : dist x y = 1) (hyz : dist y z = 1) (hxz : dist x z = 1) :\n    mstLength {x, y, z} = 2 := by\n  sorry\n\n/--\nThe vertices of an equilateral triangle of unit side length have a Steiner minimum tree of\nlength $\\sqrt{3}$: the three segments from the vertices to the centroid.\n-/\n@[category textbook, AMS 5 52]\ntheorem steinerLength_equilateral {x y z : ℝ²}\n    (hxy : dist x y = 1) (hyz : dist y z = 1) (hxz : dist x z = 1) :\n    steinerLength {x, y, z} = √3 := by\n  sorry\n\n/--\n**The Gilbert–Pollak conjecture.**\n\nFor every finite set $S$ of at least two points in the Euclidean plane, the length of a\nEuclidean minimum spanning tree of $S$ is at most $2/\\sqrt{3}$ times the length of a Steiner\nminimum tree of $S$. Equivalently, the Steiner ratio of the Euclidean plane is $\\sqrt{3}/2$,\nsince the equilateral triangle shows that the ratio cannot be larger.\n\nThe restriction to at least two points only excludes the degenerate case in which both\nlengths are $0$.\n-/\n@[category research open, AMS 5 52]\ntheorem gilbert_pollak_conjecture (S : Finset ℝ²) (hS : 2 ≤ S.card) :\n    mstLength S ≤ 2 / √3 * steinerLength S := by\n  sorry\n\n/--\n**The Gilbert–Pollak conjecture**, stated as in the Wikipedia list of unsolved problems:\nthe Steiner ratio of the Euclidean plane is $\\sqrt{3}/2$.\n-/\n@[category research open, AMS 5 52]\ntheorem gilbert_pollak_conjecture.variants.steinerRatio_eq : steinerRatio ℝ² = √3 / 2 := by\n  sorry\n\n/--\nThe Steiner ratio of the Euclidean plane is at most $\\sqrt{3}/2$, as shown by the vertices\nof an equilateral triangle.\n-/\n@[category textbook, AMS 5 52]\ntheorem steinerRatio_le : steinerRatio ℝ² ≤ √3 / 2 := by\n  sorry\n\nend GilbertPollakConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.88,
+   "decomposition_objections": "None substantive. The table's inequality form is followed for the slot. Because the list entry literally says 'the Steiner ratio is √3/2' (an equality), I additionally included a variant declaration stating the equality steinerRatio ℝ² = √3 / 2, together with the textbook bound steinerRatio ℝ² ≤ √3 / 2 from the equilateral triangle, so that the file records both readings; they are equivalent given the equilateral triangle example, as the table notes.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Euclidean plane modeled as EuclideanSpace ℝ (Fin 2) via the repo's scoped notation ℝ² (FormalConjecturesForMathlib/Geometry/2d.lean).",
+    "Minimum spanning tree length of a Finset S := ⨅ over all T : SimpleGraph ↥S with T.IsTree of the sum of dist over T.edgeFinset (Sym2.lift ⟨dist, dist_comm⟩). The subtype ↥S carries the restricted metric; the real iInf over the nonempty finite family of trees is the true minimum.",
+    "Steiner minimum tree length := ⨅ over all Finsets S' ⊇ S of mstLength S' (Steiner points = S' \\ S). This is the standard definition (Gilbert–Pollak; Ivanov–Tuzhilin) and equals the length of an actual Steiner minimum tree since the infimum is attained; the family is nonempty and bounded below by 0, so Real.iInf gives the genuine infimum (no default-0 behaviour is reached).",
+    "Main slot follows the decomposition table: the inequality mstLength S ≤ 2 / √3 * steinerLength S for all S with 2 ≤ S.card. The card hypothesis matches the table's '(nonempty, ≥2-point)' note; for |S| < 2 both lengths are 0 so the statement is trivially true either way (explained in the docstring).",
+    "Convention clash handled as in the table: the list entry's 'Steiner ratio = √3/2' uses inf SMT/MST; the article uses sup MST/SMT = 2/√3. The slot uses the article's inequality form; a variant `gilbert_pollak_conjecture.variants.steinerRatio_eq` states the list entry literally as steinerRatio ℝ² = √3 / 2 with steinerRatio P := ⨅ over Finsets S with 2 ≤ S.card of steinerLength S / mstLength S (mstLength S > 0 when |S| ≥ 2, so no division by zero; family nonempty and bounded below by 0). Both are tagged research open.",
+    "Definitions are stated for a general MetricSpace P (Steiner ratio is standardly defined for metric spaces) and specialised to ℝ² in the theorems; since the task restricts output to one problem file, they live in the problem file rather than FormalConjecturesForMathlib.",
+    "Extra declarations: tests mstLength_pair (two distinct points ↦ dist) and mstLength_equilateral (unit equilateral triangle ↦ 2), textbook steinerLength_equilateral (unit equilateral triangle ↦ √3, Fermat point) and steinerRatio_le (steinerRatio ℝ² ≤ √3/2), all with sorry, as sanity checks of the bespoke definitions.",
+    "Sphere analogue of Rubinstein–Weng deliberately not included, per the table.",
+    "AMS tags 5 (combinatorics) and 52 (convex and discrete geometry)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.edgeFinset together with Sym2.lift (used as building blocks); no existing edge-weight or length notion in Mathlib or FormalConjecturesForMathlib.",
+     "name": "GilbertPollakConjecture.totalLength",
+     "why_needed": "Sum of Euclidean edge lengths of a SimpleGraph on a finite pseudo-metric space; Mathlib has no weighted/geometric graph length."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.IsTree, SimpleGraph.Connected; Mathlib has no minimum spanning tree definition.",
+     "name": "GilbertPollakConjecture.mstLength",
+     "why_needed": "Length of a Euclidean minimum spanning tree of a Finset: infimum of totalLength over trees (SimpleGraph.IsTree) on the subtype ↥S."
+    },
+    {
+     "closest_existing_considered": "Nothing related in Mathlib (only SteinerSystem in the repo, an unrelated design-theory notion).",
+     "name": "GilbertPollakConjecture.steinerLength",
+     "why_needed": "Length of a Steiner minimum tree: infimum of mstLength over finite supersets of S."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or FormalConjecturesForMathlib.",
+     "name": "GilbertPollakConjecture.steinerRatio",
+     "why_needed": "The Steiner ratio of a metric space as in the list entry's convention (inf SMT/MST over sets of ≥2 points), used for the literal variant statement steinerRatio ℝ² = √3 / 2."
+    }
+   ],
+   "per_slot": {
+    "gilbert_pollak_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every Finset S of the Euclidean plane (EuclideanSpace ℝ (Fin 2)) with 2 ≤ S.card, mstLength S ≤ 2 / √3 * steinerLength S, exactly the inequality in the decomposition note (article convention MST ≤ (2/√3)·SMT). mstLength/steinerLength/totalLength are bespoke (no MST/Steiner tree notions exist in Mathlib or FormalConjecturesForMathlib). A separately named variant gilbert_pollak_conjecture.variants.steinerRatio_eq states the list entry literally (steinerRatio ℝ² = √3 / 2), plus textbook/test statements for the equilateral triangle and two-point set."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "gilbert_pollak_conjecture": "/--\n**The Gilbert–Pollak conjecture.**\n\nFor every finite set $S$ of at least two points in the Euclidean plane, the length of a\nEuclidean minimum spanning tree of $S$ is at most $2/\\sqrt{3}$ times the length of a Steiner\nminimum tree of $S$. Equivalently, the Steiner ratio of the Euclidean plane is $\\sqrt{3}/2$,\nsince the equilateral triangle shows that the ratio cannot be larger.\n\nThe restriction to at least two points only excludes the degenerate case in which both\nlengths are $0$.\n-/\n@[category research open, AMS 5 52]\ntheorem gilbert_pollak_conjecture (S : Finset ℝ²) (hS : 2 ≤ S.card) :\n    mstLength S ≤ 2 / √3 * steinerLength S := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Gilbert–Pollak conjecture\n\nLet $P$ be a finite set of points in the Euclidean plane. The *Euclidean minimum spanning tree*\nof $P$ is a shortest network of line segments connecting the points of $P$ whose endpoints all\nbelong to $P$. A *Steiner minimum tree* of $P$ is a shortest network of line segments connecting\nthe points of $P$ that may also use additional endpoints, called *Steiner points*. The\n*Steiner ratio* of the Euclidean plane is the infimum, over all finite point sets $P$ (with at\nleast two points), of the ratio of the length of a Steiner minimum tree of $P$ to the length of a\nEuclidean minimum spanning tree of $P$. (Some authors, including the Wikipedia article on the\nconjecture, use the reciprocal convention and call the supremum of the reciprocal ratios the\nSteiner ratio.)\n\nThe equilateral triangle of unit side length has a minimum spanning tree of length $2$ and a\nSteiner minimum tree of length $\\sqrt{3}$, so the Steiner ratio is at most $\\sqrt{3}/2$.\nThe Gilbert–Pollak conjecture states that this example is the worst case, i.e. that the Steiner\nratio of the Euclidean plane equals $\\sqrt{3}/2$. Equivalently, for every finite set of points in\nthe Euclidean plane, the Euclidean minimum spanning tree is no longer than $2/\\sqrt{3}$ times the\nSteiner minimum tree. A proof published by Du and Hwang in 1990 was later found to contain a gap,\nand the conjecture is considered open.\n\n*References:*\n- [Wikipedia, Gilbert–Pollak conjecture](https://en.wikipedia.org/wiki/Gilbert%E2%80%93Pollak_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [GP68] Gilbert, E. N., Pollak, H. O., _Steiner minimal trees_, SIAM J. Appl. Math. 16 (1968),\n  1–29.\n- [IT12] Ivanov, A. O., Tuzhilin, A. A., _The Steiner ratio Gilbert–Pollak conjecture is still\n  open_, Algorithmica 62 (2012), 630–632.\n-/\n\nnamespace GilbertPollakConjecture\n\nopen scoped EuclideanGeometry Finset\n\nvariable {X : Type*} [MetricSpace X]\n\n/-- The total length of a graph `G` whose vertices are points of a metric space: the sum, over the\nedges of `G`, of the distance between the two endpoints of the edge. -/\nnoncomputable def graphLength {V : Type*} [MetricSpace V] [Fintype V] (G : SimpleGraph V) : ℝ :=\n  open scoped Classical in\n  ∑ e ∈ G.edgeFinset, Sym2.lift ⟨dist, dist_comm⟩ e\n\n/-- The edgeless graph has length `0`. -/\n@[category API, AMS 5]\ntheorem graphLength_bot {V : Type*} [MetricSpace V] [Fintype V] :\n    graphLength (⊥ : SimpleGraph V) = 0 := by\n  refine Finset.sum_eq_zero fun e he => ?_\n  simp at he\n\n/-- The length of a graph is nonnegative. -/\n@[category API, AMS 5]\ntheorem graphLength_nonneg {V : Type*} [MetricSpace V] [Fintype V] (G : SimpleGraph V) :\n    0 ≤ graphLength G := by\n  classical\n  unfold graphLength\n  refine Finset.sum_nonneg fun e _ => ?_\n  induction e using Sym2.ind\n  simp [dist_nonneg]\n\n/-- The length of a minimum spanning tree of a finite set `S` of points of a metric space:\nthe least total length of a tree whose vertex set is exactly `S`, where each edge has the\ndistance between its endpoints as its length. -/\nnoncomputable def mstLength (S : Finset X) : ℝ :=\n  sInf {graphLength T | (T : SimpleGraph S) (_ : T.IsTree)}\n\n/-- The empty set has no spanning tree, so its minimum spanning tree length is the junk\nvalue `sInf ∅ = 0`. -/\n@[category API, AMS 5]\ntheorem mstLength_empty : mstLength (∅ : Finset X) = 0 := by\n  have : {graphLength T | (T : SimpleGraph (∅ : Finset X)) (_ : T.IsTree)} = ∅ := by\n    ext L\n    simp only [Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false, not_exists]\n    rintro T ⟨hT, -⟩\n    obtain ⟨⟨x, hx⟩⟩ := hT.nonempty\n    simp at hx\n  rw [mstLength, this, Real.sInf_empty]\n\n/-- The only spanning tree of a single point has no edges. -/\n@[category API, AMS 5]\ntheorem mstLength_singleton (x : X) : mstLength ({x} : Finset X) = 0 := by\n  have : {graphLength T | (T : SimpleGraph ({x} : Finset X)) (_ : T.IsTree)} = {0} := by\n    ext L\n    simp only [Set.mem_setOf_eq, Set.mem_singleton_iff]\n    constructor\n    · rintro ⟨T, -, rfl⟩\n      rw [Subsingleton.elim T ⊥, graphLength_bot]\n    · rintro rfl\n      exact ⟨⊥, SimpleGraph.IsTree.of_subsingleton, graphLength_bot⟩\n  rw [mstLength, this, csInf_singleton]\n\n/-- The length of a Steiner minimum tree of a finite set `S` of points of a metric space: the\ninfimum of the total lengths of trees connecting the points of `S` that may use finitely many\nadditional vertices (Steiner points), i.e. the infimum of the minimum spanning tree lengths of\nthe finite supersets of `S`. -/\nnoncomputable def smtLength (S : Finset X) : ℝ :=\n  sInf {mstLength Q | (Q : Finset X) (_ : S ⊆ Q)}\n\n/-- The Steiner ratio of the Euclidean plane: the infimum, over all finite sets `S` of at least two\npoints of the plane, of the ratio of the length of a Steiner minimum tree of `S` to the length of a\nEuclidean minimum spanning tree of `S`. -/\nnoncomputable def steinerRatio : ℝ :=\n  sInf {smtLength S / mstLength S | (S : Finset ℝ²) (_ : 2 ≤ #S)}\n\n/-- **Gilbert–Pollak conjecture.** For every finite set $S$ of points in the Euclidean plane, the\nlength of a Euclidean minimum spanning tree of $S$ is at most $2/\\sqrt{3}$ times the length of a\nSteiner minimum tree of $S$. Equivalently, the Steiner ratio of the Euclidean plane is\n$\\sqrt{3}/2$. -/\n@[category research open, AMS 5 51]\ntheorem gilbert_pollak_conjecture (S : Finset ℝ²) :\n    mstLength S ≤ 2 / √3 * smtLength S := by\n  sorry\n\n/-- The Gilbert–Pollak conjecture, stated in terms of the Steiner ratio: the Steiner ratio of the\nEuclidean plane, i.e. the infimum over finite point sets of the ratio of the Steiner minimum tree\nlength to the Euclidean minimum spanning tree length, is $\\sqrt{3}/2$. -/\n@[category research open, AMS 5 51]\ntheorem gilbert_pollak_conjecture.variants.steinerRatio : steinerRatio = √3 / 2 := by\n  sorry\n\n/-- The three vertices of an equilateral triangle of unit side length have a minimum spanning tree\nof length $2$ and a Steiner minimum tree of length $\\sqrt{3}$ (three segments from the vertices to\nthe centre), so the Steiner ratio of the Euclidean plane is at most $\\sqrt{3}/2$. -/\n@[category textbook, AMS 5 51]\ntheorem steinerRatio_le : steinerRatio ≤ √3 / 2 := by\n  sorry\n\nend GilbertPollakConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is correct; the note on the convention clash (√3/2 vs 2/√3) is accurate and I handled it by stating the inequality form as the slot and the ratio-equality form as a variant.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Convention: the list entry says the Steiner ratio is √3/2 (inf SMT/MST) while the article says 2/√3 (sup MST/SMT). The main declaration `gilbert_pollak_conjecture` follows the decomposition table and states the inequality MST ≤ (2/√3)·SMT for every finite point set, which is the open content under both conventions. A separate variant `gilbert_pollak_conjecture.variants.steinerRatio` states the literal list-entry form `steinerRatio = √3 / 2`, with `steinerRatio := sInf {smtLength S / mstLength S | S : Finset ℝ², 2 ≤ #S}`. These are equivalent given the (textbook) equilateral-triangle bound, also included as `steinerRatio_le`.",
+    "Steiner minimum tree length is modelled as the infimum over finite supersets Q ⊇ S of the minimum spanning tree length of Q (straight-line networks with finitely many extra vertices). This is the standard characterization used in the notes; the set is nonempty (Q = S) and bounded below by 0, so `sInf` is genuine. Attainment of the infimum is not needed for the statement.",
+    "Minimum spanning tree length is modelled as `sInf` of the total edge length over all `T : SimpleGraph ↥S` with `T.IsTree`; since `IsTree` requires connectivity of the whole vertex type ↥S, the tree's vertex set is exactly S. Edge lengths are the restricted L² metric on ℝ² (checked via pp.explicit). The set of trees on a finite type is finite so `sInf` is a minimum for nonempty S.",
+    "The main theorem quantifies over all `S : Finset ℝ²` with no cardinality hypothesis, matching 'for every finite point set'. Degenerate cases are trivially true: for S = ∅ the tree set is empty so mstLength ∅ = sInf ∅ = 0 and smtLength ∅ = 0 (0 ≤ 0); for singletons both are 0. Both facts are proved as API lemmas (`mstLength_empty`, `mstLength_singleton`), so the default values do not alter the claim.",
+    "In `steinerRatio` the restriction `2 ≤ #S` guarantees mstLength S > 0, so the real division is genuine (no division-by-zero junk).",
+    "The main theorem's docstring is in bold-prefixed 'P holds' style (no `answer(sorry)`) since the conjecture is an assertion, not a question. AMS tags 5 (combinatorics/graph theory) and 51 (geometry) chosen; 52 or 90 would also be defensible.",
+    "Definitions live in the problem file (sandbox restricted to a single file); `graphLength`, `mstLength`, `smtLength` are stated for an arbitrary metric space and could be moved to FormalConjecturesForMathlib."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.edgeFinset together with Sym2.lift (used to build it); FormalConjecturesForMathlib's SimpleGraph.Ls (leaf count of spanning trees) is unrelated.",
+     "name": "GilbertPollakConjecture.graphLength",
+     "why_needed": "Total length of a finite simple graph whose vertices are points of a metric space (sum over edges of the distance between endpoints). Mathlib has no weighted/geometric graph length notion."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.IsTree, SimpleGraph.Subgraph.IsSpanning, FormalConjecturesForMathlib SimpleGraph.Ls.",
+     "name": "GilbertPollakConjecture.mstLength",
+     "why_needed": "Length of a Euclidean minimum spanning tree of a finite point set: sInf of graphLength over all trees (SimpleGraph.IsTree) on the subtype of the finset. Mathlib has IsTree and Subgraph.IsSpanning but no minimum spanning tree or its weight."
+    },
+    {
+     "closest_existing_considered": "FormalConjectures/Wikipedia/SteinerSystem.lean (unrelated Steiner systems).",
+     "name": "GilbertPollakConjecture.smtLength",
+     "why_needed": "Length of a Steiner minimum tree: infimum of mstLength over finite supersets (Steiner points allowed). No Steiner tree notion exists in Mathlib or the repo (Wikipedia/SteinerSystem.lean concerns Steiner systems, a different notion)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or the repo.",
+     "name": "GilbertPollakConjecture.steinerRatio",
+     "why_needed": "The Steiner ratio of the Euclidean plane, inf over finite sets of ≥ 2 points of smtLength / mstLength, used to state the literal list-entry form 'the Steiner ratio is √3/2' and the textbook upper bound."
+    }
+   ],
+   "per_slot": {
+    "gilbert_pollak_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite set S of points of ℝ² (EuclideanSpace ℝ (Fin 2)), mstLength S ≤ 2/√3 * smtLength S, where mstLength S is the least total Euclidean edge length of a tree (Mathlib's SimpleGraph.IsTree) whose vertex type is the subtype ↥S, and smtLength S is the infimum of mstLength Q over finite supersets Q ⊇ S (Steiner points allowed). Mathlib has no minimum-spanning-tree length, Steiner tree, or edge-length notions, so bespoke definitions were needed. A variant gilbert_pollak_conjecture.variants.steinerRatio states the literal list-entry form steinerRatio = √3/2 with steinerRatio = inf over |S| ≥ 2 of smtLength S / mstLength S."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "gilbert_pollak_conjecture": "/-- **Gilbert–Pollak conjecture.** For every finite set $S$ of points in the Euclidean plane, the\nlength of a Euclidean minimum spanning tree of $S$ is at most $2/\\sqrt{3}$ times the length of a\nSteiner minimum tree of $S$. Equivalently, the Steiner ratio of the Euclidean plane is\n$\\sqrt{3}/2$. -/\n@[category research open, AMS 5 51]\ntheorem gilbert_pollak_conjecture (S : Finset ℝ²) :\n    mstLength S ≤ 2 / √3 * smtLength S := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Gilbert–Pollak conjecture\n\nThe Gilbert–Pollak conjecture concerns the ratio between Euclidean minimum spanning trees and\nSteiner minimum trees for finite point sets in the Euclidean plane.\n\n*References:*\n- [Wikipedia, Gilbert–Pollak conjecture](https://en.wikipedia.org/wiki/Gilbert%E2%80%93Pollak_conjecture)\n-/\n\nnamespace GilbertPollakConjecture\n\nopen SimpleGraph\n\n/-- The length of a Euclidean minimum spanning tree on a finite set of planar points. -/\nnoncomputable def euclideanMSTLength (s : Finset (EuclideanSpace ℝ (Fin 2))) : ℝ := by\n  classical\n  exact sInf {r : ℝ | ∃ G : SimpleGraph s, G.IsTree ∧\n    r = ∑ e ∈ G.edgeFinset,\n      e.lift ⟨fun u v : s => dist (u : EuclideanSpace ℝ (Fin 2))\n        (v : EuclideanSpace ℝ (Fin 2)), fun u v => dist_comm _ _⟩}\n\n/--\nThe length of a Steiner minimum tree on `s`, defined as the infimum of the Euclidean minimum\nspanning-tree lengths of finite supersets of `s`. The additional points are the Steiner points.\n-/\nnoncomputable def steinerMinimumTreeLength (s : Finset (EuclideanSpace ℝ (Fin 2))) : ℝ :=\n  sInf {r : ℝ | ∃ t : Finset (EuclideanSpace ℝ (Fin 2)), s ⊆ t ∧\n    r = euclideanMSTLength t}\n\n/--\n**Gilbert–Pollak conjecture.** For every finite set of at least two points in the Euclidean plane,\nthe Euclidean minimum spanning-tree length is at most $2/\\sqrt{3}$ times the Steiner minimum-tree\nlength. Equivalently, under the reciprocal convention used in the list entry, the Steiner ratio\nis $\\sqrt{3}/2$; the equilateral triangle attains this bound.\n-/\n@[category research open, AMS 5 51]\ntheorem gilbert_pollak_conjecture (s : Finset (EuclideanSpace ℝ (Fin 2)))\n    (hs : 2 ≤ s.card) :\n    euclideanMSTLength s ≤ 2 / Real.sqrt 3 * steinerMinimumTreeLength s := by\n  sorry\n\nend GilbertPollakConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled the Euclidean plane as `EuclideanSpace ℝ (Fin 2)` and finite point sets as `Finset`s.",
+    "Restricted the conjecture to point sets of cardinality at least two, following the fixed decomposition and avoiding degenerate empty or singleton cases.",
+    "Defined Euclidean MST length as the infimum of the sums of Euclidean edge lengths over `SimpleGraph.IsTree` graphs whose vertex type is the given finite point set. Thus every original point is connected and each abstract edge represents its straight Euclidean segment.",
+    "Defined Steiner minimum-tree length exactly as the infimum of Euclidean MST lengths over all finite supersets, whose additional elements represent Steiner points.",
+    "Formalized the open content as `MST ≤ (2 / √3) * SMT`. This is equivalent to the list entry's reciprocal convention `inf SMT/MST = √3/2` because the equilateral-triangle equality case is already known, as specified by the decomposition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.IsTree`, `SimpleGraph.edgeFinset`, `Sym2.lift`, and `dist`; these supply the ingredients but not the optimization functional.",
+     "name": "euclideanMSTLength",
+     "why_needed": "Mathlib has finite simple trees and Euclidean distance but no weighted Euclidean minimum-spanning-tree length for a finite point set."
+    },
+    {
+     "closest_existing_considered": "An infimum over `euclideanMSTLength` on finite supersets; no existing Steiner-tree primitive was found.",
+     "name": "steinerMinimumTreeLength",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides the Steiner minimum-tree length or Steiner ratio."
+    }
+   ],
+   "per_slot": {
+    "gilbert_pollak_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "gilbert_pollak_conjecture": "/--\n**Gilbert–Pollak conjecture.** For every finite set of at least two points in the Euclidean plane,\nthe Euclidean minimum spanning-tree length is at most $2/\\sqrt{3}$ times the Steiner minimum-tree\nlength. Equivalently, under the reciprocal convention used in the list entry, the Steiner ratio\nis $\\sqrt{3}/2$; the equilateral triangle attains this bound.\n-/\n@[category research open, AMS 5 51]\ntheorem gilbert_pollak_conjecture (s : Finset (EuclideanSpace ℝ (Fin 2)))\n    (hs : 2 ≤ s.card) :\n    euclideanMSTLength s ≤ 2 / Real.sqrt 3 * steinerMinimumTreeLength s := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Gilbert–Pollak conjecture\n\n*References:*\n- [Wikipedia, Gilbert–Pollak conjecture](https://en.wikipedia.org/wiki/Gilbert%E2%80%93Pollak_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnoncomputable section\n\nnamespace GilbertPollakConjecture\n\nopen scoped EuclideanGeometry\n\n/--\nThe total Euclidean length of a tree whose vertex set is the finite set `s` of points in the\nEuclidean plane.\n-/\nnoncomputable def euclideanTreeLength {s : Finset ℝ²} (T : SimpleGraph s) : ℝ :=\n  ∑ e ∈ T.edgeFinset, dist e.out.1.1 e.out.2.1\n\n/--\nThe Euclidean minimum spanning tree length of a finite set `s` of points, defined as the\ninfimum of the total edge lengths of all trees with vertex set `s`.\n-/\nnoncomputable def euclideanMSTLength (s : Finset ℝ²) : ℝ :=\n  sInf {x : ℝ | ∃ T : SimpleGraph s, T.IsTree ∧ euclideanTreeLength T = x}\n\n/--\nThe Steiner minimum tree length of a finite set `s` of points. Extra Steiner points are allowed,\nso this is the infimum of the Euclidean minimum spanning tree lengths over all finite supersets\nof `s`.\n-/\nnoncomputable def steinerMinimumTreeLength (s : Finset ℝ²) : ℝ :=\n  sInf {x : ℝ | ∃ t : Finset ℝ², s ⊆ t ∧ euclideanMSTLength t = x}\n\n/--\nThe **Gilbert–Pollak conjecture**: for every finite set `s` of at least two points in the\nEuclidean plane, its Euclidean minimum spanning tree has length at most $2/\\sqrt{3}$ times its\nSteiner minimum tree length. Equivalently, with the convention that the Steiner ratio is the\ninfimum of Steiner minimum tree length divided by minimum spanning tree length, the Steiner\nratio of the Euclidean plane is $\\sqrt{3}/2$; the equilateral triangle supplies equality.\n-/\n@[category research open, AMS 05 51]\ntheorem gilbert_pollak_conjecture (s : Finset ℝ²) (hs : 2 ≤ s.card) :\n    euclideanMSTLength s ≤ (2 / Real.sqrt 3) * steinerMinimumTreeLength s := by\n  sorry\n\nend GilbertPollakConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled the Euclidean plane as `ℝ² = EuclideanSpace ℝ (Fin 2)` and finite terminal sets as `Finset ℝ²`.",
+    "Restricted terminal sets by `2 ≤ s.card`, following the decomposition's explicit nondegeneracy convention.",
+    "Modeled a straight-line network on a finite point set by a `SimpleGraph` on that set's subtype; `SimpleGraph.IsTree` requires connectedness and acyclicity, and each undirected edge contributes the Euclidean distance between its endpoints exactly once.",
+    "Defined Euclidean MST length as the real infimum of lengths of trees on exactly the terminal vertex set.",
+    "Defined Steiner minimum-tree length as the infimum of Euclidean MST lengths over all finite supersets of the terminal set. This allows arbitrary finite extra Steiner points and matches the formulation prescribed by the decomposition.",
+    "Resolved the ratio-convention clash by stating the open-content inequality `MST ≤ (2 / √3) * SMT`. Together with the equilateral-triangle equality case noted in the docstring, this is equivalent to the list entry's convention `inf SMT/MST = √3/2`; no separate equilateral-triangle declaration was added because the fixed decomposition has one slot."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.IsTree`, `SimpleGraph.edgeFinset`, and Mathlib's metric `dist` provide the constituent notions but not their weighted sum.",
+     "name": "GilbertPollakConjecture.euclideanTreeLength",
+     "why_needed": "The conjecture needs the total Euclidean length of an undirected straight-line tree, but no aggregate weighted-tree-length primitive was found."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `SimpleGraph.IsTree` and existence of spanning trees, but no weighted minimum spanning tree objective; the definition therefore takes `sInf` of `euclideanTreeLength` over all trees.",
+     "name": "GilbertPollakConjecture.euclideanMSTLength",
+     "why_needed": "No Euclidean minimum spanning tree length definition was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "The closest faithful reduction is the decomposition-prescribed infimum of `euclideanMSTLength` over finite supersets, using `Finset` inclusion and real `sInf`.",
+     "name": "GilbertPollakConjecture.steinerMinimumTreeLength",
+     "why_needed": "No Steiner minimum tree or Steiner ratio primitive was found in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "gilbert_pollak_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "gilbert_pollak_conjecture": "/--\nThe **Gilbert–Pollak conjecture**: for every finite set `s` of at least two points in the\nEuclidean plane, its Euclidean minimum spanning tree has length at most $2/\\sqrt{3}$ times its\nSteiner minimum tree length. Equivalently, with the convention that the Steiner ratio is the\ninfimum of Steiner minimum tree length divided by minimum spanning tree length, the Steiner\nratio of the Euclidean plane is $\\sqrt{3}/2$; the equilateral triangle supplies equality.\n-/\n@[category research open, AMS 05 51]\ntheorem gilbert_pollak_conjecture (s : Finset ℝ²) (hs : 2 ≤ s.card) :\n    euclideanMSTLength s ≤ (2 / Real.sqrt 3) * steinerMinimumTreeLength s := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Gilbert–Pollak conjecture\n\nThe Gilbert–Pollak conjecture concerns the ratio of the lengths of Steiner minimum trees and\nEuclidean minimum spanning trees of finite point sets in the Euclidean plane.\n\nFor a finite set $P$ of points in the plane, the *Euclidean minimum spanning tree* of $P$ is the\nshortest tree of straight line segments connecting the points of $P$ and having only points of $P$\nas vertices. A shorter network may be possible if additional vertices (*Steiner points*) are\nallowed; the shortest such network is the *Steiner minimum tree* of $P$.\n\nThe conjecture states that for every finite set $P$ of points in the Euclidean plane, the length\nof the Euclidean minimum spanning tree of $P$ is at most $2/\\sqrt{3}$ times the length of the\nSteiner minimum tree of $P$. Equivalently, the *Steiner ratio* of the Euclidean plane, i.e. the\ninfimum over all finite point sets of the ratio (Steiner minimum tree length) / (minimum spanning\ntree length), is equal to $\\sqrt{3}/2$. The three vertices of an equilateral triangle show that the\nratio $\\sqrt{3}/2$ is attained, so the open part of the conjecture is the inequality.\n\n*References:*\n- [Wikipedia, Gilbert–Pollak conjecture](https://en.wikipedia.org/wiki/Gilbert%E2%80%93Pollak_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- Gilbert, E. N.; Pollak, H. O. (1968), _Steiner minimal trees_, SIAM Journal on Applied\n  Mathematics, 16 (1): 1–29.\n-/\n\nnamespace GilbertPollakConjecture\n\nopen scoped EuclideanGeometry\n\n/-- The total Euclidean length of a graph `G` whose vertices are placed at the points `p v` of the\nplane: the sum, over all edges of `G`, of the distance between the two endpoints of the edge. -/\nnoncomputable def totalLength {V : Type*} [Fintype V] (G : SimpleGraph V) (p : V → ℝ²) : ℝ :=\n  open scoped Classical in\n  ∑ e ∈ G.edgeFinset, Sym2.lift ⟨fun u v => dist (p u) (p v), fun _ _ => dist_comm _ _⟩ e\n\n/-- The length of a Euclidean minimum spanning tree of a finite set `P` of points in the plane:\nthe least total length of a tree whose vertex set is exactly `P` and whose edges are the straight\nline segments between their endpoints.\n\nIf `P` has fewer than two points this is `0`. -/\nnoncomputable def mstLength (P : Finset ℝ²) : ℝ :=\n  sInf {L | ∃ T : SimpleGraph P, T.IsTree ∧ L = totalLength T (↑)}\n\n/-- The length of a Steiner minimum tree of a finite set `P` of points in the plane: the length of\nthe shortest network of straight line segments connecting the points of `P`, where the network is\nallowed to use additional vertices (Steiner points) not in `P`. This is the infimum of the lengths\nof the Euclidean minimum spanning trees of all finite sets `Q` containing `P`. -/\nnoncomputable def smtLength (P : Finset ℝ²) : ℝ :=\n  sInf {L | ∃ Q : Finset ℝ², P ⊆ Q ∧ L = mstLength Q}\n\n/-- The total length of a graph is nonnegative. -/\n@[category API, AMS 5 51]\nlemma totalLength_nonneg {V : Type*} [Fintype V] (G : SimpleGraph V) (p : V → ℝ²) :\n    0 ≤ totalLength G p :=\n  Finset.sum_nonneg fun e _ => Sym2.inductionOn e fun _ _ => by simp\n\n/-- The graph with no edges has total length `0`. -/\n@[category API, AMS 5 51]\nlemma totalLength_bot {V : Type*} [Fintype V] (p : V → ℝ²) : totalLength ⊥ p = 0 := by\n  unfold totalLength\n  exact Finset.sum_eq_zero fun e he => by simp at he\n\n/-- The length of a Euclidean minimum spanning tree is nonnegative. -/\n@[category API, AMS 5 51]\nlemma mstLength_nonneg (P : Finset ℝ²) : 0 ≤ mstLength P :=\n  Real.sInf_nonneg fun _ ⟨T, _, hL⟩ => hL ▸ totalLength_nonneg T _\n\n/-- The empty set has no spanning tree, so its minimum spanning tree length is `0` by convention. -/\n@[category test, AMS 5 51]\nlemma mstLength_empty : mstLength ∅ = 0 := by\n  have : {L | ∃ T : SimpleGraph (∅ : Finset ℝ²), T.IsTree ∧ L = totalLength T (↑)} =\n      ∅ := by\n    ext L\n    simp only [Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false]\n    rintro ⟨T, hT, -⟩\n    exact hT.isConnected.nonempty.elim fun x => Finset.notMem_empty _ x.2\n  rw [mstLength, this, Real.sInf_empty]\n\n/-- The minimum spanning tree of a single point has length `0`. -/\n@[category test, AMS 5 51]\nlemma mstLength_singleton (x : ℝ²) : mstLength {x} = 0 := by\n  have : {L | ∃ T : SimpleGraph ({x} : Finset ℝ²), T.IsTree ∧ L = totalLength T (↑)} =\n      {0} := by\n    ext L\n    simp only [Set.mem_setOf_eq, Set.mem_singleton_iff]\n    constructor\n    · rintro ⟨T, -, rfl⟩\n      rw [Subsingleton.elim T ⊥, totalLength_bot]\n    · rintro rfl\n      exact ⟨⊥, ⟨SimpleGraph.connected_bot_iff.2 ⟨inferInstance, inferInstance⟩,\n        SimpleGraph.isAcyclic_bot⟩, (totalLength_bot _).symm⟩\n  rw [mstLength, this, csInf_singleton]\n\n/-- The length of a Steiner minimum tree is nonnegative. -/\n@[category API, AMS 5 51]\nlemma smtLength_nonneg (P : Finset ℝ²) : 0 ≤ smtLength P :=\n  Real.sInf_nonneg fun _ ⟨Q, _, hL⟩ => hL ▸ mstLength_nonneg Q\n\n/-- A Steiner minimum tree is no longer than a Euclidean minimum spanning tree. -/\n@[category API, AMS 5 51]\nlemma smtLength_le_mstLength (P : Finset ℝ²) : smtLength P ≤ mstLength P :=\n  csInf_le ⟨0, fun _ ⟨Q, _, hL⟩ => hL ▸ mstLength_nonneg Q⟩ ⟨P, subset_rfl, rfl⟩\n\n/-- **Gilbert–Pollak conjecture.** For every finite set $P$ of points in the Euclidean plane, the\nlength of the Euclidean minimum spanning tree of $P$ is at most $2/\\sqrt{3}$ times the length of\nthe Steiner minimum tree of $P$. That is, the Steiner ratio of the Euclidean plane is\n$\\sqrt{3}/2$ (the value attained by the vertices of an equilateral triangle). -/\n@[category research open, AMS 5 51 90]\ntheorem gilbert_pollak_conjecture (P : Finset ℝ²) :\n    mstLength P ≤ 2 / √3 * smtLength P := by\n  sorry\n\n/-- The **Steiner ratio** of the Euclidean plane: the infimum, over all finite sets $P$ of at least\ntwo points in the plane, of the ratio of the length of a Steiner minimum tree of $P$ to the length\nof a Euclidean minimum spanning tree of $P$.\n\nNote that the Wikipedia article on the conjecture uses the reciprocal convention (the supremum of\nthe ratio of the minimum spanning tree length to the Steiner minimum tree length), for which the\nconjectured value is $2/\\sqrt{3}$. -/\nnoncomputable def steinerRatio : ℝ :=\n  sInf {r | ∃ P : Finset ℝ², 2 ≤ P.card ∧ r = smtLength P / mstLength P}\n\n/-- **Gilbert–Pollak conjecture**, stated as the value of the Steiner ratio of the Euclidean\nplane: the Steiner ratio is $\\sqrt{3}/2$. -/\n@[category research open, AMS 5 51 90]\ntheorem gilbert_pollak_conjecture.variants.steinerRatio_eq : steinerRatio = √3 / 2 := by\n  sorry\n\nend GilbertPollakConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate. Minor note: the slot notes suggest a '(nonempty, ≥2-point)' restriction; I omitted it from the inequality form since the statement is trivially true (0 ≤ 0) for sets of fewer than two points, which is proved by the included tests, so the omission does not alter the claim. The ≥2-point restriction is used where it is genuinely needed, in the ratio-form variant.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The terse list entry ('the Steiner ratio is √3/2') is expanded using the Wikipedia article: for every finite point set in the Euclidean plane, MST length ≤ (2/√3) · SMT length. The main slot declaration `gilbert_pollak_conjecture` states this inequality, as directed by the decomposition notes.",
+    "Euclidean plane = `EuclideanSpace ℝ (Fin 2)` (repo notation `ℝ²`, scoped in `EuclideanGeometry`); finite point sets are `Finset ℝ²`.",
+    "Euclidean minimum spanning tree length `mstLength P` = `sInf` of the total Euclidean edge lengths over all `T : SimpleGraph P` with `T.IsTree` (vertex type is the subtype of P, so the tree uses exactly the points of P as vertices, edges are straight segments weighted by `dist`). The set is finite and nonempty for nonempty P, so sInf is a minimum; for P = ∅ there are no trees (Connected requires Nonempty) and sInf ∅ = 0; for a singleton the only tree is ⊥ with length 0. Both degenerate values are proved as `category test` lemmas.",
+    "Steiner minimum tree length `smtLength P` = `sInf {mstLength Q | P ⊆ Q, Q finite}` — the standard characterization that an SMT is an MST of P together with a finite set of Steiner points; the set is nonempty (Q = P) and bounded below by 0, so this is a genuine infimum (and it is a classical theorem that it is attained). Networks are modelled as straight-line trees, which is WLOG for shortest connecting networks.",
+    "No cardinality hypothesis on P in the main theorem: the source says 'every finite point set', and for |P| ≤ 1 both sides are 0 so the inequality holds trivially and the mathematical content is unchanged.",
+    "Convention clash recorded: the list entry's Steiner ratio is inf SMT/MST = √3/2, the article's is sup MST/SMT = 2/√3. The variant `gilbert_pollak_conjecture.variants.steinerRatio_eq` uses the list entry's convention: `steinerRatio := sInf {smtLength P / mstLength P | 2 ≤ P.card}` and asserts `steinerRatio = √3 / 2`. The restriction 2 ≤ P.card is needed so that mstLength P > 0 (otherwise Lean's x/0 = 0 would corrupt the infimum). Equality (rather than only ≥) is faithful because the ≤ half is the known equilateral-triangle example, and equality is exactly what the entry asserts.",
+    "The Rubinstein–Weng sphere analogue mentioned in the article is not formalized, per the decomposition notes.",
+    "AMS tags 5 (combinatorics/graph theory), 51 (geometry), 90 (operations research, where Steiner trees are classified). Copyright year 2026, matching the majority of files in the repository."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `SimpleGraph.edgeFinset`, `Sym2.lift`, `SimpleGraph.dist` (graph-theoretic distance, not Euclidean); repo `SimpleGraph.Ls`, WienerIndex — none give Euclidean edge-length sums.",
+     "name": "GilbertPollakConjecture.totalLength",
+     "why_needed": "Total Euclidean length (sum of `dist` over edges) of a `SimpleGraph V` whose vertices are placed at points `p : V → ℝ²`. Mathlib has no weighted-graph total length."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.IsTree`, `SimpleGraph.Subgraph.IsSpanning`, repo `FormalConjecturesForMathlib/Combinatorics/SimpleGraph/SpanningTree.lean` (only counts leaves).",
+     "name": "GilbertPollakConjecture.mstLength",
+     "why_needed": "Length of a Euclidean minimum spanning tree of a finite planar point set; Mathlib has `SimpleGraph.IsTree` but no minimum spanning tree or MST length."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjecturesForMathlib for 'Steiner' (only Steiner systems, unrelated).",
+     "name": "GilbertPollakConjecture.smtLength",
+     "why_needed": "Length of a Steiner minimum tree (shortest network allowed to use extra Steiner points), defined as the infimum of `mstLength Q` over finite supersets Q ⊇ P. No Steiner tree notion exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or the repo.",
+     "name": "GilbertPollakConjecture.steinerRatio",
+     "why_needed": "The Steiner ratio of the Euclidean plane, inf over finite sets with ≥ 2 points of SMT/MST, used only for the variant theorem that states the list entry verbatim ('the Steiner ratio is √3/2')."
+    }
+   ],
+   "per_slot": {
+    "gilbert_pollak_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite set P of points in the Euclidean plane (P : Finset ℝ²), mstLength P ≤ 2 / √3 * smtLength P, where mstLength is the least Euclidean length of a tree with vertex set exactly P and smtLength is the infimum of mstLength Q over finite supersets Q ⊇ P (Steiner points allowed). This is the article's precise formulation of the list entry; the equivalent 'Steiner ratio = √3/2' form is also included as a variant theorem. Mathlib has no minimum spanning tree / Steiner tree notions, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "gilbert_pollak_conjecture": "/-- **Gilbert–Pollak conjecture.** For every finite set $P$ of points in the Euclidean plane, the\nlength of the Euclidean minimum spanning tree of $P$ is at most $2/\\sqrt{3}$ times the length of\nthe Steiner minimum tree of $P$. That is, the Steiner ratio of the Euclidean plane is\n$\\sqrt{3}/2$ (the value attained by the vertices of an equilateral triangle). -/\n@[category research open, AMS 5 51 90]\ntheorem gilbert_pollak_conjecture (P : Finset ℝ²) :\n    mstLength P ≤ 2 / √3 * smtLength P := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Gilbert–Pollak conjecture\n\n*References:*\n- [Wikipedia, *Gilbert–Pollak conjecture*](https://en.wikipedia.org/wiki/Gilbert%E2%80%93Pollak_conjecture)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace GilbertPollakConjecture\n\n/-- The sum of the Euclidean lengths of the edges of a finite simple graph in the plane. -/\nnoncomputable def euclideanGraphLength {points : Finset (EuclideanSpace ℝ (Fin 2))}\n    (G : SimpleGraph ↥points) : ℝ :=\n  ∑ e ∈ G.edgeFinset,\n    Sym2.lift ⟨fun p q : ↥points ↦\n      dist (p : EuclideanSpace ℝ (Fin 2)) (q : EuclideanSpace ℝ (Fin 2)), dist_comm⟩ e\n\n/-- The length of a Euclidean minimum spanning tree on a finite set of points. -/\nnoncomputable def minimumSpanningTreeLength\n    (points : Finset (EuclideanSpace ℝ (Fin 2))) : ℝ :=\n  sInf {length : ℝ | ∃ T : SimpleGraph ↥points,\n    T.IsTree ∧ length = euclideanGraphLength T}\n\n/-- The length of a Steiner minimum tree, allowing any finite set of additional points. -/\nnoncomputable def steinerMinimumTreeLength\n    (points : Finset (EuclideanSpace ℝ (Fin 2))) : ℝ :=\n  sInf {length : ℝ | ∃ larger : Finset (EuclideanSpace ℝ (Fin 2)),\n    points ⊆ larger ∧ length = minimumSpanningTreeLength larger}\n\n/--\nThe Gilbert–Pollak conjecture: for every finite set of at least two points in the Euclidean\nplane, the Euclidean minimum spanning tree has length at most $2/\\sqrt{3}$ times the length of\nthe Steiner minimum tree. Equivalently, under the reciprocal convention used by the cited\nlist entry, the Steiner ratio is $\\sqrt{3}/2$.\n-/\n@[category research open, AMS 5 51]\ntheorem gilbert_pollak_conjecture :\n    ∀ points : Finset (EuclideanSpace ℝ (Fin 2)), 2 ≤ points.card →\n      minimumSpanningTreeLength points ≤\n        (2 / Real.sqrt 3) * steinerMinimumTreeLength points := by\n  sorry\n\nend GilbertPollakConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled the Euclidean plane as `EuclideanSpace ℝ (Fin 2)` and finite point sets as `Finset`s, with the conjecture restricted to sets of cardinality at least two as required by the decomposition.",
+    "Modeled a Euclidean spanning tree as a Mathlib `SimpleGraph.IsTree` on the subtype of the finite point set. Its length is the sum of ambient Euclidean distances over `SimpleGraph.edgeFinset`, so each undirected edge is counted once.",
+    "Defined the Euclidean minimum spanning tree length as the real infimum of the lengths of all trees spanning the given finite point set.",
+    "Defined the Steiner minimum tree length exactly as prescribed in the decomposition: the infimum of MST lengths over all finite supersets, whose additional elements serve as Steiner points.",
+    "Resolved the source convention clash by stating the open inequality `MST ≤ (2 / √3) * SMT`. The theorem docstring records that this corresponds to the list entry's reciprocal Steiner-ratio value `√3 / 2`; equality attainment by the equilateral triangle is established background and is not added as another conjecture declaration."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `SimpleGraph.edgeFinset` supplies the finite unordered edge set, and `Sym2.lift` lifts the symmetric Euclidean distance to those edges, but Mathlib has no existing aggregate Euclidean graph-length definition.",
+     "name": "euclideanGraphLength",
+     "why_needed": "The statement needs the total Euclidean edge length of a finite graph, and no existing weighted Euclidean graph-length primitive was found."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `SimpleGraph.IsTree` and `SimpleGraph.edgeFinset`, but no minimum weighted spanning-tree length; the definition therefore takes `sInf` of `euclideanGraphLength` over all trees on the point-set subtype.",
+     "name": "minimumSpanningTreeLength",
+     "why_needed": "The conjecture compares the Euclidean MST length of each finite planar point set, for which no existing Mathlib or FormalConjecturesForMathlib definition was found."
+    },
+    {
+     "closest_existing_considered": "No Steiner minimum tree definition exists in Mathlib or FormalConjecturesForMathlib. The prescribed equivalent model is implemented as `sInf` of `minimumSpanningTreeLength` over finite supersets.",
+     "name": "steinerMinimumTreeLength",
+     "why_needed": "The conjecture requires the shortest connecting network when finitely many additional Steiner points may be used, and no existing Steiner-tree primitive was found."
+    }
+   ],
+   "per_slot": {
+    "gilbert_pollak_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "gilbert_pollak_conjecture": "/--\nThe Gilbert–Pollak conjecture: for every finite set of at least two points in the Euclidean\nplane, the Euclidean minimum spanning tree has length at most $2/\\sqrt{3}$ times the length of\nthe Steiner minimum tree. Equivalently, under the reciprocal convention used by the cited\nlist entry, the Steiner ratio is $\\sqrt{3}/2$.\n-/\n@[category research open, AMS 5 51]\ntheorem gilbert_pollak_conjecture :\n    ∀ points : Finset (EuclideanSpace ℝ (Fin 2)), 2 ≤ points.card →\n      minimumSpanningTreeLength points ≤\n        (2 / Real.sqrt 3) * steinerMinimumTreeLength points := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "gilbert_pollak_conjecture": "c04"
+ },
+ "id": "wp-gilbert-pollak-conjecture",
+ "main_attempt": "c04"
+}

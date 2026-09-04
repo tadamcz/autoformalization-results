@@ -1,0 +1,688 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Negami's conjecture\n\nNegami's conjecture characterizes the finite connected graphs having finite planar covers as the\nfinite graphs that embed in the projective plane. Two equivalent forms concern planar covers of\nply at most two and the graph $K_{1,2,2,2}$.\n\n*Reference:*\n- [Wikipedia, Negami's conjecture](https://en.wikipedia.org/wiki/Negami%27s_conjecture)\n-/\n\nnamespace NegamisConjecture\n\nopen Set\n\n/-- A topological embedding of a simple graph in a space. Vertices are placed injectively and\nedges are represented by simple continuous arcs. Edge interiors contain no vertex, and interiors\nof distinct (unoriented) edges are disjoint. -/\ndef EmbedsIn {V X : Type*} [TopologicalSpace X] (G : SimpleGraph V) : Prop :=\n  ∃ (p : V → X) (e : V → V → ℝ → X), Function.Injective p ∧\n    (∀ ⦃v w⦄, G.Adj v w →\n      ContinuousOn (e v w) (Icc 0 1) ∧ e v w 0 = p v ∧ e v w 1 = p w ∧\n        Set.InjOn (e v w) (Icc 0 1)) ∧\n    (∀ ⦃v w⦄, G.Adj v w → ∀ t ∈ Ioo (0 : ℝ) 1, ∀ x, e v w t ≠ p x) ∧\n    (∀ ⦃v w x y⦄, G.Adj v w → G.Adj x y →\n      ∀ t ∈ Ioo (0 : ℝ) 1, ∀ u ∈ Ioo (0 : ℝ) 1, e v w t = e x y u →\n        (v = x ∧ w = y) ∨ (v = y ∧ w = x))\n\n/-- The unit two-sphere in three-dimensional Euclidean space. -/\nabbrev Sphere2 := Metric.sphere (0 : EuclideanSpace ℝ (Fin 3)) 1\n\n/-- The equivalence relation on the two-sphere identifying antipodal points. -/\ndef antipodalSetoid : Setoid Sphere2 where\n  r x y := (x : EuclideanSpace ℝ (Fin 3)) = y ∨\n    (x : EuclideanSpace ℝ (Fin 3)) = -y\n  iseqv := {\n    refl := fun _ ↦ Or.inl rfl\n    symm := by\n      intro x y h\n      rcases h with h | h\n      · exact Or.inl h.symm\n      · right\n        rw [h, neg_neg]\n    trans := by\n      intro x y z hxy hyz\n      rcases hxy with hxy | hxy <;> rcases hyz with hyz | hyz\n      · exact Or.inl (hxy.trans hyz)\n      · exact Or.inr (hxy.trans hyz)\n      · exact Or.inr (hxy.trans (congrArg Neg.neg hyz))\n      · left\n        rw [hxy, hyz, neg_neg] }\n\n/-- The real projective plane, presented as the quotient of the unit two-sphere by the antipodal\nmap. -/\nabbrev RealProjectivePlane := Quotient antipodalSetoid\n\n/-- A finite simple graph is planar when it has a topological embedding in the plane. -/\ndef IsPlanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  EmbedsIn (X := EuclideanSpace ℝ (Fin 2)) G\n\n/-- A finite simple graph is projective-planar when it has a topological embedding in the real\nprojective plane. -/\ndef IsProjectivePlanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  EmbedsIn (X := RealProjectivePlane) G\n\n/-- `f` is a covering map of simple graphs when it is onto on vertices and, at every vertex, its\nrestriction is a bijection between the two neighbor sets. -/\ndef IsCoveringMap {C H : Type*} (GC : SimpleGraph C) (GH : SimpleGraph H) (f : C → H) : Prop :=\n  Function.Surjective f ∧\n    ∃ hmap : ∀ ⦃v w⦄, GC.Adj v w → GH.Adj (f v) (f w),\n      ∀ v, Function.Bijective (fun w : GC.neighborSet v ↦\n        (⟨f w, hmap w.property⟩ : GH.neighborSet (f v)))\n\n/-- The graph-covering map `f` has ply at most `n` when every vertex has at most `n` preimages. -/\ndef HasPlyAtMost {C H : Type*} [Fintype C] (f : C → H) (n : ℕ) : Prop :=\n  ∀ v, Nat.card {x : C // f x = v} ≤ n\n\n/-- The part occupied by each vertex in the complete multipartite graph $K_{1,2,2,2}$. -/\ndef k1222Part : Fin 1 ⊕ Fin 2 ⊕ Fin 2 ⊕ Fin 2 → Fin 4\n  | Sum.inl _ => 0\n  | Sum.inr (Sum.inl _) => 1\n  | Sum.inr (Sum.inr (Sum.inl _)) => 2\n  | Sum.inr (Sum.inr (Sum.inr _)) => 3\n\n/-- The complete four-partite graph $K_{1,2,2,2}$. -/\ndef K1222 : SimpleGraph (Fin 1 ⊕ Fin 2 ⊕ Fin 2 ⊕ Fin 2) :=\n  SimpleGraph.fromRel fun v w ↦ k1222Part v ≠ k1222Part w\n\n/--\n**Negami's conjecture.** Every finite connected simple graph with a finite planar covering graph\nembeds in the projective plane. Here a covering map is a vertex surjection inducing a bijection on\nthe neighbor set of every vertex.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture :\n    ∀ {H : Type} [Fintype H] (GH : SimpleGraph H), GH.Connected →\n      (∃ (C : Type) (_ : Fintype C) (GC : SimpleGraph C) (f : C → H),\n        IsPlanar GC ∧ IsCoveringMap GC GH f) →\n      IsProjectivePlanar GH := by\n  sorry\n\n/--\n**Negami's 1-2-$\\infty$ conjecture.** Every finite graph that has a finite planar cover has a\nfinite planar cover of ply at most two. Equivalently, whenever a minimum ply exists, it is one or\ntwo.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.one_two_infinity :\n    ∀ {H : Type} [Fintype H] (GH : SimpleGraph H),\n      (∃ (C : Type) (_ : Fintype C) (GC : SimpleGraph C) (f : C → H),\n        IsPlanar GC ∧ IsCoveringMap GC GH f) →\n      ∃ (C : Type) (_ : Fintype C) (GC : SimpleGraph C) (f : C → H),\n        IsPlanar GC ∧ IsCoveringMap GC GH f ∧ HasPlyAtMost f 2 := by\n  sorry\n\n/--\n**$K_{1,2,2,2}$ reformulation of Negami's conjecture.** The complete four-partite graph with\nparts of sizes $1,2,2,2$ has no finite planar covering graph.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.K1222 :\n    ¬ ∃ (C : Type) (_ : Fintype C) (GC : SimpleGraph C)\n        (f : C → Fin 1 ⊕ Fin 2 ⊕ Fin 2 ⊕ Fin 2),\n      IsPlanar GC ∧ IsCoveringMap GC K1222 f := by\n  sorry\n\nend NegamisConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “projective” from the terse list entry as “embeddable in the real projective plane,” following the supplied Wikipedia article and decomposition notes.",
+    "Represented a topological graph embedding by injective vertex placements and continuous injective arcs for edges, with edge interiors avoiding every vertex and interiors of distinct unoriented edges disjoint.",
+    "Defined planarity using embedding in the Euclidean plane; for finite graphs this is the standard notion equivalent to embedding in the sphere.",
+    "Presented the real projective plane as the quotient of the unit 2-sphere in three-dimensional Euclidean space by the antipodal equivalence relation.",
+    "Used the article's explicit definition of a graph covering map: a vertex-surjective function whose restriction at each vertex is a bijection of neighbor sets.",
+    "Formalized the 1-2-infinity variant in the decomposition's disconnected-safe form: existence of some finite planar cover with every vertex fiber of cardinality at most two, rather than introducing a potentially partial minimum-ply operator.",
+    "Modeled K_{1,2,2,2} on the nested sum Fin 1 ⊕ Fin 2 ⊕ Fin 2 ⊕ Fin 2, with adjacency exactly when vertices lie in different parts."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.Embedding and Topology.IsEmbedding; neither packages vertices and edge arcs into a topological graph drawing.",
+     "name": "EmbedsIn",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have graph embeddings between abstract graphs but no topological embedding predicate for a graph in a space."
+    },
+    {
+     "closest_existing_considered": "Metric.sphere on EuclideanSpace, which this abbreviation specializes.",
+     "name": "Sphere2",
+     "why_needed": "Provides the concrete unit 2-sphere used to construct the real projective plane."
+    },
+    {
+     "closest_existing_considered": "Mathlib's general Setoid and Quotient topology machinery.",
+     "name": "antipodalSetoid",
+     "why_needed": "Mathlib has no supplied antipodal quotient relation defining the real projective plane."
+    },
+    {
+     "closest_existing_considered": "Quotient of Metric.sphere by antipodalSetoid.",
+     "name": "RealProjectivePlane",
+     "why_needed": "No topological real projective plane type was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "EmbedsIn specialized to EuclideanSpace ℝ (Fin 2); forbidden-minor APIs were also searched but do not provide graph planarity.",
+     "name": "IsPlanar",
+     "why_needed": "No graph-planarity predicate was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "EmbedsIn specialized to the antipodal sphere quotient RealProjectivePlane.",
+     "name": "IsProjectivePlanar",
+     "why_needed": "No predicate for embedding a graph in the projective plane was found."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Hom.mapNeighborSet provides a related neighbor map, but no surjective locally bijective graph map structure or predicate.",
+     "name": "IsCoveringMap",
+     "why_needed": "No graph covering-map notion was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Nat.card of each fiber subtype.",
+     "name": "HasPlyAtMost",
+     "why_needed": "The 1-2-infinity variant requires a bound on graph-cover fibers and no graph-cover ply notion exists."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.completeBipartiteGraph only handles two parts.",
+     "name": "k1222Part",
+     "why_needed": "A concrete part-labeling function is needed to define the specified complete multipartite graph, for which no general complete multipartite constructor was found."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.fromRel applied to inequality of k1222Part labels.",
+     "name": "K1222",
+     "why_needed": "The concrete complete four-partite graph K_{1,2,2,2} is not predefined in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "negamis_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "negamis_conjecture.variants.K1222": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "negamis_conjecture.variants.one_two_infinity": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "negamis_conjecture": "/--\n**Negami's conjecture.** Every finite connected simple graph with a finite planar covering graph\nembeds in the projective plane. Here a covering map is a vertex surjection inducing a bijection on\nthe neighbor set of every vertex.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture :\n    ∀ {H : Type} [Fintype H] (GH : SimpleGraph H), GH.Connected →\n      (∃ (C : Type) (_ : Fintype C) (GC : SimpleGraph C) (f : C → H),\n        IsPlanar GC ∧ IsCoveringMap GC GH f) →\n      IsProjectivePlanar GH := by\n  sorry",
+    "negamis_conjecture.variants.K1222": "/--\n**$K_{1,2,2,2}$ reformulation of Negami's conjecture.** The complete four-partite graph with\nparts of sizes $1,2,2,2$ has no finite planar covering graph.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.K1222 :\n    ¬ ∃ (C : Type) (_ : Fintype C) (GC : SimpleGraph C)\n        (f : C → Fin 1 ⊕ Fin 2 ⊕ Fin 2 ⊕ Fin 2),\n      IsPlanar GC ∧ IsCoveringMap GC K1222 f := by\n  sorry",
+    "negamis_conjecture.variants.one_two_infinity": "/--\n**Negami's 1-2-$\\infty$ conjecture.** Every finite graph that has a finite planar cover has a\nfinite planar cover of ply at most two. Equivalently, whenever a minimum ply exists, it is one or\ntwo.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.one_two_infinity :\n    ∀ {H : Type} [Fintype H] (GH : SimpleGraph H),\n      (∃ (C : Type) (_ : Fintype C) (GC : SimpleGraph C) (f : C → H),\n        IsPlanar GC ∧ IsCoveringMap GC GH f) →\n      ∃ (C : Type) (_ : Fintype C) (GC : SimpleGraph C) (f : C → H),\n        IsPlanar GC ∧ IsCoveringMap GC GH f ∧ HasPlyAtMost f 2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Negami's conjecture\n\nA *planar cover* of a finite graph $H$ is a finite planar graph $C$ together with a covering\nmap $f \\colon C \\to H$: a map from the vertices of $C$ onto the vertices of $H$ that, for every\nvertex $v$ of $C$, restricts to a bijection between the neighbours of $v$ and the neighbours of\n$f(v)$.\n\nEvery graph that embeds in the projective plane has a planar cover (its preimage in the sphere,\nthe orientable double cover of the projective plane). Negami conjectured the converse: every\nconnected graph with a planar cover embeds in the projective plane.\n\nMathlib has no notion of a planar or projective-planar graph, nor of a covering map of graphs.\nWe define drawings of a simple graph in an arbitrary topological space and specialise to the\nplane $\\mathbb{R}^2$ and to the real projective plane $\\mathbb{R}P^2$, modelled as the quotient\nof the unit sphere in $\\mathbb{R}^3$ by the antipodal map.\n\n*References:*\n- [Wikipedia, *Planar cover*](https://en.wikipedia.org/wiki/Negami%27s_conjecture)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ne88] S. Negami, *The spherical genus and virtually planar graphs*,\n  Discrete Math. 70 (1988), 159–168.\n  [doi:10.1016/0012-365X(88)90090-8](https://doi.org/10.1016/0012-365X(88)90090-8)\n- [Hl10] P. Hliněný, *20 years of Negami's planar cover conjecture*,\n  Graphs Combin. 26 (2010), 525–536.\n  [doi:10.1007/s00373-010-0934-9](https://doi.org/10.1007/s00373-010-0934-9)\n- [RY10] Y. Rieck, Y. Yamashita, *Finite planar emulators for $K_{4,5} - 4K_2$ and $K_{1,2,2,2}$\n  and Fellows' conjecture*, European J. Combin. 31 (2010), 903–907.\n  [arXiv:0812.3700](https://arxiv.org/abs/0812.3700)\n-/\n\nnamespace NegamisConjecture\n\nopen SimpleGraph unitInterval\n\nvariable {V W : Type*}\n\n/-\n## Topological embeddings of graphs\n-/\n\n/-- A drawing (topological embedding) of the simple graph `G` in the topological space `X`:\ndistinct vertices go to distinct points of `X`; every edge `uv` is drawn as an arc (an injective\npath) from the point of `u` to the point of `v`, the arc of `vu` being the reverse of the arc of\n`uv`; no arc passes through the point of a vertex except at its endpoints; and the arcs of two\ndifferent edges meet only at common endpoints. -/\nstructure Drawing (G : SimpleGraph V) (X : Type*) [TopologicalSpace X] where\n  /-- The point of `X` representing a vertex. -/\n  vertex : V → X\n  vertex_injective : Function.Injective vertex\n  /-- The arc representing an edge, oriented from `u` to `v`. -/\n  edge ⦃u v : V⦄ : G.Adj u v → Path (vertex u) (vertex v)\n  edge_symm ⦃u v : V⦄ (h : G.Adj u v) : edge h.symm = (edge h).symm\n  edge_injective ⦃u v : V⦄ (h : G.Adj u v) : Function.Injective (edge h)\n  edge_ne_vertex ⦃u v : V⦄ (h : G.Adj u v) (w : V) ⦃t : I⦄ :\n    t ≠ 0 → t ≠ 1 → edge h t ≠ vertex w\n  edge_disjoint ⦃u v u' v' : V⦄ (h : G.Adj u v) (h' : G.Adj u' v') ⦃s t : I⦄ :\n    s ≠ 0 → s ≠ 1 → edge h s = edge h' t → s(u, v) = s(u', v')\n\n/-- The simple graph `G` embeds in the topological space `X`. -/\ndef EmbedsIn (G : SimpleGraph V) (X : Type*) [TopologicalSpace X] : Prop :=\n  Nonempty (Drawing G X)\n\n/-- A simple graph is *planar* if it embeds in the plane $\\mathbb{R}^2$. -/\ndef Planar (G : SimpleGraph V) : Prop :=\n  EmbedsIn G (EuclideanSpace ℝ (Fin 2))\n\n/-- The identification of antipodal points on the unit sphere of $\\mathbb{R}^3$. -/\ndef antipodalSetoid : Setoid (Metric.sphere (0 : EuclideanSpace ℝ (Fin 3)) 1) where\n  r x y := x = y ∨ x = -y\n  iseqv := by\n    refine ⟨fun _ => .inl rfl, fun h => ?_, fun h₁ h₂ => ?_⟩\n    · rcases h with rfl | rfl <;> simp\n    · rcases h₁ with rfl | rfl <;> rcases h₂ with rfl | rfl <;> simp\n\n/-- The real projective plane $\\mathbb{R}P^2$: the unit sphere in $\\mathbb{R}^3$ with antipodal\npoints identified, carrying the quotient topology. -/\nabbrev RealProjectivePlane : Type :=\n  Quotient antipodalSetoid\n\n/-- A simple graph is *projective-planar* if it embeds in the projective plane\n$\\mathbb{R}P^2$. -/\ndef ProjectivePlanar (G : SimpleGraph V) : Prop :=\n  EmbedsIn G RealProjectivePlane\n\n@[category test, AMS 57]\ntheorem realProjectivePlane_mk_neg (x : Metric.sphere (0 : EuclideanSpace ℝ (Fin 3)) 1) :\n    (⟦-x⟧ : RealProjectivePlane) = ⟦x⟧ :=\n  Quotient.sound (.inr rfl)\n\n/-- The edgeless graph on a finite vertex type is planar. -/\n@[category test, AMS 5 57]\ntheorem planar_bot (α : Type*) [Finite α] : Planar (⊥ : SimpleGraph α) := by\n  let e := Finite.equivFin α\n  let p : α → EuclideanSpace ℝ (Fin 2) := fun a => EuclideanSpace.single 0 ((e a : ℕ) : ℝ)\n  have hp : Function.Injective p := fun a b hab => by\n    have := congrFun (congrArg (⇑) hab) 0\n    simp [p] at this\n    exact e.injective (Fin.ext (by exact_mod_cast this))\n  exact ⟨{ vertex := p\n           vertex_injective := hp\n           edge := fun _ _ h => h.elim\n           edge_symm := fun _ _ h => h.elim\n           edge_injective := fun _ _ h => h.elim\n           edge_ne_vertex := fun _ _ h => h.elim\n           edge_disjoint := fun _ _ _ _ h => h.elim }⟩\n\n/-- The complete graph on two vertices is planar: draw its edge as a straight segment. -/\n@[category test, AMS 5 57]\ntheorem planar_top_fin_two : Planar (⊤ : SimpleGraph (Fin 2)) := by\n  let p : Fin 2 → EuclideanSpace ℝ (Fin 2) := fun i => EuclideanSpace.single 0 (i : ℝ)\n  have hp : Function.Injective p := fun i j hij => by\n    have := congrFun (congrArg (⇑) hij) 0\n    simp [p] at this\n    exact Fin.ext (by exact_mod_cast this)\n  refine ⟨{ vertex := p\n            vertex_injective := hp\n            edge := fun u v _ => Path.segment (p u) (p v)\n            edge_symm := fun u v _ => ?_\n            edge_injective := fun u v h => ?_\n            edge_ne_vertex := fun u v h w t ht0 ht1 => ?_\n            edge_disjoint := fun u v u' v' h h' s t _ _ _ => ?_ }⟩\n  · ext t\n    simp [Path.symm, AffineMap.lineMap_apply_one_sub]\n  · intro s t hst\n    have := AffineMap.lineMap_injective ℝ (hp.ne h.ne) (by simpa using hst)\n    exact Subtype.ext this\n  · have huw : w = u ∨ w = v := by\n      have := h.ne\n      fin_cases u <;> fin_cases v <;> fin_cases w <;> simp_all\n    rcases huw with rfl | rfl\n    · simp [hp.ne h.ne, ht0]\n    · simp [hp.ne h.ne, ht1]\n  · have := h.ne\n    have := h'.ne\n    fin_cases u <;> fin_cases v <;> fin_cases u' <;> fin_cases v' <;> simp_all [Sym2.eq_swap]\n\n@[category test, AMS 5 57]\ntheorem projectivePlanar_bot_unit : ProjectivePlanar (⊥ : SimpleGraph Unit) :=\n  ⟨{ vertex := fun _ => ⟦⟨EuclideanSpace.single 0 1, by simp⟩⟧\n     vertex_injective := fun _ _ _ => Subsingleton.elim _ _\n     edge := fun _ _ h => h.elim\n     edge_symm := fun _ _ h => h.elim\n     edge_injective := fun _ _ h => h.elim\n     edge_ne_vertex := fun _ _ h => h.elim\n     edge_disjoint := fun _ _ _ _ h => h.elim }⟩\n\n/-\n## Covering maps and planar covers\n-/\n\n/-- `f` is a *covering map* from the simple graph `C` onto the simple graph `H`: `f` maps the\nvertices of `C` onto the vertices of `H` and, for every vertex `v` of `C`, restricts to a\nbijection from the neighbours of `v` in `C` onto the neighbours of `f v` in `H`. -/\nstructure IsGraphCoveringMap (C : SimpleGraph V) (H : SimpleGraph W) (f : V → W) : Prop where\n  surjective : Function.Surjective f\n  bijOn (v : V) : Set.BijOn f (C.neighborSet v) (H.neighborSet (f v))\n\n/-- A covering map is a graph homomorphism. -/\n@[category API, AMS 5]\ntheorem IsGraphCoveringMap.adj {C : SimpleGraph V} {H : SimpleGraph W} {f : V → W}\n    (hf : IsGraphCoveringMap C H f) {u v : V} (huv : C.Adj u v) : H.Adj (f u) (f v) :=\n  (hf.bijOn u).mapsTo huv\n\n@[category test, AMS 5]\ntheorem isGraphCoveringMap_id (G : SimpleGraph V) : IsGraphCoveringMap G G id :=\n  ⟨Function.surjective_id, fun _ => Set.bijOn_id _⟩\n\n/-- The graph `H` has a *planar cover*: a finite planar graph `C` together with a covering map\nfrom `C` onto `H`. -/\ndef HasPlanarCover (H : SimpleGraph W) : Prop :=\n  ∃ (V : Type) (C : SimpleGraph V) (f : V → W),\n    Finite V ∧ Planar C ∧ IsGraphCoveringMap C H f\n\n/-- The graph `H` has a planar cover of *ply* `k` (a `k`-fold planar cover): a finite planar\ngraph `C` together with a covering map from `C` onto `H` under which every vertex of `H` has\nexactly `k` preimages. -/\ndef HasPlanarCoverOfPly (H : SimpleGraph W) (k : ℕ) : Prop :=\n  ∃ (V : Type) (C : SimpleGraph V) (f : V → W),\n    Finite V ∧ Planar C ∧ IsGraphCoveringMap C H f ∧ ∀ w, Nat.card (f ⁻¹' {w}) = k\n\n/-- A finite planar graph is a `1`-fold planar cover of itself. -/\n@[category test, AMS 5 57]\ntheorem hasPlanarCoverOfPly_one_of_planar {α : Type} [Finite α] {G : SimpleGraph α}\n    (hG : Planar G) : HasPlanarCoverOfPly G 1 := by\n  refine ⟨α, G, id, ‹_›, hG, isGraphCoveringMap_id G, fun w => ?_⟩\n  simp\n\n/-- Two disjoint copies of a single vertex form a `2`-fold planar cover of a single vertex. -/\n@[category test, AMS 5 57]\ntheorem hasPlanarCoverOfPly_bot_unit_two : HasPlanarCoverOfPly (⊥ : SimpleGraph Unit) 2 := by\n  refine ⟨Fin 2, ⊥, fun _ => (), inferInstance, planar_bot (Fin 2),\n    ⟨fun _ => ⟨0, rfl⟩, fun v => ?_⟩, fun w => ?_⟩\n  · simp [SimpleGraph.neighborSet]\n  · simp\n\n/-- The complete $4$-partite graph $K_{1,2,2,2}$ on $7$ vertices, with parts of sizes $1$, $2$,\n$2$, $2$: two vertices are adjacent if and only if they lie in different parts. -/\nabbrev K1222 : SimpleGraph (Σ i : Fin 4, Fin (![1, 2, 2, 2] i)) :=\n  completeMultipartiteGraph fun i => Fin (![1, 2, 2, 2] i)\n\n@[category test, AMS 5]\ntheorem card_K1222 : Fintype.card (Σ i : Fin 4, Fin (![1, 2, 2, 2] i)) = 7 := by\n  simp [Fintype.card_sigma, Fin.sum_univ_succ]\n\n@[category test, AMS 5]\ntheorem card_edgeFinset_K1222 : K1222.edgeFinset.card = 18 := by\n  decide\n\n/-\n## The conjecture\n-/\n\n/-- **Negami's conjecture** (Negami, 1988). Every connected finite graph that has a planar\ncover embeds in the projective plane. Equivalently (the converse being a theorem), a connected\nfinite graph has a planar cover if and only if it embeds in the projective plane.\n\nThe connectedness hypothesis cannot be dropped: a disjoint union of projective-planar graphs\nhas a planar cover but need not be projective-planar. -/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture [Finite W] (H : SimpleGraph W) (hH : H.Connected)\n    (hcover : HasPlanarCover H) : ProjectivePlanar H := by\n  sorry\n\n/-- **Negami's \"$1$-$2$-$\\infty$ conjecture\"**, a reformulation of Negami's conjecture: the\nminimum ply of a planar cover of a finite graph, if it has one, is either $1$ or $2$. That is,\nevery finite graph with a planar cover has a planar cover of ply $1$ or a planar cover of\nply $2$.\n\nThe equivalence with `negamis_conjecture` uses Negami's theorem that a connected graph with a\n$2$-fold planar cover is projective-planar, the sphere as the double cover of the projective\nplane, and the fact that $2$-fold planar covers are closed under disjoint unions (so no\nconnectedness hypothesis is needed here). -/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.one_two_infinity [Finite W] (H : SimpleGraph W)\n    (hcover : HasPlanarCover H) :\n    HasPlanarCoverOfPly H 1 ∨ HasPlanarCoverOfPly H 2 := by\n  sorry\n\n/-- The complete $4$-partite graph $K_{1,2,2,2}$ has no planar cover.\n\nBy work of Archdeacon, Fellows, Hliněný and Negami on the $32$ connected minor-minimal\nnon-projective-planar graphs, this statement is equivalent to Negami's conjecture: proving it\nwould complete a proof of the conjecture, and if the conjecture is false then $K_{1,2,2,2}$ is\nits smallest counterexample. -/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.K1222 : ¬ HasPlanarCover K1222 := by\n  sorry\n\nend NegamisConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None of substance. Minor remark: the 1-2-∞ reformulation in the article is phrased in terms of 'ply', which the article defines only for connected graphs; the table's connectedness-free k-fold formulation is equivalent to the conjecture (as the notes argue) and was followed, but a reviewer may prefer adding `H.Connected` for literalness (both forms are equivalent to Negami's conjecture).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Planarity and projective-planarity are modelled topologically (the literal 'embeds in the plane / projective plane'), not via Kuratowski/Wagner or the 35 forbidden minors: `Drawing G X` assigns injectively points to vertices and a Mathlib `Path` (continuous, plus required injective) to each ordered adjacent pair, with the arc of vu equal to the reverse of the arc of uv, arcs avoiding vertex points in their interiors, and arcs of distinct edges having disjoint interiors. For finite graphs in a Hausdorff space this is exactly an embedding of the geometric realization. `Planar` := drawing in `EuclideanSpace ℝ (Fin 2)`.",
+    "The projective plane is modelled as `Quotient antipodalSetoid`, the unit sphere `Metric.sphere (0 : EuclideanSpace ℝ (Fin 3)) 1` with x ~ -x (using Mathlib's `InvolutiveNeg` antipodal map on spheres), carrying Mathlib's quotient topology. Mathlib's `Projectivization` has no topology instance, so this self-contained model was preferred over adding an instance on a Mathlib type.",
+    "Covering map (`IsGraphCoveringMap C H f`): `Function.Surjective f` and `∀ v, Set.BijOn f (C.neighborSet v) (H.neighborSet (f v))`, exactly the article's definition (MapsTo makes f a homomorphism; InjOn/SurjOn give the local bijection).",
+    "`HasPlanarCover H` quantifies the cover's vertex type over `Type` (universe 0) and requires `Finite V`; finiteness of the cover is essential (the universal cover of any graph is a planar tree). Universe 0 loses nothing for finite types.",
+    "The primary slot keeps a `[Finite W]` hypothesis although it is implied by connectedness plus the existence of a finite cover; it records the source's 'finite graph' setting.",
+    "Ply is formalised as uniform fibre cardinality `∀ w, Nat.card (f ⁻¹' {w}) = k` (a k-fold cover). The 1-2-∞ variant is stated without connectedness, as the decomposition notes prescribe, as `HasPlanarCoverOfPly H 1 ∨ HasPlanarCoverOfPly H 2` ('either 1 or 2' literally); this is equivalent to Negami's conjecture via Negami's 1986 theorem and the sphere double cover.",
+    "K_{1,2,2,2} is `completeMultipartiteGraph fun i : Fin 4 => Fin (![1, 2, 2, 2] i)` (vertex type a Sigma type); tests check 7 vertices and 18 edges. An alternative `Fin 7` presentation via `comap` would be equally faithful.",
+    "Because the task allows exactly one file, the generic reusable definitions (Drawing, EmbedsIn, Planar, ProjectivePlanar, RealProjectivePlane, IsGraphCoveringMap) live in the problem file; in a real PR they would more naturally go to FormalConjecturesForMathlib/. The structure is named `IsGraphCoveringMap` to avoid clashing with Mathlib's topological `IsCoveringMap`.",
+    "The known converse (projective-planar ⇒ planar cover) is not stated as a separate declaration; the primary slot is the open implication only, as the decomposition table prescribes."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Path`, `C(I, X)`, `IsEmbedding` (used as building blocks; no graph-realization or planarity notion exists in Mathlib or FormalConjecturesForMathlib; `UnitDistancePlaneGraph`/`UnitDistanceEmbeddable` are about straight unit edges, not planarity).",
+     "name": "NegamisConjecture.Drawing",
+     "why_needed": "Mathlib has no notion of a graph embedded/drawn in a topological space; needed to define planar and projective-planar graphs faithfully."
+    },
+    {
+     "closest_existing_considered": "Nonempty (Drawing G X) inlined; no Mathlib analogue.",
+     "name": "NegamisConjecture.EmbedsIn",
+     "why_needed": "Prop-valued existence of a drawing of G in X."
+    },
+    {
+     "closest_existing_considered": "Kuratowski/Wagner characterisations would require graph minors or subdivisions, also absent from Mathlib.",
+     "name": "NegamisConjecture.Planar",
+     "why_needed": "Planar graph = embeds in ℝ²; absent from Mathlib (only mentioned in a Coloring.lean TODO)."
+    },
+    {
+     "closest_existing_considered": "`MulAction.orbitRel` for a ±1 action (no such action instance on spheres); `Projectivization ℝ (Fin 3 → ℝ)` (no TopologicalSpace instance in Mathlib).",
+     "name": "NegamisConjecture.antipodalSetoid",
+     "why_needed": "Setoid identifying x with -x on the unit 2-sphere, to build ℝP²."
+    },
+    {
+     "closest_existing_considered": "`Projectivization` (no topology), `TopCat.sphere` (ULift/TopCat wrapper, no quotient).",
+     "name": "NegamisConjecture.RealProjectivePlane",
+     "why_needed": "A topological model of ℝP² to define projective-planar graphs."
+    },
+    {
+     "closest_existing_considered": "The 35 forbidden minors (infeasible and requires minors).",
+     "name": "NegamisConjecture.ProjectivePlanar",
+     "why_needed": "Projective-planar graph = embeds in ℝP²; absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib `IsCoveringMap` (topological covering maps, wrong notion); `SimpleGraph.Hom` (no local bijectivity).",
+     "name": "NegamisConjecture.IsGraphCoveringMap",
+     "why_needed": "Covering maps of graphs (locally bijective vertex surjections) are absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "NegamisConjecture.HasPlanarCover",
+     "why_needed": "Existence of a finite planar graph with a covering map onto H."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "NegamisConjecture.HasPlanarCoverOfPly",
+     "why_needed": "Existence of a k-fold finite planar cover, to express the 1-2-∞ reformulation."
+    },
+    {
+     "closest_existing_considered": "Built directly from Mathlib's `completeMultipartiteGraph`; kept as a named abbrev for readability and tests.",
+     "name": "NegamisConjecture.K1222",
+     "why_needed": "The concrete graph K_{1,2,2,2} for the third slot."
+    }
+   ],
+   "per_slot": {
+    "negamis_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for a finite vertex type W, every connected simple graph H on W with a finite planar cover (HasPlanarCover H) is projective-planar (ProjectivePlanar H). Planarity, projective-planarity and graph covering maps are absent from Mathlib and the repo, so they are defined in the file (topological drawings via Mathlib `Path`s; RP^2 as the antipodal quotient of the unit sphere in R^3; covering map = vertex surjection restricting to a bijection N(v) -> N(f v) for every v)."
+    },
+    "negamis_conjecture.variants.K1222": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ¬ HasPlanarCover K1222 where K1222 := completeMultipartiteGraph (fun i : Fin 4 => Fin (![1, 2, 2, 2] i)), Mathlib's complete multipartite graph with parts of sizes 1, 2, 2, 2 (tests confirm 7 vertices and 18 edges). Only the planarity and covering-map definitions are needed."
+    },
+    "negamis_conjecture.variants.one_two_infinity": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for a finite vertex type W, every simple graph H on W with a finite planar cover has a finite planar cover of ply 1 or a finite planar cover of ply 2, where a cover has ply k if every vertex of H has exactly k preimages (HasPlanarCoverOfPly). Following the decomposition notes, no connectedness hypothesis is imposed (k-fold planar covers are closed under disjoint union). 'Minimum ply is 1 or 2' is rendered as the existence of a cover of ply 1 or 2, which is equivalent for nonempty graphs and avoids the sInf-degeneracy on the empty graph."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "negamis_conjecture": "/-- **Negami's conjecture** (Negami, 1988). Every connected finite graph that has a planar\ncover embeds in the projective plane. Equivalently (the converse being a theorem), a connected\nfinite graph has a planar cover if and only if it embeds in the projective plane.\n\nThe connectedness hypothesis cannot be dropped: a disjoint union of projective-planar graphs\nhas a planar cover but need not be projective-planar. -/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture [Finite W] (H : SimpleGraph W) (hH : H.Connected)\n    (hcover : HasPlanarCover H) : ProjectivePlanar H := by\n  sorry",
+    "negamis_conjecture.variants.K1222": "/-- The complete $4$-partite graph $K_{1,2,2,2}$ has no planar cover.\n\nBy work of Archdeacon, Fellows, Hliněný and Negami on the $32$ connected minor-minimal\nnon-projective-planar graphs, this statement is equivalent to Negami's conjecture: proving it\nwould complete a proof of the conjecture, and if the conjecture is false then $K_{1,2,2,2}$ is\nits smallest counterexample. -/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.K1222 : ¬ HasPlanarCover K1222 := by\n  sorry",
+    "negamis_conjecture.variants.one_two_infinity": "/-- **Negami's \"$1$-$2$-$\\infty$ conjecture\"**, a reformulation of Negami's conjecture: the\nminimum ply of a planar cover of a finite graph, if it has one, is either $1$ or $2$. That is,\nevery finite graph with a planar cover has a planar cover of ply $1$ or a planar cover of\nply $2$.\n\nThe equivalence with `negamis_conjecture` uses Negami's theorem that a connected graph with a\n$2$-fold planar cover is projective-planar, the sphere as the double cover of the projective\nplane, and the fact that $2$-fold planar covers are closed under disjoint unions (so no\nconnectedness hypothesis is needed here). -/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.one_two_infinity [Finite W] (H : SimpleGraph W)\n    (hcover : HasPlanarCover H) :\n    HasPlanarCoverOfPly H 1 ∨ HasPlanarCoverOfPly H 2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Negami's conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Negami%27s_conjecture)\n-/\n\nnamespace NegamisConjecture\n\n/-- A covering map of simple graphs is a vertex surjection that restricts to a bijection on the\nneighbors of every vertex. -/\ndef IsGraphCover {V W : Type*} (C : SimpleGraph V) (H : SimpleGraph W) (f : V → W) : Prop :=\n  Function.Surjective f ∧ ∀ v, Set.BijOn f (C.neighborSet v) (H.neighborSet (f v))\n\n/-- A topological embedding of a simple graph in a space, described by vertex points and continuous\narcs for its edges. The arcs are injective, have the prescribed endpoints, and their interiors meet\nneither vertices nor interiors of distinct edges. -/\ndef EmbedsIn {V S : Type*} [TopologicalSpace S] (G : SimpleGraph V) : Prop :=\n  ∃ (p : V → S) (e : V → V → Set.Icc (0 : ℝ) 1 → S),\n    Function.Injective p ∧\n    (∀ u v, G.Adj u v → Continuous (e u v)) ∧\n    (∀ u v, G.Adj u v → Function.Injective (e u v)) ∧\n    (∀ u v, G.Adj u v → e u v ⟨0, by norm_num⟩ = p u ∧\n      e u v ⟨1, by norm_num⟩ = p v) ∧\n    (∀ u v (t : Set.Icc (0 : ℝ) 1), G.Adj u v →\n      e v u ⟨1 - t, by constructor <;> simp [t.2.1, t.2.2]⟩ = e u v t) ∧\n    (∀ u v (t : Set.Icc (0 : ℝ) 1) w,\n      G.Adj u v → 0 < (t : ℝ) → (t : ℝ) < 1 → e u v t ≠ p w) ∧\n    (∀ u v x y (t s : Set.Icc (0 : ℝ) 1),\n      G.Adj u v → G.Adj x y → 0 < (t : ℝ) → (t : ℝ) < 1 →\n      0 < (s : ℝ) → (s : ℝ) < 1 → e u v t = e x y s →\n      (u = x ∧ v = y) ∨ (u = y ∧ v = x))\n\n/-- A simple graph is planar when it has a topological embedding in the real plane. -/\ndef IsPlanar {V : Type*} (G : SimpleGraph V) : Prop := EmbedsIn (S := ℝ × ℝ) G\n\nprivate def antipodalSetoid : Setoid (Metric.sphere (0 : EuclideanSpace ℝ (Fin 3)) 1) where\n  r x y := (x : EuclideanSpace ℝ (Fin 3)) = y ∨ (x : EuclideanSpace ℝ (Fin 3)) = -y\n  iseqv := by\n    refine ⟨?_, ?_, ?_⟩\n    · exact fun x ↦ Or.inl rfl\n    · rintro x y (h | h)\n      · exact Or.inl h.symm\n      · right\n        simpa only [neg_neg] using (congrArg Neg.neg h).symm\n    · rintro x y z (hxy | hxy) (hyz | hyz)\n      · exact Or.inl (hxy.trans hyz)\n      · exact Or.inr (hxy.trans hyz)\n      · exact Or.inr (hxy.trans (congrArg Neg.neg hyz))\n      · left\n        rw [hxy, hyz, neg_neg]\n\n/-- The real projective plane, as the quotient of the unit sphere in `ℝ³` by the antipodal\nidentification. -/\nabbrev RealProjectivePlane := Quotient antipodalSetoid\n\n/-- A simple graph is projective-planar when it embeds in the real projective plane. -/\ndef IsProjectivePlanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  EmbedsIn (S := RealProjectivePlane) G\n\n/--\n**Negami's conjecture.** Every finite connected simple graph with a finite planar covering graph\nembeds in the projective plane.\n-/\n@[category research open, AMS 05 57]\ntheorem negamis_conjecture :\n    ∀ (V : Type) [Fintype V] (H : SimpleGraph V), H.Connected →\n      (∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : W → V),\n        IsPlanar C ∧ IsGraphCover C H f) → IsProjectivePlanar H := by\n  sorry\n\n/--\n**Negami's 1-2-∞ conjecture.** Every finite simple graph that has a finite planar cover has a\nfinite planar cover in which every vertex has at most two preimages.\n-/\n@[category research open, AMS 05 57]\ntheorem negamis_conjecture.variants.one_two_infinity :\n    ∀ (V : Type) [Fintype V] (H : SimpleGraph V),\n      (∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : W → V),\n        IsPlanar C ∧ IsGraphCover C H f) →\n      ∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : W → V),\n        IsPlanar C ∧ IsGraphCover C H f ∧ ∀ v, Nat.card {w // f w = v} ≤ 2 := by\n  sorry\n\n/-- The complete multipartite graph $K_{1,2,2,2}$. -/\nabbrev K1222 : SimpleGraph (Σ i : Fin 4, Fin (![1, 2, 2, 2] i)) :=\n  SimpleGraph.completeMultipartiteGraph fun i : Fin 4 ↦ Fin (![1, 2, 2, 2] i)\n\n/--\nThe $K_{1,2,2,2}$ reformulation of Negami's conjecture: the complete four-partite graph with parts\nof sizes $1,2,2,2$ has no finite planar cover.\n-/\n@[category research open, AMS 05 57]\ntheorem negamis_conjecture.variants.K1222 :\n    ¬ ∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W)\n        (f : W → (Σ i : Fin 4, Fin (![1, 2, 2, 2] i))),\n      IsPlanar C ∧ IsGraphCover C K1222 f := by\n  sorry\n\nend NegamisConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite graphs are represented as Mathlib `SimpleGraph`s on vertex types equipped with `Fintype`; `SimpleGraph.Connected` supplies the essential connectedness and nonemptiness hypothesis in the primary formulation.",
+    "A graph covering map is modeled exactly as the article describes: a surjective vertex function whose restriction to each neighbor set is a `Set.BijOn` onto the corresponding neighbor set.",
+    "Topological graph embedding is modeled by distinct vertex points and continuous injective arcs for adjacent vertex pairs, with opposite orientations identified by parameter reversal, no vertex in an edge interior, and disjoint interiors for distinct undirected edges.",
+    "Planarity is topological embeddability in `ℝ × ℝ`. Projective-planarity is topological embeddability in the real projective plane, modeled as the antipodal quotient of the unit sphere in `EuclideanSpace ℝ (Fin 3)`.",
+    "The 1-2-∞ formulation is stated without connectedness as existence of a finite planar cover whose fibers all have cardinality at most two. Surjectivity ensures each fiber has cardinality one or two.",
+    "The concrete graph is Mathlib's `completeMultipartiteGraph` with four parts indexed by `Fin 4` and respective vertex types of cardinalities 1, 2, 2, and 2."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Set.BijOn` on neighbor sets and Mathlib graph map structures; none packages the required global vertex surjection with local neighborhood bijections.",
+     "name": "IsGraphCover",
+     "why_needed": "Mathlib has no covering-map predicate for simple graphs."
+    },
+    {
+     "closest_existing_considered": "Topological `IsEmbedding` applies to an existing map of spaces, but Mathlib has no geometric-realization space for `SimpleGraph` suitable for this statement.",
+     "name": "EmbedsIn",
+     "why_needed": "Mathlib has no predicate for a simple graph topologically embedding in a space."
+    },
+    {
+     "closest_existing_considered": "Forbidden-minor APIs and graph-minor characterizations were searched; no existing planarity definition was available.",
+     "name": "IsPlanar",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no graph-planarity predicate."
+    },
+    {
+     "closest_existing_considered": "Mathlib projective-space results concern algebraic projective space; no topological real projective plane type was found.",
+     "name": "antipodalSetoid",
+     "why_needed": "Implementation of the antipodal identification used to construct the real projective plane."
+    },
+    {
+     "closest_existing_considered": "No existing topological `RealProjectiveSpace` or real projective plane was found; this uses the standard sphere antipodal quotient.",
+     "name": "RealProjectivePlane",
+     "why_needed": "A target topological space is required to state projective-plane embeddability."
+    },
+    {
+     "closest_existing_considered": "The newly defined generic `EmbedsIn` predicate instantiated with `RealProjectivePlane`.",
+     "name": "IsProjectivePlanar",
+     "why_needed": "Mathlib has no predicate for embedding a simple graph in the projective plane."
+    },
+    {
+     "closest_existing_considered": "Defined directly using Mathlib's existing `SimpleGraph.completeMultipartiteGraph`, following the repository's existing `K133` idiom.",
+     "name": "K1222",
+     "why_needed": "A concise exact name for the concrete graph in the third formulation."
+    }
+   ],
+   "per_slot": {
+    "negamis_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "negamis_conjecture.variants.K1222": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "negamis_conjecture.variants.one_two_infinity": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "negamis_conjecture": "/--\n**Negami's conjecture.** Every finite connected simple graph with a finite planar covering graph\nembeds in the projective plane.\n-/\n@[category research open, AMS 05 57]\ntheorem negamis_conjecture :\n    ∀ (V : Type) [Fintype V] (H : SimpleGraph V), H.Connected →\n      (∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : W → V),\n        IsPlanar C ∧ IsGraphCover C H f) → IsProjectivePlanar H := by\n  sorry",
+    "negamis_conjecture.variants.K1222": "/--\nThe $K_{1,2,2,2}$ reformulation of Negami's conjecture: the complete four-partite graph with parts\nof sizes $1,2,2,2$ has no finite planar cover.\n-/\n@[category research open, AMS 05 57]\ntheorem negamis_conjecture.variants.K1222 :\n    ¬ ∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W)\n        (f : W → (Σ i : Fin 4, Fin (![1, 2, 2, 2] i))),\n      IsPlanar C ∧ IsGraphCover C K1222 f := by\n  sorry",
+    "negamis_conjecture.variants.one_two_infinity": "/--\n**Negami's 1-2-∞ conjecture.** Every finite simple graph that has a finite planar cover has a\nfinite planar cover in which every vertex has at most two preimages.\n-/\n@[category research open, AMS 05 57]\ntheorem negamis_conjecture.variants.one_two_infinity :\n    ∀ (V : Type) [Fintype V] (H : SimpleGraph V),\n      (∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : W → V),\n        IsPlanar C ∧ IsGraphCover C H f) →\n      ∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : W → V),\n        IsPlanar C ∧ IsGraphCover C H f ∧ ∀ v, Nat.card {w // f w = v} ≤ 2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Negami's conjecture\n\nA *covering map* from a graph $C$ to a graph $H$ is a map from the vertices of $C$ onto the\nvertices of $H$ which, for every vertex $v$ of $C$, restricts to a bijection between the\nneighbours of $v$ and the neighbours of its image. A *planar cover* of a finite graph $H$ is a\nfinite planar graph $C$ together with a covering map from $C$ to $H$.\n\nEvery graph that embeds in the projective plane has a planar cover (its preimage in the sphere,\nthe orientable double cover of the projective plane). Negami conjectured (1988) that these are\nthe only connected graphs with planar covers: every connected graph with a planar cover embeds\nin the projective plane.\n\n*References:*\n- [Wikipedia, Planar cover](https://en.wikipedia.org/wiki/Negami%27s_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- S. Negami, *Enumeration of projective-planar embeddings of graphs*, Discrete Math. 62 (1986),\n  299–306.\n- S. Negami, *The spherical genus and virtually planar graphs*, Discrete Math. 70 (1988), 159–168.\n- P. Hliněný, *20 years of Negami's planar cover conjecture*, Graphs Combin. 26 (2010), 525–536.\n- [Rieck, Yamashita, *Finite planar emulators for $K_{4,5} - 4K_2$ and $K_{1,2,2,2}$ and Fellows'\n  conjecture*](https://arxiv.org/abs/0812.3700)\n-/\n\nnamespace NegamisConjecture\n\nopen SimpleGraph\nopen scoped EuclideanGeometry LinearAlgebra.Projectivization unitInterval\n\nvariable {V W : Type*}\n\n/- ## Embeddings of graphs in topological spaces -/\n\n/--\n`IsGraphEmbedding G f γ` says that `f` and `γ` form a (topological) embedding of the simple graph\n`G` in the topological space `X`: `f` sends the vertices of `G` to distinct points of `X`, and `γ`\nsends every edge `e` of `G` to an arc in `X` (a continuous injective map from the unit interval\nto `X`) whose two endpoints are the images of the two ends of `e`. Moreover, an arc passes\nthrough the image of a vertex only if that vertex is an end of the corresponding edge, and two\ndistinct arcs meet only at images of vertices (hence only at their common ends).\n-/\nstructure IsGraphEmbedding {X : Type*} [TopologicalSpace X] (G : SimpleGraph V) (f : V → X)\n    (γ : G.edgeSet → I → X) : Prop where\n  injective : Function.Injective f\n  continuous (e : G.edgeSet) : Continuous (γ e)\n  arc_injective (e : G.edgeSet) : Function.Injective (γ e)\n  endpoints (e : G.edgeSet) : Sym2.map f e = s(γ e 0, γ e 1)\n  mem_of_apply_mem_range (e : G.edgeSet) (v : V) : f v ∈ Set.range (γ e) → v ∈ (e : Sym2 V)\n  inter_subset_range (e e' : G.edgeSet) :\n    e ≠ e' → Set.range (γ e) ∩ Set.range (γ e') ⊆ Set.range f\n\n/-- The simple graph `G` embeds in the topological space `X`. -/\ndef EmbedsIn (G : SimpleGraph V) (X : Type*) [TopologicalSpace X] : Prop :=\n  ∃ (f : V → X) (γ : G.edgeSet → I → X), IsGraphEmbedding G f γ\n\n/-- A simple graph is *planar* if it embeds in the Euclidean plane $\\mathbb{R}^2$. -/\ndef IsPlanar (G : SimpleGraph V) : Prop :=\n  EmbedsIn G ℝ²\n\n/-- The real projective plane $\\mathbb{R}P^2$, i.e. the projectivization of $\\mathbb{R}^3$. -/\nscoped notation \"ℝP²\" => ℙ ℝ (Fin 3 → ℝ)\n\n/-- The topology of the real projective plane: the quotient topology of\n$\\mathbb{R}^3 \\setminus \\{0\\}$ under the identification of proportional vectors. -/\ninstance : TopologicalSpace ℝP² :=\n  inferInstanceAs (TopologicalSpace (Quotient (projectivizationSetoid ℝ (Fin 3 → ℝ))))\n\n/-- A simple graph is *projective-planar* if it embeds in the real projective plane. -/\ndef IsProjectivePlanar (G : SimpleGraph V) : Prop :=\n  EmbedsIn G ℝP²\n\n/- ## Covering maps and planar covers -/\n\n/--\n`IsCover C H f` says that `f` is a *covering map* from the simple graph `C` to the simple graph\n`H`: `f` maps the vertices of `C` onto the vertices of `H` and, for every vertex `w` of `C`, it\nrestricts to a bijection between the neighbours of `w` and the neighbours of `f w`.\n-/\ndef IsCover (C : SimpleGraph W) (H : SimpleGraph V) (f : W → V) : Prop :=\n  Function.Surjective f ∧ ∀ w, Set.BijOn f (C.neighborSet w) (H.neighborSet (f w))\n\n/--\n`HasPlanarCover H` says that the simple graph `H` has a *planar cover*: there is a finite planar\nsimple graph `C` and a covering map from `C` to `H`.\n-/\ndef HasPlanarCover (H : SimpleGraph V) : Prop :=\n  ∃ (W : Type) (C : SimpleGraph W) (f : W → V), Finite W ∧ IsPlanar C ∧ IsCover C H f\n\n/--\n`HasPlanarCoverOfPly H k` says that the simple graph `H` has a planar cover of *ply* `k`: there\nis a finite planar simple graph `C` and a covering map from `C` to `H` under which every vertex\nof `H` has exactly `k` preimages (a `k`-fold planar cover).\n-/\ndef HasPlanarCoverOfPly (H : SimpleGraph V) (k : ℕ) : Prop :=\n  ∃ (W : Type) (C : SimpleGraph W) (f : W → V),\n    Finite W ∧ IsPlanar C ∧ IsCover C H f ∧ ∀ v, (f ⁻¹' {v}).ncard = k\n\n/-- The identity is a covering map from any graph to itself. -/\n@[category test, AMS 5]\ntheorem isCover_id (G : SimpleGraph V) : IsCover G G id :=\n  ⟨Function.surjective_id, fun w => Set.bijOn_id (G.neighborSet w)⟩\n\n/-- A finite planar graph is a planar cover of itself, of ply `1`. -/\n@[category test, AMS 5]\ntheorem hasPlanarCoverOfPly_one_of_isPlanar {V : Type} [Finite V] (H : SimpleGraph V)\n    (hH : IsPlanar H) : HasPlanarCoverOfPly H 1 :=\n  ⟨V, H, id, inferInstance, hH, isCover_id H, fun v => by simp⟩\n\n/-- The graph with `n` vertices and no edges is planar. -/\n@[category test, AMS 5]\ntheorem isPlanar_bot (n : ℕ) : IsPlanar (⊥ : SimpleGraph (Fin n)) := by\n  have h : ∀ e : (⊥ : SimpleGraph (Fin n)).edgeSet, False := fun e => by\n    simpa using e.2\n  refine ⟨fun i => WithLp.toLp 2 fun _ => (i : ℝ), fun e => (h e).elim, ?_, fun e => (h e).elim,\n    fun e => (h e).elim, fun e => (h e).elim, fun e => (h e).elim, fun e => (h e).elim⟩\n  intro i j hij\n  have := congrArg (fun x : ℝ² => x 0) hij\n  simpa [Fin.ext_iff] using this\n\n/- ## Negami's conjecture -/\n\n/--\n**Negami's conjecture.** Every finite connected simple graph with a planar cover embeds in the\nprojective plane. That is, if $H$ is a finite connected simple graph and there are a finite\nplanar simple graph $C$ and a covering map from $C$ onto $H$, then $H$ is projective-planar.\n\nThe connectedness hypothesis is needed: a disjoint union of two projective-planar graphs has a\nplanar cover (the disjoint union of their double covers from the sphere) but need not be\nprojective-planar. The converse is a theorem: every projective-planar graph has a planar cover.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture [Finite V] (H : SimpleGraph V) (hH : H.Connected)\n    (hcov : HasPlanarCover H) : IsProjectivePlanar H := by\n  sorry\n\n/--\n**Negami's \"1-2-∞ conjecture\".** The minimum ply of a planar cover of a finite simple graph, if\na planar cover exists, is either $1$ or $2$. That is, every finite simple graph that has a planar\ncover has a planar cover of ply $1$ or of ply $2$.\n\nThis is an equivalent reformulation of Negami's conjecture: if a connected graph has a planar\ncover of ply $2$ then it is projective-planar (Negami, 1986), and every projective-planar graph\nhas a planar cover of ply $2$ (from the sphere). No connectedness hypothesis is needed here: a\ndisjoint union of graphs with planar covers of ply $2$ again has a planar cover of ply $2$.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture.variants.one_two_infinity [Finite V] (H : SimpleGraph V)\n    (hcov : HasPlanarCover H) : HasPlanarCoverOfPly H 1 ∨ HasPlanarCoverOfPly H 2 := by\n  sorry\n\n/-- The complete $4$-partite graph $K_{1,2,2,2}$, with parts of sizes $1$, $2$, $2$, $2$. -/\nabbrev K1222 : SimpleGraph (Σ i : Fin 4, Fin (![1, 2, 2, 2] i)) :=\n  completeMultipartiteGraph fun i : Fin 4 => Fin (![1, 2, 2, 2] i)\n\n/--\nThe complete $4$-partite graph $K_{1,2,2,2}$ has no planar cover: there is no finite planar simple\ngraph $C$ with a covering map from $C$ onto $K_{1,2,2,2}$.\n\nThis is equivalent to Negami's conjecture (Archdeacon, Fellows, Hliněný, Negami): $K_{1,2,2,2}$\nis not projective-planar, so it is a counterexample if it has a planar cover, and it is the only\none of the $32$ connected minor-minimal non-projective-planar graphs for which the absence of a\nplanar cover has not yet been established.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture.variants.K1222 : ¬ HasPlanarCover K1222 := by\n  sorry\n\nend NegamisConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None of substance. One remark: the 1-2-∞ variant's text refers to the 'ply' of a planar cover, which Wikipedia defines only for connected H; following the decomposition notes I stated the variant without a connectedness hypothesis using the uniform-fibre (k-fold) notion of ply, which is the natural extension and keeps the variant equivalent to the primary form.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple graphs (`SimpleGraph V` with `[Finite V]`), matching Wikipedia and the cited papers ('All graphs considered are assumed to be finite and simple'). Covering graphs are also required to be finite (`Finite W`), as in Wikipedia's definition of a planar cover.",
+    "Planarity and projective-planarity are defined topologically (not via Kuratowski–Wagner / the 35 forbidden minors): `IsGraphEmbedding G f γ` requires an injective vertex map f and, for each edge, an injective continuous map γ e : I → X with endpoints s(γ e 0, γ e 1) = Sym2.map f e, such that a vertex image lies on an arc only if that vertex is an end of the edge, and distinct arcs meet only at vertex images. In a Hausdorff space injective continuous images of I are arcs, so this is the standard notion of a graph embedding in a surface.",
+    "The plane is `EuclideanSpace ℝ (Fin 2)` (repo notation ℝ²). The real projective plane is modelled as `ℙ ℝ (Fin 3 → ℝ)` (Mathlib's `Projectivization`) equipped with the quotient topology from `{v : Fin 3 → ℝ // v ≠ 0}`; this instance is bespoke (Mathlib has no topology on `Projectivization`) and is the standard topology of ℝP². Reviewers may prefer the antipodal quotient of S²; the two are homeomorphic.",
+    "A covering map `IsCover C H f` is `Function.Surjective f ∧ ∀ w, Set.BijOn f (C.neighborSet w) (H.neighborSet (f w))`, exactly Wikipedia's definition ('a function f from the vertices of C onto the vertices of H that, for each vertex v of C, gives a bijection between the neighbors of v and the neighbors of f(v)'). BijOn's MapsTo part makes f a graph homomorphism.",
+    "Ply: `HasPlanarCoverOfPly H k` requires every vertex of H to have exactly k preimages (`(f ⁻¹' {v}).ncard = k`), i.e. a k-fold cover. For connected H this is Wikipedia's ply; for disconnected H it is the natural uniform-fibre reading. The 1-2-∞ variant is stated as `HasPlanarCoverOfPly H 1 ∨ HasPlanarCoverOfPly H 2` under the hypothesis `HasPlanarCover H`, with no connectedness hypothesis, following the decomposition notes (equivalence with the primary form uses Negami 1986 and the sphere double cover; both directions were checked informally, including for disconnected H).",
+    "The covering graph's vertex type is quantified over `Type` (universe 0) while V : Type*; since the cover is finite this is without loss of generality.",
+    "The primary conjecture is stated as an implication (planar cover ⇒ projective-planar), not an iff; the known converse is mentioned in the docstring only.",
+    "Three `@[category test]` lemmas with proofs are included as basic API tests of the bespoke definitions: the identity is a cover, a finite planar graph is its own 1-fold planar cover, and the edgeless graph on Fin n is planar."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Topology.IsEmbedding (for maps of spaces, not graphs); Mathlib `Path`/`unitInterval`; no graph planarity/genus notion exists in Mathlib or FormalConjecturesForMathlib (grep for planar/Kuratowski/minor found nothing).",
+     "name": "NegamisConjecture.IsGraphEmbedding",
+     "why_needed": "Mathlib has no notion of a topological embedding (drawing) of a graph in a topological space; needed to define planar and projective-planar graphs."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib; SimpleGraph.HasDimension (unit-distance embeddings) in the repo is a different notion.",
+     "name": "NegamisConjecture.EmbedsIn",
+     "why_needed": "Prop-valued 'G embeds in X' (existence of an IsGraphEmbedding), used to define IsPlanar and IsProjectivePlanar uniformly."
+    },
+    {
+     "closest_existing_considered": "No existing definition; Kuratowski/Wagner characterisations would require graph minors, also absent from Mathlib.",
+     "name": "NegamisConjecture.IsPlanar",
+     "why_needed": "Planar graphs are absent from Mathlib (only mentioned in a docstring of SimpleGraph/Coloring)."
+    },
+    {
+     "closest_existing_considered": "Mathlib.Topology.Compactification.OnePoint.ProjectiveLine (only a set-theoretic equivalence for the projective line); antipodal quotient of Metric.sphere (equivalent, but also bespoke).",
+     "name": "NegamisConjecture.ℝP² (scoped notation) and instance TopologicalSpace (ℙ ℝ (Fin 3 → ℝ))",
+     "why_needed": "Mathlib defines Projectivization but gives it no topology; the quotient topology from ℝ³∖{0} is the standard topology of the real projective plane, needed to speak of embeddings in the projective plane."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "NegamisConjecture.IsProjectivePlanar",
+     "why_needed": "Projective-planar graphs are absent from Mathlib; the 35-forbidden-minor characterisation is infeasible and minors are absent anyway."
+    },
+    {
+     "closest_existing_considered": "Prefunctor.IsCovering (Mathlib.Combinatorics.Quiver.Covering) for quivers; not directly usable for SimpleGraph and would obscure the statement. Mathlib's IsCoveringMap is topological.",
+     "name": "NegamisConjecture.IsCover",
+     "why_needed": "Covering maps of graphs (local isomorphisms) are absent from Mathlib for SimpleGraph."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "NegamisConjecture.HasPlanarCover",
+     "why_needed": "Existence of a finite planar cover, the central hypothesis of all three slots."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "NegamisConjecture.HasPlanarCoverOfPly",
+     "why_needed": "k-fold (ply k) planar covers, needed for the 1-2-∞ reformulation."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.completeMultipartiteGraph (used to define it), following the K133 abbreviation in ErdosProblems/1007.lean.",
+     "name": "NegamisConjecture.K1222",
+     "why_needed": "Readable name for the complete 4-partite graph K_{1,2,2,2}."
+    }
+   ],
+   "per_slot": {
+    "negamis_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite type V, every connected simple graph H on V with a planar cover (a finite planar simple graph C and a covering map C → H, i.e. a vertex surjection restricting to a bijection N(w) → N(f w) for every w) embeds in the real projective plane. Planarity, projective-planarity and covering maps are absent from Mathlib and the repo, so they are defined in the file via topological graph embeddings (arcs = injective continuous maps from the unit interval, internally disjoint) into ℝ² resp. ℙ ℝ (Fin 3 → ℝ) with the quotient topology."
+    },
+    "negamis_conjecture.variants.K1222": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ¬ HasPlanarCover K1222 where K1222 := completeMultipartiteGraph fun i : Fin 4 => Fin (![1, 2, 2, 2] i) (checked by `decide` in a scratch file to have 7 vertices, 18 edges, apex adjacent to all, same-part vertices non-adjacent). Only planarity and covering maps are needed, no projective-planarity."
+    },
+    "negamis_conjecture.variants.one_two_infinity": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: every finite simple graph with a planar cover has a planar cover of ply 1 or a planar cover of ply 2, where a cover of ply k means every vertex of H has exactly k preimages (a k-fold cover). No connectedness hypothesis, as in the decomposition notes; the docstring records why this is equivalent to the primary form."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "negamis_conjecture": "/--\n**Negami's conjecture.** Every finite connected simple graph with a planar cover embeds in the\nprojective plane. That is, if $H$ is a finite connected simple graph and there are a finite\nplanar simple graph $C$ and a covering map from $C$ onto $H$, then $H$ is projective-planar.\n\nThe connectedness hypothesis is needed: a disjoint union of two projective-planar graphs has a\nplanar cover (the disjoint union of their double covers from the sphere) but need not be\nprojective-planar. The converse is a theorem: every projective-planar graph has a planar cover.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture [Finite V] (H : SimpleGraph V) (hH : H.Connected)\n    (hcov : HasPlanarCover H) : IsProjectivePlanar H := by\n  sorry",
+    "negamis_conjecture.variants.K1222": "/--\nThe complete $4$-partite graph $K_{1,2,2,2}$ has no planar cover: there is no finite planar simple\ngraph $C$ with a covering map from $C$ onto $K_{1,2,2,2}$.\n\nThis is equivalent to Negami's conjecture (Archdeacon, Fellows, Hliněný, Negami): $K_{1,2,2,2}$\nis not projective-planar, so it is a counterexample if it has a planar cover, and it is the only\none of the $32$ connected minor-minimal non-projective-planar graphs for which the absence of a\nplanar cover has not yet been established.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture.variants.K1222 : ¬ HasPlanarCover K1222 := by\n  sorry",
+    "negamis_conjecture.variants.one_two_infinity": "/--\n**Negami's \"1-2-∞ conjecture\".** The minimum ply of a planar cover of a finite simple graph, if\na planar cover exists, is either $1$ or $2$. That is, every finite simple graph that has a planar\ncover has a planar cover of ply $1$ or of ply $2$.\n\nThis is an equivalent reformulation of Negami's conjecture: if a connected graph has a planar\ncover of ply $2$ then it is projective-planar (Negami, 1986), and every projective-planar graph\nhas a planar cover of ply $2$ (from the sphere). No connectedness hypothesis is needed here: a\ndisjoint union of graphs with planar covers of ply $2$ again has a planar cover of ply $2$.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture.variants.one_two_infinity [Finite V] (H : SimpleGraph V)\n    (hcov : HasPlanarCover H) : HasPlanarCoverOfPly H 1 ∨ HasPlanarCoverOfPly H 2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Negami's conjecture\n\nNegami's conjecture characterizes the finite connected graphs having finite planar covers as\nthose that embed in the real projective plane.\n\n*Reference:*\n- [Wikipedia, Negami's conjecture](https://en.wikipedia.org/wiki/Negami%27s_conjecture)\n-/\n\nnamespace NegamisConjecture\n\nopen SimpleGraph\nopen scoped LinearAlgebra.Projectivization unitInterval\n\n/-- The real projective plane, equipped with its quotient topology. -/\nabbrev RealProjectivePlane := Projectivization ℝ (Fin 3 → ℝ)\n\nnoncomputable instance : TopologicalSpace RealProjectivePlane := by\n  unfold RealProjectivePlane Projectivization\n  infer_instance\n\n/-- The interior of a topological edge represented by an injective path. -/\ndef edgeInterior {X : Type*} [TopologicalSpace X] {x y : X} (p : Path x y) : Set X :=\n  p '' {t | t ≠ 0 ∧ t ≠ 1}\n\n/--\nA simple graph embeds in a topological space if its vertices can be represented by distinct\npoints and its edges by simple continuous arcs whose interiors avoid every vertex and are\ndisjoint for distinct undirected edges.\n-/\ndef EmbedsIn {V : Type*} (G : SimpleGraph V) (X : Type*) [TopologicalSpace X] : Prop :=\n  ∃ vertexPoint : V → X, Function.Injective vertexPoint ∧\n    ∃ edgePath : ∀ ⦃v w : V⦄, G.Adj v w → Path (vertexPoint v) (vertexPoint w),\n      (∀ ⦃v w : V⦄ (h : G.Adj v w), Function.Injective (edgePath h)) ∧\n      (∀ ⦃v w : V⦄ (h : G.Adj v w) (x : V),\n        vertexPoint x ∉ edgeInterior (edgePath h)) ∧\n      (∀ ⦃v w x y : V⦄ (hvw : G.Adj v w) (hxy : G.Adj x y),\n        s(v, w) ≠ s(x, y) →\n          Disjoint (edgeInterior (edgePath hvw)) (edgeInterior (edgePath hxy)))\n\n/-- A graph is planar if it embeds in the real plane. -/\ndef IsPlanar {V : Type*} (G : SimpleGraph V) : Prop := EmbedsIn G (ℝ × ℝ)\n\n/-- A graph embeds in the projective plane if it embeds in the real projective plane. -/\ndef IsProjectivePlanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  EmbedsIn G RealProjectivePlane\n\n/--\n`IsGraphCover C H f` says that `f` is a graph covering map from `C` onto `H`: it is surjective\non vertices and restricts at each vertex to a bijection of neighbor sets.\n-/\ndef IsGraphCover {V W : Type*} (C : SimpleGraph V) (H : SimpleGraph W) (f : V → W) : Prop :=\n  Function.Surjective f ∧\n    ∀ v : V, ∃ e : C.neighborSet v ≃ H.neighborSet (f v),\n      ∀ w : C.neighborSet v, (e w : W) = f w\n\n/-- `H` has a finite planar cover whose vertex fibers all have cardinality at most `k`. -/\ndef HasPlanarCoverOfPlyAtMost {V : Type*} (H : SimpleGraph V) (k : ℕ) : Prop :=\n  ∃ n : ℕ, ∃ C : SimpleGraph (Fin n), IsPlanar C ∧\n    ∃ f : Fin n → V, IsGraphCover C H f ∧ ∀ v : V, Nat.card {w // f w = v} ≤ k\n\n/-- `H` has a finite planar cover. -/\ndef HasPlanarCover {V : Type*} (H : SimpleGraph V) : Prop :=\n  ∃ n : ℕ, ∃ C : SimpleGraph (Fin n), IsPlanar C ∧\n    ∃ f : Fin n → V, IsGraphCover C H f\n\n/--\nNegami's conjecture: every finite connected simple graph that has a finite planar graph covering\nit by a vertex-surjective neighborhood-bijection covering map embeds in the real projective\nplane.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture {V : Type*} [Fintype V] (H : SimpleGraph V) (hH : H.Connected)\n    (hcover : HasPlanarCover H) : IsProjectivePlanar H := by\n  sorry\n\nnamespace negamis_conjecture.variants\n\n/--\nNegami's $1$-$2$-$\\infty$ conjecture: every finite simple graph that has a finite planar cover\nhas one of ply at most two. Equivalently, the minimum ply of a planar cover, when it exists, is\none or two. No connectedness assumption is imposed.\n-/\n@[category research open, AMS 5 57]\ntheorem one_two_infinity {V : Type*} [Fintype V] (H : SimpleGraph V)\n    (hcover : HasPlanarCover H) : HasPlanarCoverOfPlyAtMost H 2 := by\n  sorry\n\n/--\nThe concrete $K_{1,2,2,2}$ reformulation of Negami's conjecture: the complete four-partite graph\nwith part sizes $1,2,2,2$ has no finite planar cover by a vertex-surjective\nneighborhood-bijection covering map.\n-/\n@[category research open, AMS 5 57]\ntheorem K1222 :\n    ¬ HasPlanarCover\n      (completeMultipartiteGraph (fun i : Fin 4 => Fin (![1, 2, 2, 2] i))) := by\n  sorry\n\nend negamis_conjecture.variants\n\nend NegamisConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry was expanded using the supplied Wikipedia article: the primary statement is the implication from a finite planar cover of a finite connected simple graph to an embedding in the real projective plane.",
+    "A graph embedding in a surface is modeled directly by distinct vertex points and injective continuous interval paths for edges, with edge interiors avoiding all vertices and interiors of distinct undirected edges disjoint. Planarity means such an embedding in ℝ × ℝ.",
+    "The real projective plane is modeled as `Projectivization ℝ (Fin 3 → ℝ)` with the quotient topology inherited from nonzero vectors modulo nonzero scalar multiplication.",
+    "A graph covering map is a surjective vertex function whose restriction at each vertex is an equivalence between the corresponding neighbor subtypes; the definition explicitly requires that the equivalence's underlying function agrees with the covering function.",
+    "Existentially quantified finite covering graphs are represented on `Fin n`; every finite simple graph can be transported to such a vertex type.",
+    "The 1-2-∞ variant is stated in the decomposition table's disconnected form: every finite graph with a planar cover has a planar cover all of whose vertex fibers have cardinality at most two.",
+    "The concrete graph is Mathlib's complete multipartite graph with parts indexed by `Fin 4` and sizes `![1, 2, 2, 2]`, hence has seven vertices and is exactly K_{1,2,2,2}.",
+    "AMS tags 5 and 57 record graph theory and manifolds/cell complexes respectively, matching the graph-embedding content."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `Projectivization ℝ (Fin 3 → ℝ)` supplies the underlying quotient type but no automatically synthesized topology without unfolding; the abbreviation is equipped with the standard quotient topology.",
+     "name": "RealProjectivePlane",
+     "why_needed": "A concrete ambient topological space is needed to express projective-planar graph embeddings."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `Path` and `unitInterval`, but no graph-edge interior construction.",
+     "name": "edgeInterior",
+     "why_needed": "The topological graph-embedding predicate must distinguish an edge arc's endpoints from its interior."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `TopologicalEmbedding` concerns maps between already topologized spaces; no geometric realization/topology for `SimpleGraph` is available.",
+     "name": "EmbedsIn",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no predicate for topological embeddings of finite simple graphs into a space."
+    },
+    {
+     "closest_existing_considered": "No existing `SimpleGraph.IsPlanar` was found; the definition specializes `EmbedsIn` to the real plane.",
+     "name": "IsPlanar",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib contain no graph planarity predicate."
+    },
+    {
+     "closest_existing_considered": "No projective-planarity predicate was found; the definition specializes `EmbedsIn` to `RealProjectivePlane`.",
+     "name": "IsProjectivePlanar",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib contain no predicate for graph embeddability in the real projective plane."
+    },
+    {
+     "closest_existing_considered": "Mathlib's simple-graph homomorphisms and embeddings do not impose vertex surjectivity plus local neighbor-set bijectivity.",
+     "name": "IsGraphCover",
+     "why_needed": "Mathlib's topological `IsCoveringMap` is unrelated to the required neighborhood-bijection graph covering maps, and no graph-cover predicate exists."
+    },
+    {
+     "closest_existing_considered": "No planar-cover or graph-cover ply API exists; this packages `IsPlanar`, `IsGraphCover`, and `Nat.card` of fibers.",
+     "name": "HasPlanarCoverOfPlyAtMost",
+     "why_needed": "The 1-2-∞ reformulation needs finite planar graph covers together with a fiber-cardinality bound."
+    },
+    {
+     "closest_existing_considered": "No planar-cover predicate exists; this packages a planar graph on `Fin n` and an `IsGraphCover` witness.",
+     "name": "HasPlanarCover",
+     "why_needed": "The primary and concrete reformulations need the existence of a finite planar graph cover."
+    }
+   ],
+   "per_slot": {
+    "negamis_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "negamis_conjecture.variants.K1222": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "negamis_conjecture.variants.one_two_infinity": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "negamis_conjecture": "/--\nNegami's conjecture: every finite connected simple graph that has a finite planar graph covering\nit by a vertex-surjective neighborhood-bijection covering map embeds in the real projective\nplane.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture {V : Type*} [Fintype V] (H : SimpleGraph V) (hH : H.Connected)\n    (hcover : HasPlanarCover H) : IsProjectivePlanar H := by\n  sorry",
+    "negamis_conjecture.variants.K1222": "/--\nThe concrete $K_{1,2,2,2}$ reformulation of Negami's conjecture: the complete four-partite graph\nwith part sizes $1,2,2,2$ has no finite planar cover by a vertex-surjective\nneighborhood-bijection covering map.\n-/\n@[category research open, AMS 5 57]\ntheorem K1222 :\n    ¬ HasPlanarCover\n      (completeMultipartiteGraph (fun i : Fin 4 => Fin (![1, 2, 2, 2] i))) := by\n  sorry",
+    "negamis_conjecture.variants.one_two_infinity": "/--\nNegami's $1$-$2$-$\\infty$ conjecture: every finite simple graph that has a finite planar cover\nhas one of ply at most two. Equivalently, the minimum ply of a planar cover, when it exists, is\none or two. No connectedness assumption is imposed.\n-/\n@[category research open, AMS 5 57]\ntheorem one_two_infinity {V : Type*} [Fintype V] (H : SimpleGraph V)\n    (hcover : HasPlanarCover H) : HasPlanarCoverOfPlyAtMost H 2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Negami's conjecture\n\nA *cover* of a finite simple graph $H$ is a finite simple graph $C$ together with a surjection\n$f$ from the vertices of $C$ onto the vertices of $H$ that, for every vertex $v$ of $C$,\nrestricts to a bijection between the neighbours of $v$ and the neighbours of $f(v)$.\nA *planar cover* of $H$ is a cover of $H$ by a planar graph.\n\nEvery graph that embeds in the projective plane has a planar cover, namely its preimage in the\nsphere, the orientable double cover of the projective plane. Negami conjectured in 1988 that,\nconversely, every connected graph with a planar cover embeds in the projective plane.\n\n*References:*\n- [Wikipedia, *Planar cover*](https://en.wikipedia.org/wiki/Negami%27s_conjecture)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ne86] Negami, S., *Enumeration of projective-planar embeddings of graphs*,\n  Discrete Mathematics 62 (1986), 299–306.\n- [Ne88] Negami, S., *The spherical genus and virtually planar graphs*,\n  Discrete Mathematics 70 (1988), 159–168.\n- [Hl10] Hliněný, P., *20 years of Negami's planar cover conjecture*,\n  Graphs and Combinatorics 26 (2010), 525–536.\n- [RY10] Rieck, Y. and Yamashita, Y., *Finite planar emulators for $K_{4,5} - 4K_2$ and\n  $K_{1,2,2,2}$ and Fellows' conjecture*, European Journal of Combinatorics 31 (2010), 903–907.\n  [arXiv:0812.3700](https://arxiv.org/abs/0812.3700)\n-/\n\nopen EuclideanGeometry\nopen scoped LinearAlgebra.Projectivization\n\nnamespace NegamisConjecture\n\nvariable {V W : Type*}\n\n/-- An embedding of the simple graph `G` in the topological space `X`: the vertices are sent\ninjectively to points of `X`, and every edge `{u, v}` is drawn as an arc (the image of an\ninjective path) from the point of `u` to the point of `v`, such that an arc passes through no\nvertex other than its two endpoints and two distinct arcs meet only at common endpoints. -/\nstructure TopologicalEmbedding (G : SimpleGraph V) (X : Type*) [TopologicalSpace X]\n    where\n  /-- The point of `X` representing a vertex. -/\n  vertex : V → X\n  /-- The arc of `X` representing an edge. -/\n  arc : G.edgeSet → Set X\n  vertex_injective : Function.Injective vertex\n  /-- The arc of the edge `{u, v}` is the image of an injective path from `vertex u` to\n  `vertex v`. -/\n  exists_path : ∀ u v (h : G.Adj u v), ∃ γ : Path (vertex u) (vertex v),\n    Function.Injective γ ∧ Set.range γ = arc ⟨s(u, v), h⟩\n  /-- An arc contains no vertex other than its endpoints. -/\n  mem_of_vertex_mem_arc : ∀ (e : G.edgeSet) (w : V), vertex w ∈ arc e → w ∈ (e : Sym2 V)\n  /-- Two distinct arcs meet only at common endpoints. -/\n  exists_of_mem_arc_inter_arc : ∀ e₁ e₂ : G.edgeSet, e₁ ≠ e₂ → ∀ x ∈ arc e₁ ∩ arc e₂,\n    ∃ w, w ∈ (e₁ : Sym2 V) ∧ w ∈ (e₂ : Sym2 V) ∧ vertex w = x\n\n/-- The simple graph `G` embeds in the topological space `X`. -/\ndef EmbedsIn (G : SimpleGraph V) (X : Type*) [TopologicalSpace X] : Prop :=\n  Nonempty (TopologicalEmbedding G X)\n\n/-- A simple graph is *planar* if it embeds in the Euclidean plane $\\mathbb{R}^2$. -/\ndef Planar (G : SimpleGraph V) : Prop :=\n  EmbedsIn G ℝ²\n\n/-- The real projective plane $\\mathbb{R}P^2 = \\mathbb{P}(\\mathbb{R}^3)$ carries the quotient\ntopology of $\\mathbb{R}^3 \\setminus \\{0\\}$. -/\nscoped instance : TopologicalSpace (ℙ ℝ (Fin 3 → ℝ)) :=\n  inferInstanceAs (TopologicalSpace (Quotient (projectivizationSetoid ℝ (Fin 3 → ℝ))))\n\n/-- A simple graph is *projective-planar* if it embeds in the real projective plane\n$\\mathbb{R}P^2$. -/\ndef ProjectivePlanar (G : SimpleGraph V) : Prop :=\n  EmbedsIn G (ℙ ℝ (Fin 3 → ℝ))\n\n/-- A map `f` from the vertices of `C` to the vertices of `H` is a *covering map* if it is\nsurjective and, for every vertex `v` of `C`, restricts to a bijection from the neighbours of `v`\nonto the neighbours of `f v`. Then `C` is a *cover* of `H`. -/\nstructure IsCoveringMap (C : SimpleGraph V) (H : SimpleGraph W) (f : V → W) :\n    Prop where\n  surjective : Function.Surjective f\n  bijOn_neighborSet : ∀ v, Set.BijOn f (C.neighborSet v) (H.neighborSet (f v))\n\n/-- A simple graph `H` *has a planar cover* if there is a finite planar simple graph `C` with a\ncovering map from `C` onto `H`. -/\ndef HasPlanarCover (H : SimpleGraph W) : Prop :=\n  ∃ (V : Type) (_ : Finite V) (C : SimpleGraph V) (f : V → W), Planar C ∧ IsCoveringMap C H f\n\n/-- The complete $4$-partite graph $K_{1,2,2,2}$ on $7$ vertices. -/\nabbrev K1222 : SimpleGraph (Σ i : Fin 4, Fin (![1, 2, 2, 2] i)) :=\n  SimpleGraph.completeMultipartiteGraph fun i : Fin 4 => Fin (![1, 2, 2, 2] i)\n\n/-- If `G'` embeds in `X`, then so does every subgraph `G ≤ G'`. -/\n@[category API, AMS 5]\ntheorem EmbedsIn.mono {G G' : SimpleGraph V} {X : Type*} [TopologicalSpace X] (hle : G ≤ G')\n    (h : EmbedsIn G' X) : EmbedsIn G X := by\n  obtain ⟨E⟩ := h\n  exact ⟨{\n    vertex := E.vertex\n    arc := fun e => E.arc ⟨e, SimpleGraph.edgeSet_subset_edgeSet.2 hle e.2⟩\n    vertex_injective := E.vertex_injective\n    exists_path := fun u v huv => E.exists_path u v (hle huv)\n    mem_of_vertex_mem_arc := fun e w hw => E.mem_of_vertex_mem_arc _ w hw\n    exists_of_mem_arc_inter_arc := fun e₁ e₂ hne x hx =>\n      E.exists_of_mem_arc_inter_arc _ _ (fun h => hne (Subtype.ext (Subtype.mk.inj h)))\n        x hx }⟩\n\n/-- The identity is a covering map of a graph onto itself. -/\n@[category API, AMS 5]\ntheorem isCoveringMap_id (G : SimpleGraph V) : IsCoveringMap G G id :=\n  ⟨Function.surjective_id, fun v => by simpa using Set.bijOn_id (G.neighborSet v)⟩\n\n/-- A graph with a single vertex is planar. -/\n@[category test, AMS 5]\ntheorem planar_bot_unit : Planar (⊥ : SimpleGraph Unit) :=\n  ⟨{ vertex := fun _ => 0\n     arc := fun e => absurd e.2 (by simp)\n     vertex_injective := fun _ _ _ => Subsingleton.elim _ _\n     exists_path := fun _ _ h => h.elim\n     mem_of_vertex_mem_arc := fun e => absurd e.2 (by simp)\n     exists_of_mem_arc_inter_arc := fun e => absurd e.2 (by simp) }⟩\n\n/-- A single edge is planar: draw it as a straight segment. -/\n@[category test, AMS 5]\ntheorem planar_top_fin_two : Planar (⊤ : SimpleGraph (Fin 2)) := by\n  let p : Fin 2 → ℝ² := fun i => (i : ℝ) • EuclideanSpace.single 0 1\n  have hp : Function.Injective p := fun i j h =>\n    Fin.ext (by exact_mod_cast (smul_left_injective ℝ (by simp) h : ((i : ℕ) : ℝ) = (j : ℕ)))\n  refine ⟨{\n    vertex := p\n    arc := fun _ => segment ℝ (p 0) (p 1)\n    vertex_injective := hp\n    exists_path := fun u v huv => ⟨Path.segment (p u) (p v),\n      fun s t hst => Subtype.ext (AffineMap.lineMap_injective ℝ (hp.ne huv.ne) hst), ?_⟩\n    mem_of_vertex_mem_arc := fun e w _ =>\n      (by decide : ∀ (e : (⊤ : SimpleGraph (Fin 2)).edgeSet) (w : Fin 2), w ∈ (e : Sym2 (Fin 2)))\n        e w\n    exists_of_mem_arc_inter_arc := fun e₁ e₂ h => (h (by revert e₁ e₂; decide)).elim }⟩\n  rw [Path.range_segment]\n  fin_cases u <;> fin_cases v <;> first | rfl | exact segment_symm ℝ _ _ | exact (huv rfl).elim\n\n/-- $K_{1,2,2,2}$ has $7$ vertices. -/\n@[category test, AMS 5]\ntheorem card_K1222 : Fintype.card (Σ i : Fin 4, Fin (![1, 2, 2, 2] i)) = 7 := by\n  decide\n\n/-- $K_{1,2,2,2}$ has $18$ edges. -/\n@[category test, AMS 5]\ntheorem card_edgeFinset_K1222 : K1222.edgeFinset.card = 18 := by\n  decide\n\n/--\n**Negami's conjecture** (1988). Every connected finite simple graph that has a planar cover\nembeds in the projective plane.\n\nThe converse is a theorem: if $H$ embeds in the projective plane, then the preimage of $H$ in\nthe sphere, the orientable double cover of the projective plane, is a $2$-fold planar cover of\n$H$. Connectedness is needed: a disjoint union of two projective-planar graphs has a planar\ncover, but need not be projective-planar.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture [Finite W] (H : SimpleGraph W) (hconn : H.Connected)\n    (hcover : HasPlanarCover H) : ProjectivePlanar H := by\n  sorry\n\n/--\n**Negami's \"1-2-∞ conjecture\"**: the minimum ply of a planar cover of a finite simple graph,\nif a planar cover exists, is either $1$ or $2$. That is, every finite simple graph with a planar\ncover has a planar cover in which every vertex has exactly $k$ preimages, for some\n$k \\in \\{1, 2\\}$.\n\nThis is equivalent to `negamis_conjecture`: a projective-planar graph has a $2$-fold planar\ncover (the sphere double cover), and Negami [Ne86] proved that a connected graph with a $2$-fold\nplanar cover is projective-planar. No connectedness hypothesis is needed here, because\n$2$-fold planar covers are closed under disjoint unions.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.one_two_infinity [Finite W] (H : SimpleGraph W)\n    (hcover : HasPlanarCover H) :\n    ∃ k ∈ ({1, 2} : Set ℕ), ∃ (V : Type) (_ : Finite V) (C : SimpleGraph V) (f : V → W),\n      Planar C ∧ IsCoveringMap C H f ∧ ∀ w, (f ⁻¹' {w}).ncard = k := by\n  sorry\n\n/--\nThe complete $4$-partite graph $K_{1,2,2,2}$ has no planar cover.\n\nBy work of Archdeacon, Fellows, Hliněný and Negami, this is equivalent to `negamis_conjecture`:\n$K_{1,2,2,2}$ is the only one of the $32$ connected minor-minimal non-projective-planar graphs\nthat has not been shown to have no planar cover (or to reduce by $Y\\Delta$-transformations to\nsuch a graph). If the conjecture is false, then $K_{1,2,2,2}$ is its smallest counterexample.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.K1222 : ¬ HasPlanarCover K1222 := by\n  sorry\n\nend NegamisConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. One minor remark: the notes for the 1-2-∞ slot say 'ply at most 2 (equivalently a 1-fold or 2-fold one)'; for disconnected graphs 'every fibre has size ≤ 2' and 'some k ∈ {1,2} with every fibre of size exactly k' differ syntactically (both equivalent to the conjecture given known results). The file uses the 'exactly k ∈ {1,2}' form, which matches the text 'either 1 or 2'.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list-page statement is terse; the precise formulation was taken from the Wikipedia 'Planar cover' article and Rieck–Yamashita (arXiv:0812.3700): 'A connected graph has a finite planar cover iff it embeds in the projective plane'. Only the open direction (planar cover ⇒ projective-planar) is stated in `negamis_conjecture`; the known converse is described in the docstring, not stated.",
+    "Graphs are finite simple graphs (Mathlib `SimpleGraph`), as in the primary literature ('All graphs considered are assumed to be finite and simple'). The finite cover's vertex type is quantified over `Type` (universe 0) with `Finite`; finiteness of H is imposed via `[Finite W]` (it also follows from surjectivity of the covering map).",
+    "Planarity and projective-planarity are defined topologically (embedding with injective arcs whose pairwise intersections are common endpoints and which avoid other vertices) rather than by forbidden minors; the plane is `EuclideanSpace ℝ (Fin 2)` and the projective plane is `ℙ ℝ (Fin 3 → ℝ)` with the quotient topology from ℝ³ \\ {0}, introduced as a scoped instance because Mathlib gives `Projectivization` no topology. Since the file must be self-contained, the reusable definitions live in the problem file rather than FormalConjecturesForMathlib.",
+    "Covering map: surjective vertex map with `Set.BijOn f (C.neighborSet v) (H.neighborSet (f v))` for every v (this implies f is a graph homomorphism). Ply k is rendered as `∀ w, (f ⁻¹' {w}).ncard = k`.",
+    "The 1-2-∞ variant is stated for all finite graphs (no connectedness), following the decomposition notes, as 'there exists a planar cover of ply k for some k ∈ {1,2}' instead of a literal `sInf`-based 'minimum ply' statement; for connected H the two are equivalent since every cover has constant fibre size ≥ 1. For the empty graph the statement is vacuously true, so no degenerate falsity arises.",
+    "K_{1,2,2,2} is represented as `completeMultipartiteGraph` with parts `Fin (![1,2,2,2] i)`; numerals in the vertex type do not elaborate directly (e.g. `⟨0, 0⟩`), but cardinality/edge-count tests via `decide` confirm the graph has 7 vertices and 18 edges.",
+    "AMS tags 5 (combinatorics) and 57 (manifolds and cell complexes, home of topological graph theory 57M15)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Topology.IsEmbedding (only for maps between topological spaces; there is no geometric realization of a SimpleGraph in Mathlib), SimpleGraph.Embedding (graph-to-graph, unrelated), UnitDistancePlaneGraph.EmbedsIn in FormalConjecturesForMathlib (vertex-only, unit-distance straight segments; not planarity).",
+     "name": "NegamisConjecture.TopologicalEmbedding",
+     "why_needed": "Mathlib has no notion of a graph embedded in a topological space (needed for both planarity and projective-planarity). A structure: injective vertex map V → X, an arc (Set X) per edge, each arc is the range of an injective Path between the endpoints (for both orientations of the edge), arcs contain no vertex other than their endpoints, and distinct arcs meet only in common endpoints."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib; UnitDistancePlaneGraph.EmbedsIn is a different notion.",
+     "name": "NegamisConjecture.EmbedsIn",
+     "why_needed": "Prop-valued wrapper `Nonempty (TopologicalEmbedding G X)`; used to define Planar and ProjectivePlanar uniformly. API lemma EmbedsIn.mono (subgraphs of embeddable graphs embed) is proved."
+    },
+    {
+     "closest_existing_considered": "Kuratowski–Wagner characterization would require graph minors, also absent from Mathlib; the topological definition is the primary one and is closest to the source.",
+     "name": "NegamisConjecture.Planar",
+     "why_needed": "Planar graph = embeds in ℝ² (EuclideanSpace ℝ (Fin 2)). Absent from Mathlib (Coloring.lean only mentions planar graphs in a TODO). Tests: the one-vertex graph and the single-edge graph are planar."
+    },
+    {
+     "closest_existing_considered": "instTopologicalSpaceQuotient on Quotient (projectivizationSetoid ℝ (Fin 3 → ℝ)) — this is exactly what the instance transfers (checked with #synth / pp.explicit).",
+     "name": "NegamisConjecture.instTopologicalSpaceProjectivization... (scoped instance : TopologicalSpace (ℙ ℝ (Fin 3 → ℝ)))",
+     "why_needed": "Mathlib's Projectivization is a bare `def` of a Quotient with no topology. The scoped instance gives ℙ ℝ ℝ³ the quotient topology of ℝ³ \\ {0}, i.e. the real projective plane as a topological space."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "NegamisConjecture.ProjectivePlanar",
+     "why_needed": "Projective-planar graph = embeds in the real projective plane ℙ ℝ (Fin 3 → ℝ). Absent from Mathlib; the 35-forbidden-minor characterization would be infeasible and less faithful."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Hom (homomorphisms are implied but not sufficient); Topology's IsCoveringMap is for spaces, not graphs.",
+     "name": "NegamisConjecture.IsCoveringMap",
+     "why_needed": "Graph covering maps are absent from Mathlib. Prop structure: f : V → W is surjective and, for every vertex v of C, Set.BijOn f (C.neighborSet v) (H.neighborSet (f v)), exactly the Wikipedia/Rieck–Yamashita definition. API lemma: the identity is a covering map."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "NegamisConjecture.HasPlanarCover",
+     "why_needed": "Packages 'there exists a finite planar simple graph C with a covering map onto H'. Cover vertex type is quantified in `Type` with a `Finite` instance."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.completeMultipartiteGraph (used directly); completeEquipartiteGraph and turanGraph do not give unequal parts.",
+     "name": "NegamisConjecture.K1222",
+     "why_needed": "The concrete graph K_{1,2,2,2} as SimpleGraph.completeMultipartiteGraph over Fin 4 with parts Fin (![1,2,2,2] i). Tests check 7 vertices and 18 edges."
+    }
+   ],
+   "per_slot": {
+    "negamis_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for a finite type W, a connected simple graph H on W with a planar cover (a finite planar simple graph C and a covering map C → H) embeds in the real projective plane. Only the open direction is stated; the known converse is mentioned in the docstring. Planarity, projective-planarity and covering maps are absent from Mathlib and the repo, so they are defined in the file (topological embeddings of graphs via injective arcs; covering map = surjection restricting to bijections on neighbourhoods)."
+    },
+    "negamis_conjecture.variants.K1222": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ¬ HasPlanarCover K1222, where K1222 := completeMultipartiteGraph over Fin 4 with parts Fin 1, Fin 2, Fin 2, Fin 2. Tests check it has 7 vertices and 18 edges. Only planarity and covering maps are needed."
+    },
+    "negamis_conjecture.variants.one_two_infinity": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: every finite simple graph H with a planar cover has a planar cover C → H in which every vertex of H has exactly k preimages, for some k ∈ {1, 2}. Following the decomposition notes, no connectedness hypothesis is imposed (this form is equivalent to the primary one via Negami's 1986 theorem and the sphere double cover, and 2-fold planar covers are closed under disjoint unions). The 'minimum ply is 1 or 2' phrasing is rendered as existence of a planar cover of ply 1 or 2 (for connected H every cover has constant fibre size ≥ 1, so this is the same as the minimum lying in {1,2})."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "negamis_conjecture": "/--\n**Negami's conjecture** (1988). Every connected finite simple graph that has a planar cover\nembeds in the projective plane.\n\nThe converse is a theorem: if $H$ embeds in the projective plane, then the preimage of $H$ in\nthe sphere, the orientable double cover of the projective plane, is a $2$-fold planar cover of\n$H$. Connectedness is needed: a disjoint union of two projective-planar graphs has a planar\ncover, but need not be projective-planar.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture [Finite W] (H : SimpleGraph W) (hconn : H.Connected)\n    (hcover : HasPlanarCover H) : ProjectivePlanar H := by\n  sorry",
+    "negamis_conjecture.variants.K1222": "/--\nThe complete $4$-partite graph $K_{1,2,2,2}$ has no planar cover.\n\nBy work of Archdeacon, Fellows, Hliněný and Negami, this is equivalent to `negamis_conjecture`:\n$K_{1,2,2,2}$ is the only one of the $32$ connected minor-minimal non-projective-planar graphs\nthat has not been shown to have no planar cover (or to reduce by $Y\\Delta$-transformations to\nsuch a graph). If the conjecture is false, then $K_{1,2,2,2}$ is its smallest counterexample.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.K1222 : ¬ HasPlanarCover K1222 := by\n  sorry",
+    "negamis_conjecture.variants.one_two_infinity": "/--\n**Negami's \"1-2-∞ conjecture\"**: the minimum ply of a planar cover of a finite simple graph,\nif a planar cover exists, is either $1$ or $2$. That is, every finite simple graph with a planar\ncover has a planar cover in which every vertex has exactly $k$ preimages, for some\n$k \\in \\{1, 2\\}$.\n\nThis is equivalent to `negamis_conjecture`: a projective-planar graph has a $2$-fold planar\ncover (the sphere double cover), and Negami [Ne86] proved that a connected graph with a $2$-fold\nplanar cover is projective-planar. No connectedness hypothesis is needed here, because\n$2$-fold planar covers are closed under disjoint unions.\n-/\n@[category research open, AMS 5 57]\ntheorem negamis_conjecture.variants.one_two_infinity [Finite W] (H : SimpleGraph W)\n    (hcover : HasPlanarCover H) :\n    ∃ k ∈ ({1, 2} : Set ℕ), ∃ (V : Type) (_ : Finite V) (C : SimpleGraph V) (f : V → W),\n      Planar C ∧ IsCoveringMap C H f ∧ ∀ w, (f ⁻¹' {w}).ncard = k := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Negami's conjecture\n\nNegami's conjecture characterizes connected finite graphs that have finite planar covers in terms\nof embeddings in the real projective plane. Two equivalent formulations concern covers of ply at\nmost two and the complete multipartite graph $K_{1,2,2,2}$.\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Negami%27s_conjecture)\n-/\n\nopen Function Set\nopen scoped unitInterval\n\nnamespace NegamisConjecture\n\n/-- The equivalence relation on the unit two-sphere that identifies antipodal points. -/\ndef projectivePlaneSetoid : Setoid (Metric.sphere (0 : EuclideanSpace ℝ (Fin 3)) 1) where\n  r x y := (x : EuclideanSpace ℝ (Fin 3)) = y ∨ (x : EuclideanSpace ℝ (Fin 3)) = -y\n  iseqv := by\n    constructor\n    · intro x\n      exact Or.inl rfl\n    · intro x y h\n      rcases h with h | h\n      · exact Or.inl h.symm\n      · exact Or.inr (by rw [h]; simp)\n    · intro x y z hxy hyz\n      rcases hxy with hxy | hxy <;> rcases hyz with hyz | hyz\n      · exact Or.inl (hxy.trans hyz)\n      · exact Or.inr (hxy.trans hyz)\n      · exact Or.inr (by rw [hxy, hyz])\n      · exact Or.inl (hxy.trans ((congrArg Neg.neg hyz).trans (neg_neg _)))\n\n/-- The real projective plane, modeled as the unit two-sphere modulo the antipodal relation. -/\ndef RealProjectivePlane := Quotient projectivePlaneSetoid\n\ninstance : TopologicalSpace RealProjectivePlane :=\n  TopologicalSpace.coinduced (Quotient.mk projectivePlaneSetoid) inferInstance\n\n/--\nA graph embeds in a topological space if its vertices can be placed at distinct points and its\nedges can be represented by embedded arcs. An arc meets the vertex set exactly at its endpoints,\nand two distinct arcs meet exactly at the images of their common endpoints.\n-/\ndef EmbedsIn {V : Type*} (G : SimpleGraph V) (X : Type*) [TopologicalSpace X] : Prop :=\n  ∃ p : V → X, Injective p ∧ ∃ a : G.edgeSet → C(I, X),\n    (∀ e, Topology.IsEmbedding (a e)) ∧\n    (∀ e, a e '' ({0, 1} : Set I) = p '' (e.1 : Set V)) ∧\n    (∀ e, range (a e) ∩ range p = p '' (e.1 : Set V)) ∧\n    ∀ e₁ e₂, e₁ ≠ e₂ →\n      range (a e₁) ∩ range (a e₂) = p '' ((e₁.1 : Set V) ∩ (e₂.1 : Set V))\n\n/-- A graph is planar if it embeds in the Euclidean plane. -/\ndef IsPlanar {V : Type*} (G : SimpleGraph V) : Prop := EmbedsIn G (EuclideanSpace ℝ (Fin 2))\n\n/-- A graph is projective-planar if it embeds in the real projective plane. -/\ndef IsProjectivePlanar {V : Type*} (G : SimpleGraph V) : Prop := EmbedsIn G RealProjectivePlane\n\n/--\nA graph homomorphism is a covering map if it is surjective on vertices and restricts at every\nvertex to a bijection between the two neighbor sets.\n-/\ndef IsCoveringMap {V W : Type*} {G : SimpleGraph V} {H : SimpleGraph W} (f : G →g H) : Prop :=\n  Surjective f ∧ ∀ v, Bijective (f.mapNeighborSet v)\n\n/-- The complete multipartite graph with parts of sizes $1,2,2,2$. -/\nabbrev K1222 :=\n  SimpleGraph.completeMultipartiteGraph fun i : Fin 4 => Fin (![1, 2, 2, 2] i)\n\n/--\n**Negami's conjecture:** every connected finite simple graph that has a finite planar covering\ngraph embeds in the real projective plane.\n-/\n@[category research open, AMS 05]\ntheorem negamis_conjecture {V : Type*} [Fintype V] (H : SimpleGraph V) (hH : H.Connected) :\n    (∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : C →g H),\n      IsPlanar C ∧ IsCoveringMap f) →\n    IsProjectivePlanar H := by\n  sorry\n\n/--\nThe **1-2-infinity formulation of Negami's conjecture:** every finite simple graph that has a\nfinite planar cover has one whose ply is at most two. Here this means that every vertex fiber of\nthe covering map has cardinality at most two.\n-/\n@[category research open, AMS 05]\ntheorem negamis_conjecture.variants.one_two_infinity {V : Type*} [Fintype V]\n    (H : SimpleGraph V) :\n    (∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : C →g H),\n      IsPlanar C ∧ IsCoveringMap f) →\n    ∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : C →g H),\n      IsPlanar C ∧ IsCoveringMap f ∧ ∀ v, Nat.card {w // f w = v} ≤ 2 := by\n  sorry\n\n/--\nThe $K_{1,2,2,2}$ formulation of Negami's conjecture: the complete multipartite graph with parts\nof sizes $1,2,2,2$ has no finite planar cover.\n-/\n@[category research open, AMS 05]\ntheorem negamis_conjecture.variants.K1222 :\n    ¬∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : C →g K1222),\n      IsPlanar C ∧ IsCoveringMap f := by\n  sorry\n\nend NegamisConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Following the background article, the primary list-page entry is stated as: every connected finite simple graph with a finite planar cover embeds in the real projective plane.",
+    "Finite simple graphs are represented by `SimpleGraph` on `Fintype` vertex types. A covering map is a graph homomorphism that is surjective on vertices and whose induced map on neighbor subtypes is bijective at every source vertex.",
+    "Graph embeddability in a topological space is modeled by injectively placed vertices and topologically embedded unit-interval edge arcs. Each arc meets the vertex set exactly in its endpoint images, and distinct arcs intersect exactly in images of common endpoints.",
+    "Planarity is embeddability in the Euclidean plane. Projective-planarity is embeddability in the quotient of the unit sphere in three-dimensional Euclidean space by the antipodal relation, equipped with the quotient topology.",
+    "Following the decomposition notes and article, the 1-2-infinity variant has no connectedness hypothesis and asks for a planar cover whose every vertex fiber has cardinality at most two. Surjectivity ensures those fiber sizes are one or two.",
+    "The concrete graph is Mathlib's `completeMultipartiteGraph` indexed by four parts with sizes given by the vector `[1, 2, 2, 2]`.",
+    "The existential source vertex type for a finite cover is taken in `Type`; every finite graph can be relabeled onto a universe-zero finite type, so this does not restrict the mathematical assertion."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has algebraic projectivization and metric spheres, but no topological real projective plane type.",
+     "name": "projectivePlaneSetoid",
+     "why_needed": "Defines the antipodal equivalence relation needed to construct the real projective plane topologically."
+    },
+    {
+     "closest_existing_considered": "Mathlib's projectivization is algebraic and did not provide the required topological surface.",
+     "name": "RealProjectivePlane",
+     "why_needed": "Provides the target surface for projective-plane graph embeddings; its instance uses the standard quotient topology."
+    },
+    {
+     "closest_existing_considered": "`Topology.IsEmbedding` handles maps of topological spaces, but Mathlib has no geometric realization of `SimpleGraph`; the definition therefore explicitly uses vertex points and edge arcs.",
+     "name": "EmbedsIn",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib contain no predicate for topological embeddings of simple graphs."
+    },
+    {
+     "closest_existing_considered": "A forbidden-minor formulation was considered, but no suitable graph-minor planarity API was available; `EmbedsIn` the Euclidean plane directly captures planarity.",
+     "name": "IsPlanar",
+     "why_needed": "No graph-planarity predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "A 35-forbidden-minor characterization was considered, but those concrete minors and the required API are absent; `EmbedsIn` the topological real projective plane is direct.",
+     "name": "IsProjectivePlanar",
+     "why_needed": "No projective-plane graph-embeddability predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Hom.mapNeighborSet` supplies the local map; the bespoke predicate adds vertex surjectivity and local bijectivity.",
+     "name": "IsCoveringMap",
+     "why_needed": "Mathlib has graph homomorphisms and induced neighbor-set maps but no graph covering-map predicate."
+    },
+    {
+     "closest_existing_considered": "Mathlib's generic `SimpleGraph.completeMultipartiteGraph` is used directly with part types of cardinalities 1, 2, 2, and 2.",
+     "name": "K1222",
+     "why_needed": "Names the single concrete complete multipartite graph appearing in the third formulation."
+    }
+   ],
+   "per_slot": {
+    "negamis_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "negamis_conjecture.variants.K1222": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "negamis_conjecture.variants.one_two_infinity": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "negamis_conjecture": "/--\n**Negami's conjecture:** every connected finite simple graph that has a finite planar covering\ngraph embeds in the real projective plane.\n-/\n@[category research open, AMS 05]\ntheorem negamis_conjecture {V : Type*} [Fintype V] (H : SimpleGraph V) (hH : H.Connected) :\n    (∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : C →g H),\n      IsPlanar C ∧ IsCoveringMap f) →\n    IsProjectivePlanar H := by\n  sorry",
+    "negamis_conjecture.variants.K1222": "/--\nThe $K_{1,2,2,2}$ formulation of Negami's conjecture: the complete multipartite graph with parts\nof sizes $1,2,2,2$ has no finite planar cover.\n-/\n@[category research open, AMS 05]\ntheorem negamis_conjecture.variants.K1222 :\n    ¬∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : C →g K1222),\n      IsPlanar C ∧ IsCoveringMap f := by\n  sorry",
+    "negamis_conjecture.variants.one_two_infinity": "/--\nThe **1-2-infinity formulation of Negami's conjecture:** every finite simple graph that has a\nfinite planar cover has one whose ply is at most two. Here this means that every vertex fiber of\nthe covering map has cardinality at most two.\n-/\n@[category research open, AMS 05]\ntheorem negamis_conjecture.variants.one_two_infinity {V : Type*} [Fintype V]\n    (H : SimpleGraph V) :\n    (∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : C →g H),\n      IsPlanar C ∧ IsCoveringMap f) →\n    ∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : C →g H),\n      IsPlanar C ∧ IsCoveringMap f ∧ ∀ v, Nat.card {w // f w = v} ≤ 2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Negami's conjecture\n\nA *planar cover* of a finite graph $H$ is a finite planar graph $C$ together with a covering map\n$C \\to H$, i.e. a surjection $f$ from the vertices of $C$ onto the vertices of $H$ which, for every\nvertex $v$ of $C$, restricts to a bijection between the neighbours of $v$ and the neighbours of\n$f(v)$. Every graph that embeds in the projective plane has a planar cover (lift it to the sphere,\nthe orientable double cover of the projective plane). Negami conjectured that these are the only\nconnected graphs with planar covers.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Negami%27s_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- S. Negami, *The spherical genus and virtually planar graphs*, Discrete Math. 70 (1988), 159–168.\n- P. Hliněný, *20 years of Negami's planar cover conjecture*, Graphs Combin. 26 (2010), 525–536.\n- Y. Rieck, Y. Yamashita, *Finite planar emulators for $K_{4,5} - 4K_2$ and $K_{1,2,2,2}$ and\n  Fellows' conjecture*, European J. Combin. 31 (2010), 903–907.\n  [arXiv:0812.3700](https://arxiv.org/abs/0812.3700)\n-/\n\nnamespace NegamisConjecture\n\nopen NegamisConjecture\n\nopen SimpleGraph\n\nvariable {V W : Type*}\n\n/-\n## Topological embeddings of graphs\n\nMathlib has no notion of planarity, so we define embeddings of a simple graph into a topological\nspace directly: vertices are sent to distinct points, every edge is drawn as an arc (the image of\nan injective path) between the points of its endpoints, an arc passes through no vertex point other\nthan its endpoints, and two distinct arcs meet only in vertex points (hence only in common\nendpoints). For finite graphs in a Hausdorff space this is the usual notion of a topological\nembedding of the graph.\n-/\n\n/-- A topological embedding of the simple graph `G` into the topological space `X`. -/\nstructure SimpleGraph.TopologicalEmbedding (G : SimpleGraph V) (X : Type*)\n    [TopologicalSpace X] where\n  /-- The point of `X` representing each vertex. -/\n  vertex : V → X\n  vertex_injective : Function.Injective vertex\n  /-- The arc of `X` representing each edge. -/\n  arc : G.edgeSet → Set X\n  /-- The arc of the edge `uv` is the image of an injective path from `vertex u` to `vertex v`. -/\n  exists_path : ∀ ⦃u v⦄ (h : G.Adj u v), ∃ γ : Path (vertex u) (vertex v),\n    Function.Injective γ ∧ Set.range γ = arc ⟨s(u, v), G.mem_edgeSet.mpr h⟩\n  /-- An arc contains no vertex points other than its endpoints. -/\n  vertex_mem_arc : ∀ (e : G.edgeSet) (w : V), vertex w ∈ arc e → w ∈ (e : Sym2 V)\n  /-- Two distinct arcs meet only in vertex points. -/\n  arc_inter_arc : ∀ e e' : G.edgeSet, e ≠ e' → arc e ∩ arc e' ⊆ Set.range vertex\n\n/-- The real projective plane $\\mathbb{R}P^2$, i.e. the projectivization of $\\mathbb{R}^3$. -/\ndef RealProjectivePlane : Type := Projectivization ℝ (Fin 3 → ℝ)\n\n/-- The quotient topology on $\\mathbb{R}P^2$, coinduced by the projection from\n$\\mathbb{R}^3 \\setminus \\{0\\}$. -/\ninstance : TopologicalSpace RealProjectivePlane :=\n  TopologicalSpace.coinduced\n    (Projectivization.mk' ℝ : {v : Fin 3 → ℝ // v ≠ 0} → RealProjectivePlane)\n    inferInstance\n\n/-- A simple graph is *planar* if it embeds in the Euclidean plane $\\mathbb{R}^2$. -/\ndef SimpleGraph.IsPlanar (G : SimpleGraph V) : Prop :=\n  Nonempty (G.TopologicalEmbedding (EuclideanSpace ℝ (Fin 2)))\n\n/-- A simple graph is *projective-planar* if it embeds in the real projective plane. -/\ndef SimpleGraph.IsProjectivePlanar (G : SimpleGraph V) : Prop :=\n  Nonempty (G.TopologicalEmbedding RealProjectivePlane)\n\n/-\n## Covering maps and planar covers\n-/\n\n/-- `C.IsCoveringMap H f` says that `f` is a covering map from the graph `C` onto the graph `H`:\n`f` is surjective on vertices and, for every vertex `v` of `C`, it restricts to a bijection from\nthe neighbours of `v` in `C` onto the neighbours of `f v` in `H`. -/\nstructure SimpleGraph.IsCoveringMap (C : SimpleGraph W) (H : SimpleGraph V) (f : W → V) :\n    Prop where\n  surjective : Function.Surjective f\n  bijOn_neighborSet : ∀ v, Set.BijOn f (C.neighborSet v) (H.neighborSet (f v))\n\n/-- A covering map of graphs is a graph homomorphism. -/\n@[category API, AMS 5]\ntheorem SimpleGraph.IsCoveringMap.adj {C : SimpleGraph W} {H : SimpleGraph V} {f : W → V}\n    (hf : C.IsCoveringMap H f) {u v : W} (huv : C.Adj u v) : H.Adj (f u) (f v) :=\n  (hf.bijOn_neighborSet u).mapsTo huv\n\n/-- The identity is a covering map of every graph onto itself. -/\n@[category test, AMS 5]\ntheorem SimpleGraph.isCoveringMap_id (G : SimpleGraph V) : G.IsCoveringMap G id :=\n  ⟨Function.surjective_id, fun _ => Set.bijOn_id _⟩\n\n/-- `H.HasPlanarCover` says that `H` has a (finite) planar cover: a finite planar graph `C`\ntogether with a covering map `C → H`. -/\ndef SimpleGraph.HasPlanarCover (H : SimpleGraph V) : Prop :=\n  ∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : W → V),\n    C.IsPlanar ∧ C.IsCoveringMap H f\n\n/-- `H.HasPlanarCoverOfFold k` says that `H` has a `k`-fold (finite) planar cover: a finite planar\ngraph `C` together with a covering map `C → H` under which every vertex of `H` has exactly `k`\npreimages. -/\ndef SimpleGraph.HasPlanarCoverOfFold (H : SimpleGraph V) (k : ℕ) : Prop :=\n  ∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : W → V),\n    C.IsPlanar ∧ C.IsCoveringMap H f ∧ ∀ v, (f ⁻¹' {v}).ncard = k\n\n/-- A finite planar graph is a `1`-fold planar cover of itself. -/\n@[category test, AMS 5]\ntheorem SimpleGraph.IsPlanar.hasPlanarCoverOfFold_one {V : Type} [Fintype V] {G : SimpleGraph V}\n    (hG : G.IsPlanar) : G.HasPlanarCoverOfFold 1 :=\n  ⟨V, inferInstance, G, id, hG, G.isCoveringMap_id, fun v => by simp⟩\n\n/-- The edgeless graph on one vertex is planar. -/\n@[category test, AMS 5]\ntheorem SimpleGraph.isPlanar_bot_fin_one : (⊥ : SimpleGraph (Fin 1)).IsPlanar :=\n  ⟨{ vertex := fun _ => 0\n     vertex_injective := fun _ _ _ => Subsingleton.elim _ _\n     arc := fun e => absurd e.2 (by simp)\n     exists_path := fun _ _ h => h.elim\n     vertex_mem_arc := fun e => absurd e.2 (by simp)\n     arc_inter_arc := fun e => absurd e.2 (by simp) }⟩\n\n/-\n## The conjecture\n-/\n\n/--\n**Negami's conjecture.** Every finite connected graph with a planar cover embeds in the\nprojective plane.\n\nThe connectedness hypothesis is essential: a disjoint union of projective-planar graphs has a\nplanar cover but need not be projective-planar.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture [Fintype V] (H : SimpleGraph V) (hH : H.Connected)\n    (hcov : H.HasPlanarCover) : H.IsProjectivePlanar := by\n  sorry\n\n/--\n**Negami's \"1-2-∞ conjecture\".** If a finite graph has a planar cover, then it has a planar cover\nof ply `1` or `2`, i.e. a `1`-fold or a `2`-fold planar cover.\n\nThis is equivalent to `negamis_conjecture` by Negami's theorem that a connected graph with a\n`2`-fold planar cover is projective-planar, together with the fact that a projective-planar graph\nhas a `2`-fold planar cover (lift to the sphere). No connectedness hypothesis is needed here,\nsince `2`-fold planar covers are closed under disjoint unions.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture.variants.one_two_infinity [Fintype V] (H : SimpleGraph V)\n    (hcov : H.HasPlanarCover) : H.HasPlanarCoverOfFold 1 ∨ H.HasPlanarCoverOfFold 2 := by\n  sorry\n\n/-- The complete $4$-partite graph $K_{1,2,2,2}$ on $7$ vertices. -/\nabbrev K1222 : SimpleGraph (Σ i : Fin 4, Fin (![1, 2, 2, 2] i)) :=\n  completeMultipartiteGraph fun i : Fin 4 => Fin (![1, 2, 2, 2] i)\n\n/-- The graph $K_{1,2,2,2}$ has $7$ vertices. -/\n@[category test, AMS 5]\ntheorem card_K1222 : Fintype.card (Σ i : Fin 4, Fin (![1, 2, 2, 2] i)) = 7 := by\n  decide\n\n/-- Two vertices of $K_{1,2,2,2}$ are adjacent iff they lie in different parts. -/\n@[category test, AMS 5]\ntheorem K1222_adj (u v : Σ i : Fin 4, Fin (![1, 2, 2, 2] i)) : K1222.Adj u v ↔ u.1 ≠ v.1 :=\n  Iff.rfl\n\n/--\n**Negami's conjecture, reduced form.** The graph $K_{1,2,2,2}$ has no planar cover.\n\nBy work of Archdeacon, Fellows, Hliněný and Negami, this is equivalent to `negamis_conjecture`:\n$K_{1,2,2,2}$ is the only one of the $32$ connected minor-minimal non-projective-planar graphs\nnot yet known to have no planar cover, and if the conjecture fails then $K_{1,2,2,2}$ is its\nsmallest counterexample.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture.variants.K1222 : ¬ K1222.HasPlanarCover := by\n  sorry\n\nend NegamisConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.82,
+   "decomposition_objections": "None. The table's three slots match the article: primary form (connected graphs), the 1-2-∞ reformulation (no connectedness needed), and the K_{1,2,2,2} reduction. The table's suggested definitions (covering maps via neighbourhood bijections; planarity/projective-planarity via topological embeddings) were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple graphs (Mathlib SimpleGraph with [Fintype V]), following the cited literature (Rieck–Yamashita, Hliněný: 'all graphs are finite and simple').",
+    "Planarity and projective-planarity are defined topologically (embedding into ℝ² = EuclideanSpace ℝ (Fin 2), resp. into ℝP² = Projectivization ℝ (Fin 3 → ℝ) with the quotient topology coinduced from ℝ³∖{0}) rather than via forbidden minors. For finite graphs in these Hausdorff spaces, 'vertices ↦ distinct points, edges ↦ ranges of injective paths meeting only at common endpoints' is the standard notion of an embedding; ℝ² is used for planarity (equivalent to the sphere for finite graphs).",
+    "The topological-embedding structure lets arcs be Sets and requires, for each adjacency u~v, an injective Path from vertex u to vertex v with range equal to the arc of s(u,v); together with 'arcs contain no other vertex points' and 'distinct arcs meet only in vertex points' this forces distinct arcs to meet only at common endpoints.",
+    "Covering map = vertex map that is surjective and restricts to a bijection N(v) → N(f v) for every v (the article's definition). Surjectivity is kept explicit so the empty graph is not a trivial cover of K_{1,2,2,2}.",
+    "The cover's vertex type is existentially quantified over `Type` (universe 0) with a Fintype instance; this is no mathematical restriction for finite covers.",
+    "Primary slot is stated as the open implication only (planar cover ⇒ projective-planar), not as an iff; the known converse is not included.",
+    "1-2-∞ variant: 'minimum ply is 1 or 2' is rendered as 'H has a 1-fold or a 2-fold planar cover' where k-fold means every vertex of H has exactly k preimages; no connectedness hypothesis, following the decomposition notes (equivalent either way given Negami's 1986 theorem and the sphere double cover).",
+    "K_{1,2,2,2} is built with completeMultipartiteGraph over parts Fin (![1,2,2,2] i), i : Fin 4; adjacency iff different parts (checked by a test lemma, plus Fintype.card = 7).",
+    "Bespoke definitions are placed in the problem file under the NegamisConjecture namespace (with `open NegamisConjecture` to enable dot notation, following the Erdos74/Erdos944 precedent) since only one file may be produced; a maintainer may prefer moving them to FormalConjecturesForMathlib.",
+    "AMS tag 5 (Combinatorics) is used for all statements."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Topology.IsEmbedding / Path (Mathlib) — no geometric realisation of a SimpleGraph exists to apply them to; SimpleGraph.Embedding (↪g) is a purely combinatorial notion.",
+     "name": "NegamisConjecture.SimpleGraph.TopologicalEmbedding",
+     "why_needed": "Mathlib has no notion of a graph drawn/embedded in a topological space. Structure: injective vertex map V → X, an arc (Set X) per edge which is the range of an injective Path between the endpoint images, arcs contain no vertex points other than their endpoints, distinct arcs meet only in vertex points. For finite graphs in Hausdorff spaces this is the standard topological embedding of a graph."
+    },
+    {
+     "closest_existing_considered": "Projectivization (Mathlib, no topology); Mathlib.Topology.Compactification.OnePoint.ProjectiveLine only gives a set-theoretic equivalence for the projective line.",
+     "name": "NegamisConjecture.RealProjectivePlane (+ TopologicalSpace instance)",
+     "why_needed": "Mathlib's Projectivization ℝ (Fin 3 → ℝ) carries no topology. Defined as that projectivization with the topology coinduced by Projectivization.mk' from {v : Fin 3 → ℝ // v ≠ 0}, i.e. the usual quotient topology on ℝP²."
+    },
+    {
+     "closest_existing_considered": "Kuratowski/Wagner forbidden-minor characterisation (no minor relation in Mathlib either); grep for planar/Planar in Mathlib and the repo found nothing graph-theoretic.",
+     "name": "NegamisConjecture.SimpleGraph.IsPlanar",
+     "why_needed": "Planarity is absent from Mathlib and the repo. Defined as Nonempty (G.TopologicalEmbedding (EuclideanSpace ℝ (Fin 2)))."
+    },
+    {
+     "closest_existing_considered": "The 35 forbidden minors characterisation (would need a minor relation and 35 explicit graphs; far more error-prone than the topological definition).",
+     "name": "NegamisConjecture.SimpleGraph.IsProjectivePlanar",
+     "why_needed": "Projective-planarity is absent. Defined as Nonempty (G.TopologicalEmbedding RealProjectivePlane)."
+    },
+    {
+     "closest_existing_considered": "IsCoveringMap (topological covering maps in Mathlib) — not about graphs; SimpleGraph.Hom lacks the local-bijection condition.",
+     "name": "NegamisConjecture.SimpleGraph.IsCoveringMap",
+     "why_needed": "Graph covering maps are absent from Mathlib. Prop structure: f : W → V surjective and ∀ v, Set.BijOn f (C.neighborSet v) (H.neighborSet (f v)), exactly the article's definition. API lemma IsCoveringMap.adj shows it is a homomorphism; test lemma isCoveringMap_id."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "NegamisConjecture.SimpleGraph.HasPlanarCover",
+     "why_needed": "∃ (W : Type) (_ : Fintype W) (C : SimpleGraph W) (f : W → V), C.IsPlanar ∧ C.IsCoveringMap H f — a finite planar cover as in the article."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "NegamisConjecture.SimpleGraph.HasPlanarCoverOfFold",
+     "why_needed": "Same as HasPlanarCover plus ∀ v, (f ⁻¹' {v}).ncard = k, to express the ply (k-fold) in the 1-2-∞ variant. Test lemma: a finite planar graph is a 1-fold planar cover of itself."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.completeMultipartiteGraph (used directly).",
+     "name": "NegamisConjecture.K1222",
+     "why_needed": "The concrete graph K_{1,2,2,2} as completeMultipartiteGraph (fun i : Fin 4 => Fin (![1, 2, 2, 2] i)); test lemmas verify 7 vertices and the adjacency rule."
+    }
+   ],
+   "per_slot": {
+    "negamis_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite (Fintype V) connected simple graph H, H.HasPlanarCover → H.IsProjectivePlanar. Needed bespoke definitions of topological graph embeddings, planarity, the real projective plane with its quotient topology, graph covering maps and planar covers, none of which exist in Mathlib or FormalConjecturesForMathlib."
+    },
+    "negamis_conjecture.variants.K1222": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ¬ K1222.HasPlanarCover with K1222 := completeMultipartiteGraph (fun i : Fin 4 => Fin (![1, 2, 2, 2] i)), the complete 4-partite graph with parts 1,2,2,2 (test lemmas check it has 7 vertices and the expected adjacency). Uses only the planarity and covering-map definitions."
+    },
+    "negamis_conjecture.variants.one_two_infinity": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph H (no connectedness hypothesis, per the decomposition notes), H.HasPlanarCover → H.HasPlanarCoverOfFold 1 ∨ H.HasPlanarCoverOfFold 2, where a k-fold planar cover is a planar cover under which every vertex of H has exactly k preimages (Set.ncard of the fibre). Uses the same bespoke definitions."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "negamis_conjecture": "/--\n**Negami's conjecture.** Every finite connected graph with a planar cover embeds in the\nprojective plane.\n\nThe connectedness hypothesis is essential: a disjoint union of projective-planar graphs has a\nplanar cover but need not be projective-planar.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture [Fintype V] (H : SimpleGraph V) (hH : H.Connected)\n    (hcov : H.HasPlanarCover) : H.IsProjectivePlanar := by\n  sorry",
+    "negamis_conjecture.variants.K1222": "/--\n**Negami's conjecture, reduced form.** The graph $K_{1,2,2,2}$ has no planar cover.\n\nBy work of Archdeacon, Fellows, Hliněný and Negami, this is equivalent to `negamis_conjecture`:\n$K_{1,2,2,2}$ is the only one of the $32$ connected minor-minimal non-projective-planar graphs\nnot yet known to have no planar cover, and if the conjecture fails then $K_{1,2,2,2}$ is its\nsmallest counterexample.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture.variants.K1222 : ¬ K1222.HasPlanarCover := by\n  sorry",
+    "negamis_conjecture.variants.one_two_infinity": "/--\n**Negami's \"1-2-∞ conjecture\".** If a finite graph has a planar cover, then it has a planar cover\nof ply `1` or `2`, i.e. a `1`-fold or a `2`-fold planar cover.\n\nThis is equivalent to `negamis_conjecture` by Negami's theorem that a connected graph with a\n`2`-fold planar cover is projective-planar, together with the fact that a projective-planar graph\nhas a `2`-fold planar cover (lift to the sphere). No connectedness hypothesis is needed here,\nsince `2`-fold planar covers are closed under disjoint unions.\n-/\n@[category research open, AMS 5]\ntheorem negamis_conjecture.variants.one_two_infinity [Fintype V] (H : SimpleGraph V)\n    (hcov : H.HasPlanarCover) : H.HasPlanarCoverOfFold 1 ∨ H.HasPlanarCoverOfFold 2 := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "negamis_conjecture": "c02",
+  "negamis_conjecture.variants.K1222": "c02",
+  "negamis_conjecture.variants.one_two_infinity": "c02"
+ },
+ "id": "wp-negamis-conjecture",
+ "main_attempt": "c02"
+}

@@ -1,0 +1,382 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Jaeger's Petersen-coloring conjecture\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Petersen graph § Petersen coloring conjecture](https://en.wikipedia.org/wiki/Petersen_graph%23Petersen_coloring_conjecture)\n- [Ja88] Jaeger, F., *Nowhere-zero flow problems*. In: Selected Topics in Graph Theory 3,\n  Academic Press (1988), 71--95.\n- [DNR07] DeVos, M., Nešetřil, J., Raspaud, A., *On edge-maps whose inverse preserves flows or\n  tensions*. In: Graph Theory in Paris, Trends in Mathematics, Birkhäuser (2007), 109--138.\n\nA *cycle* of a graph $G$, in the sense of the cycle space of $G$, is a set of edges of $G$ that\nmeets every vertex of $G$ an even number of times; that is, the edge set of an Eulerian subgraph\nof $G$. A map from the edges of $G$ to the edges of $H$ is *cycle-continuous* if the preimage of\nevery cycle of $H$ is a cycle of $G$. Jaeger's Petersen-coloring conjecture asserts that every\nbridgeless cubic graph has a cycle-continuous mapping to the Petersen graph.\n\nThe Wikipedia article on the Petersen graph states the conjecture for all bridgeless graphs. The\nlist entry formalised here poses the cubic case, which is the form in which Jaeger stated it and\nto which the general case is known to reduce.\n-/\n\nopen SimpleGraph\n\nnamespace JaegersPetersenColoringConjecture\n\nvariable {V W : Type*}\n\n/-- A set `S` of edges of `G` is *even* if every vertex of `G` is incident to an even number of\nedges of `S`. These sets are the edge sets of the Eulerian subgraphs of `G`, i.e. the elements of\nthe cycle space of `G` over $\\mathbb{Z}/2$; they are also called the *cycles* of `G`. -/\ndef IsEvenEdgeSet (G : SimpleGraph V) (S : Set G.edgeSet) : Prop :=\n  ∀ v : V, Even {e ∈ S | v ∈ (e : Sym2 V)}.ncard\n\n/-- A map `f` from the edges of `G` to the edges of `H` is *cycle-continuous* if the preimage under\n`f` of every cycle (even edge set) of `H` is a cycle of `G`. Here `f` is an arbitrary map between\nedge sets; it need not come from a graph homomorphism. -/\ndef IsCycleContinuous (G : SimpleGraph V) (H : SimpleGraph W) (f : G.edgeSet → H.edgeSet) :\n    Prop :=\n  ∀ C : Set H.edgeSet, IsEvenEdgeSet H C → IsEvenEdgeSet G (f ⁻¹' C)\n\n/-- The Petersen graph, realised as the Kneser graph $K(5, 2)$: its vertices are the $2$-element\nsubsets of a $5$-element set, and two vertices are adjacent when they are disjoint. -/\ndef petersenGraph : SimpleGraph {s : Finset (Fin 5) // s.card = 2} where\n  Adj s t := Disjoint s.1 t.1\n  symm _ _ h := h.symm\n  loopless s h := by\n    have := s.2\n    dsimp only at h\n    rw [disjoint_self, Finset.bot_eq_empty] at h\n    simp [h] at this\n\ninstance : DecidableRel petersenGraph.Adj :=\n  fun s t => inferInstanceAs (Decidable (Disjoint s.1 t.1))\n\n/-- **Jaeger's Petersen-coloring conjecture.** Every bridgeless cubic graph $G$ has a\ncycle-continuous mapping to the Petersen graph $P$: there is a map $f \\colon E(G) \\to E(P)$ such\nthat for every cycle $C$ of $P$ (a set of edges meeting every vertex of $P$ an even number of\ntimes) the preimage $f^{-1}(C)$ is a cycle of $G$. -/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hcubic : G.IsRegularOfDegree 3) (hbridgeless : G.IsBridgeless) :\n    ∃ f : G.edgeSet → petersenGraph.edgeSet, IsCycleContinuous G petersenGraph f := by\n  sorry\n\n/-- The Petersen graph has $10$ vertices. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_vertices : Fintype.card {s : Finset (Fin 5) // s.card = 2} = 10 := by\n  rw [Fintype.card_finset_len, Fintype.card_fin]\n  rfl\n\n/-- The Petersen graph is cubic. -/\n@[category test, AMS 5]\ntheorem petersenGraph_isRegularOfDegree_three : petersenGraph.IsRegularOfDegree 3 := by\n  unfold IsRegularOfDegree\n  decide\n\n/-- The Petersen graph has $15$ edges. -/\n@[category test, AMS 5]\ntheorem petersenGraph_card_edgeFinset : petersenGraph.edgeFinset.card = 15 := by\n  decide\n\n/-- The empty set of edges is a cycle of every graph. -/\n@[category API, AMS 5]\ntheorem isEvenEdgeSet_empty (G : SimpleGraph V) : IsEvenEdgeSet G ∅ := by\n  intro v\n  simp\n\n/-- The identity map on the edges of a graph is cycle-continuous. -/\n@[category API, AMS 5]\ntheorem isCycleContinuous_id (G : SimpleGraph V) : IsCycleContinuous G G id :=\n  fun _ hC => hC\n\n/-- The set of all edges of the Petersen graph is not a cycle, since every vertex has degree $3$. -/\n@[category test, AMS 5]\ntheorem not_isEvenEdgeSet_univ_petersenGraph : ¬ IsEvenEdgeSet petersenGraph Set.univ := by\n  intro h\n  have := h ⟨{0, 1}, rfl⟩\n  rw [Set.ncard_eq_toFinset_card'] at this\n  revert this\n  decide\n\nend JaegersPetersenColoringConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate: the list entry poses only the cubic form, and the general-bridgeless-graph form in the article is a known-equivalent variant not required by the statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple graphs (Mathlib's SimpleGraph with [Fintype V]); cubic multigraphs with parallel edges are excluded, as Mathlib has no multigraph type. This matches the decomposition table's '(simple) 3-regular graphs'.",
+    "'Cubic' is G.IsRegularOfDegree 3 (every vertex has degree exactly 3), with the LocallyFinite instance coming from [Fintype V] [DecidableRel G.Adj].",
+    "'Bridgeless' is SimpleGraph.IsBridgeless from FormalConjecturesForMathlib (∀ e ∈ G.edgeSet, ¬ G.IsBridge e); connectedness is not assumed, following the decomposition notes. The empty graph and disconnected graphs are allowed; the empty graph satisfies the statement trivially, as in the informal version.",
+    "A 'cycle' of a graph is taken in the cycle-space sense used by the article (edge set meeting every vertex an even number of times), formalised as IsEvenEdgeSet via Set.ncard on the incident edges. Set.ncard returns 0 on infinite sets, but the definition is only applied to finite graphs (Fintype V and the Petersen graph), so this default is unreachable.",
+    "A cycle-continuous mapping is an arbitrary function G.edgeSet → petersenGraph.edgeSet (edges as elements of the edge-set subtype), not a graph homomorphism; the preimage is Set.preimage.",
+    "The Petersen graph is modelled as the Kneser graph K(5,2) rather than an explicit 10-vertex edge list; its basic invariants (10 vertices, 15 edges, 3-regular) are checked by decidable test lemmas in the file.",
+    "Only the cubic form posed by the list entry is stated; the article's version for all bridgeless graphs is mentioned in the module docstring but not given a separate declaration, per the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.Walk.IsCycle / SimpleGraph.Cycle (FormalConjecturesForMathlib) — these are simple cycles (closed paths), not elements of the cycle space, so they are the wrong notion; SimpleGraph.Walk.IsEulerian is about trails covering all edges, also different.",
+     "name": "JaegersPetersenColoringConjecture.IsEvenEdgeSet",
+     "why_needed": "The article's notion of a 'cycle' (Eulerian subgraph / element of the Z/2 cycle space): a set S of edges of G such that every vertex is incident to an even number of edges of S. Defined as ∀ v, Even {e ∈ S | v ∈ (e : Sym2 V)}.ncard for S : Set G.edgeSet. Mathlib has no cycle space or even-subgraph notion."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Hom / SimpleGraph.Hom.mapEdgeSet — but a cycle-continuous map is an arbitrary edge map, not one induced by a graph homomorphism, so a Hom would be strictly too restrictive.",
+     "name": "JaegersPetersenColoringConjecture.IsCycleContinuous",
+     "why_needed": "A map f : G.edgeSet → H.edgeSet such that the preimage of every cycle (even edge set) of H is a cycle of G, exactly as defined in the Wikipedia article. No such notion exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "WrittenOnTheWallII.Test.PetersenGraph (an explicit Fin 10 edge list inside a test-problem file, not a reusable/shared definition); no Kneser graph in Mathlib.",
+     "name": "JaegersPetersenColoringConjecture.petersenGraph",
+     "why_needed": "The Petersen graph is not in Mathlib. Defined as the Kneser graph K(5,2) on the 2-element subsets of Fin 5 with adjacency = disjointness. Test lemmas verify (by decide) that it has 10 vertices, 15 edges and is 3-regular."
+    }
+   ],
+   "per_slot": {
+    "jaegers_petersen_coloring_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G with G.IsRegularOfDegree 3 and G.IsBridgeless (repo definition: no edge is a bridge), there exists f : G.edgeSet → petersenGraph.edgeSet that is cycle-continuous, i.e. the preimage of every even edge set (cycle-space element) of the Petersen graph is an even edge set of G. Needed bespoke definitions for the Petersen graph, even edge sets, and cycle-continuous maps, since none exist in Mathlib or FormalConjecturesForMathlib."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "jaegers_petersen_coloring_conjecture": "/-- **Jaeger's Petersen-coloring conjecture.** Every bridgeless cubic graph $G$ has a\ncycle-continuous mapping to the Petersen graph $P$: there is a map $f \\colon E(G) \\to E(P)$ such\nthat for every cycle $C$ of $P$ (a set of edges meeting every vertex of $P$ an even number of\ntimes) the preimage $f^{-1}(C)$ is a cycle of $G$. -/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hcubic : G.IsRegularOfDegree 3) (hbridgeless : G.IsBridgeless) :\n    ∃ f : G.edgeSet → petersenGraph.edgeSet, IsCycleContinuous G petersenGraph f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Jaeger's Petersen-coloring conjecture\n\n*References:*\n- [Wikipedia, Petersen graph: Petersen coloring conjecture](https://en.wikipedia.org/wiki/Petersen_graph%23Petersen_coloring_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Jaeger, F., *Nowhere-zero flow problems*, in: Selected Topics in Graph Theory 3 (1988)]\n- [Zhang, C.-Q., *Integer Flows and Cycle Covers of Graphs*, CRC Press (1997)](https://archive.org/details/integerflowscycl0000zhan)\n\nA *cycle* of a graph $G$ (an Eulerian subgraph, or an element of the cycle space of $G$ over\n$\\mathbb{Z}/2$) is a set of edges of $G$ meeting every vertex of $G$ in an even number of edges.\nA map $f : E(G) \\to E(H)$ between the edge sets of two graphs is *cycle-continuous* if the\npreimage under $f$ of every cycle of $H$ is a cycle of $G$.\n\nJaeger's Petersen-coloring conjecture states that every bridgeless cubic graph has a\ncycle-continuous mapping to the Petersen graph. Jaeger showed that this conjecture implies the\n$5$-cycle-double-cover conjecture and the Berge–Fulkerson conjecture. The conjecture is also often\nstated for all bridgeless graphs; that version is known to be equivalent to the cubic one.\n-/\n\nopen Finset SimpleGraph\n\nnamespace JaegersPetersenColoringConjecture\n\nvariable {V W : Type*}\n\n/-- A finset `C` of edges of `G` is a *cycle* of `G` in the sense of the cycle space (that is, an\nEulerian subgraph of `G`) if every vertex of `G` lies on an even number of edges of `C`. -/\ndef IsCycleSpaceElement [DecidableEq V] (G : SimpleGraph V) (C : Finset G.edgeSet) : Prop :=\n  ∀ v : V, Even #{e ∈ C | v ∈ e.1}\n\n/-- A map `f : E(G) → E(H)` between the edge sets of two graphs is *cycle-continuous* if the\npreimage of every cycle of `H` is a cycle of `G`. -/\ndef IsCycleContinuous [Fintype V] [DecidableEq V] [DecidableEq W] (G : SimpleGraph V)\n    [DecidableRel G.Adj] (H : SimpleGraph W) (f : G.edgeSet → H.edgeSet) : Prop :=\n  ∀ C : Finset H.edgeSet, IsCycleSpaceElement H C → IsCycleSpaceElement G {e | f e ∈ C}\n\n/-- The Petersen graph, realised as the Kneser graph $K(5, 2)$: its vertices are the two-element\nsubsets of a five-element set, and two vertices are adjacent when they are disjoint. -/\ndef petersenGraph : SimpleGraph {s : Finset (Fin 5) // #s = 2} where\n  Adj a b := Disjoint a.1 b.1\n  symm _ _ h := h.symm\n  loopless a h := by\n    have := a.2\n    simp only [Finset.disjoint_self_iff_empty] at h\n    simp [h] at this\n\ninstance : DecidableRel petersenGraph.Adj := fun a b =>\n  inferInstanceAs (Decidable (Disjoint a.1 b.1))\n\n/--\n**Jaeger's Petersen-coloring conjecture.** Every bridgeless cubic graph has a cycle-continuous\nmapping to the Petersen graph.\n\nThat is, for every finite simple $3$-regular graph $G$ with no bridge there is a map\n$f : E(G) \\to E(P)$ to the edge set of the Petersen graph $P$ such that, for every cycle $C$ of\n$P$ (every set of edges of $P$ meeting each vertex of $P$ in an even number of edges), the preimage\n$f^{-1}(C)$ meets each vertex of $G$ in an even number of edges.\n-/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    [DecidableRel G.Adj] (hcubic : G.IsRegularOfDegree 3) (hbridgeless : G.IsBridgeless) :\n    ∃ f : G.edgeSet → petersenGraph.edgeSet, IsCycleContinuous G petersenGraph f := by\n  sorry\n\n/-- The Petersen graph has `10` vertices. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_vertices : Fintype.card {s : Finset (Fin 5) // #s = 2} = 10 := by\n  decide\n\n/-- The Petersen graph is cubic. -/\n@[category test, AMS 5]\ntheorem petersenGraph_isRegularOfDegree_three : petersenGraph.IsRegularOfDegree 3 := by\n  unfold IsRegularOfDegree\n  decide\n\n/-- The Petersen graph has `15` edges. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_edgeFinset : #petersenGraph.edgeFinset = 15 := by\n  decide\n\n/-- The empty set of edges is a cycle of every graph. -/\n@[category API, AMS 5]\ntheorem isCycleSpaceElement_empty [DecidableEq V] (G : SimpleGraph V) :\n    IsCycleSpaceElement G ∅ := by\n  simp [IsCycleSpaceElement]\n\n/-- The edge set of the triangle is a cycle of the triangle. -/\n@[category test, AMS 5]\ntheorem isCycleSpaceElement_univ_cycleGraph_three :\n    IsCycleSpaceElement (cycleGraph 3) Finset.univ := by\n  unfold IsCycleSpaceElement\n  decide\n\n/-- The full edge set of the Petersen graph is not a cycle, since every vertex has odd degree. -/\n@[category test, AMS 5]\ntheorem not_isCycleSpaceElement_univ_petersenGraph :\n    ¬ IsCycleSpaceElement petersenGraph Finset.univ := by\n  unfold IsCycleSpaceElement\n  decide\n\n/-- The identity map on the edges of a graph is cycle-continuous. -/\n@[category API, AMS 5]\ntheorem isCycleContinuous_id [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    [DecidableRel G.Adj] : IsCycleContinuous G G id := by\n  intro C hC\n  convert hC using 2\n  ext e\n  simp\n\n/-- The Petersen graph itself has a cycle-continuous mapping to the Petersen graph. -/\n@[category test, AMS 5]\ntheorem exists_isCycleContinuous_petersenGraph :\n    ∃ f : petersenGraph.edgeSet → petersenGraph.edgeSet,\n      IsCycleContinuous petersenGraph petersenGraph f :=\n  ⟨id, isCycleContinuous_id petersenGraph⟩\n\nend JaegersPetersenColoringConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The table's single slot (cubic bridgeless form, simple graphs, edge-set map, Z/2 cycle-space cycles) is faithful to the list entry and consistent with the article's definitions; the general 'all bridgeless graphs' form is mentioned in the module docstring only, as the table prescribes.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are finite simple graphs (`SimpleGraph V` with `[Fintype V]`), per the decomposition table. Jaeger's conjecture is often stated for (bridgeless) multigraphs; the simple cubic form is known to be equivalent, but a reviewer should confirm they are content with excluding cubic multigraphs with parallel edges.",
+    "'Cubic' is `G.IsRegularOfDegree 3` (every vertex has degree exactly 3); connectedness is not assumed, per the table. The empty graph satisfies the hypotheses vacuously and the conclusion trivially (any f works, all preimages are ∅), which matches the mathematics.",
+    "'Bridgeless' uses the repo's `SimpleGraph.IsBridgeless` (∀ e ∈ G.edgeSet, ¬ G.IsBridge e), building on Mathlib's `SimpleGraph.IsBridge`.",
+    "A cycle of a graph is an element of the Z/2 cycle space: a finset of edges meeting every vertex in an even number of edges (`IsCycleSpaceElement`). Since graphs are simple, 'touching a vertex an even number of times' equals 'an even number of incident edges'. The empty edge set counts as a cycle (as in the cycle space).",
+    "A cycle-continuous map is a bare function `f : G.edgeSet → petersenGraph.edgeSet` on edge subtypes (not a graph homomorphism); the preimage of C is `Finset.univ.filter (fun e => f e ∈ C)`. Typing f on the edge subtypes is what makes the statement non-trivial: a constant map would pull back some 5-cycle of Petersen to all of E(G), which is not a cycle of a cubic graph (test `not_isCycleSpaceElement_univ_petersenGraph` checks the analogous fact for Petersen itself).",
+    "The Petersen graph is realised as the Kneser graph K(5,2) (vertices = 2-subsets of Fin 5, adjacent iff disjoint) rather than an explicit edge list on Fin 10; tests confirm 10 vertices, 3-regularity and 15 edges by `decide`.",
+    "Extra references added in the module docstring: Jaeger's 1988 survey 'Nowhere-zero flow problems' (where the conjecture originates) and Zhang's 1997 book (cited by the Wikipedia article)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.Walk.IsCycle / SimpleGraph.Cycle (FormalConjecturesForMathlib) are simple cycles as walks, not cycle-space elements; SimpleGraph.Walk.IsEulerian is about trails visiting all edges; SimpleGraph.IsCycles (Matching.lean) is a vertex-degree-2 condition on a whole graph. None matches the Z/2 cycle space.",
+     "name": "JaegersPetersenColoringConjecture.IsCycleSpaceElement",
+     "why_needed": "The notion of a 'cycle' in the sense of the cycle space (Eulerian subgraph: an edge set meeting every vertex in an even number of edges) does not exist in Mathlib or the repo. Defined on `Finset G.edgeSet` as `∀ v, Even #{e ∈ C | v ∈ e.1}`. The empty set qualifies, as it should."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Hom / SimpleGraph.Embedding (graph homomorphisms) — rejected since a cycle-continuous map is merely an edge-set map, not induced by a vertex map.",
+     "name": "JaegersPetersenColoringConjecture.IsCycleContinuous",
+     "why_needed": "Cycle-continuous maps between edge sets do not exist in Mathlib or the repo. Defined for f : G.edgeSet → H.edgeSet as: for every cycle-space element C of H, the preimage Finset.univ.filter (fun e => f e ∈ C) is a cycle-space element of G. Typing f on the edge subtypes enforces 'function from the edges of G to the edges of H' with no extra MapsTo hypothesis."
+    },
+    {
+     "closest_existing_considered": "WrittenOnTheWallII.Test.PetersenGraph (explicit edge list on Fin 10, in a problem file, not FormalConjecturesForMathlib); no Kneser graph in Mathlib.",
+     "name": "JaegersPetersenColoringConjecture.petersenGraph",
+     "why_needed": "Mathlib has no Petersen graph. The only repo definition is `WrittenOnTheWallII.Test.PetersenGraph` inside a problem/test file in another directory, which problem files should not import. Defined here as the Kneser graph K(5,2) on 2-subsets of Fin 5 with adjacency = disjointness (the article's own characterisation); test theorems verify by `decide` that it has 10 vertices, is 3-regular and has 15 edges."
+    }
+   ],
+   "per_slot": {
+    "jaegers_petersen_coloring_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G with [Fintype V], G.IsRegularOfDegree 3 (cubic) and G.IsBridgeless (repo definition via Mathlib's IsBridge), there exists f : G.edgeSet → petersenGraph.edgeSet that is cycle-continuous, i.e. the preimage {e | f e ∈ C} of every cycle-space element C of the Petersen graph is a cycle-space element of G. Needed bespoke definitions for the Petersen graph, cycle-space elements (even edge sets) and cycle-continuous maps, none of which exist in Mathlib or FormalConjecturesForMathlib."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "jaegers_petersen_coloring_conjecture": "/--\n**Jaeger's Petersen-coloring conjecture.** Every bridgeless cubic graph has a cycle-continuous\nmapping to the Petersen graph.\n\nThat is, for every finite simple $3$-regular graph $G$ with no bridge there is a map\n$f : E(G) \\to E(P)$ to the edge set of the Petersen graph $P$ such that, for every cycle $C$ of\n$P$ (every set of edges of $P$ meeting each vertex of $P$ in an even number of edges), the preimage\n$f^{-1}(C)$ meets each vertex of $G$ in an even number of edges.\n-/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    [DecidableRel G.Adj] (hcubic : G.IsRegularOfDegree 3) (hbridgeless : G.IsBridgeless) :\n    ∃ f : G.edgeSet → petersenGraph.edgeSet, IsCycleContinuous G petersenGraph f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Jaeger's Petersen-coloring conjecture\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Petersen_graph%23Petersen_coloring_conjecture)\n- [Wikipedia, problem list](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ja88] Jaeger, F., *Nowhere-zero flow problems*, in: Selected Topics in Graph Theory 3,\n  Academic Press (1988), 71--95.\n- [DNR07] DeVos, M., Nešetřil, J., Raspaud, A., *On edge-maps whose inverse preserves flows or\n  tensions*, in: Graph Theory in Paris, Birkhäuser (2007), 109--138.\n\nA *cycle* of a graph $H$ (an Eulerian subgraph, i.e. an element of the cycle space of $H$ over\n$\\mathbb{Z}/2$) is a set of edges of $H$ that touches every vertex of $H$ an even number of times.\nA map $f \\colon E(G) \\to E(H)$ between the edge sets of two graphs is *cycle-continuous* if the\npreimage under $f$ of every cycle of $H$ is a cycle of $G$.\n\nJaeger conjectured that every bridgeless graph has a cycle-continuous mapping to the Petersen\ngraph. The list entry states the cubic case: every bridgeless cubic graph has a cycle-continuous\nmapping to the Petersen graph.\n-/\n\nopen SimpleGraph Finset\n\nnamespace JaegersPetersenColoringConjecture\n\nvariable {V W : Type*}\n\n/-- The Petersen graph, realised as the Kneser graph $KG(5, 2)$: the vertices are the\n$2$-element subsets of a $5$-element set, and two vertices are adjacent when the corresponding\nsubsets are disjoint. -/\ndef petersenGraph : SimpleGraph {s : Finset (Fin 5) // #s = 2} where\n  Adj s t := Disjoint s.1 t.1\n  symm _ _ h := h.symm\n  loopless s h := by\n    have hs := s.2\n    have h' : (s : Finset (Fin 5)) = ∅ := (Finset.disjoint_self_iff_empty _).mp h\n    simp [h'] at hs\n\ninstance : DecidableRel petersenGraph.Adj :=\n  fun s t => inferInstanceAs (Decidable (Disjoint s.1 t.1))\n\n/-- The Petersen graph has $15$ edges. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_edgeFinset : #petersenGraph.edgeFinset = 15 := by\n  decide\n\n/-- The Petersen graph is strongly regular with parameters $(10, 3, 0, 1)$. These parameters\ndetermine the Petersen graph up to isomorphism. -/\n@[category test, AMS 5]\ntheorem petersenGraph_isSRGWith : petersenGraph.IsSRGWith 10 3 0 1 where\n  card := by decide\n  regular := by\n    unfold IsRegularOfDegree\n    decide\n  of_adj := by decide\n  of_not_adj := by\n    unfold Pairwise\n    decide\n\n/-- A set `C` of edges of `G` is a *cycle* of `G` in the sense of the cycle space (an Eulerian\nsubgraph) if every vertex of `G` is touched by an even number of edges of `C`. -/\ndef IsEvenEdgeSet (G : SimpleGraph V) (C : Set G.edgeSet) : Prop :=\n  ∀ v : V, Even {e ∈ C | v ∈ (e : Sym2 V)}.ncard\n\n/-- A map `f` from the edges of `G` to the edges of `H` is *cycle-continuous* if the preimage\nunder `f` of every cycle of `H` is a cycle of `G`. -/\ndef IsCycleContinuous (G : SimpleGraph V) (H : SimpleGraph W) (f : G.edgeSet → H.edgeSet) :\n    Prop :=\n  ∀ C : Set H.edgeSet, IsEvenEdgeSet H C → IsEvenEdgeSet G (f ⁻¹' C)\n\n/-- The empty set of edges is a cycle. -/\n@[category API, AMS 5]\ntheorem isEvenEdgeSet_empty (G : SimpleGraph V) : IsEvenEdgeSet G ∅ := by\n  intro v\n  simp\n\n/-- A single edge is never a cycle. -/\n@[category API, AMS 5]\ntheorem not_isEvenEdgeSet_singleton (G : SimpleGraph V) (e : G.edgeSet) :\n    ¬ IsEvenEdgeSet G {e} := by\n  intro h\n  obtain ⟨v, w, hvw⟩ : ∃ v w : V, (e : Sym2 V) = s(v, w) :=\n    Sym2.ind (fun v w => ⟨v, w, rfl⟩) (e : Sym2 V)\n  have hv : v ∈ (e : Sym2 V) := hvw ▸ Sym2.mem_mk_left v w\n  have : {e' ∈ ({e} : Set G.edgeSet) | v ∈ (e' : Sym2 V)} = {e} := by\n    ext e'\n    simp only [Set.mem_setOf_eq, Set.mem_singleton_iff, and_iff_left_iff_imp]\n    rintro rfl\n    exact hv\n  have h' := h v\n  rw [this, Set.ncard_singleton] at h'\n  exact Nat.not_even_one h'\n\n/-- The identity map on the edges of a graph is cycle-continuous. -/\n@[category API, AMS 5]\ntheorem isCycleContinuous_id (G : SimpleGraph V) : IsCycleContinuous G G id :=\n  fun _ hC => hC\n\n/-- **Jaeger's Petersen-coloring conjecture.** Every bridgeless cubic graph has a\ncycle-continuous mapping to the Petersen graph: for every finite bridgeless $3$-regular simple\ngraph $G$ there is a map $f \\colon E(G) \\to E(P)$ to the edge set of the Petersen graph $P$ such\nthat the preimage under $f$ of every cycle of $P$ (a set of edges touching every vertex an even\nnumber of times) is a cycle of $G$. -/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hcubic : G.IsRegularOfDegree 3) (hbridgeless : G.IsBridgeless) :\n    ∃ f : G.edgeSet → petersenGraph.edgeSet, IsCycleContinuous G petersenGraph f := by\n  sorry\n\nend JaegersPetersenColoringConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate; the only remark is that the literature's 'cubic graph' may include multigraphs, but the table explicitly fixes simple graphs and the Wikipedia entry says 'graph', so the file conforms to the table.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs are Mathlib SimpleGraphs, i.e. simple (no parallel edges/loops), finite (Fintype V), not required to be connected or nonempty, as fixed by the decomposition table. In the literature cubic graphs in this conjecture are sometimes allowed to be multigraphs; the simple-graph statement is what the table prescribes.",
+    "'Cubic' is formalized as G.IsRegularOfDegree 3 (every vertex has degree exactly 3).",
+    "'Bridgeless' uses the existing SimpleGraph.IsBridgeless from FormalConjecturesForMathlib (∀ e ∈ G.edgeSet, ¬ G.IsBridge e).",
+    "'Cycle' of a graph is taken, following the article's own definition, as an edge set touching every vertex an even number of times (Eulerian subgraph / Z/2 cycle-space element), encoded as IsEvenEdgeSet with Set.ncard; all sets involved are finite in the statement, so ncard is the true cardinality (the definition would treat infinite incidence sets as even, but that input is unreachable here).",
+    "A cycle-continuous mapping is an arbitrary function G.edgeSet → petersenGraph.edgeSet (on the edge subtypes) whose preimages of even edge sets are even edge sets; it is not required to be a graph homomorphism, injective, or surjective.",
+    "The Petersen graph is defined as the Kneser graph KG(5,2) rather than by an explicit edge list; the tests card_petersenGraph_edgeFinset (15 edges) and petersenGraph_isSRGWith (srg(10,3,0,1), which characterizes the Petersen graph up to isomorphism) are proved by `decide` to confirm the definition.",
+    "The theorem is stated with hypotheses as arguments (G, hcubic, hbridgeless) and an existential conclusion, following the repository's style for non-question conjectures; the empty graph satisfies it vacuously, which agrees with the mathematics."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "WrittenOnTheWallII.Test.PetersenGraph (edge-list abbrev in another problem file, not importable); Mathlib has no Kneser/Petersen graph.",
+     "name": "JaegersPetersenColoringConjecture.petersenGraph",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines the Petersen graph (the only occurrence in the repo is an abbrev inside the problem file FormalConjectures/WrittenOnTheWallII/Test.lean, which problem files do not import). Defined as the Kneser graph KG(5,2) on 2-element subsets of Fin 5 with adjacency = disjointness; the file checks by `decide` that it has 15 edges and is IsSRGWith 10 3 0 1, which determines the Petersen graph up to isomorphism."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.IsCycles (a graph all of whose nonempty neighbourhoods have size 2 — a different, 2-regularity notion on graphs rather than edge subsets), SimpleGraph.Walk.IsCycle / SimpleGraph.Walk.IsEulerian (walk-based, not edge-set based), SimpleGraph.Cycle in FormalConjecturesForMathlib (single circuits, not cycle-space elements).",
+     "name": "JaegersPetersenColoringConjecture.IsEvenEdgeSet",
+     "why_needed": "The notion of a 'cycle' in the sense of the article (Eulerian subgraph = element of the Z/2 cycle space = set of edges touching every vertex an even number of times) has no Mathlib counterpart. Defined for C : Set G.edgeSet as ∀ v, Even {e ∈ C | v ∈ e}.ncard."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Hom / graph homomorphisms (a different, vertex-based notion; the conjecture explicitly concerns an arbitrary edge-set map).",
+     "name": "JaegersPetersenColoringConjecture.IsCycleContinuous",
+     "why_needed": "Cycle-continuous maps (edge maps whose preimages of cycles are cycles, DeVos–Nešetřil–Raspaud / Jaeger) are absent from Mathlib and the repo. Defined for f : G.edgeSet → H.edgeSet as ∀ C, IsEvenEdgeSet H C → IsEvenEdgeSet G (f ⁻¹' C)."
+    }
+   ],
+   "per_slot": {
+    "jaegers_petersen_coloring_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G (Fintype V, DecidableRel G.Adj) with G.IsRegularOfDegree 3 and G.IsBridgeless (existing repo definition: no edge is a bridge), there exists f : G.edgeSet → petersenGraph.edgeSet that is cycle-continuous, i.e. the preimage of every even edge set (Eulerian subgraph / Z/2 cycle-space element) of the Petersen graph is an even edge set of G. Bespoke definitions were needed for the Petersen graph, even edge sets and cycle-continuity, since none exist in Mathlib or FormalConjecturesForMathlib."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "jaegers_petersen_coloring_conjecture": "/-- **Jaeger's Petersen-coloring conjecture.** Every bridgeless cubic graph has a\ncycle-continuous mapping to the Petersen graph: for every finite bridgeless $3$-regular simple\ngraph $G$ there is a map $f \\colon E(G) \\to E(P)$ to the edge set of the Petersen graph $P$ such\nthat the preimage under $f$ of every cycle of $P$ (a set of edges touching every vertex an even\nnumber of times) is a cycle of $G$. -/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hcubic : G.IsRegularOfDegree 3) (hbridgeless : G.IsBridgeless) :\n    ∃ f : G.edgeSet → petersenGraph.edgeSet, IsCycleContinuous G petersenGraph f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Jaeger's Petersen-coloring conjecture\n\n*References:*\n- [Wikipedia, Petersen coloring conjecture](https://en.wikipedia.org/wiki/Petersen_graph%23Petersen_coloring_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nopen SimpleGraph\n\nnamespace JaegersPetersenColoringConjecture\n\n/-- The Petersen graph, drawn as a pentagon joined by five spokes to a pentagram. -/\nabbrev PetersenGraph : SimpleGraph (Fin 10) :=\n  SimpleGraph.fromEdgeSet {\n    s(0, 1), s(1, 2), s(2, 3), s(3, 4), s(4, 0),\n    s(0, 5), s(1, 6), s(2, 7), s(3, 8), s(4, 9),\n    s(5, 7), s(7, 9), s(9, 6), s(6, 8), s(8, 5)\n  }\n\n/-- An edge set is a cycle-space element (or Eulerian subgraph) if it meets every vertex in an\n even number of edges. -/\ndef IsCycleEdgeSet {V : Type*} [Fintype V] (G : SimpleGraph V) (C : Set G.edgeSet) : Prop :=\n  ∀ v, Even {e : G.edgeSet | e ∈ C ∧ v ∈ (e.1 : Sym2 V)}.ncard\n\n/-- An edge map is cycle-continuous if the preimage of every cycle-space element is a cycle-space\n element. -/\ndef IsCycleContinuous {V W : Type*} [Fintype V] [Fintype W]\n    (G : SimpleGraph V) (H : SimpleGraph W) (f : G.edgeSet → H.edgeSet) : Prop :=\n  ∀ C : Set H.edgeSet, IsCycleEdgeSet H C → IsCycleEdgeSet G (f ⁻¹' C)\n\n/--\n**Jaeger's Petersen-coloring conjecture.** Every finite bridgeless cubic simple graph has a\ncycle-continuous edge mapping to the Petersen graph. Here cycles are Eulerian edge subsets: they\nmeet every vertex an even number of times. Connectedness is not required.\n-/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture :\n    ∀ (V : Type*) [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      G.IsBridgeless → G.IsRegularOfDegree 3 →\n        ∃ f : G.edgeSet → PetersenGraph.edgeSet,\n          IsCycleContinuous G PetersenGraph f := by\n  sorry\n\nend JaegersPetersenColoringConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Formalized the cubic version specified by the decomposition: finite simple graphs satisfying `SimpleGraph.IsRegularOfDegree 3` and `SimpleGraph.IsBridgeless`, without a connectedness hypothesis.",
+    "Interpreted a cycle exactly as the background article does: an arbitrary edge subset meeting every vertex evenly (an Eulerian subgraph / element of the mod-2 cycle space), rather than a single closed walk or a 2-regular subgraph.",
+    "Made the cycle-continuous mapping a function between bundled edge types. It has no vertex map and no graph-homomorphism condition; it only requires that the preimage of every cycle-space element of the Petersen graph be a cycle-space element of the source.",
+    "Used the standard concrete pentagon–spokes–pentagram presentation of the Petersen graph on `Fin 10`, with its 15 edges explicitly listed.",
+    "Included `[DecidableRel G.Adj]` as computational structure needed by Mathlib's finite degree API. Every finite graph adjacency relation is classically decidable, so this does not impose an additional mathematical restriction."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`WrittenOnTheWallII.Test.PetersenGraph` is an identical concrete graph local to another conjecture namespace; importing a problem file to reuse it would be inappropriate. No Mathlib Kneser-graph constructor was found.",
+     "name": "PetersenGraph",
+     "why_needed": "The target of the edge mapping must be the Petersen graph, but Mathlib has no reusable Petersen-graph definition."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Walk.IsEulerian` describes one trail traversing all graph edges and cannot represent disconnected Eulerian edge subsets. `SimpleGraph.IsCycles` requires every non-isolated vertex to have degree exactly two and incorrectly excludes cycle-space elements with degree 4 or more.",
+     "name": "IsCycleEdgeSet",
+     "why_needed": "The source defines cycles as arbitrary Eulerian edge subsets, i.e. mod-2 cycle-space elements, so a predicate requiring even incidence at every vertex is needed."
+    },
+    {
+     "closest_existing_considered": "Mathlib graph homomorphisms and edge labelings do not express the required inverse-image condition and would add incorrect vertex-map or adjacency structure.",
+     "name": "IsCycleContinuous",
+     "why_needed": "No existing predicate expresses an edge function whose inverse image preserves all Eulerian edge subsets."
+    }
+   ],
+   "per_slot": {
+    "jaegers_petersen_coloring_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "jaegers_petersen_coloring_conjecture": "/--\n**Jaeger's Petersen-coloring conjecture.** Every finite bridgeless cubic simple graph has a\ncycle-continuous edge mapping to the Petersen graph. Here cycles are Eulerian edge subsets: they\nmeet every vertex an even number of times. Connectedness is not required.\n-/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture :\n    ∀ (V : Type*) [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      G.IsBridgeless → G.IsRegularOfDegree 3 →\n        ∃ f : G.edgeSet → PetersenGraph.edgeSet,\n          IsCycleContinuous G PetersenGraph f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Jaeger's Petersen-coloring conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Petersen_graph%23Petersen_coloring_conjecture)\n-/\n\nopen scoped Sym2\n\nnamespace JaegersPetersenColoringConjecture\n\n/-- The Petersen graph, represented by its standard pentagon, pentagram, and five spokes. -/\nabbrev PetersenGraph : SimpleGraph (Fin 10) :=\n  SimpleGraph.fromEdgeSet {\n    s(0, 1), s(1, 2), s(2, 3), s(3, 4), s(4, 0),\n    s(0, 5), s(1, 6), s(2, 7), s(3, 8), s(4, 9),\n    s(5, 7), s(7, 9), s(9, 6), s(6, 8), s(8, 5)\n  }\n\n/-- An edge set is a cycle-space element if it meets every vertex an even number of times. -/\ndef IsCycleEdgeSet {V : Type*} (G : SimpleGraph V) (C : Set G.edgeSet) : Prop :=\n  ∀ v : V, Even {e : G.edgeSet | e ∈ C ∧ v ∈ (e : Sym2 V)}.ncard\n\n/-- An edge map is cycle-continuous if the inverse image of every cycle-space element is a\ncycle-space element. -/\ndef IsCycleContinuous {V W : Type*} {G : SimpleGraph V} {H : SimpleGraph W}\n    (f : G.edgeSet → H.edgeSet) : Prop :=\n  ∀ C : Set H.edgeSet, IsCycleEdgeSet H C → IsCycleEdgeSet G (f ⁻¹' C)\n\n/--\n**Jaeger's Petersen-coloring conjecture:** Every finite bridgeless cubic simple graph has a\ncycle-continuous mapping from its edge set to the edge set of the Petersen graph. Here\ncycle-continuity means that the inverse image of every edge set meeting each Petersen vertex an\neven number of times also meets every vertex of the source graph an even number of times.\n-/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture :\n    ∀ (V : Type*) [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      G.IsBridgeless → G.IsRegularOfDegree 3 →\n        ∃ f : G.edgeSet → PetersenGraph.edgeSet, IsCycleContinuous f := by\n  sorry\n\nend JaegersPetersenColoringConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted graphs as finite simple undirected graphs, as required by the decomposition; cubicity is `SimpleGraph.IsRegularOfDegree 3`.",
+    "Used `SimpleGraph.IsBridgeless` from FormalConjecturesForMathlib. No connectedness hypothesis is imposed, so disconnected bridgeless cubic graphs are included.",
+    "Interpreted a cycle as an arbitrary mod-2 cycle-space element: a subset of edges incident to every vertex an even number of times. This allows disconnected Eulerian subgraphs and the empty edge set.",
+    "Interpreted a cycle-continuous mapping as only a function between edge types whose inverse image preserves cycle-space elements; no vertex map or graph-homomorphism condition is imposed.",
+    "Represented the Petersen graph by the standard explicit 10-vertex, 15-edge pentagon/pentagram/spokes model already used elsewhere in the repository."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`WrittenOnTheWallII.Test.PetersenGraph` has the same edge-list model but is namespace-local to a broad unrelated test module, so importing it would be inappropriate.",
+     "name": "PetersenGraph",
+     "why_needed": "The conjecture requires a concrete Petersen graph, and no reusable Mathlib or FormalConjecturesForMathlib definition exists."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Cycle` describes a single based simple closed walk, while `SimpleGraph.Walk.IsEulerian` describes a trail traversing every edge of a graph; neither represents an arbitrary, possibly disconnected Eulerian edge subset.",
+     "name": "IsCycleEdgeSet",
+     "why_needed": "The source's cycles are arbitrary Eulerian edge subsets / mod-2 cycle-space elements, requiring even selected incidence at every vertex."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib, FormalConjecturesForMathlib, and existing conjecture files for cycle-continuous maps and cycle-space mappings; no matching definition was found.",
+     "name": "IsCycleContinuous",
+     "why_needed": "No existing predicate expresses inverse-image preservation of Eulerian edge subsets by a bare edge map."
+    }
+   ],
+   "per_slot": {
+    "jaegers_petersen_coloring_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "jaegers_petersen_coloring_conjecture": "/--\n**Jaeger's Petersen-coloring conjecture:** Every finite bridgeless cubic simple graph has a\ncycle-continuous mapping from its edge set to the edge set of the Petersen graph. Here\ncycle-continuity means that the inverse image of every edge set meeting each Petersen vertex an\neven number of times also meets every vertex of the source graph an even number of times.\n-/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture :\n    ∀ (V : Type*) [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      G.IsBridgeless → G.IsRegularOfDegree 3 →\n        ∃ f : G.edgeSet → PetersenGraph.edgeSet, IsCycleContinuous f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Jaeger's Petersen-coloring conjecture\n\n*References:*\n- [Wikipedia, Petersen graph: Petersen coloring conjecture](https://en.wikipedia.org/wiki/Petersen_graph%23Petersen_coloring_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ja88] Jaeger, F., *Nowhere-zero flow problems*. In: Selected Topics in Graph Theory 3,\n  Academic Press (1988), 71--95.\n\nAn *Eulerian subgraph* of a graph $G$ is a set of edges of $G$ meeting every vertex of $G$ an\neven number of times. These edge sets are the elements of the cycle space of $G$ over\n$\\mathbb{Z}/2$ and are also called *cycles*. A map from the edges of $G$ to the edges of $H$ is\n*cycle-continuous* if the preimage of every cycle of $H$ is a cycle of $G$. Jaeger conjectured\nthat every bridgeless cubic graph has a cycle-continuous mapping to the Petersen graph.\n-/\n\nopen SimpleGraph\n\nnamespace JaegersPetersenColoringConjecture\n\nvariable {V W : Type*}\n\n/-- The Petersen graph, realised as the Kneser graph $KG(5, 2)$: its vertices are the $10$\ntwo-element subsets of a five-element set, and two of them are adjacent if and only if they are\ndisjoint. -/\ndef petersenGraph : SimpleGraph {s : Finset (Fin 5) // s.card = 2} where\n  Adj s t := Disjoint s.1 t.1\n  symm _ _ h := h.symm\n  loopless s h := by\n    have hs := s.2\n    simp only [Finset.disjoint_self_iff_empty] at h\n    simp [h] at hs\n\ninstance : DecidableRel petersenGraph.Adj :=\n  fun s t => inferInstanceAs (Decidable (Disjoint s.1 t.1))\n\n/-- A set `C` of edges of `G` is an *even subgraph* (an *Eulerian subgraph*, or a *cycle* in the\nsense of the cycle space over $\\mathbb{Z}/2$) if every vertex of `G` lies on an even number of\nedges of `C`. Connectedness is not required. The finiteness assumption on the vertex type makes\n`Set.ncard` count the edges of `C` at a vertex correctly. -/\ndef IsEvenSubgraph [Finite V] (G : SimpleGraph V) (C : Set G.edgeSet) : Prop :=\n  ∀ v : V, Even {e ∈ C | v ∈ (e : Sym2 V)}.ncard\n\n/-- A map `f` from the edges of `G` to the edges of `H` is *cycle-continuous* if the preimage\nunder `f` of every even subgraph (cycle) of `H` is an even subgraph (cycle) of `G`. No\ncompatibility with the vertices is required: `f` is merely a map between edge sets. -/\ndef IsCycleContinuous [Finite V] [Finite W] {G : SimpleGraph V} {H : SimpleGraph W}\n    (f : G.edgeSet → H.edgeSet) : Prop :=\n  ∀ C : Set H.edgeSet, IsEvenSubgraph H C → IsEvenSubgraph G (f ⁻¹' C)\n\n/--\n**Jaeger's Petersen-coloring conjecture.** Every bridgeless cubic graph has a cycle-continuous\nmapping to the Petersen graph.\n\nHere a *cubic graph* is a finite simple graph in which every vertex has degree $3$\n(connectedness is not required), a graph is *bridgeless* if none of its edges is a bridge, and a\nmap $f \\colon E(G) \\to E(P)$ to the edge set of the Petersen graph $P$ is *cycle-continuous* if the\npreimage under $f$ of every cycle (Eulerian subgraph) of $P$ is a cycle of $G$.\n-/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hcubic : G.IsRegularOfDegree 3) (hbridgeless : G.IsBridgeless) :\n    ∃ f : G.edgeSet → petersenGraph.edgeSet, IsCycleContinuous f := by\n  sorry\n\n/-- The Petersen graph is the (unique) strongly regular graph with parameters $(10, 3, 0, 1)$: it\nhas $10$ vertices, is cubic, adjacent vertices have no common neighbour and non-adjacent vertices\nhave exactly one common neighbour. -/\n@[category test, AMS 5]\ntheorem petersenGraph_isSRGWith : petersenGraph.IsSRGWith 10 3 0 1 where\n  card := by\n    rw [Fintype.card_finset_len, Fintype.card_fin]\n    rfl\n  regular := by\n    unfold IsRegularOfDegree\n    decide\n  of_adj := by decide\n  of_not_adj := by\n    unfold Pairwise\n    decide\n\n/-- The Petersen graph has $15$ edges. -/\n@[category test, AMS 5]\ntheorem card_petersenGraph_edgeFinset : petersenGraph.edgeFinset.card = 15 := by\n  decide\n\n/-- The Petersen graph is bridgeless. -/\n@[category test, AMS 5]\ntheorem petersenGraph_isBridgeless : petersenGraph.IsBridgeless := by\n  intro e he\n  induction e using Sym2.ind with\n  | h u v =>\n    rw [isBridge_iff]\n    revert u v\n    decide\n\n/-- The empty set of edges is an even subgraph. -/\n@[category API, AMS 5]\ntheorem isEvenSubgraph_empty [Finite V] (G : SimpleGraph V) : IsEvenSubgraph G ∅ := by\n  intro v\n  simp\n\n/-- The number of edges of `G` at a vertex `v` is the degree of `v`. -/\n@[category API, AMS 5]\ntheorem ncard_univ_incident [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj]\n    (v : V) : {e ∈ (Set.univ : Set G.edgeSet) | v ∈ (e : Sym2 V)}.ncard = G.degree v := by\n  have h : Subtype.val '' {e ∈ (Set.univ : Set G.edgeSet) | v ∈ (e : Sym2 V)} =\n      G.incidenceSet v := by\n    ext e\n    simp [incidenceSet, and_comm]\n  rw [← Set.ncard_image_of_injective _ Subtype.val_injective, h, Set.ncard_eq_toFinset_card',\n    ← incidenceFinset, card_incidenceFinset_eq_degree]\n\n/-- The whole edge set of `G` is an even subgraph if and only if every vertex has even degree. -/\n@[category API, AMS 5]\ntheorem isEvenSubgraph_univ_iff [Fintype V] [DecidableEq V] (G : SimpleGraph V)\n    [DecidableRel G.Adj] : IsEvenSubgraph G Set.univ ↔ ∀ v, Even (G.degree v) := by\n  simp only [IsEvenSubgraph, ncard_univ_incident]\n\n/-- The whole edge set of the Petersen graph is not a cycle, since every vertex has degree $3$. -/\n@[category test, AMS 5]\ntheorem not_isEvenSubgraph_univ : ¬ IsEvenSubgraph petersenGraph Set.univ := by\n  rw [isEvenSubgraph_univ_iff]\n  decide\n\n/-- The identity map on the edges of a graph is cycle-continuous. -/\n@[category API, AMS 5]\ntheorem isCycleContinuous_id [Finite V] (G : SimpleGraph V) :\n    IsCycleContinuous (id : G.edgeSet → G.edgeSet) :=\n  fun _ hC => hC\n\n/-- The composite of two cycle-continuous maps is cycle-continuous. -/\n@[category API, AMS 5]\ntheorem IsCycleContinuous.comp {U : Type*} [Finite U] [Finite V] [Finite W]\n    {G : SimpleGraph U} {H : SimpleGraph V} {K : SimpleGraph W}\n    {g : H.edgeSet → K.edgeSet} {f : G.edgeSet → H.edgeSet}\n    (hg : IsCycleContinuous g) (hf : IsCycleContinuous f) : IsCycleContinuous (g ∘ f) :=\n  fun C hC => hf _ (hg C hC)\n\nend JaegersPetersenColoringConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The table's reading (single universally quantified Prop over finite simple bridgeless cubic graphs, cycle-continuous map as a bare edge-set map with the Z/2 cycle-space notion of cycle, no variant slot for general bridgeless graphs) matches the Wikipedia list entry and the linked Petersen graph article, and was followed exactly.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Cubic graphs are taken to be finite *simple* 3-regular graphs (`SimpleGraph V` with `[Fintype V]` and `G.IsRegularOfDegree 3`), as prescribed by the decomposition notes; Jaeger's original conjecture and much of the literature allow cubic multigraphs (parallel edges), but the simple-graph version is the one the table asks for and is known to be equivalent. Connectedness is not required.",
+    "Bridgeless uses the existing repo definition `SimpleGraph.IsBridgeless` (∀ e ∈ G.edgeSet, ¬ G.IsBridge e) from FormalConjecturesForMathlib/Combinatorics/SimpleGraph/Cycle.lean.",
+    "A 'cycle' of a graph (in the cycle-continuity sense) is formalized as `IsEvenSubgraph G C` for `C : Set G.edgeSet`: for every vertex v, the number (`Set.ncard`) of edges of C containing v is even. This is exactly the article's 'Eulerian subgraph / element of the Z/2 cycle space'; connectedness is not required. The definition carries an (otherwise unused) `[Finite V]` hypothesis so that `Set.ncard` is a genuine count; an API lemma `isEvenSubgraph_univ_iff` checks it against `SimpleGraph.degree`.",
+    "A cycle-continuous mapping is a bare function `f : G.edgeSet → H.edgeSet` between edge subtypes (no vertex compatibility / not a graph homomorphism) such that `f ⁻¹' C` is an even subgraph of G whenever C is an even subgraph of H. Preimage is `Set.preimage` on `Set H.edgeSet`.",
+    "The Petersen graph is defined as the Kneser graph KG(5,2): vertices are `{s : Finset (Fin 5) // s.card = 2}`, adjacency is `Disjoint`. Its correctness is certified by the test `petersenGraph_isSRGWith : petersenGraph.IsSRGWith 10 3 0 1` (the Petersen graph is the unique srg(10,3,0,1)), plus 15 edges and bridgelessness, all proved by kernel `decide`.",
+    "The empty vertex type satisfies the hypotheses vacuously and the conclusion holds trivially (empty edge set), so there is no degenerate-case defect. No variant for general (non-cubic) bridgeless graphs was added, per the decomposition notes."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "WrittenOnTheWallII.Test.PetersenGraph (test-file abbrev, not reusable); no Kneser graph in Mathlib (searched `rg -i kneser`).",
+     "name": "JaegersPetersenColoringConjecture.petersenGraph",
+     "why_needed": "Mathlib has no Petersen graph and no Kneser graph; the only Petersen graph in the repo lives in the test namespace WrittenOnTheWallII.Test (as an `abbrev` via `fromEdgeSet` on `Fin 10`) and is not a shared definition. Defined here as KG(5,2) on 2-subsets of Fin 5 with adjacency = disjointness, with a `DecidableRel` instance; verified by `IsSRGWith 10 3 0 1`, 15 edges, and bridgelessness."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Walk.IsEulerian (Mathlib), SimpleGraph.Cycle (FormalConjecturesForMathlib), SimpleGraph.incidenceSet/degree (used in the API lemma checking the definition).",
+     "name": "JaegersPetersenColoringConjecture.IsEvenSubgraph",
+     "why_needed": "Mathlib has no notion of the Z/2 cycle space or of even/Eulerian edge subsets of a SimpleGraph; `SimpleGraph.Walk.IsEulerian` is about trails and requires a single closed walk, and `SimpleGraph.Cycle` (repo) is a single cycle walk, neither of which matches 'edge set meeting every vertex evenly'."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Hom (graph homomorphism) — explicitly not what the statement requires, since the map is only on edges with no vertex compatibility.",
+     "name": "JaegersPetersenColoringConjecture.IsCycleContinuous",
+     "why_needed": "Cycle-continuous maps between edge sets do not exist in Mathlib or the repo (searched for cycleSpace, cycle-continuous, IsEulerian)."
+    }
+   ],
+   "per_slot": {
+    "jaegers_petersen_coloring_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G (vertex type with [Fintype V], [DecidableRel G.Adj]) with G.IsRegularOfDegree 3 and G.IsBridgeless (existing repo definition: no edge is a bridge), there exists f : G.edgeSet → petersenGraph.edgeSet that is cycle-continuous, i.e. the preimage of every even subgraph (Z/2 cycle-space element) of the Petersen graph is an even subgraph of G. Needed bespoke definitions for the Petersen graph, even subgraphs, and cycle-continuity, none of which exist in Mathlib or FormalConjecturesForMathlib."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "jaegers_petersen_coloring_conjecture": "/--\n**Jaeger's Petersen-coloring conjecture.** Every bridgeless cubic graph has a cycle-continuous\nmapping to the Petersen graph.\n\nHere a *cubic graph* is a finite simple graph in which every vertex has degree $3$\n(connectedness is not required), a graph is *bridgeless* if none of its edges is a bridge, and a\nmap $f \\colon E(G) \\to E(P)$ to the edge set of the Petersen graph $P$ is *cycle-continuous* if the\npreimage under $f$ of every cycle (Eulerian subgraph) of $P$ is a cycle of $G$.\n-/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj]\n    (hcubic : G.IsRegularOfDegree 3) (hbridgeless : G.IsBridgeless) :\n    ∃ f : G.edgeSet → petersenGraph.edgeSet, IsCycleContinuous f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Jaeger's Petersen-coloring conjecture\n\n*Reference:*\n- [Wikipedia: Petersen graph](https://en.wikipedia.org/wiki/Petersen_graph%23Petersen_coloring_conjecture)\n-/\n\nnamespace JaegersPetersenColoringConjecture\n\n/-- The vertices of the Petersen graph, represented as the two-element subsets of `Fin 5`. -/\nabbrev PetersenVertex := {s : Finset (Fin 5) // s.card = 2}\n\n/-- The Petersen graph, in its realization as the Kneser graph $KG(5,2)$. -/\ndef petersenGraph : SimpleGraph PetersenVertex :=\n  SimpleGraph.fromRel fun s t ↦ Disjoint s.1 t.1\n\n/-- An element of the $\\mathbb{Z}/2\\mathbb{Z}$ cycle space of a finite simple graph: a set of\nedges incident to every vertex an even number of times. -/\ndef IsCycleSpaceElement {V : Type*} [Finite V] (G : SimpleGraph V)\n    (c : Set G.edgeSet) : Prop :=\n  ∀ v, Even {e ∈ c | v ∈ (e.1 : Sym2 V)}.ncard\n\n/-- An edge-set map is cycle-continuous if the preimage of each cycle-space element is a\ncycle-space element. -/\ndef IsCycleContinuous {V W : Type*} [Finite V] [Finite W] (G : SimpleGraph V)\n    (H : SimpleGraph W) (f : G.edgeSet → H.edgeSet) : Prop :=\n  ∀ c, IsCycleSpaceElement H c → IsCycleSpaceElement G (f ⁻¹' c)\n\n/--\n**Jaeger's Petersen-coloring conjecture.** Every finite bridgeless cubic simple graph has a\ncycle-continuous mapping from its edges to the edges of the Petersen graph. Here, cycles are\nEulerian edge subsets (elements of the $\\mathbb{Z}/2\\mathbb{Z}$ cycle space); the mapping is only\nan edge-set map and is not required to be a graph homomorphism. Connectedness is not required.\n-/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture {V : Type*} [Fintype V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] (hcubic : G.IsRegularOfDegree 3)\n    (hbridgeless : G.IsBridgeless) :\n    ∃ f : G.edgeSet → petersenGraph.edgeSet, IsCycleContinuous G petersenGraph f := by\n  sorry\n\nend JaegersPetersenColoringConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Formalized the cubic version required by the decomposition table, rather than the article's equivalent formulation over all bridgeless graphs.",
+    "Modeled finite graphs as `SimpleGraph V` with `[Fintype V]`; `[DecidableRel G.Adj]` supplies the local-finiteness instance needed by Mathlib's `IsRegularOfDegree` and adds no mathematical restriction on a finite graph.",
+    "Did not assume connectedness: disconnected bridgeless cubic graphs are included.",
+    "Realized the Petersen graph as the Kneser graph `KG(5,2)`: vertices are two-element subsets of `Fin 5`, with adjacency given by disjointness.",
+    "Interpreted a cycle exactly as in the background article: an Eulerian edge subset, equivalently an element of the binary cycle space, whose incidence count at every vertex is even. This includes the empty edge set and potentially disconnected unions of ordinary cycles.",
+    "Modeled a cycle-continuous mapping as a bare function between the subtype of source edges and the subtype of Petersen edges, requiring preimages of every cycle-space element to be cycle-space elements; no vertex map or graph-homomorphism condition is imposed."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "No Petersen-graph or Kneser-graph vertex type was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "PetersenVertex",
+     "why_needed": "Provides the standard finite vertex type for the Petersen graph as the two-element subsets of a five-element set."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `SimpleGraph.fromRel` provides the graph constructor, but there is no existing Petersen or Kneser graph definition.",
+     "name": "petersenGraph",
+     "why_needed": "The conjecture has the Petersen graph as its fixed target, but no existing named Petersen graph was found."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Cycle` and `SimpleGraph.Walk.IsCycle` encode a single cycle walk, while `SimpleGraph.Walk.IsEulerian` encodes a walk traversing an entire graph; neither represents arbitrary Eulerian edge subsets.",
+     "name": "IsCycleSpaceElement",
+     "why_needed": "The source uses “cycle” to mean an arbitrary Eulerian edge subset / element of the Z/2 cycle space, not a single closed walk."
+    },
+    {
+     "closest_existing_considered": "Mathlib has maps of walks and graph homomorphisms, but those impose or express vertex/adjacency structure and do not capture a bare edge function preserving the binary cycle space by preimage.",
+     "name": "IsCycleContinuous",
+     "why_needed": "No predicate for cycle-continuous edge-set mappings was found; the conjecture requires preimages of all cycle-space elements to remain cycle-space elements."
+    }
+   ],
+   "per_slot": {
+    "jaegers_petersen_coloring_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "jaegers_petersen_coloring_conjecture": "/--\n**Jaeger's Petersen-coloring conjecture.** Every finite bridgeless cubic simple graph has a\ncycle-continuous mapping from its edges to the edges of the Petersen graph. Here, cycles are\nEulerian edge subsets (elements of the $\\mathbb{Z}/2\\mathbb{Z}$ cycle space); the mapping is only\nan edge-set map and is not required to be a graph homomorphism. Connectedness is not required.\n-/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture {V : Type*} [Fintype V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] (hcubic : G.IsRegularOfDegree 3)\n    (hbridgeless : G.IsBridgeless) :\n    ∃ f : G.edgeSet → petersenGraph.edgeSet, IsCycleContinuous G petersenGraph f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Jaeger's Petersen-coloring conjecture\n\n*Reference:*\n- [Wikipedia: Petersen graph, Petersen coloring conjecture](https://en.wikipedia.org/wiki/Petersen_graph%23Petersen_coloring_conjecture)\n-/\n\nnamespace JaegersPetersenColoringConjecture\n\nopen SimpleGraph\n\n/-- The Petersen graph, presented as an outer pentagon, five spokes, and an inner pentagram. -/\nabbrev petersenGraph : SimpleGraph (Fin 10) :=\n  SimpleGraph.fromEdgeSet {\n    s(0, 1), s(1, 2), s(2, 3), s(3, 4), s(4, 0),\n    s(0, 5), s(1, 6), s(2, 7), s(3, 8), s(4, 9),\n    s(5, 7), s(7, 9), s(9, 6), s(6, 8), s(8, 5)\n  }\n\n/-- An edge set is an element of the mod-two cycle space when it meets every vertex in an\n    even number of edges. -/\ndef IsCycleSpaceElement {V : Type*} [Fintype V] (G : SimpleGraph V)\n    (C : Set G.edgeSet) : Prop :=\n  ∀ v : V, Even (Set.ncard {e : G.edgeSet | e ∈ C ∧ v ∈ (e.1 : Sym2 V)})\n\n/-- An edge map is cycle-continuous when the inverse image of every cycle-space element is a\n    cycle-space element. -/\ndef IsCycleContinuous {V W : Type*} [Fintype V] [Fintype W]\n    (G : SimpleGraph V) (H : SimpleGraph W) (f : G.edgeSet → H.edgeSet) : Prop :=\n  ∀ C : Set H.edgeSet, IsCycleSpaceElement H C → IsCycleSpaceElement G (f ⁻¹' C)\n\n/-- **Jaeger's Petersen-coloring conjecture.** Every finite bridgeless cubic simple graph has a\ncycle-continuous mapping from its edge set to the edge set of the Petersen graph. Here a cycle is\nan Eulerian edge set (an element of the mod-two cycle space), and the graph need not be connected. -/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture :\n    ∀ (V : Type) [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      G.IsBridgeless → G.IsRegularOfDegree 3 →\n        ∃ f : G.edgeSet → petersenGraph.edgeSet,\n          IsCycleContinuous G petersenGraph f := by\n  sorry\n\nend JaegersPetersenColoringConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Formalized graphs as finite simple graphs on an arbitrary finite vertex type, following the fixed decomposition; connectedness is intentionally not assumed.",
+    "Used the cubic formulation requested by the decomposition (`IsRegularOfDegree 3`), although the background article states the equivalent broader bridgeless-graph formulation.",
+    "Interpreted a cycle as any mod-two cycle-space element: an edge subset incident to every vertex an even number of times. Thus this includes the empty set and disconnected Eulerian subgraphs, rather than only walk-based simple cycles.",
+    "Modeled a cycle-continuous mapping as a bare function between edge-set subtypes whose inverse image preserves every cycle-space element; no vertex map, incidence preservation, surjectivity, or graph-homomorphism condition is imposed.",
+    "Presented the Petersen graph concretely on `Fin 10` as the standard outer pentagon, five spokes, and inner pentagram. Separate checks confirmed that this graph has 15 edges and is 3-regular."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`WrittenOnTheWallII.Test.PetersenGraph` uses the same concrete presentation, but it lives in an unrelated problem/test module rather than the shared imports.",
+     "name": "petersenGraph",
+     "why_needed": "The conjecture requires a concrete Petersen graph, and no generally available Petersen graph definition was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Walk.IsCycle`, `SimpleGraph.Walk.IsEulerian`, and graph incidence finsets; these concern walks or the entire graph rather than an arbitrary edge subset.",
+     "name": "IsCycleSpaceElement",
+     "why_needed": "Mathlib's walk-cycle and Eulerian-trail predicates do not represent arbitrary Eulerian edge subsets, which are the cycle-space elements used by the source."
+    },
+    {
+     "closest_existing_considered": "No cycle-continuous mapping primitive was found in Mathlib, FormalConjecturesForMathlib, or the conjecture files.",
+     "name": "IsCycleContinuous",
+     "why_needed": "No existing predicate was found for an edge-set function whose inverse images preserve mod-two cycle-space elements."
+    }
+   ],
+   "per_slot": {
+    "jaegers_petersen_coloring_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "jaegers_petersen_coloring_conjecture": "/-- **Jaeger's Petersen-coloring conjecture.** Every finite bridgeless cubic simple graph has a\ncycle-continuous mapping from its edge set to the edge set of the Petersen graph. Here a cycle is\nan Eulerian edge set (an element of the mod-two cycle space), and the graph need not be connected. -/\n@[category research open, AMS 5]\ntheorem jaegers_petersen_coloring_conjecture :\n    ∀ (V : Type) [Fintype V] [DecidableEq V] (G : SimpleGraph V) [DecidableRel G.Adj],\n      G.IsBridgeless → G.IsRegularOfDegree 3 →\n        ∃ f : G.edgeSet → petersenGraph.edgeSet,\n          IsCycleContinuous G petersenGraph f := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "jaegers_petersen_coloring_conjecture": "c06"
+ },
+ "id": "wp-jaegers-petersen-coloring-conjecture",
+ "main_attempt": "c06"
+}

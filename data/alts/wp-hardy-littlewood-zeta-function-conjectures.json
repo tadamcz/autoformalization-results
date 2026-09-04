@@ -1,0 +1,362 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hardy–Littlewood zeta function conjectures\n\nTwo conjectures of Hardy and Littlewood on the zeros of odd order of $\\zeta(1/2 + it)$,\ni.e. the zeros of the Riemann zeta function on the critical line counted with attention to\ntheir multiplicity. Let $N_0(T)$ be the number of zeros of odd order of $\\zeta(1/2 + it)$\nwith $t \\in (0, T]$.\n\n1. For any $\\varepsilon > 0$ there exists $T_0 = T_0(\\varepsilon) > 0$ such that for\n   $T \\ge T_0$ and $H = T^{0.25 + \\varepsilon}$ the interval $(T, T + H]$ contains a zero of\n   odd order of $\\zeta(1/2 + it)$.\n2. For any $\\varepsilon > 0$ there exist $T_0 = T_0(\\varepsilon) > 0$ and\n   $c = c(\\varepsilon) > 0$ such that for $T \\ge T_0$ and $H = T^{0.5 + \\varepsilon}$ the\n   inequality $N_0(T + H) - N_0(T) \\ge cH$ holds.\n\nThe first conjecture is open. The second was proved by Selberg (1942), who showed the stronger\nbound $N_0(T + H) - N_0(T) \\ge cH \\log T$ for $H = T^{0.5 + \\varepsilon}$; Karatsuba (1984)\nlater proved the same bound for $H = T^{27/82 + \\varepsilon}$.\n\n*References:*\n- [Wikipedia: Hardy–Littlewood zeta function conjectures](https://en.wikipedia.org/wiki/Hardy%E2%80%93Littlewood_zeta_function_conjectures)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- G. H. Hardy, J. E. Littlewood, *The zeros of Riemann's zeta-function on the critical line*,\n  Math. Z. 10 (1921), 283–317. [doi:10.1007/bf01211614](https://doi.org/10.1007/bf01211614)\n- A. Selberg, *On the zeros of Riemann's zeta-function*, Skr. Norske Vid. Akad. Oslo I (1942),\n  no. 10, 1–59.\n- A. A. Karatsuba, *On the zeros of the function ζ(s) on short intervals of the critical line*,\n  Izv. Akad. Nauk SSSR Ser. Mat. 48 (1984), no. 3, 569–584.\n-/\n\nnamespace HardyLittlewoodZetaFunctionConjectures\n\nopen Complex\n\n/-- A real number $t$ is a *zero of odd order* of $\\zeta(1/2 + it)$ if the order of vanishing\nof the Riemann zeta function at the point $1/2 + it$ is odd.\n\nThe Riemann zeta function is analytic and not identically zero near every point $1/2 + it$, so\n`analyticOrderNatAt riemannZeta (1 / 2 + t * I)` is the genuine multiplicity of the zero\n$1/2 + it$ of $\\zeta$ (and is `0` when $\\zeta(1/2 + it) \\ne 0$). This is the same as the order of\n$t$ as a zero of the function $t \\mapsto \\zeta(1/2 + it)$ of a real variable. -/\ndef IsOddOrderZero (t : ℝ) : Prop :=\n  Odd (analyticOrderNatAt riemannZeta (1 / 2 + t * I))\n\n/-- $N_0(T)$: the number of zeros of odd order of $\\zeta(1/2 + it)$ with $t \\in (0, T]$. -/\nnoncomputable def oddOrderZeroCount (T : ℝ) : ℕ :=\n  {t ∈ Set.Ioc 0 T | IsOddOrderZero t}.ncard\n\nlocal notation \"N₀\" => oddOrderZeroCount\n\n/-- The Riemann zeta function is analytic at every point $1/2 + it$ of the critical line, so the\norder of vanishing used in `IsOddOrderZero` is the genuine multiplicity, not a junk value. -/\n@[category API, AMS 11]\ntheorem analyticAt_riemannZeta_critical_line (t : ℝ) :\n    AnalyticAt ℂ riemannZeta (1 / 2 + t * I) := by\n  have h : (1 / 2 + t * I : ℂ) ≠ 1 := fun h => by\n    have := congrArg Complex.re h\n    norm_num at this\n  exact DifferentiableOn.analyticAt (s := {1}ᶜ)\n    (fun z hz => (differentiableAt_riemannZeta hz).differentiableWithinAt)\n    (isOpen_compl_singleton.mem_nhds h)\n\n/-- A zero of odd order of $\\zeta(1/2 + it)$ is in particular a zero of $\\zeta$. -/\n@[category API, AMS 11]\ntheorem IsOddOrderZero.riemannZeta_eq_zero {t : ℝ} (ht : IsOddOrderZero t) :\n    riemannZeta (1 / 2 + t * I) = 0 :=\n  apply_eq_zero_of_analyticOrderNatAt_ne_zero ht.pos.ne'\n\n/-- The interval $(0, 0]$ is empty, so $N_0(0) = 0$. -/\n@[category test, AMS 11]\ntheorem oddOrderZeroCount_zero : N₀ 0 = 0 := by\n  simp [oddOrderZeroCount]\n\n/-- **Hardy–Littlewood conjecture 1** (open).\nFor any $\\varepsilon > 0$ there exists $T_0 = T_0(\\varepsilon) > 0$ such that for all\n$T \\ge T_0$ and $H = T^{0.25 + \\varepsilon}$, the interval $(T, T + H]$ contains a zero of odd\norder of the function $\\zeta(1/2 + it)$.\n\nKaratsuba (1984) proved this with $H = T^{27/82 + \\varepsilon}$ in place of\n$H = T^{0.25 + \\varepsilon}$. -/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.i :\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ : ℝ, 0 < T₀ ∧ ∀ T : ℝ, T₀ ≤ T →\n      ∃ t ∈ Set.Ioc T (T + T ^ (1 / 4 + ε)), IsOddOrderZero t := by\n  sorry\n\n/-- **Hardy–Littlewood conjecture 2** (proved by Selberg).\nFor any $\\varepsilon > 0$ there exist $T_0 = T_0(\\varepsilon) > 0$ and $c = c(\\varepsilon) > 0$\nsuch that for all $T \\ge T_0$ and $H = T^{0.5 + \\varepsilon}$ the inequality\n$N_0(T + H) - N_0(T) \\ge cH$ holds, where $N_0(T)$ is the number of zeros of odd order of\n$\\zeta(1/2 + it)$ with $t \\in (0, T]$.\n\nSelberg (1942) proved the stronger bound $N_0(T + H) - N_0(T) \\ge cH \\log T$ for\n$H = T^{0.5 + \\varepsilon}$, which implies this statement. -/\n@[category research solved, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.ii :\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ : ℝ, 0 < T₀ ∧ ∃ c : ℝ, 0 < c ∧\n      ∀ T : ℝ, T₀ ≤ T → c * T ^ (1 / 2 + ε) ≤ (N₀ (T + T ^ (1 / 2 + ε)) : ℝ) - N₀ T := by\n  sorry\n\nend HardyLittlewoodZetaFunctionConjectures\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The two slots match the article's two numbered conjectures exactly. I agree with the note that part (ii) is settled (Selberg 1942), and accordingly tagged it research solved rather than research open; if the harness insists on the list-page status 'open' for every slot, only that one tag would need changing.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Zero of odd order of the function ζ(1/2+it)' is modeled as Odd (analyticOrderNatAt riemannZeta (1/2 + t*I)), i.e. the multiplicity of s = 1/2+it as a zero of the complex function ζ is odd. This coincides with the order of t as a zero of the real-variable function t ↦ ζ(1/2+it), since the two differ by composition with the affine map t ↦ 1/2 + it (ζ(1/2+it) = (i(t−t₀))ⁿ g(1/2+it)). An odd order forces the order to be ≥ 1, so ζ(1/2+it) = 0 is implied (proved as the API lemma IsOddOrderZero.riemannZeta_eq_zero).",
+    "analyticOrderNatAt returns junk 0 when the function is not analytic or vanishes identically nearby; neither happens here: ζ is analytic at every 1/2+it (proved as API lemma analyticAt_riemannZeta_critical_line, since 1/2+it ≠ 1) and ζ is not identically zero near any point. Both junk cases would give order 0, which is not odd, so they could not create spurious odd-order zeros anyway.",
+    "N₀(T) is defined as Set.ncard of {t ∈ Set.Ioc 0 T | IsOddOrderZero t}; this set is finite (zeros of ζ are isolated and the segment is compact), so ncard is the genuine count. The article's N₀ counts odd-order zeros on the critical line in (0, T], not the usual N(T) of all zeros in the critical strip.",
+    "H = T^{0.25+ε} and H = T^{0.5+ε} are written as T ^ (1 / 4 + ε) and T ^ (1 / 2 + ε) with ε : ℝ, so these are real rpow with real exponents 0.25+ε and 0.5+ε (verified via pp.numericTypes). T > 0 is guaranteed by T ≥ T₀ > 0.",
+    "In part (ii) the inequality N₀(T+H) − N₀(T) ≥ cH is stated with both counts cast to ℝ, so that the subtraction is real subtraction, not truncated ℕ subtraction (mathematically equivalent since N₀ is monotone, but unambiguous).",
+    "Category: part (i) is research open; part (ii) is tagged research solved (not research open as the list-page status says) because Selberg (1942) proved the stronger bound N₀(T+H) − N₀(T) ≥ cH log T for H = T^{0.5+ε}, as stated in the article's Status section and in the decomposition-table notes. A reviewer who wants strict conformity to the list-page status should change this single tag. No formal_proof attribute is attached since no formal proof exists.",
+    "Only Wikipedia-style ASCII '1 / 2' is used for the point on the critical line: (1 / 2 + t * I : ℂ), verified to elaborate as complex 1/2 rather than a natural-number division."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "analyticOrderAt / analyticOrderNatAt (Mathlib.Analysis.Analytic.Order), meromorphicOrderAt (Mathlib.Analysis.Meromorphic.Order); the ℕ-valued analyticOrderNatAt was used directly inside the definition (Odd on ℕ∞ would make Odd ⊤ true, so the ℕ version is safer).",
+     "name": "HardyLittlewoodZetaFunctionConjectures.IsOddOrderZero",
+     "why_needed": "The conjectures are about zeros of odd order (odd multiplicity) of ζ(1/2+it), not merely zeros. Mathlib has analyticOrderNatAt but no predicate for 'odd-order zero of ζ on the critical line'; the definition is problem-specific so it is kept in the problem file."
+    },
+    {
+     "closest_existing_considered": "Set.ncard (used to implement it); Nat.count (only for ℕ-predicates, not applicable to real t); no zeta-zero counting function exists in Mathlib or FormalConjecturesForMathlib (grepped for riemannZeta in FormalConjecturesForMathlib and for ncard/riemannZeta combinations in the repo).",
+     "name": "HardyLittlewoodZetaFunctionConjectures.oddOrderZeroCount",
+     "why_needed": "The article's counting function N₀(T) = number of zeros of odd order of ζ(1/2+it) with t ∈ (0, T] is needed for part (ii). Neither Mathlib nor FormalConjecturesForMathlib has a zero-counting function for the Riemann zeta function on the critical line. Introduced with local notation N₀."
+    }
+   ],
+   "per_slot": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∀ ε > 0, ∃ T₀ > 0, ∀ T ≥ T₀, ∃ t ∈ Set.Ioc T (T + T ^ (1/4 + ε)), IsOddOrderZero t, where IsOddOrderZero t := Odd (analyticOrderNatAt riemannZeta (1/2 + t * I)). Quantifier order, half-open interval (T, T+H], H = T^{0.25+ε} (real rpow, T > 0 since T ≥ T₀ > 0) and 'odd order' (odd multiplicity of the zero 1/2+it of ζ, which forces ζ(1/2+it) = 0) all match the source. Category research open."
+    },
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∀ ε > 0, ∃ T₀ > 0, ∃ c > 0, ∀ T ≥ T₀, c * T ^ (1/2 + ε) ≤ (N₀ (T + T ^ (1/2 + ε)) : ℝ) - N₀ T, where N₀ T := {t ∈ Set.Ioc 0 T | IsOddOrderZero t}.ncard is the article's count of odd-order zeros of ζ(1/2+it) with t ∈ (0, T]. T₀ and c depend only on ε and are chosen before T; the difference is taken in ℝ to avoid truncated ℕ subtraction. Tagged research solved because Selberg (1942) proved the stronger bound ≥ cH log T (as the article's Status section and the decomposition notes record)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": "/-- **Hardy–Littlewood conjecture 1** (open).\nFor any $\\varepsilon > 0$ there exists $T_0 = T_0(\\varepsilon) > 0$ such that for all\n$T \\ge T_0$ and $H = T^{0.25 + \\varepsilon}$, the interval $(T, T + H]$ contains a zero of odd\norder of the function $\\zeta(1/2 + it)$.\n\nKaratsuba (1984) proved this with $H = T^{27/82 + \\varepsilon}$ in place of\n$H = T^{0.25 + \\varepsilon}$. -/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.i :\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ : ℝ, 0 < T₀ ∧ ∀ T : ℝ, T₀ ≤ T →\n      ∃ t ∈ Set.Ioc T (T + T ^ (1 / 4 + ε)), IsOddOrderZero t := by\n  sorry",
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": "/-- **Hardy–Littlewood conjecture 2** (proved by Selberg).\nFor any $\\varepsilon > 0$ there exist $T_0 = T_0(\\varepsilon) > 0$ and $c = c(\\varepsilon) > 0$\nsuch that for all $T \\ge T_0$ and $H = T^{0.5 + \\varepsilon}$ the inequality\n$N_0(T + H) - N_0(T) \\ge cH$ holds, where $N_0(T)$ is the number of zeros of odd order of\n$\\zeta(1/2 + it)$ with $t \\in (0, T]$.\n\nSelberg (1942) proved the stronger bound $N_0(T + H) - N_0(T) \\ge cH \\log T$ for\n$H = T^{0.5 + \\varepsilon}$, which implies this statement. -/\n@[category research solved, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.ii :\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ : ℝ, 0 < T₀ ∧ ∃ c : ℝ, 0 < c ∧\n      ∀ T : ℝ, T₀ ≤ T → c * T ^ (1 / 2 + ε) ≤ (N₀ (T + T ^ (1 / 2 + ε)) : ℝ) - N₀ T := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hardy–Littlewood zeta function conjectures\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Hardy%E2%80%93Littlewood_zeta_function_conjectures)\n-/\n\nnamespace HardyLittlewoodZetaFunctionConjectures\n\n/--\nFor every $\\varepsilon > 0$, there is a $T_0 > 0$ such that, for every $T \\geq T_0$,\nthe half-open interval $(T, T + T^{1/4 + \\varepsilon}]$ contains an ordinate $t$ for which\n$\\zeta(1/2 + it)$ is a zero of odd order.\n-/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.i :\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ : ℝ, 0 < T₀ ∧ ∀ T : ℝ, T₀ ≤ T →\n      ∃ t ∈ Set.Ioc T (T + T ^ (1 / 4 + ε : ℝ)),\n        riemannZeta ((1 / 2 : ℂ) + t * Complex.I) = 0 ∧\n          ∃ n : ℕ, Odd n ∧\n            analyticOrderAt riemannZeta ((1 / 2 : ℂ) + t * Complex.I) = n := by\n  sorry\n\n/--\nLet $N_0(X)$ count the odd-order zeros $\\zeta(1/2 + it)=0$ with $t \\in (0,X]$.\nFor every $\\varepsilon > 0$, there are constants $T_0 > 0$ and $c > 0$ such that, for every\n$T \\geq T_0$, with $H=T^{1/2+\\varepsilon}$ one has\n$N_0(T+H)-N_0(T) \\geq cH$.\n-/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.ii :\n    let N₀ : ℝ → ℕ := fun X ↦\n      {t : ℝ | t ∈ Set.Ioc 0 X ∧\n        riemannZeta ((1 / 2 : ℂ) + t * Complex.I) = 0 ∧\n          ∃ n : ℕ, Odd n ∧\n            analyticOrderAt riemannZeta ((1 / 2 : ℂ) + t * Complex.I) = n}.ncard\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ c : ℝ, 0 < T₀ ∧ 0 < c ∧ ∀ T : ℝ, T₀ ≤ T →\n      c * T ^ (1 / 2 + ε : ℝ) ≤\n        (N₀ (T + T ^ (1 / 2 + ε : ℝ)) : ℝ) - N₀ T := by\n  sorry\n\nend HardyLittlewoodZetaFunctionConjectures\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted a zero of odd order as a complex zero s = 1/2 + it for which `analyticOrderAt riemannZeta s` equals an odd natural number; the explicit equality to a natural also excludes infinite order.",
+    "Used `Set.Ioc` for both (T, T+H] and (0, X], preserving the strict lower and non-strict upper endpoints.",
+    "Interpreted N₀(X) as the number of distinct ordinates t in (0, X] at which the critical-line zeta zero has odd multiplicity, rather than counting each zero with its multiplicity.",
+    "Defined N₀ locally in part (ii), using existing `Set.ncard`, so the file introduces no bespoke top-level definition or extra declaration.",
+    "Cast the two natural-valued counts to real numbers before subtraction, matching the real inequality against cH and avoiding truncated natural subtraction.",
+    "Used real exponentiation for H = T^(1/4+ε) and H = T^(1/2+ε). Positivity of T follows from T ≥ T₀ > 0.",
+    "Tagged both slots `research open` to match the supplied overall status and explicit requirement, despite the decomposition note that part (ii) is historically settled."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": {
+     "outcome": "formalized",
+     "why": ""
+    },
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": "/--\nFor every $\\varepsilon > 0$, there is a $T_0 > 0$ such that, for every $T \\geq T_0$,\nthe half-open interval $(T, T + T^{1/4 + \\varepsilon}]$ contains an ordinate $t$ for which\n$\\zeta(1/2 + it)$ is a zero of odd order.\n-/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.i :\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ : ℝ, 0 < T₀ ∧ ∀ T : ℝ, T₀ ≤ T →\n      ∃ t ∈ Set.Ioc T (T + T ^ (1 / 4 + ε : ℝ)),\n        riemannZeta ((1 / 2 : ℂ) + t * Complex.I) = 0 ∧\n          ∃ n : ℕ, Odd n ∧\n            analyticOrderAt riemannZeta ((1 / 2 : ℂ) + t * Complex.I) = n := by\n  sorry",
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": "/--\nLet $N_0(X)$ count the odd-order zeros $\\zeta(1/2 + it)=0$ with $t \\in (0,X]$.\nFor every $\\varepsilon > 0$, there are constants $T_0 > 0$ and $c > 0$ such that, for every\n$T \\geq T_0$, with $H=T^{1/2+\\varepsilon}$ one has\n$N_0(T+H)-N_0(T) \\geq cH$.\n-/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.ii :\n    let N₀ : ℝ → ℕ := fun X ↦\n      {t : ℝ | t ∈ Set.Ioc 0 X ∧\n        riemannZeta ((1 / 2 : ℂ) + t * Complex.I) = 0 ∧\n          ∃ n : ℕ, Odd n ∧\n            analyticOrderAt riemannZeta ((1 / 2 : ℂ) + t * Complex.I) = n}.ncard\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ c : ℝ, 0 < T₀ ∧ 0 < c ∧ ∀ T : ℝ, T₀ ≤ T →\n      c * T ^ (1 / 2 + ε : ℝ) ≤\n        (N₀ (T + T ^ (1 / 2 + ε : ℝ)) : ℝ) - N₀ T := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hardy–Littlewood zeta function conjectures\n\n*Reference:*\n- [Hardy–Littlewood zeta function conjectures](https://en.wikipedia.org/wiki/Hardy%E2%80%93Littlewood_zeta_function_conjectures)\n-/\n\nnamespace HardyLittlewoodZetaFunctionConjectures\n\n/-- A complex number is an odd-order zero of the Riemann zeta function if its finite analytic\norder of vanishing is an odd natural number. -/\ndef IsOddOrderZero (s : ℂ) : Prop :=\n  ∃ n : ℕ, Odd n ∧ analyticOrderAt riemannZeta s = n\n\n/-- The number $N₀(T)$ of distinct odd-order zeros $\\frac12+it$ of the Riemann zeta function\nwhose ordinates $t$ lie in $(0,T]$. -/\nnoncomputable def N₀ (T : ℝ) : ℕ :=\n  Set.ncard {t : ℝ | 0 < t ∧ t ≤ T ∧ IsOddOrderZero (1 / 2 + t * Complex.I)}\n\nnamespace parts\n\n/-- For every $\\varepsilon>0$, there is a $T₀>0$ such that, for every $T\\geq T₀$, the\nhalf-open interval $(T,T+T^{1/4+\\varepsilon}]$ contains the ordinate of an odd-order zero\n$\\frac12+it$ of the Riemann zeta function. -/\n@[category research open, AMS 11]\ntheorem i :\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ : ℝ, 0 < T₀ ∧ ∀ T : ℝ, T₀ ≤ T →\n      ∃ t : ℝ, T < t ∧ t ≤ T + T ^ (1 / 4 + ε) ∧ IsOddOrderZero (1 / 2 + t * Complex.I) := by\n  sorry\n\n/-- For every $\\varepsilon>0$, there are $T₀>0$ and $c>0$ such that, for every $T\\geq T₀$\nand $H=T^{1/2+\\varepsilon}$, one has $N₀(T+H)-N₀(T)\\geq cH$, where $N₀(x)$ counts\nthe distinct odd-order zeros $\\frac12+it$ with $t\\in(0,x]$. -/\n@[category research open, AMS 11]\ntheorem ii :\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ c : ℝ, 0 < T₀ ∧ 0 < c ∧ ∀ T : ℝ, T₀ ≤ T →\n      c * T ^ (1 / 2 + ε) ≤\n        (N₀ (T + T ^ (1 / 2 + ε)) - N₀ T : ℕ) := by\n  sorry\n\nend parts\n\nend HardyLittlewoodZetaFunctionConjectures\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "The decomposition marks the collection open but notes that part ii is settled. I followed the requested open status in the file; the category of part ii is the only substantive metadata issue for human review.",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted an odd-order zero as a zero whose complex analytic order of vanishing under `analyticOrderAt riemannZeta` is a finite odd natural number, as required by the decomposition notes; this is stronger and more precise than merely asserting `riemannZeta s = 0`.",
+    "Defined `N₀ T` as the `Set.ncard` of distinct real ordinates `t` in `(0,T]` for which `1/2 + t * I` is an odd-order zero. Thus zeros are counted once per ordinate, not with multiplicity, and only zeros on the critical line are included.",
+    "Used `Real.rpow` through Lean's real exponentiation notation for `T ^ (1 / 4 + ε)` and `T ^ (1 / 2 + ε)`. The theorem hypotheses imply every relevant `T` is positive.",
+    "Represented the source's natural-number difference `N₀(T+H)-N₀(T)` by natural subtraction and coerced it to `ℝ` for comparison with `cH`; for the actual nested counting sets this agrees with ordinary subtraction.",
+    "Tagged both slots `research open` to match the supplied overall status and explicit category instruction. The supplied notes indicate that part ii is historically settled, so a reviewer may instead decide that its category should be `research solved`.",
+    "The article's `N₀` definition and the decomposition notes were used to disambiguate the terse list-page entry: it counts odd-order zeros on the critical line with ordinates in `(0,T]`, rather than all nontrivial zeta zeros."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `analyticOrderAt`; the new predicate specializes it to `riemannZeta` and requires equality with an odd natural number.",
+     "name": "HardyLittlewoodZetaFunctionConjectures.IsOddOrderZero",
+     "why_needed": "The statements repeatedly need the source's notion of a zeta zero having odd complex analytic multiplicity; no dedicated predicate was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Set.ncard`, used directly on the set of qualifying ordinates. For the bounded zero set of the actual analytic zeta function this is its finite cardinality.",
+     "name": "HardyLittlewoodZetaFunctionConjectures.N₀",
+     "why_needed": "Part ii explicitly uses the article-specific counting function for distinct odd-order critical-line zeros with ordinates in `(0,T]`; no such zeta zero-counting function was found."
+    }
+   ],
+   "per_slot": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hardy–Littlewood zeta function conjectures\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Hardy%E2%80%93Littlewood_zeta_function_conjectures)\n-/\n\nnamespace HardyLittlewoodZetaFunctionConjectures\n\n/-- The ordinate `t` gives an odd-order zero of the Riemann zeta function on the critical line. -/\nnoncomputable def IsOddOrderZero (t : ℝ) : Prop :=\n  riemannZeta ((1 : ℂ) / 2 + t * Complex.I) = 0 ∧\n    Odd (analyticOrderNatAt riemannZeta ((1 : ℂ) / 2 + t * Complex.I))\n\n/-- $N_0(T)$ is the number of odd-order zeros\n$\\zeta(\\frac12+it)=0$ whose ordinates lie in $(0,T]$. -/\nnoncomputable def N₀ (T : ℝ) : ℕ :=\n  {t : ℝ | 0 < t ∧ t ≤ T ∧ IsOddOrderZero t}.ncard\n\nnamespace parts\n\n/--\nFor every $\\varepsilon>0$, there is $T_0=T_0(\\varepsilon)>0$ such that, for every\n$T\\geq T_0$, the half-open interval\n$(T,T+T^{1/4+\\varepsilon}]$ contains an ordinate $t$ for which\n$\\zeta(\\frac12+it)$ is a zero of odd order.\n-/\n@[category research open, AMS 11]\ntheorem i :\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ : ℝ, 0 < T₀ ∧ ∀ T : ℝ, T₀ ≤ T →\n      ∃ t : ℝ, T < t ∧ t ≤ T + T ^ ((1 : ℝ) / 4 + ε) ∧ IsOddOrderZero t := by\n  sorry\n\n/--\nFor every $\\varepsilon>0$, there are $T_0=T_0(\\varepsilon)>0$ and\n$c=c(\\varepsilon)>0$ such that, for every $T\\geq T_0$, setting\n$H=T^{1/2+\\varepsilon}$ gives\n$N_0(T+H)-N_0(T)\\geq cH$, where $N_0(X)$ counts the odd-order zeros\n$\\zeta(\\frac12+it)=0$ with $t\\in(0,X]$.\n-/\n@[category research open, AMS 11]\ntheorem ii :\n    ∀ ε : ℝ, 0 < ε → ∃ T₀ : ℝ, 0 < T₀ ∧ ∃ c : ℝ, 0 < c ∧ ∀ T : ℝ, T₀ ≤ T →\n      let H := T ^ ((1 : ℝ) / 2 + ε)\n      (N₀ (T + H) : ℝ) - N₀ T ≥ c * H := by\n  sorry\n\nend parts\n\nend HardyLittlewoodZetaFunctionConjectures\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A critical-line zero at ordinate t is represented by the complex point 1/2 + t·i. Its multiplicity is `analyticOrderNatAt riemannZeta` at that point; explicit vanishing is also required so the Lean predicate visibly states both zerohood and odd analytic order.",
+    "The article-specific function N₀(T) counts distinct real ordinates t in the half-open interval (0,T] satisfying the odd-order-zero predicate. `Set.ncard` is used because N₀ is a natural-valued counting function in the source.",
+    "In part (ii), each natural count is cast to ℝ before subtraction. This models the ordinary numerical difference in the source and avoids the truncation semantics of natural subtraction.",
+    "Real powers `T ^ (1/4 + ε)` and `T ^ (1/2 + ε)` model the source's H. The hypotheses T ≥ T₀ > 0 ensure these powers are evaluated on a positive base.",
+    "Both slot declarations are tagged `research open` to match the supplied status and explicit category requirement, although the task notes that part (ii) has reportedly been settled."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `riemannZeta`, `analyticOrderAt`, and `analyticOrderNatAt` provide the ingredients, but no searched Mathlib or FormalConjecturesForMathlib predicate combines them for critical-line odd-order zeros.",
+     "name": "HardyLittlewoodZetaFunctionConjectures.IsOddOrderZero",
+     "why_needed": "Packages the source-specific condition that an ordinate gives a vanishing Riemann zeta value on the critical line with odd analytic multiplicity."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Set.ncard` provides finite set cardinality, but no searched Mathlib or FormalConjecturesForMathlib declaration defines this zeta-zero counting function.",
+     "name": "HardyLittlewoodZetaFunctionConjectures.N₀",
+     "why_needed": "Represents the article's specific count of odd-order critical-line zero ordinates in (0,T]."
+    }
+   ],
+   "per_slot": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hardy–Littlewood zeta function conjectures\n\nTwo conjectures of Hardy and Littlewood on the zeros of the Riemann zeta function\n$\\zeta$ on the critical line. Let $N_0(T)$ be the number of zeros of odd order of the\nfunction $t \\mapsto \\zeta(\\tfrac{1}{2} + it)$ lying in the interval $(0, T]$. Both conjectures\nconcern short intervals $(T, T + H]$ with $H = T^{a + \\varepsilon}$, where $\\varepsilon > 0$ is\narbitrarily small.\n\n1. For any $\\varepsilon > 0$ there exists $T_0 = T_0(\\varepsilon) > 0$ such that for\n   $T \\ge T_0$ and $H = T^{0.25 + \\varepsilon}$ the interval $(T, T + H]$ contains a zero of\n   odd order of $\\zeta(\\tfrac{1}{2} + it)$.\n2. For any $\\varepsilon > 0$ there exist $T_0 = T_0(\\varepsilon) > 0$ and\n   $c = c(\\varepsilon) > 0$ such that for $T \\ge T_0$ and $H = T^{0.5 + \\varepsilon}$ the\n   inequality $N_0(T + H) - N_0(T) \\ge cH$ holds.\n\nConjecture 1 is open: Karatsuba [Ka84] proved it with the exponent $27/82$ in place of\n$0.25$. Conjecture 2 was proved by Selberg [Se42] in the stronger form\n$N_0(T + H) - N_0(T) \\ge cH \\log T$.\n\nA zero of odd order of the real-variable function $t \\mapsto \\zeta(\\tfrac{1}{2} + it)$ at\n$t_0$ is the same as a zero of odd multiplicity of $\\zeta$ at $s_0 = \\tfrac{1}{2} + it_0$,\nbecause the substitution $s = \\tfrac{1}{2} + it$ is affine and preserves the order of\nvanishing. We therefore express \"odd order\" through `analyticOrderNatAt riemannZeta`.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Hardy%E2%80%93Littlewood_zeta_function_conjectures)\n- [HL21] Hardy, G. H. and Littlewood, J. E., *The zeros of Riemann's zeta-function on the\n  critical line*, Math. Z. 10 (1921), 283–317.\n- [Se42] Selberg, A., *On the zeros of Riemann's zeta-function*, Skr. Norske Vid. Akad. Oslo\n  I (1942), no. 10, 1–59.\n- [Ka84] Karatsuba, A. A., *On the zeros of the function ζ(s) on short intervals of the\n  critical line*, Izv. Akad. Nauk SSSR Ser. Mat. 48 (1984), no. 3, 569–584.\n-/\n\nopen Complex\n\nnamespace HardyLittlewoodZetaFunctionConjectures\n\n/--\n`IsOddOrderZero t` means that $t$ is a zero of odd order of the function\n$t \\mapsto \\zeta(\\tfrac{1}{2} + it)$, i.e. the Riemann zeta function vanishes to odd order at\n$s = \\tfrac{1}{2} + it$.\n\nNote that `riemannZeta` is analytic at every point $\\tfrac{1}{2} + it \\ne 1$ and is not\nidentically zero near any point, so `analyticOrderNatAt` never takes its junk value here: it is\nthe genuine multiplicity of the zero (and $0$ when $\\zeta(\\tfrac{1}{2} + it) \\ne 0$).\n-/\ndef IsOddOrderZero (t : ℝ) : Prop :=\n  Odd (analyticOrderNatAt riemannZeta (1 / 2 + t * I))\n\n/--\n$N_0(T)$: the number of zeros of odd order of the function $t \\mapsto \\zeta(\\tfrac{1}{2} + it)$\nlying in the interval $(0, T]$.\n-/\nnoncomputable def N₀ (T : ℝ) : ℕ :=\n  {t : ℝ | t ∈ Set.Ioc 0 T ∧ IsOddOrderZero t}.ncard\n\n/-- A zero of odd order is in particular a zero of $\\zeta(\\tfrac{1}{2} + it)$. -/\n@[category API, AMS 11]\ntheorem IsOddOrderZero.riemannZeta_eq_zero {t : ℝ} (ht : IsOddOrderZero t) :\n    riemannZeta (1 / 2 + t * I) = 0 := by\n  have h : analyticOrderAt riemannZeta (1 / 2 + t * I) ≠ 0 := by\n    intro h0\n    have h1 : analyticOrderNatAt riemannZeta (1 / 2 + t * I) = 0 := by\n      rw [analyticOrderNatAt, h0]\n      rfl\n    exact Nat.not_even_iff_odd.mpr ht (h1 ▸ Even.zero)\n  rw [Ne, analyticOrderAt_eq_zero] at h\n  push_neg at h\n  exact h.2\n\n/-- There are no zeros in the empty interval $(0, 0]$. -/\n@[category test, AMS 11]\ntheorem N₀_zero : N₀ 0 = 0 := by\n  simp [N₀]\n\n/--\n**Hardy–Littlewood conjecture 1.**\nFor any $\\varepsilon > 0$ there exists $T_0 = T_0(\\varepsilon) > 0$ such that for every\n$T \\ge T_0$, with $H = T^{0.25 + \\varepsilon}$, the interval $(T, T + H]$ contains a zero of\nodd order of the function $t \\mapsto \\zeta(\\tfrac{1}{2} + it)$.\n\nThis is open: Karatsuba [Ka84] proved the statement with the exponent $27/82$ in place of\n$0.25$.\n-/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.i (ε : ℝ) (hε : 0 < ε) :\n    ∃ T₀ > (0 : ℝ), ∀ T ≥ T₀,\n      ∃ t ∈ Set.Ioc T (T + T ^ (1 / 4 + ε)), IsOddOrderZero t := by\n  sorry\n\n/--\n**Hardy–Littlewood conjecture 2.**\nFor any $\\varepsilon > 0$ there exist $T_0 = T_0(\\varepsilon) > 0$ and $c = c(\\varepsilon) > 0$\nsuch that for every $T \\ge T_0$, with $H = T^{0.5 + \\varepsilon}$, the inequality\n$$N_0(T + H) - N_0(T) \\ge cH$$\nholds, where $N_0(T)$ is the number of zeros of odd order of $t \\mapsto \\zeta(\\tfrac{1}{2} + it)$\nin $(0, T]$.\n\nThis was proved by Selberg [Se42] in the stronger form $N_0(T + H) - N_0(T) \\ge cH \\log T$.\n-/\n@[category research solved, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.ii (ε : ℝ) (hε : 0 < ε) :\n    ∃ T₀ > (0 : ℝ), ∃ c > (0 : ℝ), ∀ T ≥ T₀,\n      c * T ^ (1 / 2 + ε) ≤ (N₀ (T + T ^ (1 / 2 + ε)) : ℝ) - N₀ T := by\n  sorry\n\nend HardyLittlewoodZetaFunctionConjectures\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.88,
+   "decomposition_objections": "The table's status line says 'open' for the whole entry, but its own notes for parts.ii correctly observe that this part was settled by Selberg (1942) in a stronger form. I followed the notes and tagged parts.ii as research solved while keeping parts.i research open; if the harness requires the category to literally equal the entry-level status, that is the one place where the file deviates. Otherwise the decomposition is faithful to the article (two parts, N₀ = odd-order zeros in (0, T], half-open intervals, quantifier order).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Zero of odd order of the function ζ(1/2+it)' is modeled as odd multiplicity of the zero s = 1/2 + it of riemannZeta via Odd (analyticOrderNatAt riemannZeta (1/2 + t*I)); this coincides with the order of the real-variable function t ↦ ζ(1/2+it) since s = 1/2 + it is an affine change of variable.",
+    "H = T^{0.25+ε} and H = T^{0.5+ε} are written inline as T ^ (1/4 + ε) and T ^ (1/2 + ε) with real rpow (verified that 1/4 and 1/2 elaborate in ℝ, not ℕ). Since T ≥ T₀ > 0 the rpow is the ordinary real power.",
+    "In part (ii) the difference N₀(T+H) − N₀(T) is computed after casting to ℝ, so ℕ truncated subtraction plays no role (N₀ is monotone anyway, so the two readings agree, but the ℝ form is unambiguous).",
+    "The inequality N₀(T+H) − N₀(T) ≥ cH is written as c * H ≤ (N₀ (T+H) : ℝ) - N₀ T; ∃ T₀ and ∃ c are both placed before ∀ T, as in the source (their relative order is immaterial).",
+    "Part (ii) is tagged @[category research solved] rather than research open: the article's Status section states Selberg (1942) proved the stronger bound N₀(T+H) − N₀(T) ≥ cH log T for H = T^{1/2+ε}, and the decomposition notes explicitly allow this. The list entry's 'open' status is carried by part (i), which is tagged research open. A reviewer who wants both tags to literally match the list-entry status should change part (ii)'s tag.",
+    "N₀ is defined with Set.ncard on a set that is provably finite for every T; the ncard junk value on infinite sets is unreachable. For T ≤ 0 the set is empty and N₀ T = 0, which matches the article's (0, T] convention.",
+    "Two small extra declarations (API lemma IsOddOrderZero.riemannZeta_eq_zero and test N₀_zero, both proved) were added per the style rule that bespoke definitions get basic API tests; they are not slots."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "analyticOrderAt / analyticOrderNatAt / meromorphicOrderAt from Mathlib (used as the building block); Odd on ℕ∞ was rejected because Odd ⊤ holds in ℕ∞, so analyticOrderNatAt (in ℕ) is used instead.",
+     "name": "HardyLittlewoodZetaFunctionConjectures.IsOddOrderZero",
+     "why_needed": "The conjectures are about zeros of odd order of t ↦ ζ(1/2 + it); the repo and Mathlib have no predicate for this. Defined as Odd (analyticOrderNatAt riemannZeta (1/2 + t * I)). The order of vanishing of the real-variable function t ↦ ζ(1/2+it) at t₀ equals the multiplicity of the zero of ζ at 1/2 + i t₀ because the substitution is affine, so this is faithful. The junk value 0 of analyticOrderNatAt (non-analytic point or order ⊤) is even, and neither case occurs for ζ at 1/2 + it (ζ is analytic away from 1 and not locally zero), so no spurious odd-order zeros can arise. An API lemma IsOddOrderZero.riemannZeta_eq_zero (proved) checks that an odd-order zero is a zero."
+    },
+    {
+     "closest_existing_considered": "No zero-counting function for riemannZeta exists in Mathlib or FormalConjecturesForMathlib (searched for 'critical line', 'zeros of zeta', 'riemannZeta ... = 0', 'Hardy'). Set.ncard, as used in nearby Wikipedia files (RudinsConjecture, PowerfulNumbersDensity), is the repo idiom for such counts.",
+     "name": "HardyLittlewoodZetaFunctionConjectures.N₀",
+     "why_needed": "The article's counting function N₀(T) = number of odd-order zeros of ζ(1/2+it) with t ∈ (0, T]. Defined as {t : ℝ | t ∈ Set.Ioc 0 T ∧ IsOddOrderZero t}.ncard. The set is finite for every T (zeros of a non-constant analytic function on a compact segment are finite), so ncard never returns its junk value; a test N₀_zero : N₀ 0 = 0 is proved."
+    }
+   ],
+   "per_slot": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every ε > 0 there is T₀ > 0 such that for all T ≥ T₀ some t ∈ Set.Ioc T (T + T ^ (1/4 + ε)) satisfies IsOddOrderZero t, where IsOddOrderZero t := Odd (analyticOrderNatAt riemannZeta (1/2 + t * I)). Quantifier order, half-open interval, non-strict T ≥ T₀ and strict T₀ > 0 match the article. Tagged research open."
+    },
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every ε > 0 there are T₀ > 0 and c > 0 such that for all T ≥ T₀, c * T ^ (1/2 + ε) ≤ (N₀ (T + T ^ (1/2 + ε)) : ℝ) - N₀ T, where N₀ T is the ncard of the odd-order zeros t of ζ(1/2+it) lying in Set.Ioc 0 T (the article's N₀, not the critical-strip count N). The difference is taken in ℝ to avoid ℕ truncation. Tagged research solved because the article's Status section (and the decomposition notes) record Selberg's 1942 proof of the stronger bound ≥ cH log T."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": "/--\n**Hardy–Littlewood conjecture 1.**\nFor any $\\varepsilon > 0$ there exists $T_0 = T_0(\\varepsilon) > 0$ such that for every\n$T \\ge T_0$, with $H = T^{0.25 + \\varepsilon}$, the interval $(T, T + H]$ contains a zero of\nodd order of the function $t \\mapsto \\zeta(\\tfrac{1}{2} + it)$.\n\nThis is open: Karatsuba [Ka84] proved the statement with the exponent $27/82$ in place of\n$0.25$.\n-/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.i (ε : ℝ) (hε : 0 < ε) :\n    ∃ T₀ > (0 : ℝ), ∀ T ≥ T₀,\n      ∃ t ∈ Set.Ioc T (T + T ^ (1 / 4 + ε)), IsOddOrderZero t := by\n  sorry",
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": "/--\n**Hardy–Littlewood conjecture 2.**\nFor any $\\varepsilon > 0$ there exist $T_0 = T_0(\\varepsilon) > 0$ and $c = c(\\varepsilon) > 0$\nsuch that for every $T \\ge T_0$, with $H = T^{0.5 + \\varepsilon}$, the inequality\n$$N_0(T + H) - N_0(T) \\ge cH$$\nholds, where $N_0(T)$ is the number of zeros of odd order of $t \\mapsto \\zeta(\\tfrac{1}{2} + it)$\nin $(0, T]$.\n\nThis was proved by Selberg [Se42] in the stronger form $N_0(T + H) - N_0(T) \\ge cH \\log T$.\n-/\n@[category research solved, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.ii (ε : ℝ) (hε : 0 < ε) :\n    ∃ T₀ > (0 : ℝ), ∃ c > (0 : ℝ), ∀ T ≥ T₀,\n      c * T ^ (1 / 2 + ε) ≤ (N₀ (T + T ^ (1 / 2 + ε)) : ℝ) - N₀ T := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hardy–Littlewood zeta function conjectures\n\n*Reference:*\n- [Wikipedia, Hardy–Littlewood zeta function conjectures](https://en.wikipedia.org/wiki/Hardy%E2%80%93Littlewood_zeta_function_conjectures)\n-/\n\nnamespace HardyLittlewoodZetaFunctionConjectures\n\n/-- The Riemann zeta function has a zero of odd order at the critical-line ordinate $t$. -/\ndef IsOddOrderZero (t : ℝ) : Prop :=\n  riemannZeta ((1 / 2 : ℂ) + t * Complex.I) = 0 ∧\n    ∃ n : ℕ, Odd n ∧\n      analyticOrderAt riemannZeta ((1 / 2 : ℂ) + t * Complex.I) = n\n\n/--\n$N_0(T)$ is the number of ordinates $t \\in (0,T]$ at which\n$\\zeta(\\frac12+it)$ has a zero of odd order.\n-/\nnoncomputable def N₀ (T : ℝ) : ℕ :=\n  {t : ℝ | t ∈ Set.Ioc 0 T ∧ IsOddOrderZero t}.ncard\n\nnamespace parts\n\n/--\nFor every $\\varepsilon > 0$, there is a $T_0 > 0$ such that, for every\n$T \\geq T_0$, the interval $(T,T+T^{1/4+\\varepsilon}]$ contains an ordinate $t$\nat which $\\zeta(\\frac12+it)$ has a zero of odd order.\n-/\n@[category research open, AMS 11]\ntheorem i :\n    ∀ ε : ℝ, 0 < ε →\n      ∃ T₀ : ℝ, 0 < T₀ ∧ ∀ T : ℝ, T₀ ≤ T →\n        ∃ t ∈ Set.Ioc T (T + T ^ ((1 : ℝ) / 4 + ε)), IsOddOrderZero t := by\n  sorry\n\n/--\nFor every $\\varepsilon > 0$, there are $T_0 > 0$ and $c > 0$ such that, for\nevery $T \\geq T_0$ and $H=T^{1/2+\\varepsilon}$,\n$N_0(T+H)-N_0(T) \\geq cH$.\n-/\n@[category research open, AMS 11]\ntheorem ii :\n    ∀ ε : ℝ, 0 < ε →\n      ∃ T₀ c : ℝ, 0 < T₀ ∧ 0 < c ∧ ∀ T : ℝ, T₀ ≤ T →\n        c * T ^ ((1 : ℝ) / 2 + ε) ≤\n          ((N₀ (T + T ^ ((1 : ℝ) / 2 + ε)) - N₀ T : ℕ) : ℝ) := by\n  sorry\n\nend parts\n\nend HardyLittlewoodZetaFunctionConjectures\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted a zero of odd order at ordinate t as the complex zero s = 1/2 + t i of `riemannZeta`, with `analyticOrderAt riemannZeta s` equal to an odd natural number; the explicit equation `riemannZeta s = 0` is also included for clarity.",
+    "Defined N₀(T) as the `Set.ncard` of distinct real ordinates t in the half-open interval (0,T] where the critical-line zero has odd analytic order. This follows the article's count of odd-order zeros rather than summing their multiplicities.",
+    "Expanded H definitionally as the relevant real power of T in each declaration, preserving the article's exponents and all quantifier dependencies.",
+    "Used `research open` on both declarations to match the supplied overall status, although the decomposition notes indicate that part ii is historically settled and should be reviewed for a possible `research solved` classification."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `analyticOrderAt` supplies the vanishing order, but no existing predicate combines it with the Riemann zeta function, the critical line, and oddness.",
+     "name": "HardyLittlewoodZetaFunctionConjectures.IsOddOrderZero",
+     "why_needed": "Packages the problem-specific notion that the Riemann zeta function has an odd-multiplicity zero at the critical-line point 1/2 + t i."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Set.ncard` provides the cardinality operation, but no existing zeta-zero counting function has the source's precise domain and odd-order restriction.",
+     "name": "HardyLittlewoodZetaFunctionConjectures.N₀",
+     "why_needed": "The source's N₀ is specifically the number of odd-order critical-line zero ordinates in (0,T], which has no existing repository definition."
+    }
+   ],
+   "per_slot": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hardy–Littlewood zeta function conjectures\n\nHardy and Littlewood made two conjectures about the zeros of odd order of the function\n$\\zeta\\bigl(\\tfrac12 + it\\bigr)$ on short intervals $(T, T + H]$ of the critical line, where\n$T > 0$ is sufficiently large and $H = T^{a + \\varepsilon}$ with $a > 0$ as small as possible\nand $\\varepsilon > 0$ arbitrarily small.\n\nLet $N_0(T)$ be the number of zeros of odd order of $\\zeta\\bigl(\\tfrac12 + it\\bigr)$ lying on\nthe interval $(0, T]$.\n\n1. For any $\\varepsilon > 0$ there exists $T_0 = T_0(\\varepsilon) > 0$ such that for\n   $T \\ge T_0$ and $H = T^{0.25 + \\varepsilon}$ the interval $(T, T + H]$ contains a zero of\n   odd order of the function $\\zeta\\bigl(\\tfrac12 + it\\bigr)$.\n2. For any $\\varepsilon > 0$ there exist $T_0 = T_0(\\varepsilon) > 0$ and\n   $c = c(\\varepsilon) > 0$ such that for $T \\ge T_0$ and $H = T^{0.5 + \\varepsilon}$ the\n   inequality $N_0(T + H) - N_0(T) \\ge cH$ is true.\n\nThe second conjecture was proved by Selberg in 1942, with the stronger lower bound\n$c H \\log T$. Selberg conjectured that the exponent $0.5$ in the second conjecture can be\ndecreased; this was proved by Karatsuba in 1984, who obtained the exponent $27/82$. The\nfirst conjecture (exponent $0.25$) remains open.\n\n*References:*\n- [Wikipedia: Hardy–Littlewood zeta function conjectures](https://en.wikipedia.org/wiki/Hardy%E2%80%93Littlewood_zeta_function_conjectures)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- G. H. Hardy, J. E. Littlewood, *The zeros of Riemann's zeta-function on the critical line*,\n  Math. Z. 10 (1921), 283–317.\n- A. Selberg, *On the zeros of Riemann's zeta-function*, Skr. Norske Vid. Akad. Oslo I (1942),\n  no. 10.\n- A. A. Karatsuba, *On the zeros of the function ζ(s) on short intervals of the critical line*,\n  Izv. Akad. Nauk SSSR Ser. Mat. 48 (1984), no. 3, 569–584.\n-/\n\nopen Complex\n\nnamespace HardyLittlewoodZetaFunctionConjectures\n\n/-- `IsOddOrderZero t` says that $t$ is a zero of odd order of the function\n$\\zeta\\bigl(\\tfrac12 + it\\bigr)$, that is, the Riemann zeta function vanishes at the point\n$\\tfrac12 + it$ of the critical line with odd multiplicity.\n\nThe multiplicity is `analyticOrderNatAt riemannZeta (1 / 2 + t * I)`. Since $\\zeta$ is analytic\nand not identically zero near every point of the critical line, this is the usual order of the\nzero of $\\zeta$ at $\\tfrac12 + it$ (and it is `0` when $\\zeta(\\tfrac12 + it) \\ne 0$). -/\ndef IsOddOrderZero (t : ℝ) : Prop :=\n  Odd (analyticOrderNatAt riemannZeta (1 / 2 + t * I))\n\n/-- A zero of odd order of $\\zeta\\bigl(\\tfrac12 + it\\bigr)$ is in particular a zero. -/\n@[category API, AMS 11]\ntheorem riemannZeta_eq_zero_of_isOddOrderZero {t : ℝ} (ht : IsOddOrderZero t) :\n    riemannZeta (1 / 2 + t * I) = 0 := by\n  refine (analyticOrderAt_ne_zero.mp fun h ↦ ?_).2\n  unfold IsOddOrderZero analyticOrderNatAt at ht\n  rw [h] at ht\n  simp at ht\n\n/-- $N_0(T)$ is the number of zeros of odd order of the function $\\zeta\\bigl(\\tfrac12 + it\\bigr)$\nlying on the interval $(0, T]$. -/\nnoncomputable def N₀ (T : ℝ) : ℕ :=\n  {t ∈ Set.Ioc 0 T | IsOddOrderZero t}.ncard\n\n/-- There are no zeros of odd order of $\\zeta\\bigl(\\tfrac12 + it\\bigr)$ on the empty interval\n$(0, T]$ when $T \\le 0$. -/\n@[category API, AMS 11]\ntheorem N₀_eq_zero_of_nonpos {T : ℝ} (hT : T ≤ 0) : N₀ T = 0 := by\n  simp [N₀, Set.Ioc_eq_empty_of_le hT]\n\n/-- **Hardy–Littlewood zeta function conjecture 1.**\nFor any $\\varepsilon > 0$ there exists $T_0 = T_0(\\varepsilon) > 0$ such that for $T \\ge T_0$\nand $H = T^{0.25 + \\varepsilon}$ the interval $(T, T + H]$ contains a zero of odd order of the\nfunction $\\zeta\\bigl(\\tfrac12 + it\\bigr)$.\n\nThe best known result in this direction is due to Karatsuba (1984), who proved this with the\nexponent $27/82$ in place of $0.25$. -/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.i :\n    ∀ ε > (0 : ℝ), ∃ T₀ > (0 : ℝ), ∀ T ≥ T₀,\n      ∃ t ∈ Set.Ioc T (T + T ^ (1 / 4 + ε)), IsOddOrderZero t := by\n  sorry\n\n/-- **Hardy–Littlewood zeta function conjecture 2.**\nFor any $\\varepsilon > 0$ there exist $T_0 = T_0(\\varepsilon) > 0$ and $c = c(\\varepsilon) > 0$\nsuch that for $T \\ge T_0$ and $H = T^{0.5 + \\varepsilon}$ the inequality\n$N_0(T + H) - N_0(T) \\ge cH$ is true, where $N_0(T)$ is the number of zeros of odd order of\n$\\zeta\\bigl(\\tfrac12 + it\\bigr)$ lying on $(0, T]$.\n\nThis was proved by Selberg (1942), who obtained the stronger bound\n$N_0(T + H) - N_0(T) \\ge c H \\log T$ for $H = T^{0.5 + \\varepsilon}$. -/\n@[category research solved, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.ii :\n    ∀ ε > (0 : ℝ), ∃ T₀ > (0 : ℝ), ∃ c > (0 : ℝ), ∀ T ≥ T₀,\n      (N₀ (T + T ^ (1 / 2 + ε)) : ℝ) - N₀ T ≥ c * T ^ (1 / 2 + ε) := by\n  sorry\n\nend HardyLittlewoodZetaFunctionConjectures\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None of substance. The table is consistent with the Wikipedia article. One remark: the table's 'Status: open' applies to the entry as a whole, while its own note (correctly) observes that part (ii) is settled by Selberg 1942; I followed the note and tagged part (ii) `research solved`, part (i) `research open`.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Zero of odd order of ζ(1/2+it)' is modelled as odd multiplicity of the complex-analytic function riemannZeta at the point 1/2 + t·I (analyticOrderNatAt over 𝕜 = ℂ), not as the order of the real-variable function t ↦ ζ(1/2+it). These coincide mathematically (the map t ↦ 1/2+it is analytic with nonvanishing derivative and ζ is analytic at every point of the critical line), and the complex multiplicity is the standard meaning in the literature (odd-order zeros = sign changes of Hardy's Z(t)).",
+    "Odd is applied to analyticOrderNatAt (an ℕ-valued order, which is 0 for ⊤ and for non-analytic points) rather than to analyticOrderAt in ℕ∞, because Odd (⊤ : ℕ∞) is true. For ζ the order is never ⊤ and ζ is analytic at every point 1/2+it, so the predicate is exactly 'ζ(1/2+it)=0 with odd multiplicity'; the file proves the API lemma that IsOddOrderZero t → riemannZeta (1/2 + t*I) = 0.",
+    "N₀ T is defined with Set.ncard on {t ∈ Set.Ioc 0 T | IsOddOrderZero t}. Set.ncard returns 0 for infinite sets, but the set is finite for every T (isolated zeros of a non-trivial analytic function on a compact segment), so this is the genuine count.",
+    "In part (ii) the difference N₀(T+H) − N₀(T) is computed after casting to ℝ, so no natural-number truncation can occur, and the inequality ≥ c·H is stated in ℝ with H = T ^ (1/2 + ε) written inline (H is not a separate bound variable).",
+    "Exponents 0.25 and 0.5 are written as the real numbers 1/4 and 1/2 (verified with pp.numericTypes that these are real, not ℕ, divisions); T^(…) is Real.rpow, and T ≥ T₀ > 0 keeps T positive.",
+    "T₀ > 0 and c > 0 are stated as strict inequalities and quantified before T, exactly as in the source; T ≥ T₀ is non-strict.",
+    "Category for part (ii): tagged `research solved` rather than `research open`. The list entry as a whole is marked open (part (i) is open), but the decomposition table's note and the Wikipedia article's Status section record that Selberg (1942) proved part (ii) with the stronger bound cH log T, and the repository's CONTRIBUTING rules require solved statements to carry `research solved`. A reviewer who wants the tag to mirror the list entry literally should change this one attribute. No formal_proof attribute is added since no formal proof exists.",
+    "Two `category API` lemmas (riemannZeta_eq_zero_of_isOddOrderZero and N₀_eq_zero_of_nonpos) are included as basic tests of the bespoke definitions, per the repo's 'add basic API tests' style guideline; both are fully proved.",
+    "The article's function N(T) (count of all real zeros of ζ(1/2+it)) is not defined since neither slot uses it."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "analyticOrderAt / analyticOrderNatAt / meromorphicOrderAt (Mathlib) — these give the multiplicity but not the 'odd' predicate specialised to ζ on the critical line; RiemannHypothesis (Mathlib) only concerns the location of zeros, not their multiplicity.",
+     "name": "HardyLittlewoodZetaFunctionConjectures.IsOddOrderZero",
+     "why_needed": "The source speaks of 'zeros of odd order of ζ(1/2+it)'. No Mathlib or repo predicate expresses 'zero of odd multiplicity of the Riemann zeta function at a point of the critical line'. Defined as Odd (analyticOrderNatAt riemannZeta (1/2 + t*I)); verified (in scratch) to be equivalent to ∃ n : ℕ, analyticOrderAt riemannZeta (1/2 + t*I) = 2n+1, and the file proves the API lemma that it implies riemannZeta (1/2 + t*I) = 0. Using analyticOrderNatAt (ℕ) rather than Odd on analyticOrderAt (ℕ∞) avoids the pitfall that Odd ⊤ holds in ℕ∞."
+    },
+    {
+     "closest_existing_considered": "Set.ncard / Set.encard applied to zero sets; no existing zero-counting function for riemannZeta was found (rg over Mathlib and the repo).",
+     "name": "HardyLittlewoodZetaFunctionConjectures.N₀",
+     "why_needed": "The article's counting function N₀(T) = number of zeros of odd order of ζ(1/2+it) with t ∈ (0,T]. No such counting function exists in Mathlib or FormalConjecturesForMathlib. Defined as {t ∈ Set.Ioc 0 T | IsOddOrderZero t}.ncard; the set is finite (zeros of the non-identically-zero analytic function ζ in a compact segment are isolated), so ncard is the true count. An API lemma N₀ T = 0 for T ≤ 0 is included."
+    }
+   ],
+   "per_slot": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∀ ε > 0, ∃ T₀ > 0, ∀ T ≥ T₀, ∃ t ∈ Set.Ioc T (T + T ^ (1/4 + ε)), IsOddOrderZero t, where IsOddOrderZero t := Odd (analyticOrderNatAt riemannZeta (1/2 + t*I)) is a bespoke problem-local definition built from Mathlib's analyticOrderNatAt and riemannZeta. Exponent is real division (checked with pp.numericTypes), interval is half-open (T, T+H], quantifier order matches the source. Tagged research open."
+    },
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∀ ε > 0, ∃ T₀ > 0, ∃ c > 0, ∀ T ≥ T₀, (N₀ (T + T ^ (1/2 + ε)) : ℝ) - N₀ T ≥ c * T ^ (1/2 + ε), with N₀ T := {t ∈ Set.Ioc 0 T | IsOddOrderZero t}.ncard the article's count of odd-order zeros of ζ(1/2+it) on (0,T]. c and T₀ depend only on ε and are chosen before T; subtraction is in ℝ. Tagged research solved (Selberg 1942), following the decomposition-table note."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": "/-- **Hardy–Littlewood zeta function conjecture 1.**\nFor any $\\varepsilon > 0$ there exists $T_0 = T_0(\\varepsilon) > 0$ such that for $T \\ge T_0$\nand $H = T^{0.25 + \\varepsilon}$ the interval $(T, T + H]$ contains a zero of odd order of the\nfunction $\\zeta\\bigl(\\tfrac12 + it\\bigr)$.\n\nThe best known result in this direction is due to Karatsuba (1984), who proved this with the\nexponent $27/82$ in place of $0.25$. -/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.i :\n    ∀ ε > (0 : ℝ), ∃ T₀ > (0 : ℝ), ∀ T ≥ T₀,\n      ∃ t ∈ Set.Ioc T (T + T ^ (1 / 4 + ε)), IsOddOrderZero t := by\n  sorry",
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": "/-- **Hardy–Littlewood zeta function conjecture 2.**\nFor any $\\varepsilon > 0$ there exist $T_0 = T_0(\\varepsilon) > 0$ and $c = c(\\varepsilon) > 0$\nsuch that for $T \\ge T_0$ and $H = T^{0.5 + \\varepsilon}$ the inequality\n$N_0(T + H) - N_0(T) \\ge cH$ is true, where $N_0(T)$ is the number of zeros of odd order of\n$\\zeta\\bigl(\\tfrac12 + it\\bigr)$ lying on $(0, T]$.\n\nThis was proved by Selberg (1942), who obtained the stronger bound\n$N_0(T + H) - N_0(T) \\ge c H \\log T$ for $H = T^{0.5 + \\varepsilon}$. -/\n@[category research solved, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.ii :\n    ∀ ε > (0 : ℝ), ∃ T₀ > (0 : ℝ), ∃ c > (0 : ℝ), ∀ T ≥ T₀,\n      (N₀ (T + T ^ (1 / 2 + ε)) : ℝ) - N₀ T ≥ c * T ^ (1 / 2 + ε) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hardy–Littlewood zeta function conjectures\n\nHardy proved in 1914 that $\\zeta(\\tfrac12 + it)$ has infinitely many real zeros. Let $N_0(T)$ be\nthe number of zeros of odd order of $\\zeta(\\tfrac12 + it)$ with $t \\in (0, T]$. Hardy and\nLittlewood stated two conjectures about the zeros of $\\zeta(\\tfrac12 + it)$ on short intervals\n$(T, T + H]$ with $H = T^{a + \\varepsilon}$:\n\n1. For any $\\varepsilon > 0$ there is $T_0 = T_0(\\varepsilon) > 0$ such that for $T \\ge T_0$ and\n   $H = T^{1/4 + \\varepsilon}$ the interval $(T, T + H]$ contains a zero of odd order of\n   $\\zeta(\\tfrac12 + it)$.\n2. For any $\\varepsilon > 0$ there are $T_0 = T_0(\\varepsilon) > 0$ and $c = c(\\varepsilon) > 0$\n   such that for $T \\ge T_0$ and $H = T^{1/2 + \\varepsilon}$ one has\n   $N_0(T + H) - N_0(T) \\ge cH$.\n\nConjecture 2 was proved by Selberg in 1942, who obtained the stronger bound\n$N_0(T + H) - N_0(T) \\ge cH \\log T$ for $H = T^{1/2 + \\varepsilon}$. Karatsuba (1984) lowered the\nexponent $1/2$ to $27/82$. Conjecture 1 (exponent $1/4$) remains open.\n\n*References:*\n- [Wikipedia: Hardy–Littlewood zeta function conjectures](https://en.wikipedia.org/wiki/Hardy%E2%80%93Littlewood_zeta_function_conjectures)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [HL21] Hardy, G. H. and Littlewood, J. E., *The zeros of Riemann's zeta-function on the critical\n  line*, Math. Z. 10 (1921), 283–317.\n- [Se42] Selberg, A., *On the zeros of Riemann's zeta-function*, Skr. Norske Vid. Akad. Oslo I\n  (1942), no. 10.\n- [Ka84] Karatsuba, A. A., *On the zeros of the function ζ(s) on short intervals of the critical\n  line*, Izv. Akad. Nauk SSSR Ser. Mat. 48 (1984), 569–584.\n-/\n\nopen Complex\n\nnamespace HardyLittlewoodZetaFunctionConjectures\n\n/-- `IsOddOrderZero t` says that `t : ℝ` is a zero of odd order of the function\n$t \\mapsto \\zeta(\\tfrac12 + it)$, i.e. the multiplicity of $\\tfrac12 + it$ as a zero of $\\zeta$\nis odd.\n\nSince $\\tfrac12 + it \\ne 1$, `riemannZeta` is analytic at $\\tfrac12 + it$, and since $\\zeta$ is\nnot identically zero, `analyticOrderNatAt riemannZeta (1 / 2 + t * I)` is the genuine\nmultiplicity of the zero (it is `0` when $\\zeta(\\tfrac12 + it) \\ne 0$). -/\ndef IsOddOrderZero (t : ℝ) : Prop :=\n  Odd (analyticOrderNatAt riemannZeta (1 / 2 + t * I))\n\n/-- $N_0(T)$ is the number of zeros of odd order of $\\zeta(\\tfrac12 + it)$ with $t \\in (0, T]$. -/\nnoncomputable def N₀ (T : ℝ) : ℕ :=\n  {t ∈ Set.Ioc 0 T | IsOddOrderZero t}.ncard\n\n/-- A zero of odd order of $\\zeta(\\tfrac12 + it)$ is a zero of $\\zeta(\\tfrac12 + it)$. -/\n@[category API, AMS 11]\ntheorem IsOddOrderZero.riemannZeta_eq_zero {t : ℝ} (h : IsOddOrderZero t) :\n    riemannZeta (1 / 2 + t * I) = 0 :=\n  apply_eq_zero_of_analyticOrderNatAt_ne_zero h.pos.ne'\n\n/-- There are no zeros counted by $N_0(T)$ when $T \\le 0$. -/\n@[category API, AMS 11]\ntheorem N₀_of_nonpos {T : ℝ} (hT : T ≤ 0) : N₀ T = 0 := by\n  simp [N₀, Set.Ioc_eq_empty_of_le hT]\n\n/-- **Hardy–Littlewood conjecture 1.**\nFor any $\\varepsilon > 0$ there exists $T_0 = T_0(\\varepsilon) > 0$ such that for all $T \\ge T_0$\nand $H = T^{1/4 + \\varepsilon}$, the interval $(T, T + H]$ contains a zero of odd order of the\nfunction $\\zeta(\\tfrac12 + it)$.\n\nThis is open: Karatsuba [Ka84] proved the analogous statement with exponent $27/82$ in place of\n$1/4$. -/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.i (ε : ℝ) (hε : 0 < ε) :\n    ∃ T₀ > (0 : ℝ), ∀ T ≥ T₀,\n      ∃ t ∈ Set.Ioc T (T + T ^ (1 / 4 + ε)), IsOddOrderZero t := by\n  sorry\n\n/-- **Hardy–Littlewood conjecture 2.**\nFor any $\\varepsilon > 0$ there exist $T_0 = T_0(\\varepsilon) > 0$ and $c = c(\\varepsilon) > 0$\nsuch that for all $T \\ge T_0$ and $H = T^{1/2 + \\varepsilon}$ the inequality\n$N_0(T + H) - N_0(T) \\ge cH$ holds, where $N_0(T)$ counts the zeros of odd order of\n$\\zeta(\\tfrac12 + it)$ with $t \\in (0, T]$.\n\nThis was proved by Selberg [Se42], who showed the stronger bound\n$N_0(T + H) - N_0(T) \\ge cH \\log T$ for $H = T^{1/2 + \\varepsilon}$. -/\n@[category research solved, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.ii (ε : ℝ) (hε : 0 < ε) :\n    ∃ T₀ > (0 : ℝ), ∃ c > (0 : ℝ), ∀ T ≥ T₀,\n      c * T ^ (1 / 2 + ε) ≤ (N₀ (T + T ^ (1 / 2 + ε)) : ℝ) - N₀ T := by\n  sorry\n\nend HardyLittlewoodZetaFunctionConjectures\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None substantive. The table is consistent with the article. One note: the article's 'Status' section phrases Selberg's theorem with N(T) (all real zeros of ζ(1/2+it)) rather than N₀(T), but Selberg's method (sign changes of Hardy's Z-function) and the standard formulation in Karatsuba's works give the bound for N₀, so the table's remark that part (ii) is settled is correct; I followed it and tagged (ii) research solved.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Zero of odd order of ζ(1/2+it)' is formalized as Odd (analyticOrderNatAt riemannZeta (1/2 + t*I)): the multiplicity of 1/2+it as a zero of ζ, which equals the order of vanishing of the real-variable function t ↦ ζ(1/2+it) at t (the change of variables is affine). analyticOrderNatAt returns the junk value 0 if ζ were not analytic there (impossible since 1/2+it ≠ 1) or if the order were ⊤ (impossible since ζ is not identically zero); 0 is even, so no spurious 'odd-order zeros' are introduced. analyticOrderNatAt (ℕ) is used rather than analyticOrderAt (ℕ∞) precisely because ⊤ would be 'Odd' in ℕ∞.",
+    "N₀(T) is defined via Set.ncard of {t ∈ (0, T] | IsOddOrderZero t}. This set is finite (zeros of a non-trivial analytic function on a compact segment), so ncard is the true count; the article's N₀ (odd-order zeros on the critical line) is used, not the usual N(T) counting all zeros in the critical strip.",
+    "H = T^{0.25+ε} and H = T^{0.5+ε} are written as real rpow T ^ (1/4 + ε) and T ^ (1/2 + ε); since T ≥ T₀ > 0 the base is positive and rpow agrees with the usual real power. The exponents 1/4 and 1/2 elaborate as real literals (checked: (1/4 : ℝ) + ε).",
+    "In part (ii) the inequality N₀(T+H) − N₀(T) ≥ cH is stated in ℝ (N₀ cast to ℝ before subtracting) to avoid truncated natural subtraction; since N₀ is monotone this is equivalent to the informal statement.",
+    "The explicit ∃ T₀ > 0, ∀ T ≥ T₀ form from the source is kept rather than an ∀ᶠ T in atTop idiom, to preserve the stated dependence T₀ = T₀(ε) (and c = c(ε)) chosen before T.",
+    "Category: part (i) is research open (Karatsuba 1984 reaches only exponent 27/82). Part (ii) is tagged research solved, following the decomposition-table note: Selberg (1942) proved N₀(T+H) − N₀(T) ≥ cH log T for H = T^{1/2+ε} (odd-order zeros via sign changes of Hardy's Z-function), which implies the conjectured bound ≥ cH for large T. The overall list-page status 'open' refers to part (i). A reviewer may prefer research open for (ii) if strictly matching the list entry's status; this is a one-token change.",
+    "Two proven @[category API] lemmas are included as basic tests for the bespoke definitions: an odd-order zero is a zero of ζ, and N₀ T = 0 for T ≤ 0."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "analyticOrderAt / analyticOrderNatAt (Mathlib.Analysis.Analytic.Order) — used directly inside the definition; analyticOrderAt (ℕ∞) was rejected as the raw carrier because ⊤ satisfies Odd in ℕ∞.",
+     "name": "HardyLittlewoodZetaFunctionConjectures.IsOddOrderZero",
+     "why_needed": "Predicate 't is a zero of odd order of ζ(1/2+it)', used by both parts; defined as Odd (analyticOrderNatAt riemannZeta (1/2 + t * I)). Mathlib has the order of vanishing but no notion of 'odd-order zero of ζ on the critical line'."
+    },
+    {
+     "closest_existing_considered": "Set.ncard applied to the filtered interval Set.Ioc 0 T (this is what the definition unfolds to); Set.encard/Nat.card were considered but ncard matches repository idiom (e.g. PowerfulNumbersDensity.Q, RudinsConjecture.Q).",
+     "name": "HardyLittlewoodZetaFunctionConjectures.N₀",
+     "why_needed": "The article's counting function N₀(T) = number of odd-order zeros of ζ(1/2+it) with t ∈ (0, T], needed for part (ii). No zero-counting function for the Riemann zeta function exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∀ ε > 0, ∃ T₀ > 0, ∀ T ≥ T₀, ∃ t ∈ Set.Ioc T (T + T ^ (1/4 + ε)), IsOddOrderZero t, where IsOddOrderZero t := Odd (analyticOrderNatAt riemannZeta (1/2 + t * I)). Quantifier order, the half-open interval (T, T+H], H = T^{0.25+ε} (real rpow, T > 0), and 'zero of odd order' (odd multiplicity, not merely a zero) follow the source verbatim. Tagged research open."
+    },
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∀ ε > 0, ∃ T₀ > 0, ∃ c > 0, ∀ T ≥ T₀, c * T ^ (1/2 + ε) ≤ (N₀ (T + T ^ (1/2 + ε)) : ℝ) - N₀ T, with N₀ T := {t ∈ Set.Ioc 0 T | IsOddOrderZero t}.ncard, the article's count of odd-order zeros of ζ(1/2+it) with t ∈ (0, T]. T₀ and c are chosen after ε and before T, as in the source; the difference is taken in ℝ. Tagged research solved (Selberg 1942), per the decomposition notes."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hardy_littlewood_zeta_function_conjectures.parts.i": "/-- **Hardy–Littlewood conjecture 1.**\nFor any $\\varepsilon > 0$ there exists $T_0 = T_0(\\varepsilon) > 0$ such that for all $T \\ge T_0$\nand $H = T^{1/4 + \\varepsilon}$, the interval $(T, T + H]$ contains a zero of odd order of the\nfunction $\\zeta(\\tfrac12 + it)$.\n\nThis is open: Karatsuba [Ka84] proved the analogous statement with exponent $27/82$ in place of\n$1/4$. -/\n@[category research open, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.i (ε : ℝ) (hε : 0 < ε) :\n    ∃ T₀ > (0 : ℝ), ∀ T ≥ T₀,\n      ∃ t ∈ Set.Ioc T (T + T ^ (1 / 4 + ε)), IsOddOrderZero t := by\n  sorry",
+    "hardy_littlewood_zeta_function_conjectures.parts.ii": "/-- **Hardy–Littlewood conjecture 2.**\nFor any $\\varepsilon > 0$ there exist $T_0 = T_0(\\varepsilon) > 0$ and $c = c(\\varepsilon) > 0$\nsuch that for all $T \\ge T_0$ and $H = T^{1/2 + \\varepsilon}$ the inequality\n$N_0(T + H) - N_0(T) \\ge cH$ holds, where $N_0(T)$ counts the zeros of odd order of\n$\\zeta(\\tfrac12 + it)$ with $t \\in (0, T]$.\n\nThis was proved by Selberg [Se42], who showed the stronger bound\n$N_0(T + H) - N_0(T) \\ge cH \\log T$ for $H = T^{1/2 + \\varepsilon}$. -/\n@[category research solved, AMS 11]\ntheorem hardy_littlewood_zeta_function_conjectures.parts.ii (ε : ℝ) (hε : 0 < ε) :\n    ∃ T₀ > (0 : ℝ), ∃ c > (0 : ℝ), ∀ T ≥ T₀,\n      c * T ^ (1 / 2 + ε) ≤ (N₀ (T + T ^ (1 / 2 + ε)) : ℝ) - N₀ T := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "hardy_littlewood_zeta_function_conjectures.parts.i": "c01",
+  "hardy_littlewood_zeta_function_conjectures.parts.ii": "c01"
+ },
+ "id": "wp-hardy-littlewood-zeta-function-conjectures",
+ "main_attempt": "c01"
+}

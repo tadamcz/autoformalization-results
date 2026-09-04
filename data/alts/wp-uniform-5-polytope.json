@@ -1,0 +1,409 @@
+{
+ "attempts": [
+  {
+   "bailed": true,
+   "cid": "c01",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page request was read, following the background article and fixed decomposition, as the positive completeness conjecture that every convex uniform 5-polytope is similar to one of the 104 known geometric sporadic models or belongs to one of the stated infinite product families, with duplicates counted by geometric identity rather than Coxeter-diagram construction.",
+    "The article's phrase '104 known' was not weakened to a cardinality-only claim: such a claim would not classify the shapes and would omit the exact infinite-family membership.",
+    "An equation with `answer(sorry)` for the set of all uniform 5-polytopes was rejected because it would not encode the candidate classification required by the decomposition and could be satisfied tautologically by the set being classified."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "uniform_5_polytope": {
+     "outcome": "missing_primitives",
+     "why": "A faithful statement needs (1) finite-dimensional convex polytopes with facets and geometric identity, (2) the recursive uniformity condition (vertex-transitivity, equal edge lengths, and uniform 4-polytope facets), (3) similarity classes of unlabelled polytopes, and (4) extensional constructions of the proposed classes: the A5/B5/D5 Wythoffians with duplicates identified, the 45 polychoral prisms, the grand-antiprism prism, and the exact duoprism-prism and uniform-polyhedron–polygon duoprism families. Mathlib has convex hulls, indexed-point similarity, abstract Coxeter systems, and group actions, but neither Mathlib nor FormalConjecturesForMathlib has a polytope/face-lattice/facet API, a uniform-polytope predicate, or a geometric Wythoff-construction API. The supplied article gives counts and family descriptions but not enough explicit vertex-coordinate data to define all candidate models extensionally. Introducing names whose definitions merely restate 'known sporadic/family member' would conceal the classification and be unfaithful."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Convex uniform 5-polytopes\n\nA uniform polytope is a convex polytope that is vertex-transitive (its symmetry group acts\ntransitively on its vertices) and whose facets are all uniform polytopes; uniform polygons are\nthe regular polygons. The complete set of convex uniform $5$-polytopes has not been determined.\nThe known ones are\n\n* the $19 + 31 + 8 = 58$ Wythoffian polytopes of the reflection groups $A_5$, $B_5$ and $D_5$;\n* the prisms over the $45$ non-prismatic convex uniform $4$-polytopes other than the tesseract\n  (whose prism is the $5$-cube) and the non-Wythoffian grand antiprism prism;\n* the infinite families of duoprism prisms $\\{p\\}\\times\\{q\\}\\times\\{\\,\\}$ and of\n  polyhedron–polygon duoprisms $\\{q,r\\}\\times\\{p\\}$.\n\nThe problem asks to find and classify the complete set of these shapes. We formalise the\nstatement that the known list is complete: every convex uniform $5$-polytope is congruent to\nthe convex hull of the orbit of a point under a finite reflection group (a reflective Wythoff\nconstruction), or is a Cartesian product of two convex uniform polytopes of lower dimension.\nIn $\\mathbb{R}^5$ the essential irreducible finite reflection groups are exactly $A_5$, $B_5$\nand $D_5$, and the Cartesian products account for all the prisms and duoprisms.\n\n*References:*\n- [Wikipedia, Uniform 5-polytope](https://en.wikipedia.org/wiki/uniform_5-polytope)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Open Problem Garden, Convex uniform 5-polytopes](http://www.openproblemgarden.org/op/convex_uniform_5_polytopes)\n-/\n\nopen scoped EuclideanGeometry Pointwise\n\nnamespace Uniform5Polytope\n\nvariable {V : Type*} [NormedAddCommGroup V] [InnerProductSpace ℝ V]\n\n/-- A **convex polytope** is the convex hull of a nonempty finite set of points. -/\ndef IsConvexPolytope (P : Set V) : Prop :=\n  ∃ S : Finset V, S.Nonempty ∧ P = convexHull ℝ (S : Set V)\n\n/-- The **dimension** of a set of points: the dimension of its affine span. -/\nnoncomputable def dim (P : Set V) : ℕ :=\n  Module.finrank ℝ (affineSpan ℝ P).direction\n\n/-- `F` is a **`k`-face** of the convex polytope `P`: a nonempty exposed subset of `P`\nof dimension `k`. The `0`-faces are the vertices, the `1`-faces the edges and, for a\n`d`-polytope, the `(d - 1)`-faces the facets. -/\ndef IsFace (k : ℕ) (P F : Set V) : Prop :=\n  IsExposed ℝ P F ∧ F.Nonempty ∧ dim F = k\n\n/-- A set `P` is **vertex-transitive** if for any two of its vertices (extreme points) there\nis an isometry of the ambient space mapping `P` onto itself and the first vertex to the\nsecond. -/\ndef IsVertexTransitive (P : Set V) : Prop :=\n  ∀ v ∈ P.extremePoints ℝ, ∀ w ∈ P.extremePoints ℝ,\n    ∃ g : V ≃ᵃⁱ[ℝ] V, g '' P = P ∧ g v = w\n\n/-- All edges (`1`-faces) of `P` have the same length. -/\ndef HasEqualEdges (P : Set V) : Prop :=\n  ∀ E E' : Set V, IsFace 1 P E → IsFace 1 P E' → Metric.diam E = Metric.diam E'\n\n/-- `IsUniformPolytope d P` says that `P` is a **convex uniform `d`-polytope**: a convex\npolytope of dimension `d` which is vertex-transitive, has all edges of the same length, and\nall of whose facets are convex uniform `(d - 1)`-polytopes. A uniform `0`-polytope is a point.\n\nFor `d = 1` this gives the segments, for `d = 2` the regular polygons, for `d = 3` the convex\nuniform polyhedra, and for `d ≥ 3` the equal-edge condition is implied by the other two. -/\ndef IsUniformPolytope : ℕ → Set V → Prop\n  | 0, P => IsConvexPolytope P ∧ dim P = 0\n  | d + 1, P => IsConvexPolytope P ∧ dim P = d + 1 ∧ IsVertexTransitive P ∧ HasEqualEdges P ∧\n      ∀ F : Set V, IsFace d P F → IsUniformPolytope d F\n\n/-- A linear isometry `g` is a **reflection** if it is the reflection in a hyperplane through\nthe origin, i.e. in the orthogonal complement of some nonzero vector. -/\ndef IsReflection (g : V ≃ₗᵢ[ℝ] V) : Prop :=\n  ∃ v : V, v ≠ 0 ∧ g = (ℝ ∙ v)ᗮ.reflection\n\n/-- A **finite reflection group** is a finite group of linear isometries generated by\nreflections. -/\ndef IsFiniteReflectionGroup (W : Subgroup (V ≃ₗᵢ[ℝ] V)) : Prop :=\n  Finite W ∧ ∃ S : Set (V ≃ₗᵢ[ℝ] V), (∀ g ∈ S, IsReflection g) ∧ Subgroup.closure S = W\n\n/-- `P` is **Wythoffian** if it is the convex hull of the orbit of a point under a finite\nreflection group. Every polytope obtained by a (reflective) Wythoff construction, i.e. from a\nringed Coxeter diagram of a finite Coxeter group, is of this form. -/\ndef IsWythoffian (P : Set V) : Prop :=\n  ∃ (W : Subgroup (V ≃ₗᵢ[ℝ] V)) (x : V), IsFiniteReflectionGroup W ∧\n    P = convexHull ℝ ((fun g : V ≃ₗᵢ[ℝ] V => g x) '' W)\n\n/-- A singleton is a convex uniform `0`-polytope. -/\n@[category test, AMS 51 52]\ntheorem isUniformPolytope_zero_singleton (x : V) : IsUniformPolytope 0 {x} := by\n  refine ⟨⟨{x}, by simp, by simp⟩, ?_⟩\n  simp [dim, direction_affineSpan]\n\n/-- The reflection in the hyperplane orthogonal to a nonzero vector is a reflection. -/\n@[category test, AMS 51]\ntheorem isReflection_reflection {v : V} (hv : v ≠ 0) : IsReflection (ℝ ∙ v)ᗮ.reflection :=\n  ⟨v, hv, rfl⟩\n\n/-- A convex uniform `d`-polytope is a convex polytope of dimension `d`. -/\n@[category API, AMS 51 52]\ntheorem IsUniformPolytope.isConvexPolytope_and_dim {d : ℕ} {P : Set V}\n    (hP : IsUniformPolytope d P) : IsConvexPolytope P ∧ dim P = d := by\n  cases d with\n  | zero => exact hP\n  | succ d => exact ⟨hP.1, hP.2.1⟩\n\n/--\n**Convex uniform 5-polytopes**: find and classify the complete set of these shapes.\n\nWe state the conjecture that the known list is complete. The known convex uniform\n$5$-polytopes are the $19$ polytopes of the $A_5$ family, the $31$ of the $B_5$ family and the\n$8$ further ones of the $D_5$ family (all obtained by Wythoff constructions from these\nreflection groups), the $45$ prisms over the non-prismatic convex uniform $4$-polytopes other\nthan the tesseract, the grand antiprism prism, and the infinite families of duoprism prisms\n$\\{p\\}\\times\\{q\\}\\times\\{\\,\\}$ and polyhedron–polygon duoprisms $\\{q,r\\}\\times\\{p\\}$.\n\nFormally: every convex uniform $5$-polytope $P\\subseteq\\mathbb{R}^5$ is either congruent to\nthe convex hull of the orbit of a point under a finite reflection group acting on\n$\\mathbb{R}^5$ (these are exactly the Wythoffian polytopes, whose essential irreducible\nsymmetry groups in dimension $5$ are $A_5$, $B_5$ and $D_5$), or is the Cartesian product of\na convex uniform $k$-polytope and a convex uniform $(5-k)$-polytope lying in orthogonal\ndirections, for some $0 < k < 5$ (these are all the prisms and duoprisms, including the grand\nantiprism prism).\n-/\n@[category research open, AMS 51 52]\ntheorem uniform_5_polytope (P : Set (ℝ^5)) (hP : IsUniformPolytope 5 P) :\n    (∃ g : (ℝ^5) ≃ᵃⁱ[ℝ] (ℝ^5), IsWythoffian (g '' P)) ∨\n    ∃ (k : ℕ) (P₁ P₂ : Set (ℝ^5)), 0 < k ∧ k < 5 ∧\n      IsUniformPolytope k P₁ ∧ IsUniformPolytope (5 - k) P₂ ∧\n      (affineSpan ℝ P₁).direction ⟂ (affineSpan ℝ P₂).direction ∧ P = P₁ + P₂ := by\n  sorry\n\nend Uniform5Polytope\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.7,
+   "decomposition_objections": "No objection to the single slot. Two notes: (1) the slot notes ask for 'exact membership of the infinite families'; the article's own description ('Cartesian products of the uniform polyhedra and regular polygons', 'duoprism prisms') is broader than its Coxeter-group tables, and I adopted the broad geometric reading (all products of lower-dimensional convex uniform polytopes), since the narrow Coxeter-only reading would make the conjecture trivially false (antiprism × polygon duoprisms are uniform). (2) The tally '104' is a count up to geometric identity that depends on this bookkeeping and is not part of the formal statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Form of the statement: the list entry is an open-ended classification request ('find and classify'). Following the decomposition table, the Prop is the completeness of the article's candidate answer (every convex uniform 5-polytope is, up to similarity, one of the known ones), not an `answer(sorry)` formulation. No converse is asserted (not every orbit polytope or product is uniform), and the count 104 is not formalized.",
+    "Definition of uniform polytope (recursive on dimension d, matching the article's 'vertex-transitive with uniform facets'): P is the convex hull of a nonempty finite set, dim(affineSpan P) = d, vertex-transitive under affine isometries of the ambient space mapping P onto itself (vertices = extreme points), all edges (nonempty exposed 1-faces, length = Metric.diam) have equal length, and every facet (nonempty exposed (d-1)-face) is a uniform (d-1)-polytope. Base case d = 0: a point. For d = 2 this yields exactly the regular polygons (vertex-transitive + equal edges), for d = 3 the convex uniform polyhedra; for d ≥ 3 the equal-edge condition is redundant but harmless. Faces are taken to be exposed sets (`IsExposed ℝ P F`), which for polytopes coincide with faces. Facets live in the same ambient space; symmetries of a facet within its affine hull extend to ambient isometries, so no transfer to ℝ^(d-1) is needed.",
+    "Encoding of the 19+31+8 = 58 A5/B5/D5 forms: instead of 58 explicit coordinate descriptions, the clause '∃ isometry g, IsWythoffian (g '' P)' with IsWythoffian P := P = conv(W·x) for a finite reflection group W ≤ O(V) (finite, generated by hyperplane reflections `(ℝ ∙ v)ᗮ.reflection`). Justification: a full-dimensional orbit polytope forces W essential; essential irreducible finite reflection groups on ℝ^5 are exactly A5, B5, D5 (unique up to conjugacy in O(5)); reducible W give products (covered by the second clause); and an orbit polytope conv(W·x) has all edges equal iff x is equidistant from the chamber walls not containing it, i.e. iff it is a Wythoff construction with a ring pattern — precisely the polytopes enumerated in the article's A5/B5/D5 tables (with the B5/D5 duplicates identified geometrically). Every listed A5/B5/D5 form is conversely an orbit polytope of its reflection group. Reviewers should check this equivalence.",
+    "Encoding of the prismatic/infinite families: 'P = P₁ + P₂ with P₁, P₂ convex uniform polytopes of dimensions k and 5-k lying in orthogonal directions' is isometric to the Cartesian product P₁ × P₂. It covers the 45 polychoral prisms, the 5-cube (tesseract prism), the grand antiprism prism, the duoprism prisms {p}×{q}×{ }, and the polyhedron–polygon duoprisms {q,r}×{p}. Following the article's phrase 'Cartesian products of the uniform polyhedra and regular polygons', the product clause also admits antiprism × polygon and snub-polyhedron × polygon duoprisms (these are genuinely convex uniform 5-polytopes, appearing as alternations of the article's Coxeter families [2p]×[q]×[ ] and [4,3]×[p], [5,3]×[p]); a literal Coxeter-group-only reading would make the conjecture trivially false. The factors range over all convex uniform polytopes of dimension ≤ 4 rather than over the explicit 3D/4D lists; this is equivalent to the article's list given the accepted classifications in dimensions ≤ 4 and isolates the genuinely open 5-dimensional content (no new non-product, non-Wythoffian polytope).",
+    "'Up to similarity' is realised as congruence (an affine isometry equivalence of ℝ^5) for the Wythoffian clause; scaling is absorbed by the choice of the orbit point x. The product clause quantifies over all sets P₁, P₂, so no similarity is needed there.",
+    "Ambient space: definitions are made for an arbitrary real inner product space V and the theorem is stated for `ℝ^5 = EuclideanSpace ℝ (Fin 5)`. The edge-length matching condition for products is implied by the hypothesis that P itself is uniform, so it is not repeated.",
+    "AMS tags 51 (Geometry) and 52 (Convex and discrete geometry)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`convexHull`, `Affine.Simplex`, `EuclideanGeometry.IsConvexPolygon` (2D only, FormalConjecturesForMathlib).",
+     "name": "Uniform5Polytope.IsConvexPolytope",
+     "why_needed": "Mathlib has no notion of a convex polytope; defined as the convex hull of a nonempty finite set."
+    },
+    {
+     "closest_existing_considered": "`Module.finrank ℝ (affineSpan ℝ P).direction` (used directly), `dimH` (Hausdorff dimension, wrong notion).",
+     "name": "Uniform5Polytope.dim",
+     "why_needed": "Dimension of a point set (finrank of the direction of its affine span), needed for d-polytopes and k-faces."
+    },
+    {
+     "closest_existing_considered": "`IsExposed ℝ P F` (used as the face notion), `IsExtreme`, `Set.extremePoints`.",
+     "name": "Uniform5Polytope.IsFace",
+     "why_needed": "k-faces of a polytope (vertices, edges, facets) are needed for the recursive definition of uniformity; Mathlib has only `IsExposed`/`IsExtreme`, without dimension."
+    },
+    {
+     "closest_existing_considered": "`MulAction.IsPretransitive` (no action of a stabiliser subgroup on extreme points is available), `AffineIsometryEquiv`.",
+     "name": "Uniform5Polytope.IsVertexTransitive",
+     "why_needed": "Vertex-transitivity under ambient isometries preserving the set; no Mathlib notion of symmetry group of a set."
+    },
+    {
+     "closest_existing_considered": "`Metric.diam` (used for edge length).",
+     "name": "Uniform5Polytope.HasEqualEdges",
+     "why_needed": "All 1-faces have the same length; needed so that uniform 2-polytopes are the regular polygons."
+    },
+    {
+     "closest_existing_considered": "`Affine.Simplex`, `EuclideanGeometry.IsConvexPolygon`, `CoxeterSystem` (abstract, not geometric).",
+     "name": "Uniform5Polytope.IsUniformPolytope",
+     "why_needed": "The central notion of convex uniform d-polytope (recursive: vertex-transitive with uniform facets) does not exist in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "`Submodule.reflection` (used: `(ℝ ∙ v)ᗮ.reflection`), `Module.reflection` (root-pairing reflections, not isometries).",
+     "name": "Uniform5Polytope.IsReflection",
+     "why_needed": "Hyperplane reflections through the origin as elements of the orthogonal group of linear isometry equivalences."
+    },
+    {
+     "closest_existing_considered": "`CoxeterSystem`, `CoxeterMatrix`, `Subgroup.closure` (used).",
+     "name": "Uniform5Polytope.IsFiniteReflectionGroup",
+     "why_needed": "Finite subgroups of O(V) generated by reflections; Mathlib's `CoxeterSystem` is abstract and has no geometric realisation."
+    },
+    {
+     "closest_existing_considered": "`MulAction.orbit` (no `MulAction (V ≃ₗᵢ[ℝ] V) V` instance exists, so the orbit is written as an image over the subgroup).",
+     "name": "Uniform5Polytope.IsWythoffian",
+     "why_needed": "Convex hull of the orbit of a point under a finite reflection group; encodes the reflective Wythoff constructions (A5, B5, D5 families and their products)."
+    }
+   ],
+   "per_slot": {
+    "uniform_5_polytope": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `Uniform5Polytope.uniform_5_polytope`: every convex uniform 5-polytope P ⊆ ℝ^5 is either congruent to the convex hull of the orbit of a point under a finite reflection group (a reflective Wythoff construction; in ℝ^5 these are the A5/B5/D5 forms and products), or is a Cartesian product (orthogonal Minkowski sum) of a convex uniform k-polytope and a convex uniform (5-k)-polytope, 0<k<5 (all prisms/duoprisms, incl. the grand antiprism prism). Mathlib has no polytope/uniform-polytope/reflection-group-orbit notions, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "uniform_5_polytope": "/--\n**Convex uniform 5-polytopes**: find and classify the complete set of these shapes.\n\nWe state the conjecture that the known list is complete. The known convex uniform\n$5$-polytopes are the $19$ polytopes of the $A_5$ family, the $31$ of the $B_5$ family and the\n$8$ further ones of the $D_5$ family (all obtained by Wythoff constructions from these\nreflection groups), the $45$ prisms over the non-prismatic convex uniform $4$-polytopes other\nthan the tesseract, the grand antiprism prism, and the infinite families of duoprism prisms\n$\\{p\\}\\times\\{q\\}\\times\\{\\,\\}$ and polyhedron–polygon duoprisms $\\{q,r\\}\\times\\{p\\}$.\n\nFormally: every convex uniform $5$-polytope $P\\subseteq\\mathbb{R}^5$ is either congruent to\nthe convex hull of the orbit of a point under a finite reflection group acting on\n$\\mathbb{R}^5$ (these are exactly the Wythoffian polytopes, whose essential irreducible\nsymmetry groups in dimension $5$ are $A_5$, $B_5$ and $D_5$), or is the Cartesian product of\na convex uniform $k$-polytope and a convex uniform $(5-k)$-polytope lying in orthogonal\ndirections, for some $0 < k < 5$ (these are all the prisms and duoprisms, including the grand\nantiprism prism).\n-/\n@[category research open, AMS 51 52]\ntheorem uniform_5_polytope (P : Set (ℝ^5)) (hP : IsUniformPolytope 5 P) :\n    (∃ g : (ℝ^5) ≃ᵃⁱ[ℝ] (ℝ^5), IsWythoffian (g '' P)) ∨\n    ∃ (k : ℕ) (P₁ P₂ : Set (ℝ^5)), 0 < k ∧ k < 5 ∧\n      IsUniformPolytope k P₁ ∧ IsUniformPolytope (5 - k) P₂ ∧\n      (affineSpan ℝ P₁).direction ⟂ (affineSpan ℝ P₂).direction ∧ P = P₁ + P₂ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Convex uniform 5-polytopes\n\nA *uniform polytope* is defined recursively. A uniform polygon is a regular polygon. For\n$d \\ge 3$, a uniform $d$-polytope is a polytope that is vertex-transitive (under its group of\nisometric symmetries) and all of whose facets are uniform $(d-1)$-polytopes. All edges of a\nuniform polytope have the same length.\n\nThe complete set of convex uniform 5-polytopes has not been determined. The known ones are:\n* the Wythoffian polytopes of the irreducible reflection groups $A_5$ ($19$ polytopes),\n  $B_5$ ($31$) and $D_5$ ($8$ not already in the $B_5$ family). A Wythoffian polytope is the\n  convex hull of the orbit of a point under a finite reflection group;\n* the prisms over the convex uniform 4-polytopes: the $45$ polychoral prisms not already counted\n  (the prism over the tesseract is the 5-cube), the grand antiprism prism (the only known\n  non-Wythoffian convex uniform 5-polytope), and the infinite family of duoprism prisms\n  $\\{p\\}\\times\\{q\\}\\times\\{\\,\\}$;\n* the infinite duoprismatic families $\\{q,r\\}\\times\\{p\\}$: Cartesian products of a convex uniform\n  polyhedron and a regular polygon.\n\nThis gives $19 + 31 + 8 + 45 + 1 = 104$ known convex uniform 5-polytopes outside the infinite\nfamilies. The problem asks to find and classify the complete set of convex uniform 5-polytopes.\n\n*References:*\n- [Wikipedia, Uniform 5-polytope](https://en.wikipedia.org/wiki/uniform_5-polytope)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Open Problem Garden, Convex uniform 5-polytopes](http://www.openproblemgarden.org/op/convex_uniform_5_polytopes)\n-/\n\nopen scoped EuclideanGeometry Pointwise\n\nnamespace Uniform5Polytope\n\nvariable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]\n\n/-- A (convex) polytope in `E`: the convex hull of a finite set of points. -/\ndef IsPolytope (P : Set E) : Prop := ∃ s : Finset E, P = convexHull ℝ (s : Set E)\n\n/-- The affine dimension of a set `P`, i.e. the dimension of its affine span. -/\nnoncomputable def affDim (P : Set E) : ℕ := Module.finrank ℝ (vectorSpan ℝ P)\n\n/-- `F` is a `k`-dimensional face of the polytope `P`: a nonempty exposed subset of `P` (the set of\nmaximisers over `P` of a linear functional) of affine dimension `k`. All faces of a polytope are\nexposed, so this captures all vertices (`k = 0`), edges (`k = 1`) and facets\n(`k = affDim P - 1`). -/\ndef IsFace (P F : Set E) (k : ℕ) : Prop := F.Nonempty ∧ IsExposed ℝ P F ∧ affDim F = k\n\n/-- `P` is vertex-transitive: for any two vertices (extreme points) `v`, `w` of `P` there is an\nisometry `g` of `E` with `g '' P = P` and `g v = w`. -/\ndef IsVertexTransitive (P : Set E) : Prop :=\n  ∀ v ∈ P.extremePoints ℝ, ∀ w ∈ P.extremePoints ℝ, ∃ g : E ≃ᵃⁱ[ℝ] E, g '' P = P ∧ g v = w\n\n/-- All edges (one-dimensional faces) of `P` have the same length. -/\ndef HasEqualEdges (P : Set E) : Prop :=\n  ∀ e₁ e₂, IsFace P e₁ 1 → IsFace P e₂ 1 → Metric.diam e₁ = Metric.diam e₂\n\n/-- `P` is a convex uniform `d`-polytope. A uniform `0`-polytope is a point. For `d ≥ 1`, a uniform\n`d`-polytope is a `d`-dimensional polytope that is vertex-transitive, has all edges of the same\nlength, and all of whose facets are uniform `(d - 1)`-polytopes.\n\nFor `d = 1` this gives segments and for `d = 2` exactly the regular polygons, so for `d ≥ 3` this\nis the usual recursive definition of a uniform polytope: vertex-transitive with uniform facets\n(the condition on edges is then automatic). -/\ndef IsUniformPolytope : ℕ → Set E → Prop\n  | 0, P => ∃ x, P = {x}\n  | d + 1, P => IsPolytope P ∧ affDim P = d + 1 ∧ IsVertexTransitive P ∧ HasEqualEdges P ∧\n      ∀ F, IsFace P F d → IsUniformPolytope d F\n\n/-- A point is a uniform `0`-polytope. -/\n@[category test, AMS 51 52]\ntheorem isUniformPolytope_zero_singleton (x : E) : IsUniformPolytope 0 ({x} : Set E) := ⟨x, rfl⟩\n\nvariable [FiniteDimensional ℝ E]\n\n/-- `g` is the reflection of `E` in an affine hyperplane `H`. -/\ndef IsHyperplaneReflection (g : E ≃ᵃⁱ[ℝ] E) : Prop :=\n  ∃ (H : AffineSubspace ℝ E) (_ : Nonempty H),\n    Module.finrank ℝ H.direction + 1 = Module.finrank ℝ E ∧ g = EuclideanGeometry.reflection H\n\n/-- `G` is a finite reflection group: a finite group of isometries of `E` generated by reflections\nin hyperplanes. -/\ndef IsFiniteReflectionGroup (G : Subgroup (E ≃ᵃⁱ[ℝ] E)) : Prop :=\n  Finite G ∧ ∃ S : Set (E ≃ᵃⁱ[ℝ] E), (∀ g ∈ S, IsHyperplaneReflection g) ∧ G = Subgroup.closure S\n\n/-- `P` is Wythoffian: it is the convex hull of the orbit of a point under a finite reflection\ngroup (Wythoff's construction). -/\ndef IsWythoffian (P : Set E) : Prop :=\n  ∃ (G : Subgroup (E ≃ᵃⁱ[ℝ] E)) (x : E), IsFiniteReflectionGroup G ∧\n    P = convexHull ℝ (Set.range fun g : G => (g : E ≃ᵃⁱ[ℝ] E) x)\n\n/-- `P` is the Cartesian product of a convex uniform `m`-polytope `A` and a convex uniform\n`n`-polytope `B` lying in orthogonal subspaces, realised as the Minkowski sum `A + B` with\n`A ⊆ U` and `B ⊆ Uᗮ`. The case `n = 1` is a (right) prism over `A`; the case `(m, n) = (3, 2)`\nis a polyhedron-polygon duoprism. -/\ndef IsProductOfUniformPolytopes (m n : ℕ) (P : Set E) : Prop :=\n  ∃ (U : Submodule ℝ E) (A B : Set E), A ⊆ U ∧ B ⊆ Uᗮ ∧\n    IsUniformPolytope m A ∧ IsUniformPolytope n B ∧ P = A + B\n\n/-- A point is Wythoffian (take the trivial reflection group). -/\n@[category test, AMS 51 52]\ntheorem isWythoffian_singleton (x : E) : IsWythoffian ({x} : Set E) := by\n  refine ⟨⊥, x, ⟨inferInstance, ∅, by simp, Subgroup.closure_empty.symm⟩, ?_⟩\n  have : Set.range (fun g : (⊥ : Subgroup (E ≃ᵃⁱ[ℝ] E)) => (g : E ≃ᵃⁱ[ℝ] E) x) = {x} := by\n    ext y\n    simp only [Set.mem_range, Set.mem_singleton_iff]\n    exact ⟨fun ⟨g, hg⟩ => by rw [← hg, show (g : E ≃ᵃⁱ[ℝ] E) = 1 from Subgroup.mem_bot.mp g.2]; rfl,\n      fun h => ⟨1, by rw [h]; rfl⟩⟩\n  rw [this, convexHull_singleton]\n\n/--\n**Classification of convex uniform 5-polytopes.**\n\nEvery convex uniform 5-polytope is one of the known ones, i.e. it is\n* a Wythoffian polytope, i.e. the convex hull of the orbit of a point under a finite reflection\n  group (the $19 + 31 + 8 = 58$ non-prismatic polytopes of the $A_5$, $B_5$ and $D_5$ families;\n  reducible reflection groups only give prisms and duoprisms, which fall under the next two\n  cases), or\n* a prism over a convex uniform 4-polytope (the $45$ polychoral prisms, the grand antiprism prism\n  and the duoprism prisms $\\{p\\}\\times\\{q\\}\\times\\{\\,\\}$), or\n* the Cartesian product of a convex uniform polyhedron and a regular polygon (the duoprismatic\n  families $\\{q,r\\}\\times\\{p\\}$).\n\nEach of the three cases is invariant under similarities, so the statement classifies convex\nuniform 5-polytopes up to similarity. It says that the list of $104$ known convex uniform\n5-polytopes, together with the infinite prismatic families, is complete.\n-/\n@[category research open, AMS 51 52]\ntheorem uniform_5_polytope (P : Set (ℝ^5)) (hP : IsUniformPolytope 5 P) :\n    IsWythoffian P ∨ IsProductOfUniformPolytopes 4 1 P ∨ IsProductOfUniformPolytopes 3 2 P := by\n  sorry\n\n/-- The problem in its original open-ended form: find the complete set of convex uniform\n5-polytopes, as subsets of $\\mathbb{R}^5$ (this set is closed under similarities, so determining\nit is the same as classifying convex uniform 5-polytopes up to similarity). -/\n@[category research open, AMS 51 52]\ntheorem uniform_5_polytope.variants.find :\n    {P : Set (ℝ^5) | IsUniformPolytope 5 P} = answer(sorry) := by\n  sorry\n\nend Uniform5Polytope\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.75,
+   "decomposition_objections": "The table calls the article's 104 known polytopes plus infinite families a 'candidate answer' and fixes the Prop as 'every convex uniform 5-polytope is, up to similarity, one of these'. The article itself only says these are the known ones ('the complete set ... has not been determined'), and the list entry asks to 'find and classify', i.e. a determination problem. I conformed to the table's Prop, but (i) the list is rendered structurally (Wythoffian ∪ prisms over uniform 4-polytopes ∪ polyhedron × polygon) because a literal enumeration of 104 coordinate sets would be unverifiable and the table itself flags that the exact membership of the infinite families is unclear; in particular antiprism × polygon and prisms over antiprismatic prisms are convex uniform 5-polytopes that the article's family descriptions only include implicitly via alternations, so the structural reading is the one under which the completeness statement is not trivially false; (ii) I added the literal open-ended form as the variant `uniform_5_polytope.variants.find` with `answer(sorry)`.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The slot Prop follows the decomposition table ('every convex uniform 5-polytope is one of the known ones'), but the known list is described structurally as three similarity-invariant classes (reflective Wythoffian; prism over a convex uniform 4-polytope; convex uniform polyhedron × regular polygon) instead of enumerating 104 coordinate sets plus families. Set-theoretically this equals the article's list: the irreducible rank-5 reflection groups are exactly A5, B5, D5, and Wythoffians of reducible groups are prisms/duoprisms already covered; the 45 polychoral prisms, the grand antiprism prism and the duoprism prisms {p}×{q}×{ } are all prisms over convex uniform 4-polytopes; the duoprismatic families {q,r}×{p} are polyhedron × polygon. This sidesteps the counting subtleties (B5/D5 duplicates, {4}×{4}×{ } = 5-cube).",
+    "Taking ALL convex uniform polyhedra / 4-polytopes in the product cases includes antiprism × polygon and prisms over antiprismatic prisms. These are genuinely convex uniform 5-polytopes; the article's Coxeter-group families ([p]×[q]×[ ] etc.) contain them only implicitly via alternations. A literal reading excluding them would make the completeness statement false, so they are included. Reviewer should confirm this reading.",
+    "'Wythoffian' is formalized as the reflective Wythoff construction only (finite group generated by affine hyperplane reflections, via `EuclideanGeometry.reflection`). Uniform alternated forms in the article (D5 forms as B5 alternations, the snub 24-cell prism) are covered by the other cases (D5 is itself a reflection group; the snub 24-cell prism is a prism over a uniform 4-polytope). Nonuniform alternations (B4×A1 snubs) are excluded by the uniformity hypothesis.",
+    "Uniform polytope defined recursively on dimension d: d=0 point; d+1: polytope (convex hull of a finite set) of affine dimension d+1, vertex-transitive under affine isometries of the ambient space, all edges of equal length, all facets uniform d-polytopes. For d=2 this gives exactly the regular polygons (vertex-transitive convex polygon with equal edges), for d≥3 Wikipedia's definition; the edge-length condition is redundant for d≥3 but included as in the decomposition notes.",
+    "Faces are nonempty exposed subsets (`IsExposed ℝ P F`) of a given affine dimension `Module.finrank ℝ (vectorSpan ℝ F)`; all faces of a polytope are exposed. Vertices are `P.extremePoints ℝ`. Edge length is `Metric.diam`.",
+    "Cartesian products are encoded as Minkowski sums `A + B` with `A ⊆ U`, `B ⊆ Uᗮ` for a subspace `U`, which avoids `WithLp 2 (E × F)` and absorbs translations; a prism is the case of a segment factor (its length is forced to equal the edge length by the uniformity hypothesis).",
+    "No explicit 'up to similarity' quotient: each disjunct is invariant under similarities of ℝ^5, and the answer(sorry) variant asks for the full set of subsets of ℝ^5, which is closed under similarities.",
+    "Ambient space is `EuclideanSpace ℝ (Fin 5)` (notation `ℝ^5` from FormalConjecturesForMathlib); definitions are stated for a general finite-dimensional real inner product space.",
+    "Extra variant `uniform_5_polytope.variants.find : {P | IsUniformPolytope 5 P} = answer(sorry)` records the statement's literal 'find and classify the complete set' form; two `@[category test]` lemmas (a point is a uniform 0-polytope; a point is Wythoffian) are proved."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "convexHull ℝ of a Finset (used in the definition); Mathlib only has lemmas like Set.Finite.isCompact_convexHull, no predicate.",
+     "name": "Uniform5Polytope.IsPolytope",
+     "why_needed": "Mathlib has no notion of a convex polytope; needed as the convex hull of a finite set."
+    },
+    {
+     "closest_existing_considered": "Module.finrank ℝ (vectorSpan ℝ s) (used inline in Mathlib, e.g. finrank_vectorSpan_of_affineIndependent, but not named).",
+     "name": "Uniform5Polytope.affDim",
+     "why_needed": "Affine dimension of a set, to specify dimensions of polytopes and faces."
+    },
+    {
+     "closest_existing_considered": "IsExposed ℝ P F (used); Mathlib has no face-with-dimension notion or face lattice for polytopes.",
+     "name": "Uniform5Polytope.IsFace",
+     "why_needed": "k-dimensional faces (edges, facets) of a polytope."
+    },
+    {
+     "closest_existing_considered": "MulAction.IsPretransitive would need a stabilizer subgroup of E ≃ᵃⁱ[ℝ] E acting on extreme points; there is no MulAction (E ≃ᵃⁱ[ℝ] E) E instance, so a direct ∃-isometry formulation was used.",
+     "name": "Uniform5Polytope.IsVertexTransitive",
+     "why_needed": "Vertex-transitivity of a polytope under Euclidean isometries."
+    },
+    {
+     "closest_existing_considered": "None; Metric.diam of 1-faces.",
+     "name": "Uniform5Polytope.HasEqualEdges",
+     "why_needed": "All edges have the same length (part of the decomposition's definition of uniform)."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or FormalConjecturesForMathlib (no polytopes, no regular polygons).",
+     "name": "Uniform5Polytope.IsUniformPolytope",
+     "why_needed": "Recursive definition of convex uniform d-polytopes (regular polygons in dimension 2, vertex-transitive with uniform facets above)."
+    },
+    {
+     "closest_existing_considered": "EuclideanGeometry.reflection (used); Submodule.reflection (linear only, would need explicit translations); CoxeterSystem.IsReflection is for abstract Coxeter groups.",
+     "name": "Uniform5Polytope.IsHyperplaneReflection",
+     "why_needed": "Predicate 'g is a reflection in an affine hyperplane' on affine isometries, to define reflection groups."
+    },
+    {
+     "closest_existing_considered": "CoxeterSystem / CoxeterMatrix and RootPairing.weylGroup: abstract or root-system based, no geometric 'finite reflection group of a Euclidean space' predicate.",
+     "name": "Uniform5Polytope.IsFiniteReflectionGroup",
+     "why_needed": "Finite groups of isometries generated by hyperplane reflections (Coxeter groups acting on ℝ^5)."
+    },
+    {
+     "closest_existing_considered": "MulAction.orbit (no MulAction instance for AffineIsometryEquiv on E; used Set.range over the subgroup instead).",
+     "name": "Uniform5Polytope.IsWythoffian",
+     "why_needed": "Wythoff's construction: convex hull of the orbit of a point under a finite reflection group."
+    },
+    {
+     "closest_existing_considered": "Set.prod inside WithLp 2 (E × F) would need an isometry to ℝ^5; the Minkowski sum A + B with A ⊆ U, B ⊆ Uᗮ (Pointwise set addition, Submodule.orthogonal) is equivalent and simpler.",
+     "name": "Uniform5Polytope.IsProductOfUniformPolytopes",
+     "why_needed": "Orthogonal Cartesian products (prisms, duoprisms) of uniform polytopes inside ℝ^5."
+    }
+   ],
+   "per_slot": {
+    "uniform_5_polytope": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: every convex uniform 5-polytope P ⊆ ℝ^5 (recursive definition: polytope, vertex-transitive under Euclidean isometries, all edges equal, facets uniform 4-polytopes, down to regular polygons/segments/points) is Wythoffian (convex hull of an orbit of a point under a finite group of isometries generated by hyperplane reflections), or a prism over a convex uniform 4-polytope, or the orthogonal product of a convex uniform polyhedron and a regular polygon. This is the article's known list (19 A5 + 31 B5 + 8 D5 Wythoffians; 45 polychoral prisms + grand antiprism prism + duoprism prisms {p}×{q}×{ } are prisms over uniform 4-polytopes; the duoprismatic families are polyhedron × polygon) described structurally rather than by 104 explicit coordinate sets. Each case is similarity-invariant, so no explicit similarity quotient is needed. A second declaration `uniform_5_polytope.variants.find` records the literal open-ended form `{P | IsUniformPolytope 5 P} = answer(sorry)`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "uniform_5_polytope": "/--\n**Classification of convex uniform 5-polytopes.**\n\nEvery convex uniform 5-polytope is one of the known ones, i.e. it is\n* a Wythoffian polytope, i.e. the convex hull of the orbit of a point under a finite reflection\n  group (the $19 + 31 + 8 = 58$ non-prismatic polytopes of the $A_5$, $B_5$ and $D_5$ families;\n  reducible reflection groups only give prisms and duoprisms, which fall under the next two\n  cases), or\n* a prism over a convex uniform 4-polytope (the $45$ polychoral prisms, the grand antiprism prism\n  and the duoprism prisms $\\{p\\}\\times\\{q\\}\\times\\{\\,\\}$), or\n* the Cartesian product of a convex uniform polyhedron and a regular polygon (the duoprismatic\n  families $\\{q,r\\}\\times\\{p\\}$).\n\nEach of the three cases is invariant under similarities, so the statement classifies convex\nuniform 5-polytopes up to similarity. It says that the list of $104$ known convex uniform\n5-polytopes, together with the infinite prismatic families, is complete.\n-/\n@[category research open, AMS 51 52]\ntheorem uniform_5_polytope (P : Set (ℝ^5)) (hP : IsUniformPolytope 5 P) :\n    IsWythoffian P ∨ IsProductOfUniformPolytopes 4 1 P ∨ IsProductOfUniformPolytopes 3 2 P := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c04",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The decomposition’s intended positive formulation was taken literally: every convex uniform 5-polytope, up to Euclidean similarity/geometric identity, belongs to the specified 104 known sporadic geometries or one of the stated duoprism-prism and uniform-polyhedron–polygon product families. A mere cardinality assertion or an existentially chosen classification was rejected as weaker and potentially tautological.",
+    "Uniformity would need the recursive geometric reading indicated by the decomposition: vertex-transitivity, equal edge lengths, and uniform 4-polytope facets, rather than merely membership in a Coxeter/Wythoff construction family."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "uniform_5_polytope": {
+     "outcome": "missing_primitives",
+     "why": "A faithful completeness statement needs a geometric type of finite convex polytopes with facets and recursive uniformity, classification up to Euclidean similarity/geometric identity, Wythoff constructions (including ringed A5, B5, and D5 diagrams and alternations), Cartesian polytope products for the two exact infinite families, and a concrete grand-antiprism prism. Hard searches found no general polytope, Wythoff, duoprism, or grand-antiprism declarations in Mathlib or FormalConjecturesForMathlib. Although some foundations exist (`convexHull`, `IsExposed`, affine spans, and indexed-point `Similar`), building the missing geometric framework would still not identify the candidate list: the supplied article gives only family counts and prose, while the coordinate/ring tables defining all 104 sporadic shapes are absent from the background extraction. Replacing the list by an arbitrary set of 104 exceptions, or by `answer(sorry)`, would not faithfully classify the shapes or handle geometric duplicates and exact infinite-family membership."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Convex uniform 5-polytopes\n\nA *uniform polytope* is defined recursively on the dimension. A uniform $0$-polytope is a point.\nA uniform $n$-polytope ($n \\ge 1$) is a convex $n$-polytope that is vertex-transitive (its\nsymmetry group, the group of isometries mapping it onto itself, acts transitively on its\nvertices), whose edges all have the same length, and whose facets are uniform $(n-1)$-polytopes.\nIn dimension $2$ this recovers the regular polygons, and in dimension $3$ the convex uniform\npolyhedra (Platonic and Archimedean solids, prisms and antiprisms).\n\nThe complete set of convex uniform $5$-polytopes has not been determined. There are 104 known\nconvex uniform $5$-polytopes outside of infinite families (19 in the $A_5$ family, 31 in the\n$B_5$ family, 8 more in the $D_5$ family, 45 prisms over uniform 4-polytopes, and the\nnon-Wythoffian grand antiprism prism), together with infinite families of duoprism prisms\n$\\{p\\} \\times \\{q\\} \\times \\{\\,\\}$ and of duoprisms of a uniform polyhedron with a regular\npolygon. The problem is to find and classify, up to similarity, the complete set of convex\nuniform $5$-polytopes.\n\n*References:*\n- [Wikipedia, Uniform 5-polytope](https://en.wikipedia.org/wiki/uniform_5-polytope)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Uniform polytope](https://en.wikipedia.org/wiki/Uniform_polytope)\n- [Open Problem Garden, Convex uniform 5-polytopes](http://www.openproblemgarden.org/op/convex_uniform_5_polytopes)\n-/\n\nopen Module\n\nnamespace Uniform5Polytope\n\nvariable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]\n\n/-- A (convex) **polytope** is the convex hull of a finite set of points. -/\ndef IsPolytope (P : Set E) : Prop :=\n  ∃ s : Finset E, P = convexHull ℝ (s : Set E)\n\n/-- `IsFace P F` means that `F` is a nonempty exposed subset of `P`, i.e. the set of points of `P`\nmaximizing some linear functional. For a polytope `P`, these are exactly the (nonempty) faces of\n`P`. -/\ndef IsFace (P F : Set E) : Prop :=\n  F.Nonempty ∧ IsExposed ℝ P F\n\n/-- `IsFaceOfDim k P F` means that `F` is a `k`-dimensional face of `P`, i.e. a face whose affine\nspan has dimension `k`. The `1`-dimensional faces are the edges; if `P` has dimension `n`, its\n`(n - 1)`-dimensional faces are its facets. -/\ndef IsFaceOfDim (k : ℕ) (P F : Set E) : Prop :=\n  IsFace P F ∧ finrank ℝ (vectorSpan ℝ F) = k\n\n/-- A set `P` is **vertex-transitive** if for any two vertices (extreme points) `v`, `w` of `P`\nthere is an isometry of the ambient space mapping `P` onto itself and `v` to `w`. -/\ndef IsVertexTransitive (P : Set E) : Prop :=\n  ∀ v ∈ P.extremePoints ℝ, ∀ w ∈ P.extremePoints ℝ, ∃ σ : E ≃ᵃⁱ[ℝ] E, σ '' P = P ∧ σ v = w\n\n/-- A set `P` **has equal edges** if all its `1`-dimensional faces have the same length. -/\ndef HasEqualEdges (P : Set E) : Prop :=\n  ∀ e₁ e₂, IsFaceOfDim 1 P e₁ → IsFaceOfDim 1 P e₂ → Metric.diam e₁ = Metric.diam e₂\n\n/-- `IsUniformPolytope n P` means that `P` is a (convex) **uniform `n`-polytope**. A uniform\n`0`-polytope is a single point. A uniform `(n + 1)`-polytope is a convex polytope of dimension\n`n + 1` that is vertex-transitive, all of whose edges have the same length, and all of whose\nfacets (`n`-dimensional faces) are uniform `n`-polytopes. -/\ndef IsUniformPolytope : ℕ → Set E → Prop\n  | 0, P => ∃ x, P = {x}\n  | n + 1, P => IsPolytope P ∧ finrank ℝ (vectorSpan ℝ P) = n + 1 ∧ IsVertexTransitive P ∧\n      HasEqualEdges P ∧ ∀ F, IsFaceOfDim n P F → IsUniformPolytope n F\n\n/-- Two subsets `P`, `Q` of a Euclidean space are **similar** if some similarity transformation\n(a bijective map scaling all distances by a fixed positive factor, i.e. a `DilationEquiv`) maps\n`P` onto `Q`. -/\ndef IsSimilar (P Q : Set E) : Prop :=\n  ∃ f : E ≃ᵈ E, f '' P = Q\n\n/-- A single point is a uniform `0`-polytope. -/\n@[category test, AMS 51 52]\ntheorem isUniformPolytope_zero_singleton (x : E) : IsUniformPolytope 0 {x} :=\n  ⟨x, rfl⟩\n\n/-- A nondegenerate segment is a uniform `1`-polytope. -/\n@[category test, AMS 51 52]\ntheorem isUniformPolytope_one_segment {a b : E} (h : a ≠ b) :\n    IsUniformPolytope 1 (segment ℝ a b) := by\n  sorry\n\n/-- Being a uniform `n`-polytope is invariant under similarity. -/\n@[category API, AMS 51 52]\ntheorem IsUniformPolytope.of_isSimilar {n : ℕ} {P Q : Set E} (hP : IsUniformPolytope n P)\n    (hPQ : IsSimilar P Q) : IsUniformPolytope n Q := by\n  sorry\n\n/-- The regular `5`-simplex (the convex hull of the standard basis of $\\mathbb{R}^6$) is a uniform\n`5`-polytope. -/\n@[category test, AMS 51 52]\ntheorem isUniformPolytope_five_simplex :\n    IsUniformPolytope 5 (convexHull ℝ (Set.range (EuclideanSpace.basisFun (Fin 6) ℝ))) := by\n  sorry\n\n/-- The unit `5`-cube is a uniform `5`-polytope. -/\n@[category test, AMS 51 52]\ntheorem isUniformPolytope_five_cube :\n    IsUniformPolytope 5 {x : EuclideanSpace ℝ (Fin 5) | ∀ i, x i ∈ Set.Icc (0 : ℝ) 1} := by\n  sorry\n\n/-- A `1 × 2` rectangle is vertex-transitive but is not a uniform `2`-polytope, because its edges\ndo not all have the same length. -/\n@[category test, AMS 51 52]\ntheorem not_isUniformPolytope_rectangle :\n    ¬ IsUniformPolytope 2\n      {x : EuclideanSpace ℝ (Fin 2) | x 0 ∈ Set.Icc (0 : ℝ) 1 ∧ x 1 ∈ Set.Icc (0 : ℝ) 2} := by\n  sorry\n\n/-- **Convex uniform 5-polytopes**: find and classify the complete set of these shapes.\n\nThat is, determine the set of convex uniform $5$-polytopes in $\\mathbb{R}^5$ up to similarity:\na set of representatives such that every convex uniform $5$-polytope is similar to one of them,\nand every similar copy of a representative is a convex uniform $5$-polytope.\n\nThe known convex uniform $5$-polytopes are the 104 sporadic ones (19 in the $A_5$ family, 31 in\nthe $B_5$ family, 8 more in the $D_5$ family, 45 prisms over uniform 4-polytopes, and the grand\nantiprism prism) together with the infinite families of duoprism prisms and of duoprisms of a\nuniform polyhedron with a regular polygon. It is not known whether this list is complete. -/\n@[category research open, AMS 51 52]\ntheorem uniform_5_polytope :\n    {P : Set (EuclideanSpace ℝ (Fin 5)) | IsUniformPolytope 5 P} =\n      {P | ∃ Q ∈ (answer(sorry) : Set (Set (EuclideanSpace ℝ (Fin 5)))), IsSimilar Q P} := by\n  sorry\n\nend Uniform5Polytope\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.75,
+   "decomposition_objections": "The table notes propose stating the candidate answer ('every convex uniform 5-polytope is, up to similarity, one of these 104 + infinite families') as a Prop. I did not hard-code that list: (1) the source statement is literally a 'find and classify' problem, and CONTRIBUTING reserves answer(sorry) for exactly the information a problem asks to determine; (2) the article's description of the infinite families is imprecise (it says 'Cartesian products of the uniform polyhedra and regular polygons' but only names [3,3]×[p], [4,3]×[p], [5,3]×[p]; e.g. antiprism×polygon duoprisms and snub-cube/snub-dodecahedron×polygon duoprisms are convex uniform 5-polytopes under the article's own definition and are not explicitly named), and the sporadic count mixes Wythoffian orbit polytopes with alternations (snub 24-cell prism) and the grand antiprism prism, so any explicit transcription (via coordinates of ~104 polytopes plus families) would very likely state a subtly false or trivially false theorem. Hard-coding the list would also require explicit coordinates for H4- and 600-cell-derived polytopes (golden-ratio coordinates), a large error-prone construction the source does not itself specify. The answer(sorry) formulation is faithful to the statement as written and its docstring records the known candidate list.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Classification is formalized as set equality {P | IsUniformPolytope 5 P} = {P | ∃ Q ∈ answer(sorry), IsSimilar Q P}: the answer is a set of representatives, every convex uniform 5-polytope in ℝ^5 must be similar to one of them, and every similar copy of a representative must be a convex uniform 5-polytope. Irredundancy of the representative list is not required (a redundant complete list still determines the classification).",
+    "'Shapes' are taken up to similarity (not congruence), following the table notes; similarity of subsets of Euclidean space is modeled by a DilationEquiv (E ≃ᵈ E) mapping one set onto the other, as in FormalConjectures/ErdosProblems/91.lean.",
+    "Uniform polytopes are defined recursively on dimension with base case 'a single point'; a uniform (n+1)-polytope must be a convex hull of a finite set with finrank (vectorSpan) = n+1, vertex-transitive, with all edges of equal length, and with all n-dimensional faces uniform. Equal edges is included explicitly (as in the table notes); with the point base case this makes uniform 2-polytopes exactly the regular polygons, agreeing with Wikipedia's convention, and is implied in dimension ≥ 3 by uniform facets.",
+    "Faces are modeled as nonempty exposed subsets (Mathlib's IsExposed ℝ P F); for polytopes these coincide with faces. Facets/edges are identified by the dimension finrank ℝ (vectorSpan ℝ F) of their affine span. Vertices are Set.extremePoints ℝ P.",
+    "Symmetries are affine isometries of the ambient Euclidean space E mapping P onto itself (E ≃ᵃⁱ[ℝ] E); for a lower-dimensional face this is equivalent to isometries of its own affine hull since these extend to E.",
+    "The ambient space for the main statement is EuclideanSpace ℝ (Fin 5) with the polytope required to be 5-dimensional; the definitions are stated for a general real inner product space so that facets can be handled in the same ambient space.",
+    "Edge length is Metric.diam of the (compact) edge.",
+    "AMS tags 51 (geometry, per the problem's 'euclidean geometry' tag) and 52 (convex and discrete geometry)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "convexHull ℝ ↑(s : Finset E) used directly; Mathlib's Exposed.lean docstring explicitly notes polytopes are not yet in Mathlib.",
+     "name": "Uniform5Polytope.IsPolytope",
+     "why_needed": "Mathlib has no notion of a convex polytope; needed to express 'convex polytope' as the convex hull of a finite set."
+    },
+    {
+     "closest_existing_considered": "IsExposed ℝ P F (used, plus Nonempty to exclude ∅, which is vacuously exposed and would otherwise count as a 0-dimensional facet of a segment); IsExtreme was rejected since extreme subsets need not be convex faces.",
+     "name": "Uniform5Polytope.IsFace",
+     "why_needed": "Faces of a polytope (needed for edges and facets); defined as nonempty exposed subsets."
+    },
+    {
+     "closest_existing_considered": "IsExposed together with Module.finrank ℝ (vectorSpan ℝ F).",
+     "name": "Uniform5Polytope.IsFaceOfDim",
+     "why_needed": "k-dimensional faces (edges for k = 1, facets for k = n - 1)."
+    },
+    {
+     "closest_existing_considered": "MulAction.IsPretransitive on a subgroup of AffineIsometryEquiv — would require constructing the symmetry subgroup and an action on extreme points; a direct ∀∃ statement is simpler and equivalent.",
+     "name": "Uniform5Polytope.IsVertexTransitive",
+     "why_needed": "Vertex-transitivity under the isometry group of the polytope is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib; uses Metric.diam.",
+     "name": "Uniform5Polytope.HasEqualEdges",
+     "why_needed": "All 1-dimensional faces have the same length."
+    },
+    {
+     "closest_existing_considered": "None; Mathlib's Coxeter group material does not define polytopes.",
+     "name": "Uniform5Polytope.IsUniformPolytope",
+     "why_needed": "The recursive notion of uniform n-polytope does not exist in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Similar (indexed families) and Erdos91.DilationEquivSimilar (Finset ℝ² only); defined via DilationEquiv as in the latter.",
+     "name": "Uniform5Polytope.IsSimilar",
+     "why_needed": "Similarity of subsets of Euclidean space (Mathlib's Similar is for indexed families of points)."
+    }
+   ],
+   "per_slot": {
+    "uniform_5_polytope": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: the set of convex uniform 5-polytopes in ℝ^5 equals the set of all similar copies of the members of answer(sorry) (a set of representatives up to similarity). 'Uniform n-polytope' is defined recursively in the file (point; convex polytope of dimension n, vertex-transitive under ambient isometries, equal edge lengths, facets uniform (n-1)-polytopes), matching the Wikipedia definition and the table notes. Neither Mathlib nor the repo has polytopes/faces/uniform polytopes, so bespoke (problem-local) definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "uniform_5_polytope": "/-- **Convex uniform 5-polytopes**: find and classify the complete set of these shapes.\n\nThat is, determine the set of convex uniform $5$-polytopes in $\\mathbb{R}^5$ up to similarity:\na set of representatives such that every convex uniform $5$-polytope is similar to one of them,\nand every similar copy of a representative is a convex uniform $5$-polytope.\n\nThe known convex uniform $5$-polytopes are the 104 sporadic ones (19 in the $A_5$ family, 31 in\nthe $B_5$ family, 8 more in the $D_5$ family, 45 prisms over uniform 4-polytopes, and the grand\nantiprism prism) together with the infinite families of duoprism prisms and of duoprisms of a\nuniform polyhedron with a regular polygon. It is not known whether this list is complete. -/\n@[category research open, AMS 51 52]\ntheorem uniform_5_polytope :\n    {P : Set (EuclideanSpace ℝ (Fin 5)) | IsUniformPolytope 5 P} =\n      {P | ∃ Q ∈ (answer(sorry) : Set (Set (EuclideanSpace ℝ (Fin 5)))), IsSimilar Q P} := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Convex uniform 5-polytopes\n\nA convex polytope is *uniform* if it is vertex-transitive (the isometries of the ambient space\nmapping it onto itself act transitively on its vertices), all its edges have the same length, and\nall its facets are uniform polytopes; the uniform polygons are the regular polygons.\n\nThe complete set of convex uniform 5-polytopes has not been determined. The known ones are:\n\n* the Wythoffian polytopes, i.e. the convex hulls of the orbit of a point under a finite reflection\n  group: the $19$ polytopes of the $A_5$ family, the $31$ of the $B_5$ family and the $8$ further\n  ones of the $D_5$ family (the reducible reflection groups only give prisms and duoprisms);\n* the prisms over convex uniform 4-polytopes: the $45$ polychoral prisms, the grand antiprism\n  prism (the only known convex uniform 5-polytope which is not obtained by a Wythoff construction\n  or an alternation of one), and the prisms over the prismatic uniform 4-polytopes;\n* the infinite families of duoprisms, i.e. the Cartesian products of a convex uniform polyhedron\n  and a regular polygon, which include the duoprism prisms $\\{p\\}\\times\\{q\\}\\times\\{\\,\\}$.\n\nThe problem asks to find and classify the complete set of convex uniform 5-polytopes. The\nconjecture formalised here is that the list above is complete: every convex uniform 5-polytope\nis Wythoffian, or a prism over a convex uniform 4-polytope, or a product of a convex uniform\npolyhedron and a regular polygon.\n\n*References:*\n- [Wikipedia, Uniform 5-polytope](https://en.wikipedia.org/wiki/uniform_5-polytope)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Open Problem Garden, Convex uniform 5-polytopes](http://www.openproblemgarden.org/op/convex_uniform_5_polytopes)\n-/\n\nopen scoped Pointwise RealInnerProductSpace\n\nnamespace Uniform5Polytope\n\nvariable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]\n\n/-- A (convex) polytope in `E`: the convex hull of a finite set of points. -/\ndef IsPolytope (P : Set E) : Prop :=\n  ∃ s : Set E, s.Finite ∧ P = convexHull ℝ s\n\n/-- `IsFaceOfDim k P F` means that `F` is a `k`-dimensional face of the polytope `P`, i.e. a\nnonempty exposed subset of `P` whose affine span has dimension `k`. -/\ndef IsFaceOfDim (k : ℕ) (P F : Set E) : Prop :=\n  IsExposed ℝ P F ∧ F.Nonempty ∧ Module.finrank ℝ (vectorSpan ℝ F) = k\n\n/-- A set `P` is vertex-transitive if for any two vertices (extreme points) `v`, `w` of `P` there\nis an isometry of `E` mapping `P` onto itself and `v` to `w`. -/\ndef IsVertexTransitive (P : Set E) : Prop :=\n  ∀ v ∈ P.extremePoints ℝ, ∀ w ∈ P.extremePoints ℝ,\n    ∃ g : E ≃ᵃⁱ[ℝ] E, g '' P = P ∧ g v = w\n\n/-- All edges (one-dimensional faces) of `P` have the same length. -/\ndef HasEqualEdges (P : Set E) : Prop :=\n  ∀ e₁ e₂ : Set E, IsFaceOfDim 1 P e₁ → IsFaceOfDim 1 P e₂ →\n    Metric.diam e₁ = Metric.diam e₂\n\n/-- `IsUniform n P` means that `P` is a convex uniform `n`-polytope: an `n`-dimensional polytope\nwhich is vertex-transitive, whose edges all have the same length, and whose facets are all\nuniform `(n - 1)`-polytopes. A uniform `0`-polytope is a point.\n\nFor `n = 2` this says exactly that `P` is a regular polygon, and for `n = 3` that `P` is a\nvertex-transitive polyhedron with regular faces, i.e. a convex uniform polyhedron. In dimension\n`n ≥ 3`, the condition that all edges have the same length follows from the other conditions,\nso this is the usual recursive definition of uniform polytopes.\n\nThe symmetries of a lower-dimensional polytope `P` are taken to be the isometries of `E` mapping\n`P` onto itself; since every isometry of the affine span of `P` extends to an isometry of `E`,\nthis agrees with the intrinsic notion. -/\ndef IsUniform : ℕ → Set E → Prop\n  | 0, P => ∃ x, P = {x}\n  | n + 1, P => IsPolytope P ∧ Module.finrank ℝ (vectorSpan ℝ P) = n + 1 ∧\n      IsVertexTransitive P ∧ HasEqualEdges P ∧ ∀ F, IsFaceOfDim n P F → IsUniform n F\n\n@[category API, AMS 51 52]\ntheorem IsUniform.isPolytope {n : ℕ} {P : Set E} (h : IsUniform n P) : IsPolytope P := by\n  cases n with\n  | zero =>\n    obtain ⟨x, rfl⟩ := h\n    exact ⟨{x}, Set.finite_singleton x, (convexHull_singleton x).symm⟩\n  | succ n => exact h.1\n\n@[category test, AMS 51 52]\ntheorem isUniform_zero_singleton (x : E) : IsUniform 0 {x} :=\n  ⟨x, rfl⟩\n\n/-- A linear isometry of `E` is a reflection if it is the reflection in a hyperplane through the\norigin, i.e. in the orthogonal complement of a nonzero vector `v`. -/\ndef IsReflection (g : E ≃ₗᵢ[ℝ] E) : Prop :=\n  ∃ v : E, v ≠ 0 ∧ g = (ℝ ∙ v)ᗮ.reflection\n\n/-- `P` is a *Wythoffian* polytope: up to translation, `P` is the convex hull of the orbit of a\npoint `p` under a finite group `W` of linear isometries generated by reflections. This is the\nWythoff construction with ringed nodes of a Coxeter diagram (the position of `p` in the\nfundamental chamber determines the ringing); alternations (\"hollow rings\") are not included. -/\ndef IsWythoffian (P : Set E) : Prop :=\n  ∃ (W : Subgroup (E ≃ₗᵢ[ℝ] E)) (S : Set (E ≃ₗᵢ[ℝ] E)) (p c : E),\n    Finite W ∧ (∀ g ∈ S, IsReflection g) ∧ Subgroup.closure S = W ∧\n      P = (c + ·) '' convexHull ℝ (Set.range fun g : W => (g : E ≃ₗᵢ[ℝ] E) p)\n\n/-- `IsUniformProduct m n P` means that `P` is the (orthogonal) Cartesian product `Q × R` of a\nconvex uniform `m`-polytope `Q` and a convex uniform `n`-polytope `R` with the same edge length,\ni.e. `P = Q + R` where the affine spans of `Q` and `R` are orthogonal.\n\nFor `n = 1` (so that `R` is a segment) this says that `P` is a right prism over `Q` whose height\nis the edge length of `Q`. For `m = 3` and `n = 2` this says that `P` is the duoprism of a convex\nuniform polyhedron and a regular polygon. -/\ndef IsUniformProduct (m n : ℕ) (P : Set E) : Prop :=\n  ∃ Q R : Set E, IsUniform m Q ∧ IsUniform n R ∧\n    (∀ x ∈ Q, ∀ y ∈ Q, ∀ z ∈ R, ∀ w ∈ R, ⟪x - y, z - w⟫ = 0) ∧\n    (∀ e f, IsFaceOfDim 1 Q e → IsFaceOfDim 1 R f → Metric.diam e = Metric.diam f) ∧\n    P = Q + R\n\n/--\n**Convex uniform 5-polytopes**: find and classify the complete set of these shapes.\n\nThe known convex uniform 5-polytopes are the Wythoffian ones (the $19 + 31 + 8 = 58$ polytopes of\nthe $A_5$, $B_5$ and $D_5$ families), the prisms over convex uniform 4-polytopes (the $45$\npolychoral prisms, the grand antiprism prism and the prisms over prismatic uniform 4-polytopes)\nand the Cartesian products of a convex uniform polyhedron and a regular polygon (which include\nthe duoprism prisms $\\{p\\}\\times\\{q\\}\\times\\{\\,\\}$). The conjecture is that this list is complete:\nevery convex uniform 5-polytope in $\\mathbb{R}^5$ is Wythoffian, or a prism over a convex uniform\n4-polytope, or a product of a convex uniform polyhedron and a regular polygon. Since the three\nclasses are closed under similarities, this is a statement about all convex uniform 5-polytopes\nup to similarity.\n-/\n@[category research open, AMS 51 52]\ntheorem uniform_5_polytope (P : Set (EuclideanSpace ℝ (Fin 5))) (hP : IsUniform 5 P) :\n    IsWythoffian P ∨ IsUniformProduct 4 1 P ∨ IsUniformProduct 3 2 P := by\n  sorry\n\nend Uniform5Polytope\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "Minor: the table's notes count '104 known sporadic' polytopes and treat the infinite families as '{p}×{q}×{ } and uniform-polyhedron–polygon duoprisms'. The article's own text organises the duoprism families by Coxeter groups ([3,3]×[p], [4,3]×[p], [5,3]×[p]), which would omit products of antiprisms or snub polyhedra with polygons; these are genuine convex uniform 5-polytopes, so a literal reading of the enumeration would be false as a completeness statement. I followed the table's (and the article's) broader phrase 'uniform polyhedra × regular polygons'. Also, the explicit sporadic count is not reproduced; the known list is described by mathematically equivalent structural classes (see modeling decisions).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The known list is described structurally rather than by 104 explicit coordinate constructions: (a) 'Wythoffian' = orbit polytope of a finite reflection group on ℝ^5 (equal edges follow from the uniformity hypothesis); by the classification of finite reflection groups the 5-dimensional uniform ones are exactly the A5/B5/D5 ringings (58 polytopes) plus reducible groups, which give only prisms/duoprisms already covered by the other clauses. (b) 'prism over a convex uniform 4-polytope' replaces the explicit 45 polychoral prisms + grand antiprism prism (+ tesseract prism = 5-cube and prisms over prismatic 4-polytopes); this relies on convex uniform 4-polytopes being completely classified (Conway–Guy 1965, proved complete by Möller 2004). (c) The infinite duoprism families are read, following the article's phrase 'Cartesian products of the uniform polyhedra and regular polygons', as products of ANY convex uniform polyhedron (Platonic, Archimedean incl. snubs, prisms, antiprisms) with a regular polygon; this includes the duoprism prisms {p}×{q}×{ } = ({p}×{ })×{q}. A narrower reading restricted to the Coxeter families [3,3]×[p], [4,3]×[p], [5,3]×[p] would make the completeness claim trivially false (e.g. antiprism × polygon and snub cube × polygon are convex uniform 5-polytopes).",
+    "Uniform is defined recursively on the dimension index: IsUniform (n+1) P := polytope of dimension n+1, vertex-transitive, all edges equal, all n-faces uniform; IsUniform 0 P := P is a point. The explicit equal-edge condition is redundant in dimension ≥ 3 but makes IsUniform 2 exactly 'regular polygon' (Wikipedia's stronger 2-dimensional convention). Reviewers should confirm they accept this as equivalent to 'vertex-transitive with uniform facets'.",
+    "Symmetries of lower-dimensional faces are isometries of the ambient space E mapping the face onto itself (rather than isometries of the face's affine hull); these are equivalent since isometries of an affine subspace extend to E.",
+    "Vertices are Set.extremePoints ℝ P; faces are nonempty exposed subsets (IsExposed ℝ P F) with dimension Module.finrank ℝ (vectorSpan ℝ F); edge length is Metric.diam of the edge.",
+    "'Up to similarity' is handled by quantifying over all P ⊆ ℝ^5 and using similarity-closed classes on the right-hand side, rather than by a Similar relation.",
+    "IsUniformProduct requires orthogonality of the affine spans of the factors and equal edge lengths of the factors and uniformity of the factors; all of these are implied by the uniformity of P, so they only make the definition self-contained and do not strengthen the theorem.",
+    "The theorem is stated as a Prop (completeness of the known list), following the decomposition table, rather than in answer(sorry) form for 'find and classify'.",
+    "Two short proved statements (category API/test) are included for the bespoke IsUniform definition, per CONTRIBUTING's request for basic API tests."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "convexHull ℝ s with s : Finset (used directly in FormalConjectures/Paper/Rupert.lean); no named predicate exists.",
+     "name": "Uniform5Polytope.IsPolytope",
+     "why_needed": "Mathlib has no notion of convex polytope; defined as convex hull of a finite set."
+    },
+    {
+     "closest_existing_considered": "IsExposed, IsExtreme, Set.extremePoints (Mathlib); none carries a dimension.",
+     "name": "Uniform5Polytope.IsFaceOfDim",
+     "why_needed": "k-dimensional faces (vertices/edges/facets) of a polytope are needed for the recursive definition of uniformity; defined as nonempty exposed subsets (IsExposed ℝ P F) whose vectorSpan has finrank k. For polytopes, faces = exposed faces."
+    },
+    {
+     "closest_existing_considered": "Set.extremePoints, AffineIsometryEquiv (E ≃ᵃⁱ[ℝ] E) and its Group instance; MulAction.IsPretransitive is not applicable without a bespoke symmetry-group action on the vertex set.",
+     "name": "Uniform5Polytope.IsVertexTransitive",
+     "why_needed": "Vertex-transitivity under the symmetry group (affine isometries g with g '' P = P) acting on extreme points; no such notion in Mathlib."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Uniform5Polytope.HasEqualEdges",
+     "why_needed": "All 1-dimensional faces have equal Metric.diam; part of the uniform definition (redundant in dim ≥ 3, essential for the polygon base case)."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or FormalConjecturesForMathlib (Geometry/2d.lean, 3d.lean only provide notation/orientation).",
+     "name": "Uniform5Polytope.IsUniform",
+     "why_needed": "The recursive notion of convex uniform n-polytope (Coxeter/Johnson) is absent from Mathlib and the repo. Recursion is on the dimension index n; a uniform 0-polytope is a point."
+    },
+    {
+     "closest_existing_considered": "Submodule.reflection (Mathlib) — used; there is no predicate 'is a hyperplane reflection'.",
+     "name": "Uniform5Polytope.IsReflection",
+     "why_needed": "Hyperplane reflections through the origin, to define finite reflection groups; uses Mathlib's Submodule.reflection on (ℝ ∙ v)ᗮ."
+    },
+    {
+     "closest_existing_considered": "CoxeterSystem/CoxeterMatrix in Mathlib (abstract groups, no geometric representation as isometries); Subgroup.closure with LinearIsometryEquiv group used instead.",
+     "name": "Uniform5Polytope.IsWythoffian",
+     "why_needed": "Wythoff construction (ringed Coxeter diagram) = convex hull of the orbit of a point under a finite group generated by reflections, up to translation. No Coxeter-group/reflection-group machinery exists in Mathlib for Euclidean reflection groups."
+    },
+    {
+     "closest_existing_considered": "Set.add (pointwise, used), Set.prod (not embedded in a common Euclidean space).",
+     "name": "Uniform5Polytope.IsUniformProduct",
+     "why_needed": "Orthogonal Cartesian product Q + R of uniform m- and n-polytopes with equal edge length (prisms for n = 1, polyhedron×polygon duoprisms for (3,2)); needed to describe the prismatic and duoprismatic families."
+    }
+   ],
+   "per_slot": {
+    "uniform_5_polytope": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: every convex uniform 5-polytope P ⊆ ℝ^5 (recursive definition: vertex-transitive polytope, equal edges, uniform facets; uniform polygons = regular polygons) is Wythoffian (convex hull of an orbit of a finite reflection group, up to translation), or a right prism over a convex uniform 4-polytope, or an orthogonal Cartesian product of a convex uniform polyhedron and a regular polygon. These three similarity-closed classes are exactly the article's known list (19 A5 + 31 B5 + 8 D5 Wythoffians; 45 polychoral prisms + grand antiprism prism + prisms over prismatic 4-polytopes; duoprism prisms and polyhedron–polygon duoprisms), so the theorem is 'the known list is complete', as prescribed by the decomposition table."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "uniform_5_polytope": "/--\n**Convex uniform 5-polytopes**: find and classify the complete set of these shapes.\n\nThe known convex uniform 5-polytopes are the Wythoffian ones (the $19 + 31 + 8 = 58$ polytopes of\nthe $A_5$, $B_5$ and $D_5$ families), the prisms over convex uniform 4-polytopes (the $45$\npolychoral prisms, the grand antiprism prism and the prisms over prismatic uniform 4-polytopes)\nand the Cartesian products of a convex uniform polyhedron and a regular polygon (which include\nthe duoprism prisms $\\{p\\}\\times\\{q\\}\\times\\{\\,\\}$). The conjecture is that this list is complete:\nevery convex uniform 5-polytope in $\\mathbb{R}^5$ is Wythoffian, or a prism over a convex uniform\n4-polytope, or a product of a convex uniform polyhedron and a regular polygon. Since the three\nclasses are closed under similarities, this is a statement about all convex uniform 5-polytopes\nup to similarity.\n-/\n@[category research open, AMS 51 52]\ntheorem uniform_5_polytope (P : Set (EuclideanSpace ℝ (Fin 5))) (hP : IsUniform 5 P) :\n    IsWythoffian P ∨ IsUniformProduct 4 1 P ∨ IsUniformProduct 3 2 P := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c07",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "The decomposition note says that the article “asserts a candidate answer” and therefore prescribes the proposition that every convex uniform 5-polytope is one of the listed known examples. The supplied article instead explicitly says that the complete set has not been determined and consistently calls the 104 shapes “known”; it does not assert that this list is exhaustive. Thus the prescribed completeness proposition is stronger than the cited source. Moreover, the counts and broad family names in the supplied text do not specify the exact 104 geometric members.",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The intended objects were read as full-dimensional finite convex polytopes in five-dimensional Euclidean space, with uniformity recursive through their four-dimensional facets and classification modulo geometric similarity, not modulo Coxeter-diagram presentations.",
+    "The requested candidate side was read as the 104 geometrically distinct known sporadic shapes together with the duoprism-prism and uniform-polyhedron–regular-polygon product families, with overlaps such as B5/D5 duplicates and {4}×{4}×{ } identified rather than counted twice.",
+    "No candidate file was created, in accordance with the instruction for a full bail-out."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "uniform_5_polytope": {
+     "outcome": "missing_primitives",
+     "why": "A faithful statement under the fixed decomposition requires (1) a semantic theory of finite convex polytopes and their vertices/facets, (2) the recursive uniform-polytope predicate (vertex transitivity, equal edges, and uniform 4-polytope facets), (3) similarity of unlabelled convex polytopes, and (4) semantic constructions identifying every member of the A5, B5, D5-unique, polychoral-prism, grand-antiprism-prism, duoprism-prism, and uniform-polyhedron–polygon families while quotienting geometric duplicates. Mathlib and FormalConjecturesForMathlib have generic convex hulls and exposed sets but no general polytope face/facet API, uniform-polytope predicate, Wythoff construction, or these named geometric families. The supplied article text gives counts but omits the diagrams/coordinates that identify the 104 sporadic shapes. Adding abstract labels or unconstrained family predicates would be placeholder formalization rather than a geometric classification."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": true,
+   "cid": "c08",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "The background article says only that 104 sporadic examples and the infinite families are known and explicitly says that the complete set has not been determined. It does not itself state that this known list is conjectured to be complete. Thus the decomposition's positive candidate proposition is stronger than the cited prose. Even accepting that imposed reading, the exact member data needed for a faithful formal statement are absent from the supplied source and libraries.",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "I treated the fixed decomposition as requesting the positive candidate classification: every convex uniform 5-polytope is similar to one of the 104 known sporadic geometric shapes or a member of one of the stated infinite product families, rather than merely asking for an unconstrained `answer(sorry)` set.",
+    "I treated uniformity geometrically and recursively, as vertex transitivity together with equal edge lengths and uniform 4-polytope facets, and treated classification as geometric identity up to similarity rather than Coxeter-diagram construction. These choices expose the unavailable prerequisites and prevent replacing the problem by a count of diagram labels."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "uniform_5_polytope": {
+     "outcome": "missing_primitives",
+     "why": "Omitted rather than weakened. Mathlib and FormalConjecturesForMathlib have convex hulls, extreme/exposed points, affine dimension, metric similarity for indexed configurations, and abstract Coxeter groups, but no geometric polytope or face-lattice type, no facet operation for general convex polytopes, no recursive uniform-polytope predicate, no geometric automorphism/vertex-transitivity notion for polytopes, and no Wythoff/alternation/duoprism constructions. Most importantly, the repository contains no explicit geometric representatives for the 104 sporadic shapes, the grand-antiprism prism, or the exact uniform-polyhedron–polygon families. The supplied article states counts and family names but does not supply enough coordinate/diagram data to define all members and identify duplicates up to geometric similarity. Introducing predicates named after the candidate families without constructive geometric semantics would be a prohibited placeholder and would make the classification theorem unfaithful or tautological."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  }
+ ],
+ "chosen": {
+  "uniform_5_polytope": "c03"
+ },
+ "id": "wp-uniform-5-polytope",
+ "main_attempt": "c03"
+}

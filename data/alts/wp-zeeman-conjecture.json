@@ -1,0 +1,471 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The Zeeman conjecture\n\nThe Zeeman conjecture asks whether the product of every finite contractible two-dimensional\ncomplex with the closed interval is PL homeomorphic to a collapsible complex. Equivalently, some\niterated derived (barycentric) subdivision of the product must be collapsible.\n\n*References:*\n- [Wikipedia, Zeeman conjecture](https://en.wikipedia.org/wiki/Zeeman_conjecture)\n- [Adiprasito and Benedetti, *Subdivisions, shellability, and collapsibility of products*]\n  (https://arxiv.org/abs/1202.6606)\n-/\n\nnamespace ZeemanConjecture\n\n/-- A finite abstract simplicial complex, before imposing the face axioms. An ordering of the\nvertices is included in order to choose the standard staircase triangulation of a product with an\ninterval. -/\nstructure FiniteSimplicialComplex where\n  Vertex : Type\n  vertexFintype : Fintype Vertex\n  vertexOrder : LinearOrder Vertex\n  faces : Finset (Finset Vertex)\n\nattribute [instance] FiniteSimplicialComplex.vertexFintype\n  FiniteSimplicialComplex.vertexOrder\n\nnamespace FiniteSimplicialComplex\n\n/-- The axioms for a finite abstract simplicial complex whose declared vertex type is exactly its\nset of vertices. -/\ndef IsComplex (K : FiniteSimplicialComplex) : Prop :=\n  ∅ ∈ K.faces ∧\n    (∀ σ ∈ K.faces, ∀ τ ⊆ σ, τ ∈ K.faces) ∧\n    ∀ v : K.Vertex, {v} ∈ K.faces\n\n/-- A simplicial complex is two-dimensional when all its faces have at most three vertices and it\nhas a face with exactly three vertices. -/\ndef IsTwoDimensional (K : FiniteSimplicialComplex) : Prop :=\n  (∀ σ ∈ K.faces, σ.card ≤ 3) ∧ ∃ σ ∈ K.faces, σ.card = 3\n\n/-- The standard geometric realization of a finite abstract simplicial complex, in barycentric\ncoordinates indexed by its vertices. -/\ndef realization (K : FiniteSimplicialComplex) : Set (K.Vertex → ℝ) :=\n  {x | (∀ v, 0 ≤ x v) ∧\n    (∑ v, x v) = 1 ∧\n    Finset.univ.filter (fun v ↦ x v ≠ 0) ∈ K.faces}\n\n/-- A face in the standard staircase triangulation of `K × [0,1]`. -/\ndef IsIntervalProductFace (K : FiniteSimplicialComplex)\n    (σ : Finset (K.Vertex × Fin 2)) : Prop :=\n  σ.image Prod.fst ∈ K.faces ∧\n    (σ : Set (K.Vertex × Fin 2)).Pairwise\n      (fun x y ↦ (x.1 ≤ y.1 ∧ x.2 ≤ y.2) ∨ (y.1 ≤ x.1 ∧ y.2 ≤ x.2))\n\n/-- The standard staircase triangulation of the product of `K` with the closed interval. -/\nnoncomputable def intervalProduct (K : FiniteSimplicialComplex) : FiniteSimplicialComplex := by\n  classical\n  exact {\n    Vertex := K.Vertex ×ₗ Fin 2\n    vertexFintype := inferInstance\n    vertexOrder := inferInstance\n    faces := Finset.univ.filter K.IsIntervalProductFace }\n\n/-- One elementary simplicial collapse of a face family removes a free codimension-one face and\nits unique coface. -/\ndef ElementaryCollapse {V : Type} [DecidableEq V]\n    (A B : Finset (Finset V)) : Prop :=\n  ∃ σ ∈ A, ∃ τ ∈ A,\n    σ ⊂ τ ∧ τ.card = σ.card + 1 ∧\n    (∀ υ ∈ A, σ ⊆ υ → υ = σ ∨ υ = τ) ∧\n    B = (A.erase σ).erase τ\n\n/-- A finite simplicial complex is collapsible if elementary collapses reduce its face family to\nthat of a single vertex. -/\ndef Collapsible (K : FiniteSimplicialComplex) : Prop :=\n  ∃ v : K.Vertex,\n    Relation.ReflTransGen ElementaryCollapse K.faces {∅, {v}}\n\n/-- `L` is the derived (barycentric) subdivision of `K`: vertices of `L` correspond to nonempty\nfaces of `K`, and faces of `L` correspond to chains of such faces. -/\ndef IsDerivedSubdivision (K L : FiniteSimplicialComplex) : Prop :=\n  ∃ e : L.Vertex ≃ {σ : Finset K.Vertex // σ ∈ K.faces ∧ σ.Nonempty},\n    ∀ τ : Finset L.Vertex,\n      τ ∈ L.faces ↔\n        (τ : Set L.Vertex).Pairwise\n          (fun x y ↦ (e x).1 ⊆ (e y).1 ∨ (e y).1 ⊆ (e x).1)\n\n/-- `L` is obtained from `K` by applying the derived-subdivision operation finitely many times. -/\ninductive IsIteratedDerivedSubdivision :\n    FiniteSimplicialComplex → FiniteSimplicialComplex → Prop\n  | refl (K) : IsIteratedDerivedSubdivision K K\n  | step {K L M} : IsIteratedDerivedSubdivision K L → IsDerivedSubdivision L M →\n      IsIteratedDerivedSubdivision K M\n\n/-- PL collapsibility, expressed by the equivalent condition that some iterated derived\nsubdivision is a collapsible simplicial complex. -/\ndef PLCollapsible (K : FiniteSimplicialComplex) : Prop :=\n  ∃ L, IsIteratedDerivedSubdivision K L ∧ L.Collapsible\n\nend FiniteSimplicialComplex\n\n/--\n**Zeeman conjecture.** Given a finite contractible two-dimensional CW (equivalently, finite\npolyhedral) complex $K$, is $K \\times [0,1]$ PL homeomorphic to a collapsible complex? Here the\nconclusion is stated in the equivalent subdivision form: some finite iterated derived subdivision\nof a staircase triangulation of $K \\times [0,1]$ is collapsible.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔ ∀ K : FiniteSimplicialComplex,\n      K.IsComplex → K.IsTwoDimensional → ContractibleSpace K.realization →\n        (K.intervalProduct).PLCollapsible := by\n  sorry\n\nend ZeemanConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled the finite two-dimensional complex by a finite abstract simplicial complex and used its standard barycentric-coordinate geometric realization for the contractibility hypothesis. This follows the background article and Adiprasito–Benedetti's equivalent finite simplicial/polyhedral formulation; Mathlib's classical CW-complex API has no notions of PL homeomorphism, subdivision, or collapse.",
+    "Interpreted “two-dimensional” as dimension exactly two: every face has at most three vertices and at least one face has three vertices.",
+    "Interpreted the question as a yes/no proposition using `answer(sorry) ↔ ...`, as required by repository conventions.",
+    "Interpreted “collapsible” in the PL sense via the cited equivalent condition that some finite iterated derived subdivision is simplicially collapsible, rather than requiring the initially chosen product triangulation to collapse.",
+    "Used the standard ordered staircase triangulation of the product with `[0,1]`. The included linear order merely chooses this triangulation; every finite vertex set can be ordered, and the resulting triangulations represent the same PL product.",
+    "Defined an elementary collapse as removal of a free codimension-one face together with its unique coface, and collapsibility as a finite sequence ending at the one-vertex complex."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `Geometry.SimplicialComplex` is an already geometrically embedded complex and provides neither abstract barycentric subdivision nor collapse; Mathlib's classical `CWComplex` API has no PL combinatorics.",
+     "name": "FiniteSimplicialComplex",
+     "why_needed": "Packages a finite abstract simplicial face family and a vertex order used to choose a staircase product triangulation."
+    },
+    {
+     "closest_existing_considered": "`Geometry.SimplicialComplex` has related face axioms but excludes the empty face and requires an ambient affine embedding.",
+     "name": "FiniteSimplicialComplex.IsComplex",
+     "why_needed": "States the empty-face, downward-closure, and declared-vertex axioms for the packaged finite face family."
+    },
+    {
+     "closest_existing_considered": "Mathlib's CW `FiniteDimensional` only asserts some finite dimension and does not specify exact dimension two; no suitable simplicial dimension predicate was found.",
+     "name": "FiniteSimplicialComplex.IsTwoDimensional",
+     "why_needed": "Expresses exact combinatorial dimension two."
+    },
+    {
+     "closest_existing_considered": "`Geometry.SimplicialComplex.space` applies only to complexes already embedded in a module and does not realize an arbitrary abstract finite complex.",
+     "name": "FiniteSimplicialComplex.realization",
+     "why_needed": "Provides the standard geometric realization on which Mathlib's `ContractibleSpace` can state contractibility."
+    },
+    {
+     "closest_existing_considered": "No finite simplicial/polyhedral product triangulation was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "FiniteSimplicialComplex.IsIntervalProductFace",
+     "why_needed": "Characterizes faces in the ordered staircase triangulation of the product with an interval."
+    },
+    {
+     "closest_existing_considered": "Topological products exist in Mathlib, but there is no compatible finite-complex product or PL triangulation API.",
+     "name": "FiniteSimplicialComplex.intervalProduct",
+     "why_needed": "Constructs a specific triangulation representing the PL space `K × [0,1]`."
+    },
+    {
+     "closest_existing_considered": "No notion of elementary collapse, free face, or collapsibility was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "FiniteSimplicialComplex.ElementaryCollapse",
+     "why_needed": "Defines an elementary PL/simplicial collapse by deleting a free codimension-one face and its unique coface."
+    },
+    {
+     "closest_existing_considered": "No existing collapsibility predicate was found.",
+     "name": "FiniteSimplicialComplex.Collapsible",
+     "why_needed": "Defines collapsibility as a finite sequence of elementary collapses to a vertex."
+    },
+    {
+     "closest_existing_considered": "No barycentric or derived subdivision operation for finite complexes was found.",
+     "name": "FiniteSimplicialComplex.IsDerivedSubdivision",
+     "why_needed": "Defines one barycentric/derived subdivision through chains of nonempty faces."
+    },
+    {
+     "closest_existing_considered": "Relation transitive closures exist in Mathlib, but subdivision changes the vertex type, so a bespoke heterogeneous packaged-complex relation was needed.",
+     "name": "FiniteSimplicialComplex.IsIteratedDerivedSubdivision",
+     "why_needed": "Allows an input-dependent finite number of derived subdivisions, essential to the PL reading of the conjecture."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Homeomorph` but no PL-homeomorphism structure, and ordinary topological homeomorphism would be too weak.",
+     "name": "FiniteSimplicialComplex.PLCollapsible",
+     "why_needed": "Encodes the PL-invariant conclusion as existence of a collapsible iterated derived subdivision."
+    }
+   ],
+   "per_slot": {
+    "zeeman_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "zeeman_conjecture": "/--\n**Zeeman conjecture.** Given a finite contractible two-dimensional CW (equivalently, finite\npolyhedral) complex $K$, is $K \\times [0,1]$ PL homeomorphic to a collapsible complex? Here the\nconclusion is stated in the equivalent subdivision form: some finite iterated derived subdivision\nof a staircase triangulation of $K \\times [0,1]$ is collapsible.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔ ∀ K : FiniteSimplicialComplex,\n      K.IsComplex → K.IsTwoDimensional → ContractibleSpace K.realization →\n        (K.intervalProduct).PLCollapsible := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\nimport Mathlib.Analysis.Convex.SimplicialComplex.Basic\nimport Mathlib.Topology.Homotopy.Contractible\n\n/-!\n# Zeeman conjecture\n\nThe conjecture asks whether the product of every finite contractible two-dimensional complex with\nan interval is PL homeomorphic to a collapsible complex. Here this is expressed by asking for a\nfinite collapsible simplicial triangulation of the product polyhedron; in particular, no fixed\ntriangulation of the product is required to collapse.\n\n*References:*\n- [Wikipedia: Zeeman conjecture](https://en.wikipedia.org/wiki/Zeeman_conjecture)\n- [Adiprasito and Benedetti, *Subdivisions, shellability, and collapsibility of products*](https://arxiv.org/abs/1202.6606)\n-/\n\nnamespace ZeemanConjecture\n\nopen Geometry Set\n\n/-- `G` is obtained from `F` by an elementary simplicial collapse: a free face `σ` and its\nunique strict coface `τ` are deleted. -/\ndef ElementaryCollapse {V : Type*} (F G : Set (Finset V)) : Prop :=\n  ∃ σ τ, σ ∈ F ∧ τ ∈ F ∧ σ ⊂ τ ∧ (∀ ρ ∈ F, σ ⊂ ρ → ρ = τ) ∧\n    G = F \\ {σ, τ}\n\n/-- A simplicial complex is collapsible if elementary collapses reduce its face set to one vertex. -/\ndef IsCollapsible {E : Type*} [AddCommGroup E] [Module ℝ E]\n    (K : SimplicialComplex ℝ E) : Prop :=\n  ∃ v, Relation.ReflTransGen ElementaryCollapse K.faces {{v}}\n\n/-- A subset of a real vector space is PL-collapsible if it has a finite collapsible simplicial\ntriangulation. -/\ndef IsPLCollapsible {E : Type*} [AddCommGroup E] [Module ℝ E] (s : Set E) : Prop :=\n  ∃ K : SimplicialComplex ℝ E, K.faces.Finite ∧ K.space = s ∧ IsCollapsible K\n\n/--\n**Zeeman conjecture.** Given any finite contractible two-dimensional polyhedral complex $K$, is\n$K \\times [0,1]$ PL homeomorphic to a collapsible complex? Equivalently, does its product\npolyhedron admit some finite collapsible simplicial triangulation? The conclusion does not assert\nthat any prescribed product triangulation is itself collapsible.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔\n      ∀ {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]\n        (K : SimplicialComplex ℝ E),\n        K.faces.Finite →\n        (∀ σ ∈ K.faces, σ.card ≤ 3) →\n        (∃ σ ∈ K.faces, σ.card = 3) →\n        ContractibleSpace K.space →\n        IsPLCollapsible (K.space ×ˢ Set.Icc (0 : ℝ) 1) := by\n  sorry\n\nend ZeemanConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled the finite two-dimensional CW/polyhedral complex by a finite geometric simplicial complex. This is the standard triangulated polyhedral formulation used in the cited Adiprasito–Benedetti paper and avoids the non-PL generality of arbitrary attaching maps in Mathlib's classical CW-complex structure.",
+    "Interpreted “two-dimensional” as exact dimension 2: every simplex has at most three vertices and at least one simplex has exactly three vertices.",
+    "Used Mathlib's `ContractibleSpace` on the underlying polyhedron `K.space` for contractibility.",
+    "Modeled the PL meaning of the conclusion as existence of a finite collapsible simplicial triangulation whose underlying space is exactly `K.space ×ˢ Set.Icc 0 1`. This does not select or require collapse of a fixed product triangulation and matches the source's equivalent subdivision formulation.",
+    "Represented the yes/no wording with `answer(sorry) ↔ ...`, following repository conventions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Geometry.SimplicialComplex` supplies face sets but no free-face deletion or collapsibility API.",
+     "name": "ZeemanConjecture.ElementaryCollapse",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no PL elementary-collapse relation for finite simplicial complexes."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `ContractibleSpace` is homotopical and is strictly weaker than combinatorial collapsibility.",
+     "name": "ZeemanConjecture.IsCollapsible",
+     "why_needed": "The conjecture requires the PL/combinatorial notion of reduction to one vertex by finitely many elementary collapses."
+    },
+    {
+     "closest_existing_considered": "Mathlib has geometric simplicial complexes and ordinary homeomorphisms, but no triangulation, subdivision, or PL-homeomorphism predicate.",
+     "name": "ZeemanConjecture.IsPLCollapsible",
+     "why_needed": "The statement must allow some collapsible triangulation/subdivision of the product rather than fixing a product cell structure."
+    }
+   ],
+   "per_slot": {
+    "zeeman_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "zeeman_conjecture": "/--\n**Zeeman conjecture.** Given any finite contractible two-dimensional polyhedral complex $K$, is\n$K \\times [0,1]$ PL homeomorphic to a collapsible complex? Equivalently, does its product\npolyhedron admit some finite collapsible simplicial triangulation? The conclusion does not assert\nthat any prescribed product triangulation is itself collapsible.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔\n      ∀ {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]\n        (K : SimplicialComplex ℝ E),\n        K.faces.Finite →\n        (∀ σ ∈ K.faces, σ.card ≤ 3) →\n        (∃ σ ∈ K.faces, σ.card = 3) →\n        ContractibleSpace K.space →\n        IsPLCollapsible (K.space ×ˢ Set.Icc (0 : ℝ) 1) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The Zeeman conjecture\n\nThe Zeeman conjecture asks whether the product of every finite contractible two-dimensional\ncomplex with the unit interval is PL homeomorphic to a collapsible complex. Equivalently, some\niterated derived subdivision of the product is collapsible.\n\n*References:*\n- [Wikipedia, *Zeeman conjecture*](https://en.wikipedia.org/wiki/Zeeman_conjecture)\n- [Adiprasito and Benedetti, *Subdivisions, shellability, and collapsibility of\n  products*](https://arxiv.org/abs/1202.6606)\n-/\n\nnamespace ZeemanConjecture\n\nopen Set\nopen Geometry\n\n/-- `L` is obtained from `K` by an elementary simplicial collapse if two faces `σ` and `τ`\nare removed, where `τ` is the unique face of `K` that strictly contains `σ`. -/\ndef ElementaryCollapse {𝕜 E : Type*} [Ring 𝕜] [PartialOrder 𝕜] [AddCommGroup E] [Module 𝕜 E]\n    (K L : SimplicialComplex 𝕜 E) : Prop :=\n  ∃ σ τ : Finset E, σ ∈ K.faces ∧\n    {ρ | ρ ∈ K.faces ∧ σ ⊂ ρ} = {τ} ∧\n    L.faces = K.faces \\ ({σ, τ} : Set (Finset E))\n\n/-- A geometric simplicial complex is collapsible if a finite sequence of elementary collapses\nreduces it to the complex consisting of one vertex. -/\ndef Collapsible {𝕜 E : Type*} [Ring 𝕜] [PartialOrder 𝕜] [AddCommGroup E] [Module 𝕜 E]\n    (K : SimplicialComplex 𝕜 E) : Prop :=\n  ∃ L : SimplicialComplex 𝕜 E,\n    Relation.ReflTransGen ElementaryCollapse K L ∧\n      ∃ v : E, L.faces = {({v} : Finset E)}\n\n/--\nThe Zeeman conjecture: given a finite contractible two-dimensional CW/polyhedral complex $K$, is\n$K \\times [0,1]$ PL collapsible? The complex is represented here by a finite geometric simplicial\ncomplex. PL collapsibility means that the product polyhedron admits some collapsible triangulation;\nit does not assert that any fixed product triangulation collapses.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture : answer(sorry) ↔\n    ∀ (E : Type*) [NormedAddCommGroup E] [NormedSpace ℝ E]\n      (K : SimplicialComplex ℝ E),\n      K.faces.Finite →\n      (∀ σ ∈ K.faces, σ.card ≤ 3) →\n      (∃ σ ∈ K.faces, σ.card = 3) →\n      ContractibleSpace K.space →\n      ∃ L : SimplicialComplex ℝ (E × ℝ),\n        L.faces.Finite ∧ L.space = K.space ×ˢ Icc 0 1 ∧ Collapsible L := by\n  sorry\n\nend ZeemanConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.91,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented finite two-dimensional CW/polyhedral complexes by finite geometric simplicial complexes over ℝ. Every finite simplicial complex has a standard geometric realization, and this representation exposes Mathlib's underlying polyhedron `K.space` for the contractibility hypothesis.",
+    "Interpreted “two-dimensional” as dimension exactly two: every face has at most three vertices and at least one face has three vertices.",
+    "Used Mathlib's `ContractibleSpace K.space`, which states that the realized polyhedron is homotopy equivalent to a point.",
+    "Formalized PL collapsibility of `K × [0,1]` by requiring the cylinder subset `K.space ×ˢ Set.Icc 0 1` to be exactly the underlying space of some finite collapsible geometric simplicial complex. This expresses existence of a collapsible triangulation and deliberately does not require a fixed product triangulation itself to collapse.",
+    "Followed the repository convention for an open yes/no question by stating `answer(sorry) ↔` the universal positive proposition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Geometry.SimplicialComplex` supplies faces, downward closure, and geometric realization, but no elementary collapse, free-face, subdivision, or collapsibility API.",
+     "name": "ZeemanConjecture.ElementaryCollapse",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have simplicial complexes but no PL elementary-collapse relation. The definition removes a free face and its unique strict coface, following the cited primary source."
+    },
+    {
+     "closest_existing_considered": "`Relation.ReflTransGen` supplies the finite reflexive-transitive closure used internally, while `Geometry.SimplicialComplex` supplies the complexes; neither defines PL collapsibility.",
+     "name": "ZeemanConjecture.Collapsible",
+     "why_needed": "No existing predicate states that a simplicial complex reduces to one vertex through finitely many elementary collapses."
+    }
+   ],
+   "per_slot": {
+    "zeeman_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "zeeman_conjecture": "/--\nThe Zeeman conjecture: given a finite contractible two-dimensional CW/polyhedral complex $K$, is\n$K \\times [0,1]$ PL collapsible? The complex is represented here by a finite geometric simplicial\ncomplex. PL collapsibility means that the product polyhedron admits some collapsible triangulation;\nit does not assert that any fixed product triangulation collapses.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture : answer(sorry) ↔\n    ∀ (E : Type*) [NormedAddCommGroup E] [NormedSpace ℝ E]\n      (K : SimplicialComplex ℝ E),\n      K.faces.Finite →\n      (∀ σ ∈ K.faces, σ.card ≤ 3) →\n      (∃ σ ∈ K.faces, σ.card = 3) →\n      ContractibleSpace K.space →\n      ∃ L : SimplicialComplex ℝ (E × ℝ),\n        L.faces.Finite ∧ L.space = K.space ×ˢ Icc 0 1 ∧ Collapsible L := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Zeeman conjecture\n\nThe Zeeman conjecture (due to Christopher Zeeman) asks whether, for every finite contractible\n$2$-dimensional complex $K$, the space $K \\times [0, 1]$ is collapsible.\n\nHere \"collapsible\" is meant in the piecewise linear sense: a compact polyhedron $P$ is\ncollapsible if *some* triangulation of $P$ collapses to a single vertex by a finite sequence of\nelementary collapses (each removing a free face together with the unique face properly\ncontaining it). Equivalently, $P$ is PL homeomorphic to a collapsible simplicial complex, or\nsome iterated derived (barycentric) subdivision of a triangulation of $P$ is collapsible.\nThe formalisation therefore does not fix a cell structure on $K \\times [0, 1]$. This matters:\nAdiprasito and Benedetti showed that for every $m$ there is a finite contractible $2$-complex\n$C$ such that the $m$-th derived subdivision of $C \\times [0, 1]$ is not collapsible.\n\nSince every compact polyhedron is triangulable, and every finite simplicial complex is\nrealised in some $\\mathbb{R}^n$, the complex $K$ is taken to be a finite simplicial complex in\n$\\mathbb{R}^n$. A \"$2$-complex\" is a complex all of whose faces have dimension at most $2$.\n\nThe conjecture implies the Poincaré conjecture and the Andrews–Curtis conjecture.\n\n*References:*\n- [Wikipedia: Zeeman conjecture](https://en.wikipedia.org/wiki/Zeeman_conjecture)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- K. Adiprasito, B. Benedetti, *Subdivisions, shellability, and collapsibility of products*,\n  [arXiv:1202.6606](https://arxiv.org/abs/1202.6606)\n- S. Matveev, *Algorithmic Topology and Classification of 3-Manifolds*, Springer (2007), p. 46\n- E. C. Zeeman, *On the dunce hat*, Topology 2, 341–358\n-/\n\nnamespace ZeemanConjecture\n\nopen Geometry\n\nvariable {E : Type*} [AddCommGroup E] [Module ℝ E]\n\n/-- `ElementaryCollapse K L` says that the simplicial complex `L` is obtained from `K` by an\n*elementary collapse*: there is a *free face* `σ` of `K`, i.e. a (nonempty) face `σ` that is\nproperly contained in exactly one other face `τ` of `K`, and `L` is `K` with the two faces `σ`\nand `τ` removed. -/\ndef ElementaryCollapse (K L : SimplicialComplex ℝ E) : Prop :=\n  ∃ σ ∈ K.faces, ∃ τ ∈ K.faces,\n    σ ⊂ τ ∧ (∀ ρ ∈ K.faces, σ ⊂ ρ → ρ = τ) ∧ L.faces = K.faces \\ {σ, τ}\n\n/-- `Collapses K L` says that the simplicial complex `K` *collapses* to `L`, i.e. `L` is\nobtained from `K` by a finite sequence of elementary collapses. -/\ndef Collapses (K L : SimplicialComplex ℝ E) : Prop :=\n  Relation.ReflTransGen ElementaryCollapse K L\n\n/-- A simplicial complex is *collapsible* if it collapses to a single vertex. -/\ndef Collapsible (K : SimplicialComplex ℝ E) : Prop :=\n  ∃ L : SimplicialComplex ℝ E, Collapses K L ∧ ∃ v : E, L.faces = {{v}}\n\n/-- A set `P` in a real vector space is a *collapsible polyhedron* if some (rectilinear)\ntriangulation of `P`, i.e. some simplicial complex whose underlying space is `P`, is\ncollapsible. This is collapsibility in the piecewise linear sense: it depends only on the\nPL homeomorphism type of `P` and not on any particular triangulation or cell structure. -/\ndef IsCollapsiblePolyhedron (P : Set E) : Prop :=\n  ∃ L : SimplicialComplex ℝ E, L.space = P ∧ Collapsible L\n\n/-- A simplicial complex has *dimension at most `d`* if each of its faces has at most `d + 1`\nvertices. -/\ndef DimLE (K : SimplicialComplex ℝ E) (d : ℕ) : Prop :=\n  ∀ s ∈ K.faces, s.card ≤ d + 1\n\n/-- **Zeeman conjecture.** Let $K$ be a finite contractible $2$-dimensional complex. Is the\nspace $K \\times [0, 1]$ collapsible?\n\nHere $K$ is a finite simplicial complex in some $\\mathbb{R}^n$ whose underlying space is\ncontractible and all of whose faces have dimension at most $2$, and \"collapsible\" is meant in\nthe piecewise linear sense: some triangulation of the polyhedron\n$|K| \\times [0, 1] \\subseteq \\mathbb{R}^n \\times \\mathbb{R}$ collapses to a single vertex. -/\n@[category research open, AMS 55 57]\ntheorem zeeman_conjecture : answer(sorry) ↔\n    ∀ (n : ℕ) (K : SimplicialComplex ℝ (Fin n → ℝ)),\n      K.faces.Finite → DimLE K 2 → ContractibleSpace K.space →\n      IsCollapsiblePolyhedron (K.space ×ˢ Set.Icc (0 : ℝ) 1) := by\n  sorry\n\n/-- A complex consisting of a single vertex is collapsible. -/\n@[category API, AMS 55 57]\ntheorem collapsible_of_faces_eq_singleton (K : SimplicialComplex ℝ E) (v : E)\n    (h : K.faces = {{v}}) : Collapsible K :=\n  ⟨K, Relation.ReflTransGen.refl, v, h⟩\n\n/-- An elementary collapse strictly decreases the set of faces. -/\n@[category API, AMS 55 57]\ntheorem ElementaryCollapse.faces_ssubset {K L : SimplicialComplex ℝ E}\n    (h : ElementaryCollapse K L) : L.faces ⊂ K.faces := by\n  obtain ⟨σ, hσ, τ, -, -, -, hL⟩ := h\n  rw [hL, Set.diff_ssubset_left_iff]\n  exact ⟨σ, hσ, by simp⟩\n\n/-- The empty complex is not collapsible. -/\n@[category API, AMS 55 57]\ntheorem not_collapsible_bot : ¬ Collapsible (⊥ : SimplicialComplex ℝ E) := by\n  rintro ⟨L, hL, v, hv⟩\n  rcases hL.cases_head with rfl | ⟨M, ⟨σ, hσ, -⟩, -⟩\n  · simp [SimplicialComplex.faces_bot] at hv\n  · simp [SimplicialComplex.faces_bot] at hσ\n\n/-- A collapsible complex has finitely many faces. -/\n@[category API, AMS 55 57]\ntheorem Collapsible.finite {K : SimplicialComplex ℝ E} (h : Collapsible K) :\n    K.faces.Finite := by\n  obtain ⟨L, hKL, v, hv⟩ := h\n  induction hKL using Relation.ReflTransGen.head_induction_on with\n  | refl => simp [hv]\n  | head hKM _ ih =>\n    obtain ⟨σ, -, τ, -, -, -, hM⟩ := hKM\n    exact (ih.union (Set.toFinite {σ, τ})).subset (hM ▸ Set.subset_diff_union _ _)\n\n/-- An edge together with its two endpoints is collapsible. -/\n@[category test, AMS 55 57]\ntheorem collapsible_of_faces_eq_edge [DecidableEq E] (K : SimplicialComplex ℝ E) {a b : E}\n    (hab : a ≠ b) (h : K.faces = {{a}, {b}, ({a, b} : Finset E)}) : Collapsible K := by\n  classical\n  let L : SimplicialComplex ℝ E :=\n    { faces := {{b}}\n      empty_notMem := by simp\n      indep := by\n        rintro s hs\n        obtain rfl : s = {b} := hs\n        exact affineIndependent_of_subsingleton ℝ _\n      down_closed := by\n        rintro s t hs hts ht\n        obtain rfl : s = {b} := hs\n        exact (Finset.subset_singleton_iff.1 hts).resolve_left ht.ne_empty\n      inter_subset_convexHull := by\n        rintro s t hs ht\n        obtain rfl : s = {b} := hs\n        obtain rfl : t = {b} := ht\n        simp }\n  have hne : ({a} : Finset E) ≠ {a, b} := by\n    intro h'\n    have : b ∈ ({a} : Finset E) := h' ▸ Finset.mem_insert_of_mem (Finset.mem_singleton_self b)\n    exact hab (Finset.mem_singleton.1 this).symm\n  refine ⟨L, Relation.ReflTransGen.single\n    ⟨{a}, by simp [h], {a, b}, by simp [h],\n      Finset.ssubset_iff_subset_ne.2 ⟨by simp, hne⟩, ?_, ?_⟩,\n    b, rfl⟩\n  · intro ρ hρ hσρ\n    rw [h] at hρ\n    rcases hρ with rfl | rfl | rfl\n    · exact absurd hσρ (ssubset_irrefl _)\n    · exact absurd (hσρ.1 (Finset.mem_singleton_self a)) (by simp [hab])\n    · rfl\n  · rw [h]\n    ext s\n    simp only [Set.mem_diff, Set.mem_insert_iff, Set.mem_singleton_iff]\n    constructor\n    · rintro rfl\n      exact ⟨Or.inr (Or.inl rfl), by simp [Finset.ext_iff, hab.symm, hab]⟩\n    · rintro ⟨rfl | rfl | rfl, hs⟩\n      · simp at hs\n      · rfl\n      · simp at hs\n\nend ZeemanConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (PL sense of collapsibility, do not fix a cell structure on K × [0,1], CW/polyhedral K) match the sources; I followed them.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "`K` ranges over finite geometric simplicial complexes in `Fin n → ℝ` (all n) rather than Mathlib's `Topology.CWComplex`. Zeeman's conjecture (and Matveev's, Adiprasito–Benedetti's formulations) is about compact 2-polyhedra; for a general CW complex with non-PL attaching maps 'collapsible' has no meaning, and the decomposition table explicitly allows 'CW/polyhedral complex'. Every finite simplicial complex is realised in some ℝⁿ, and contractibility/dimension/collapsibility are invariant under combinatorial isomorphism, so this covers all finite 2-polyhedra.",
+    "'Two-dimensional' is read as dimension at most 2 (`DimLE K 2`: every face has ≤ 3 vertices), the usual meaning of '2-complex' in this literature. The extra cases (contractible complexes of dimension ≤ 1, i.e. a point or a tree) are trivially collapsible after taking the product with [0,1], so this is equivalent to requiring dimension exactly 2.",
+    "'Collapsible' is formalised in the PL sense as `IsCollapsiblePolyhedron (K.space ×ˢ Icc 0 1)`: there exists a simplicial complex L in `(Fin n → ℝ) × ℝ` with `L.space = K.space ×ˢ Icc 0 1` that collapses to a single vertex. This is the textbook definition of a collapsible polyhedron (Rourke–Sanderson, Matveev); by Adiprasito–Benedetti's theorem (`thm:zeemanyes`: PL homeomorphic to a collapsible complex ⇔ some iterated derived subdivision is collapsible) it is equivalent to the 'PL homeomorphic to a collapsible complex' and 'some barycentric subdivision of K × [0,1] is collapsible' formulations. It does not fix any cell structure on K × [0,1].",
+    "Elementary collapse: remove a nonempty face σ that is properly contained in exactly one other face τ, together with τ. Uniqueness of τ forces τ to be maximal and σ to have codimension 1 (any intermediate face would be a face of K by down-closure), so this matches the standard definition. Collapsibility uses `Relation.ReflTransGen`, so a one-vertex complex is collapsible (zero steps), the empty complex is not, and a collapsible complex is automatically finite (proved as API lemma `Collapsible.finite`), so the triangulation L is a genuine finite rectilinear triangulation.",
+    "Finiteness of K is imposed explicitly as `K.faces.Finite`, since Mathlib's `SimplicialComplex` allows infinitely many faces.",
+    "Contractibility is `ContractibleSpace K.space` with the subspace topology of `Fin n → ℝ`; this forces K to be nonempty, excluding the degenerate empty complex.",
+    "Since the statement is a question ('is the space … collapsible?'), the repository's `answer(sorry) ↔ ∀ …` style is used; `answer(True)` is the positive answer.",
+    "Used `Fin n → ℝ` rather than `EuclideanSpace ℝ (Fin n)`; the topologies coincide so this is immaterial."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Geometry.SimplicialComplex.facets / Geometry.SimplicialComplex (faces, down_closed) — used as the base structure, but no collapse relation exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "ZeemanConjecture.ElementaryCollapse",
+     "why_needed": "Mathlib has no notion of (free face) elementary collapse for simplicial complexes."
+    },
+    {
+     "closest_existing_considered": "Relation.ReflTransGen (used to define it).",
+     "name": "ZeemanConjecture.Collapses",
+     "why_needed": "Reflexive-transitive closure of elementary collapse (finite sequence of collapses); nothing analogous exists."
+    },
+    {
+     "closest_existing_considered": "ContractibleSpace (a homotopy-theoretic notion, strictly weaker; not what the conjecture asks).",
+     "name": "ZeemanConjecture.Collapsible",
+     "why_needed": "Collapsibility (collapsing to a single vertex) is absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "Geometry.SimplicialComplex.space (used to express 'L triangulates P'); Topology.CWComplex (no PL structure, no collapses).",
+     "name": "ZeemanConjecture.IsCollapsiblePolyhedron",
+     "why_needed": "Encodes PL-collapsibility of the polyhedron |K| × [0,1] as existence of a collapsible rectilinear triangulation, so that no cell structure on the product is fixed. Mathlib has no subdivisions, derived subdivisions, or PL homeomorphisms."
+    },
+    {
+     "closest_existing_considered": "Finset.card of faces (used directly in the definition); no `SimplicialComplex.dim` exists.",
+     "name": "ZeemanConjecture.DimLE",
+     "why_needed": "Mathlib's Geometry.SimplicialComplex has no dimension function."
+    }
+   ],
+   "per_slot": {
+    "zeeman_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ n K, K.faces.Finite → DimLE K 2 → ContractibleSpace K.space → IsCollapsiblePolyhedron (K.space ×ˢ Icc 0 1)`, with K a Mathlib `Geometry.SimplicialComplex ℝ (Fin n → ℝ)`. Collapsibility is the PL notion: some (rectilinear) triangulation of the polyhedron |K| × [0,1] ⊆ ℝⁿ × ℝ collapses to a vertex via elementary collapses, so no cell structure on K × [0,1] is fixed. Mathlib has simplicial complexes but no notion of collapse, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "zeeman_conjecture": "/-- **Zeeman conjecture.** Let $K$ be a finite contractible $2$-dimensional complex. Is the\nspace $K \\times [0, 1]$ collapsible?\n\nHere $K$ is a finite simplicial complex in some $\\mathbb{R}^n$ whose underlying space is\ncontractible and all of whose faces have dimension at most $2$, and \"collapsible\" is meant in\nthe piecewise linear sense: some triangulation of the polyhedron\n$|K| \\times [0, 1] \\subseteq \\mathbb{R}^n \\times \\mathbb{R}$ collapses to a single vertex. -/\n@[category research open, AMS 55 57]\ntheorem zeeman_conjecture : answer(sorry) ↔\n    ∀ (n : ℕ) (K : SimplicialComplex ℝ (Fin n → ℝ)),\n      K.faces.Finite → DimLE K 2 → ContractibleSpace K.space →\n      IsCollapsiblePolyhedron (K.space ×ˢ Set.Icc (0 : ℝ) 1) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Zeeman conjecture\n\nThe Zeeman conjecture (or Zeeman's collapsibility conjecture) asks whether, given a finite\ncontractible $2$-dimensional complex $K$, the space $K \\times [0, 1]$ is collapsible.\n\nHere \"collapsible\" is meant in the piecewise-linear sense: the polyhedron $K \\times [0, 1]$ has\na triangulation that collapses onto a single vertex by a sequence of elementary collapses.\nEquivalently (Adiprasito–Benedetti, [AB12] Section 3.2), some iterated derived (barycentric)\nsubdivision of $K \\times [0, 1]$ is collapsible. The product cell structure on $K \\times [0, 1]$\nitself need not collapse ([AB12]), so the statement below does not fix any particular cell\nstructure on $K \\times [0, 1]$.\n\nThe conjecture implies the Poincaré conjecture and the Andrews–Curtis conjecture.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Zeeman_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [AB12] Adiprasito, K. and Benedetti, B., _Subdivisions, shellability, and collapsibility of\n  products_. [arXiv:1202.6606](https://arxiv.org/abs/1202.6606)\n- [Ze64] Zeeman, E. C., _On the dunce hat_. Topology 2 (1964), 341–358.\n-/\n\nnamespace ZeemanConjecture\n\nopen Geometry\n\nvariable {𝕜 E : Type*} [Ring 𝕜] [PartialOrder 𝕜] [AddCommGroup E] [Module 𝕜 E]\n\n/-- The face `σ` of the simplicial complex `K` is a **free face** of `K` with coface `τ`: `τ` is\nthe only face of `K` that strictly contains `σ`. -/\ndef IsFreeFace (K : SimplicialComplex 𝕜 E) (σ τ : Finset E) : Prop :=\n  σ ∈ K.faces ∧ τ ∈ K.faces ∧ σ ⊂ τ ∧ ∀ ρ ∈ K.faces, σ ⊂ ρ → ρ = τ\n\n/-- The simplicial complex `L` is obtained from `K` by an **elementary collapse**: `L` is `K` with\na free face `σ` and its unique coface `τ` removed. -/\ndef ElementaryCollapse (K L : SimplicialComplex 𝕜 E) : Prop :=\n  ∃ σ τ, IsFreeFace K σ τ ∧ L.faces = K.faces \\ {σ, τ}\n\n/-- The simplicial complex `K` **collapses** onto `L` if `L` is obtained from `K` by a finite\nsequence of elementary collapses. -/\ndef Collapses (K L : SimplicialComplex 𝕜 E) : Prop :=\n  Relation.ReflTransGen ElementaryCollapse K L\n\n/-- A simplicial complex is **collapsible** if it collapses onto a single vertex. -/\ndef Collapsible (K : SimplicialComplex 𝕜 E) : Prop :=\n  ∃ L, Collapses K L ∧ ∃ v, L.faces = {{v}}\n\n/-- The coface `τ` of a free face is a facet. -/\n@[category API, AMS 57]\ntheorem IsFreeFace.mem_facets {K : SimplicialComplex 𝕜 E} {σ τ : Finset E}\n    (h : IsFreeFace K σ τ) : τ ∈ K.facets := by\n  obtain ⟨-, hτ, hστ, huniq⟩ := h\n  exact ⟨hτ, fun ρ hρ hτρ => (huniq ρ hρ (hστ.trans_subset hτρ)).symm⟩\n\n/-- The coface `τ` of a free face `σ` has exactly one more vertex than `σ`. -/\n@[category API, AMS 57]\ntheorem IsFreeFace.card_eq {K : SimplicialComplex 𝕜 E} {σ τ : Finset E}\n    (h : IsFreeFace K σ τ) : τ.card = σ.card + 1 := by\n  classical\n  obtain ⟨-, hτ, hστ, huniq⟩ := h\n  obtain ⟨x, hxτ, hxσ⟩ := Finset.exists_of_ssubset hστ\n  have hρ : insert x σ ∈ K.faces :=\n    K.down_closed hτ (Finset.insert_subset hxτ hστ.subset) (Finset.insert_nonempty x σ)\n  rw [← huniq _ hρ (Finset.ssubset_insert hxσ), Finset.card_insert_of_notMem hxσ]\n\n/-- An elementary collapse produces a subcomplex. -/\n@[category API, AMS 57]\ntheorem ElementaryCollapse.le {K L : SimplicialComplex 𝕜 E} (h : ElementaryCollapse K L) :\n    L ≤ K := by\n  obtain ⟨σ, τ, -, hL⟩ := h\n  show L.faces ⊆ K.faces\n  rw [hL]\n  exact Set.diff_subset\n\n/-- A complex collapses only onto its subcomplexes. -/\n@[category API, AMS 57]\ntheorem Collapses.le {K L : SimplicialComplex 𝕜 E} (h : Collapses K L) : L ≤ K := by\n  induction h with\n  | refl => exact le_rfl\n  | tail _ h ih => exact h.le.trans ih\n\n/-- The simplicial complex consisting of the single vertex `v`. -/\ndef singleVertex (v : E) : SimplicialComplex 𝕜 E where\n  faces := {{v}}\n  empty_notMem := by simp\n  indep := by\n    rintro s hs\n    rw [Set.mem_singleton_iff] at hs\n    subst hs\n    haveI : Subsingleton (({v} : Finset E) : Type _) :=\n      ⟨fun a b =>\n        Subtype.ext ((Finset.mem_singleton.1 a.2).trans (Finset.mem_singleton.1 b.2).symm)⟩\n    exact affineIndependent_of_subsingleton 𝕜 _\n  down_closed := by\n    rintro s t hs hts ht\n    rw [Set.mem_singleton_iff] at hs ⊢\n    subst hs\n    exact (Finset.subset_singleton_iff.1 hts).resolve_left ht.ne_empty\n  inter_subset_convexHull := by\n    rintro s t hs ht\n    rw [Set.mem_singleton_iff] at hs ht\n    subst hs ht\n    simp\n\n/-- A single vertex is collapsible. -/\n@[category test, AMS 57]\ntheorem collapsible_singleVertex (v : E) : Collapsible (singleVertex (𝕜 := 𝕜) v) :=\n  ⟨_, Relation.ReflTransGen.refl, v, rfl⟩\n\n/-- The empty complex is not collapsible. -/\n@[category test, AMS 57]\ntheorem not_collapsible_bot : ¬ Collapsible (⊥ : SimplicialComplex 𝕜 E) := by\n  rintro ⟨L, hL, v, hv⟩\n  have : L.faces = ∅ := Set.subset_eq_empty hL.le (SimplicialComplex.faces_bot ..)\n  simp [this] at hv\n\n/--\n**Zeeman's conjecture.** Given a finite contractible $2$-dimensional complex $K$, is the space\n$K \\times [0, 1]$ collapsible?\n\nHere $K$ is a finite geometric simplicial complex in some $\\mathbb{R}^n$, all of whose faces have\nat most $3$ vertices (so $\\dim K \\le 2$), whose underlying space is contractible. The space\n$K \\times [0, 1]$ is collapsible in the piecewise-linear sense: some geometric simplicial complex\n$L$ in $\\mathbb{R}^n \\times \\mathbb{R}$ whose underlying space is exactly $|K| \\times [0, 1]$ is\ncollapsible. No particular cell structure on $K \\times [0, 1]$ is fixed.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔ ∀ (n : ℕ) (K : SimplicialComplex ℝ (EuclideanSpace ℝ (Fin n))),\n      K.faces.Finite → (∀ s ∈ K.faces, s.card ≤ 3) → ContractibleSpace K.space →\n        ∃ L : SimplicialComplex ℝ (EuclideanSpace ℝ (Fin n) × ℝ),\n          L.space = K.space ×ˢ Set.Icc 0 1 ∧ Collapsible L := by\n  sorry\n\nend ZeemanConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate; the note that collapsibility must be taken in the PL sense (not with the fixed product cell structure) is correct per Adiprasito–Benedetti and is followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "K is modelled as a finite geometric simplicial complex (`Geometry.SimplicialComplex ℝ (EuclideanSpace ℝ (Fin n))`, arbitrary n, `K.faces.Finite`) rather than a general finite CW complex. Collapsibility is a polyhedral/PL notion, and the literature (Zeeman 1964, Adiprasito–Benedetti 2012, the Wikipedia article's '2-complex') states the conjecture for finite 2-dimensional polyhedra / simplicial 2-complexes. Every finite simplicial complex embeds linearly in some ℝⁿ, so quantifying over all n loses nothing.",
+    "'Two-dimensional' is rendered as dim K ≤ 2 (`∀ s ∈ K.faces, s.card ≤ 3`) rather than dim K = 2. Contractible complexes of dimension ≤ 1 are trees, for which K × [0,1] is trivially collapsible, so the two readings are equivalent; the ≤ reading avoids an artificial exclusion.",
+    "'Contractible' is `ContractibleSpace ↥K.space` with the subspace topology from ℝⁿ (for finite complexes this is the usual topology). `ContractibleSpace` implies nonempty, so the empty complex ⊥ is excluded automatically.",
+    "'K × [0,1] is collapsible' (PL sense) is rendered as: there exists a geometric simplicial complex L in ℝⁿ × ℝ whose underlying set is exactly `K.space ×ˢ Set.Icc 0 1` and which is `Collapsible`. Any two linear cell decompositions of the same polyhedron in ℝⁿ⁺¹ have a common subdivision, so such an L is PL homeomorphic to K × [0,1]; conversely Adiprasito–Benedetti (arXiv:1202.6606, Sec. 3.2) show that if K × [0,1] is PL homeomorphic to a collapsible complex then some derived subdivision of K × [0,1] (a linear triangulation of the same set) is collapsible. Hence this is equivalent to 'K × [0,1] is PL homeomorphic to a collapsible complex' and does not fix the product cell structure, as the decomposition notes require.",
+    "`Collapsible L` := L collapses (Relation.ReflTransGen of elementary collapses) onto a complex with face set {{v}}. A finite chain of elementary collapses each removing two faces forces L to be finite, so no separate finiteness hypothesis on L is needed. Free face: σ ∈ K with exactly one face τ ⊋ σ (API lemmas verify τ is then a facet with exactly one more vertex, matching the textbook definition).",
+    "Because the source phrases the problem as a question ('is the space ... collapsible?'), the repository's `answer(sorry) ↔ P` style is used; `answer(True)` corresponds to the conjecture holding.",
+    "Category `research open`, AMS 57 (manifolds and cell complexes / PL topology)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Geometry.SimplicialComplex.facets (maximal faces) — related but does not express 'proper face of exactly one other face'.",
+     "name": "ZeemanConjecture.IsFreeFace",
+     "why_needed": "Mathlib has no notion of a free face of a simplicial complex; needed to define elementary collapses."
+    },
+    {
+     "closest_existing_considered": "Geometry.SimplicialComplex.ofSubcomplex / the `≤` order on simplicial complexes, which only express 'subcomplex', not collapse.",
+     "name": "ZeemanConjecture.ElementaryCollapse",
+     "why_needed": "No notion of elementary collapse (removing a free face and its unique coface) exists in Mathlib or FormalConjecturesForMathlib (grep for 'collaps' finds nothing relevant)."
+    },
+    {
+     "closest_existing_considered": "Relation.ReflTransGen (used as the underlying combinator).",
+     "name": "ZeemanConjecture.Collapses",
+     "why_needed": "Reflexive-transitive closure of elementary collapses; standard 'K ↘ L'."
+    },
+    {
+     "closest_existing_considered": "ContractibleSpace (topological, strictly weaker; not the same notion).",
+     "name": "ZeemanConjecture.Collapsible",
+     "why_needed": "Collapsibility (collapse onto a single vertex) is the central notion of the conjecture and absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "Geometry.SimplicialComplex.ofErase / ⊥ — Mathlib has no singleton simplicial complex constructor.",
+     "name": "ZeemanConjecture.singleVertex",
+     "why_needed": "Helper for a `category test` lemma showing `Collapsible` is non-vacuous (a single vertex is collapsible)."
+    }
+   ],
+   "per_slot": {
+    "zeeman_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ n (K : Geometry.SimplicialComplex ℝ (EuclideanSpace ℝ (Fin n))), K.faces.Finite → (∀ s ∈ K.faces, s.card ≤ 3) → ContractibleSpace K.space → ∃ L : SimplicialComplex ℝ (EuclideanSpace ℝ (Fin n) × ℝ), L.space = K.space ×ˢ Set.Icc 0 1 ∧ Collapsible L`. Mathlib has geometric simplicial complexes and `ContractibleSpace` but no notion of free face / elementary collapse / collapsibility, so these were defined in the file (with API lemmas and tests). 'Collapsible' is taken in the PL sense as required by the decomposition notes: the conclusion asks for SOME linear triangulation L of the polyhedron |K| × [0,1] ⊆ ℝⁿ × ℝ that collapses to a vertex, fixing no cell structure on K × [0,1]."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "zeeman_conjecture": "/--\n**Zeeman's conjecture.** Given a finite contractible $2$-dimensional complex $K$, is the space\n$K \\times [0, 1]$ collapsible?\n\nHere $K$ is a finite geometric simplicial complex in some $\\mathbb{R}^n$, all of whose faces have\nat most $3$ vertices (so $\\dim K \\le 2$), whose underlying space is contractible. The space\n$K \\times [0, 1]$ is collapsible in the piecewise-linear sense: some geometric simplicial complex\n$L$ in $\\mathbb{R}^n \\times \\mathbb{R}$ whose underlying space is exactly $|K| \\times [0, 1]$ is\ncollapsible. No particular cell structure on $K \\times [0, 1]$ is fixed.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔ ∀ (n : ℕ) (K : SimplicialComplex ℝ (EuclideanSpace ℝ (Fin n))),\n      K.faces.Finite → (∀ s ∈ K.faces, s.card ≤ 3) → ContractibleSpace K.space →\n        ∃ L : SimplicialComplex ℝ (EuclideanSpace ℝ (Fin n) × ℝ),\n          L.space = K.space ×ˢ Set.Icc 0 1 ∧ Collapsible L := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Zeeman conjecture\n\n*References:*\n- [Wikipedia: Zeeman conjecture](https://en.wikipedia.org/wiki/Zeeman_conjecture)\n- [Adiprasito and Benedetti, *Subdivisions, shellability, and collapsibility of\n  products*](https://arxiv.org/abs/1202.6606)\n-/\n\nnamespace ZeemanConjecture\n\n/-- A finite abstract simplicial complex on a finite linearly ordered type of vertices. -/\nstructure FiniteSimplicialComplex where\n  Vertex : Type\n  fintypeVertex : Fintype Vertex\n  linearOrderVertex : LinearOrder Vertex\n  faces : Finset (Finset Vertex)\n  empty_mem : ∅ ∈ faces\n  down_closed : ∀ ⦃s t : Finset Vertex⦄, s ∈ faces → t ⊆ s → t ∈ faces\n\nnamespace FiniteSimplicialComplex\n\nattribute [local instance] fintypeVertex linearOrderVertex\n\n/-- The geometric realization of a finite abstract simplicial complex in its standard simplex. -/\ndef Realization (K : FiniteSimplicialComplex) : Type :=\n  {x : K.Vertex → ℝ //\n    (∀ v, 0 ≤ x v) ∧\n    ∑ v, x v = 1 ∧\n    ∃ s ∈ K.faces, ∀ v, x v ≠ 0 → v ∈ s}\n\ninstance (K : FiniteSimplicialComplex) : TopologicalSpace K.Realization :=\n  inferInstanceAs (TopologicalSpace {x : K.Vertex → ℝ //\n    (∀ v, 0 ≤ x v) ∧\n    ∑ v, x v = 1 ∧\n    ∃ s ∈ K.faces, ∀ v, x v ≠ 0 → v ∈ s})\n\n/-- A complex is exactly two-dimensional if its faces have at most three vertices and one has\nthree vertices. -/\ndef IsTwoDimensional (K : FiniteSimplicialComplex) : Prop :=\n  (∀ s ∈ K.faces, s.card ≤ 3) ∧ ∃ s ∈ K.faces, s.card = 3\n\n/-- A linear order on any finite type, used only to order vertices of constructed complexes. -/\nnoncomputable def finiteLinearOrder (α : Type) [Fintype α] : LinearOrder α :=\n  LinearOrder.lift' (Fintype.equivFin α) (Fintype.equivFin α).injective\n\n/-- The standard ordered simplicial triangulation of the product with the unit interval. -/\nnoncomputable def productWithInterval (K : FiniteSimplicialComplex) :\n    FiniteSimplicialComplex where\n  Vertex := K.Vertex × Fin 2\n  fintypeVertex := inferInstance\n  linearOrderVertex := finiteLinearOrder (K.Vertex × Fin 2)\n  faces := Finset.univ.powerset.filter fun s ↦\n    s.image Prod.fst ∈ K.faces ∧\n      ∀ a ∈ s, ∀ b ∈ s,\n        (a.1 ≤ b.1 ∧ a.2 ≤ b.2) ∨ (b.1 ≤ a.1 ∧ b.2 ≤ a.2)\n  empty_mem := by simp [K.empty_mem]\n  down_closed := by\n    intro s t hs hts\n    rw [Finset.mem_filter] at hs ⊢\n    refine ⟨Finset.mem_powerset.mpr (Finset.subset_univ t),\n      K.down_closed hs.2.1 (Finset.image_mono Prod.fst hts), ?_⟩\n    intro a ha b hb\n    exact hs.2.2 a (hts ha) b (hts hb)\n\n/-- The barycentric (derived) subdivision of a finite simplicial complex. -/\nnoncomputable def barycentricSubdivision (K : FiniteSimplicialComplex) :\n    FiniteSimplicialComplex where\n  Vertex := {s : Finset K.Vertex // s ∈ K.faces ∧ s.Nonempty}\n  fintypeVertex := inferInstance\n  linearOrderVertex := finiteLinearOrder {s : Finset K.Vertex // s ∈ K.faces ∧ s.Nonempty}\n  faces := Finset.univ.powerset.filter fun c ↦\n    ∀ a ∈ c, ∀ b ∈ c, a.1 ⊆ b.1 ∨ b.1 ⊆ a.1\n  empty_mem := by simp\n  down_closed := by\n    intro s t hs hts\n    rw [Finset.mem_filter] at hs ⊢\n    refine ⟨Finset.mem_powerset.mpr (Finset.subset_univ t), ?_⟩\n    intro a ha b hb\n    exact hs.2 a (hts ha) b (hts hb)\n\n/-- The `n`-fold barycentric subdivision. -/\nnoncomputable def iteratedBarycentricSubdivision (K : FiniteSimplicialComplex) :\n    ℕ → FiniteSimplicialComplex\n  | 0 => K\n  | n + 1 => barycentricSubdivision (iteratedBarycentricSubdivision K n)\n\n/-- `L` is obtained from `K` by an elementary simplicial collapse: a nonempty free face and its\nunique proper coface are deleted. -/\ndef IsElementaryCollapse {α : Type} [DecidableEq α]\n    (K L : Finset (Finset α)) : Prop :=\n  ∃ σ τ,\n    σ.Nonempty ∧ σ ∈ K ∧ τ ∈ K ∧ σ ⊂ τ ∧\n    (∀ ρ ∈ K, σ ⊂ ρ → ρ = τ) ∧ L = (K.erase σ).erase τ\n\n/-- A finite simplicial complex is collapsible if elementary collapses reduce it to one vertex. -/\ndef IsCollapsible (K : FiniteSimplicialComplex) : Prop :=\n  ∃ v : K.Vertex,\n    Relation.ReflTransGen IsElementaryCollapse K.faces {∅, {v}}\n\nend FiniteSimplicialComplex\n\n/-- **Zeeman conjecture.** Given any finite contractible two-dimensional CW (equivalently,\npolyhedral) complex $K$, is $K \\times [0,1]$ PL collapsible? Here PL collapsibility is expressed by\nthe equivalent requirement that some iterated barycentric subdivision of the standard product\ntriangulation is a collapsible complex. -/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔\n      ∀ K : FiniteSimplicialComplex,\n        K.IsTwoDimensional → ContractibleSpace K.Realization →\n          ∃ n : ℕ, (K.productWithInterval.iteratedBarycentricSubdivision n).IsCollapsible := by\n  sorry\n\nend ZeemanConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled finite CW/polyhedral 2-complexes by finite abstract simplicial complexes. This is the triangulated/polyhedral formulation used by the cited primary source and is necessary to express the PL notion of collapse.",
+    "Interpreted “two-dimensional” as dimension exactly 2: every face has at most three vertices and at least one face has three vertices.",
+    "Defined contractibility as Mathlib's `ContractibleSpace` property of the standard geometric realization.",
+    "Used the standard staircase triangulation of the product of an ordered simplicial complex with the 1-simplex.",
+    "Following the background article and Adiprasito–Benedetti, interpreted “K × [0,1] is collapsible” in the PL sense: some finite iterated barycentric subdivision of the product triangulation is simplicially collapsible. This deliberately does not assert that the fixed product triangulation itself collapses.",
+    "Used `answer(sorry) ↔ ...` because the source states the conjecture as a yes/no question.",
+    "Defined an elementary collapse exactly as in the cited primary source: delete a nonempty face strictly contained in only one other face; collapsibility is reduction by finitely many such steps to the complex on one vertex."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `SimplicialComplex` in `Analysis.Convex.SimplicialComplex` is a geometric family of affine-independent finsets, but has no collapsibility or subdivision API; Mathlib's classical and abstract CW-complex APIs likewise have no PL collapse API.",
+     "name": "FiniteSimplicialComplex",
+     "why_needed": "Provides a finite ordered abstract simplicial/polyhedral complex model with downward-closed faces; no suitable finite PL complex model exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's geometric `SimplicialComplex.space`; it does not apply to the needed finite abstract combinatorial model.",
+     "name": "FiniteSimplicialComplex.Realization",
+     "why_needed": "Connects the combinatorial complex to a topological space so the source's contractibility hypothesis can use Mathlib's `ContractibleSpace`."
+    },
+    {
+     "closest_existing_considered": "Mathlib CW-complex `FiniteDimensional` only expresses bounded finite dimension and belongs to a different CW model; no exact dimension predicate for finite abstract simplicial complexes was found.",
+     "name": "FiniteSimplicialComplex.IsTwoDimensional",
+     "why_needed": "Expresses exact combinatorial dimension two."
+    },
+    {
+     "closest_existing_considered": "`LinearOrder.lift'` and `Fintype.equivFin` are used to implement it; no directly inferred `LinearOrder` instance exists for arbitrary finite types.",
+     "name": "FiniteSimplicialComplex.finiteLinearOrder",
+     "why_needed": "Supplies deterministic orders on finite vertex types produced by product and subdivision constructions; ordered vertices are used for the standard staircase product triangulation."
+    },
+    {
+     "closest_existing_considered": "No simplicial-complex product triangulation was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "FiniteSimplicialComplex.productWithInterval",
+     "why_needed": "Defines a standard triangulation of the product with the unit interval, required before applying combinatorial barycentric subdivision and collapse."
+    },
+    {
+     "closest_existing_considered": "No barycentric or derived subdivision operation on complexes was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "FiniteSimplicialComplex.barycentricSubdivision",
+     "why_needed": "Expresses the derived subdivision used in the primary source's equivalent formulation of the Zeeman conjecture."
+    },
+    {
+     "closest_existing_considered": "Iteration uses the bespoke `barycentricSubdivision`; no existing subdivision iteration API was available.",
+     "name": "FiniteSimplicialComplex.iteratedBarycentricSubdivision",
+     "why_needed": "Allows existential quantification over a finite number of derived subdivisions, thereby expressing PL collapsibility without requiring the fixed product triangulation itself to collapse."
+    },
+    {
+     "closest_existing_considered": "No elementary simplicial/polytopal collapse or free-face predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "FiniteSimplicialComplex.IsElementaryCollapse",
+     "why_needed": "Formalizes deletion of a nonempty free face and its unique proper coface, the PL elementary-collapse notion in the source."
+    },
+    {
+     "closest_existing_considered": "Uses Mathlib's `Relation.ReflTransGen` for finite collapse sequences, but no existing PL collapsibility predicate was found.",
+     "name": "FiniteSimplicialComplex.IsCollapsible",
+     "why_needed": "Formalizes reduction by finitely many elementary collapses to a single vertex."
+    }
+   ],
+   "per_slot": {
+    "zeeman_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "zeeman_conjecture": "/-- **Zeeman conjecture.** Given any finite contractible two-dimensional CW (equivalently,\npolyhedral) complex $K$, is $K \\times [0,1]$ PL collapsible? Here PL collapsibility is expressed by\nthe equivalent requirement that some iterated barycentric subdivision of the standard product\ntriangulation is a collapsible complex. -/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔\n      ∀ K : FiniteSimplicialComplex,\n        K.IsTwoDimensional → ContractibleSpace K.Realization →\n          ∃ n : ℕ, (K.productWithInterval.iteratedBarycentricSubdivision n).IsCollapsible := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Zeeman conjecture\n\nThe Zeeman conjecture (Zeeman's collapsibility conjecture) asks whether, given a finite\ncontractible $2$-dimensional CW complex $K$, the space $K \\times [0, 1]$ is collapsible.\n\nHere \"collapsible\" is meant in the piecewise linear sense: the polyhedron $K \\times [0, 1]$\nadmits a collapsible triangulation, i.e. it is PL homeomorphic to a collapsible simplicial\ncomplex. It is important not to fix a cell structure on $K \\times [0, 1]$: Adiprasito and\nBenedetti showed that for every $m$ there is a finite contractible $2$-complex $K$ such that\nthe $m$-th derived subdivision of the product cell complex $K \\times [0, 1]$ is not collapsible,\nalthough some derived subdivision of $K \\times [0, 1]$ is collapsible if and only if\n$K \\times [0, 1]$ is PL collapsible.\n\nThe conjecture implies the Poincaré conjecture and the Andrews–Curtis conjecture.\n\n*References:*\n- [Wikipedia, Zeeman conjecture](https://en.wikipedia.org/wiki/Zeeman_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ze64] Zeeman, E. C. \"On the dunce hat.\" Topology 2 (1964): 341–358.\n- [AB12] Adiprasito, K., Benedetti, B. \"Subdivisions, shellability, and the Zeeman conjecture.\"\n  [arXiv:1202.6606](https://arxiv.org/abs/1202.6606)\n-/\n\nnamespace ZeemanConjecture\n\nopen Geometry\n\nvariable {E : Type*} [AddCommGroup E] [Module ℝ E]\n\n/--\n`IsElementaryCollapse K L` means that the simplicial complex `L` is obtained from `K` by an\nelementary collapse: there are faces `s ⊂ t` of `K` such that `t` has exactly one more vertex\nthan `s` and `t` is the only face of `K` properly containing `s` (so `s` is a *free face* of the\nfacet `t`), and `L` consists of the faces of `K` other than `s` and `t`.\n-/\ndef IsElementaryCollapse (K L : SimplicialComplex ℝ E) : Prop :=\n  ∃ s ∈ K.faces, ∃ t ∈ K.faces, s ⊂ t ∧ t.card = s.card + 1 ∧\n    (∀ u ∈ K.faces, s ⊂ u → u = t) ∧ L.faces = K.faces \\ {s, t}\n\n/-- `Collapses K L` means that the simplicial complex `K` collapses to `L`, i.e. `L` is obtained\nfrom `K` by a finite sequence of elementary collapses. -/\ndef Collapses (K L : SimplicialComplex ℝ E) : Prop :=\n  Relation.ReflTransGen IsElementaryCollapse K L\n\n/-- An elementary collapse of `K` yields a subcomplex of `K`. -/\n@[category API, AMS 57]\ntheorem IsElementaryCollapse.le {K L : SimplicialComplex ℝ E} (h : IsElementaryCollapse K L) :\n    L ≤ K := by\n  obtain ⟨s, -, t, -, -, -, -, hL⟩ := h\n  intro u hu\n  rw [hL] at hu\n  exact hu.1\n\n/-- If `K` collapses to `L`, then `L` is a subcomplex of `K`. -/\n@[category API, AMS 57]\ntheorem Collapses.le {K L : SimplicialComplex ℝ E} (h : Collapses K L) : L ≤ K := by\n  induction h with\n  | refl => exact le_rfl\n  | tail _ h ih => exact h.le.trans ih\n\n/-- A simplicial complex is *collapsible* if it collapses to a single vertex. -/\ndef Collapsible (K : SimplicialComplex ℝ E) : Prop :=\n  ∃ L, Collapses K L ∧ ∃ v, L.faces = {{v}}\n\n/--\nA subset `P` of a real vector space is *collapsible in the PL sense* if it admits a finite\n(linear) triangulation that is collapsible, i.e. there is a finite simplicial complex `T` whose\nunderlying space is `P` and which collapses to a vertex. Equivalently, the polyhedron `P` is PL\nhomeomorphic to a collapsible simplicial complex.\n-/\ndef IsPLCollapsible (P : Set E) : Prop :=\n  ∃ T : SimplicialComplex ℝ E, T.faces.Finite ∧ T.space = P ∧ Collapsible T\n\n/-- A single point is collapsible in the PL sense. -/\n@[category test, AMS 57]\ntheorem isPLCollapsible_singleton (x : E) : IsPLCollapsible ({x} : Set E) := by\n  refine ⟨⟨{{x}}, by simp, ?_, ?_, ?_⟩, Set.finite_singleton _, ?_, ⟨_, .refl, x, rfl⟩⟩\n  · rintro s rfl\n    exact affineIndependent_of_subsingleton ℝ _\n  · rintro s t rfl hts ht\n    rcases Finset.subset_singleton_iff.1 hts with rfl | rfl\n    · exact absurd ht Finset.not_nonempty_empty\n    · exact Set.mem_singleton _\n  · rintro s t rfl rfl\n    simp\n  · simp [SimplicialComplex.space]\n\n/-- The empty simplicial complex is not collapsible. -/\n@[category test, AMS 57]\ntheorem not_collapsible_bot : ¬ Collapsible (⊥ : SimplicialComplex ℝ E) := by\n  rintro ⟨L, hL, v, hv⟩\n  have : L.faces = ∅ := by\n    clear hv\n    induction hL with\n    | refl => rfl\n    | tail _ h ih =>\n      obtain ⟨s, hs, -⟩ := h\n      rw [ih] at hs\n      exact hs.elim\n  simp [this] at hv\n\n/--\n**Zeeman conjecture.** Given a finite contractible two-dimensional CW complex $K$, is the space\n$K \\times [0, 1]$ collapsible?\n\nHere $K$ is a finite contractible simplicial complex of dimension $2$ in some $\\mathbb{R}^d$\n(every finite $2$-dimensional polyhedron can be triangulated in this way), and \"collapsible\" is\nmeant in the PL sense: the polyhedron $K \\times [0, 1] \\subseteq \\mathbb{R}^d \\times \\mathbb{R}$\nadmits a collapsible triangulation, i.e. it is PL homeomorphic to a collapsible complex.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔ ∀ (d : ℕ) (K : SimplicialComplex ℝ (Fin d → ℝ)), K.faces.Finite →\n      ContractibleSpace K.space → (∀ s ∈ K.faces, s.card ≤ 3) → (∃ s ∈ K.faces, s.card = 3) →\n      IsPLCollapsible (K.space ×ˢ Set.Icc (0 : ℝ) 1) := by\n  sorry\n\nend ZeemanConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition and its note (PL sense of collapsibility; do not fix a cell structure on K × [0,1]) match the primary literature (Adiprasito–Benedetti, arXiv:1202.6606, §'A simplicial approach to the Zeeman conjecture').",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "K is modelled as a finite geometric simplicial complex in some ℝ^d (Mathlib `Geometry.SimplicialComplex ℝ (Fin d → ℝ)`, `K.faces.Finite`), not a general CW complex: PL collapsibility is only meaningful for polyhedra, every finite 2-dimensional polyhedron is triangulated by such a complex, and the literature (Zeeman; Adiprasito–Benedetti) states the conjecture for simplicial/polytopal 2-complexes.",
+    "'two-dimensional' is taken literally as dimension exactly 2: `(∀ s ∈ K.faces, s.card ≤ 3) ∧ (∃ s ∈ K.faces, s.card = 3)`. The variant with dimension ≤ 2 is trivially equivalent (contractible complexes of dimension ≤ 1 are points or trees, whose product with [0,1] is collapsible).",
+    "'contractible' is `ContractibleSpace K.space` with the subspace topology from ℝ^d (homotopy equivalent to a point).",
+    "'collapsible' is in the PL sense, as required by the decomposition note: `IsPLCollapsible P` := there is a finite geometric simplicial complex T in the same ambient space ((Fin d → ℝ) × ℝ) with `T.space = P` that collapses simplicially to a single vertex. This is the textbook definition of a collapsible polyhedron (Rourke–Sanderson/Zeeman); it is equivalent to 'P is PL homeomorphic to a collapsible complex' and (via Adiprasito–Benedetti, Thm. 'zeemanyes') to 'some derived subdivision of K × [0,1] is collapsible'. It does not fix any particular triangulation of K × [0,1]. The staircase triangulation shows a linear triangulation of |K| × [0,1] always exists, so the hypothesis is never vacuous.",
+    "Elementary collapse is defined combinatorially on face sets: remove a free face s together with the unique face t ⊋ s, with |t| = |s| + 1 (the cardinality condition is redundant given downward closure but kept for readability). 'Collapsible' = collapses (ReflTransGen of elementary collapses) to a complex whose face set is `{{v}}`.",
+    "Finiteness of the triangulation T in `IsPLCollapsible` is stated explicitly although it is implied by collapsibility.",
+    "Reviewer should double-check the intended reading of the question form: `answer(True)` means every such K has K × [0,1] PL-collapsible."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Geometry.SimplicialComplex.facets` / `≤` on `Geometry.SimplicialComplex` (only subcomplex order, no collapse relation); `Topology.RelCWComplex` (no collapse notion).",
+     "name": "ZeemanConjecture.IsElementaryCollapse",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no notion of (simplicial) collapse. Defines K ↘ L by removing a free face and the unique facet containing it."
+    },
+    {
+     "closest_existing_considered": "`Relation.ReflTransGen` (used as the building block).",
+     "name": "ZeemanConjecture.Collapses",
+     "why_needed": "Finite sequences of elementary collapses (`Relation.ReflTransGen IsElementaryCollapse`)."
+    },
+    {
+     "closest_existing_considered": "`ContractibleSpace` (topological, strictly weaker; not the same notion).",
+     "name": "ZeemanConjecture.Collapsible",
+     "why_needed": "A simplicial complex collapsing to a single vertex; no such notion exists in Mathlib."
+    },
+    {
+     "closest_existing_considered": "`Geometry.SimplicialComplex.space` (used to express that T triangulates P); no PL-homeomorphism or subdivision API exists in Mathlib.",
+     "name": "ZeemanConjecture.IsPLCollapsible",
+     "why_needed": "PL collapsibility of a polyhedron (a set in a real vector space): existence of a finite linear triangulation which is collapsible. Needed because the conjecture must not fix a cell structure on K × [0,1]; Mathlib has no subdivision or PL homeomorphism notions."
+    }
+   ],
+   "per_slot": {
+    "zeeman_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ d K, K finite → ContractibleSpace K.space → dim K = 2 → IsPLCollapsible (K.space ×ˢ Icc 0 1)` where K ranges over Mathlib geometric simplicial complexes `Geometry.SimplicialComplex ℝ (Fin d → ℝ)`. Mathlib/repo have no notion of collapse, collapsibility or PL collapsibility, so these were defined in the file (elementary simplicial collapse, collapse, collapsible, PL-collapsible polyhedron = admits a finite linear triangulation that collapses to a vertex). This does not fix a cell structure on K × [0,1], as the decomposition note requires."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "zeeman_conjecture": "/--\n**Zeeman conjecture.** Given a finite contractible two-dimensional CW complex $K$, is the space\n$K \\times [0, 1]$ collapsible?\n\nHere $K$ is a finite contractible simplicial complex of dimension $2$ in some $\\mathbb{R}^d$\n(every finite $2$-dimensional polyhedron can be triangulated in this way), and \"collapsible\" is\nmeant in the PL sense: the polyhedron $K \\times [0, 1] \\subseteq \\mathbb{R}^d \\times \\mathbb{R}$\nadmits a collapsible triangulation, i.e. it is PL homeomorphic to a collapsible complex.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔ ∀ (d : ℕ) (K : SimplicialComplex ℝ (Fin d → ℝ)), K.faces.Finite →\n      ContractibleSpace K.space → (∀ s ∈ K.faces, s.card ≤ 3) → (∃ s ∈ K.faces, s.card = 3) →\n      IsPLCollapsible (K.space ×ˢ Set.Icc (0 : ℝ) 1) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Zeeman conjecture\n\nThe Zeeman conjecture (or Zeeman's collapsibility conjecture) asks whether, given a finite\ncontractible $2$-dimensional complex $K$, the space $K \\times [0, 1]$ is collapsible.\n\nHere \"collapsible\" is meant in the piecewise-linear sense: $K \\times [0, 1]$ should be PL\nhomeomorphic to a collapsible complex. Equivalently, some subdivision of the prism complex\n$K \\times [0, 1]$ is a collapsible simplicial complex; equivalently, some iterated barycentric\n(derived) subdivision of $K \\times [0, 1]$ is collapsible. The equivalences follow from the\ntheorem of Adiprasito and Benedetti [AB] that a complex is PL homeomorphic to a collapsible\ncomplex if and only if some iterated derived subdivision of it is collapsible. Working up to\nsubdivision is essential: for every $m$, Adiprasito and Benedetti exhibit a finite contractible\n$2$-complex $C$ such that the $m$-th derived subdivision of $C \\times [0, 1]$ is *not*\ncollapsible [AB], so the conjecture would be false if a fixed cell structure on\n$K \\times [0, 1]$ were prescribed.\n\nThe conjecture implies the (now proven) Poincaré conjecture and the Andrews–Curtis conjecture.\n\n*References:*\n- [Wikipedia, Zeeman conjecture](https://en.wikipedia.org/wiki/Zeeman_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [AB] K. Adiprasito, B. Benedetti, *Subdivisions, shellability, and the Zeeman conjecture*,\n  [arXiv:1202.6606](https://arxiv.org/abs/1202.6606)\n- [Ze] E. C. Zeeman, *On the dunce hat*, Topology 2 (1964), 341–358.\n-/\n\nnamespace ZeemanConjecture\n\nopen Geometry\n\nsection Collapsibility\n\nvariable {𝕜 E : Type*} [Ring 𝕜] [PartialOrder 𝕜] [AddCommGroup E] [Module 𝕜 E]\n\n/-- The simplicial complex `K` collapses onto `L` by a single *elementary collapse*: there is a\nface `σ` of `K` which is a proper face of exactly one other face `τ` of `K` (a *free face*; `τ`\nis then a facet of `K` and `σ` has codimension one in it), and `L` is obtained from `K` by\nremoving the two faces `σ` and `τ`. -/\ndef ElementaryCollapse (K L : SimplicialComplex 𝕜 E) : Prop :=\n  ∃ σ ∈ K.faces, ∃ τ ∈ K.faces, σ ⊂ τ ∧ (∀ ρ ∈ K.faces, σ ⊂ ρ → ρ = τ) ∧\n    L.faces = K.faces \\ {σ, τ}\n\n/-- A simplicial complex is *collapsible* if a finite sequence of elementary collapses\nreduces it to a single vertex. -/\ndef Collapsible (K : SimplicialComplex 𝕜 E) : Prop :=\n  ∃ L, Relation.ReflTransGen ElementaryCollapse K L ∧ ∃ v, L.faces = {{v}}\n\n/-- An elementary collapse produces a subcomplex. -/\n@[category API, AMS 57]\ntheorem ElementaryCollapse.le {K L : SimplicialComplex 𝕜 E} (h : ElementaryCollapse K L) :\n    L ≤ K := by\n  obtain ⟨σ, -, τ, -, -, -, hL⟩ := h\n  show L.faces ⊆ K.faces\n  rw [hL]\n  exact Set.diff_subset\n\n/-- A complex consisting of a single vertex is collapsible. -/\n@[category API, AMS 57]\ntheorem Collapsible.of_faces_eq {K : SimplicialComplex 𝕜 E} {v : E} (h : K.faces = {{v}}) :\n    Collapsible K :=\n  ⟨K, .refl, v, h⟩\n\n/-- The empty complex is not collapsible. -/\n@[category test, AMS 57]\ntheorem not_collapsible_bot : ¬ Collapsible (⊥ : SimplicialComplex 𝕜 E) := by\n  rintro ⟨L, hL, v, hv⟩\n  rcases hL.cases_head with rfl | ⟨_, ⟨σ, hσ, -⟩, -⟩\n  · simp [SimplicialComplex.faces_bot] at hv\n  · simp [SimplicialComplex.faces_bot] at hσ\n\nend Collapsibility\n\n/-- A simplicial complex `L` in `E × ℝ` is a (linear, simplicial) *subdivision of the prism\ncomplex* `K × [0, 1]`: the underlying space of `L` is `|K| × [0, 1]`, and every simplex of `L`\nis contained in one of the prisms `σ × [0, 1]`, where `σ` is a face of `K`. -/\ndef IsSubdivisionOfProdUnitInterval {E : Type*} [AddCommGroup E] [Module ℝ E]\n    (K : SimplicialComplex ℝ E) (L : SimplicialComplex ℝ (E × ℝ)) : Prop :=\n  L.space = K.space ×ˢ Set.Icc 0 1 ∧\n    ∀ s ∈ L.faces, ∃ σ ∈ K.faces,\n      convexHull ℝ (s : Set (E × ℝ)) ⊆ convexHull ℝ (σ : Set E) ×ˢ Set.Icc 0 1\n\n/--\n**Zeeman conjecture.** Let $K$ be a finite contractible $2$-dimensional simplicial complex,\nrealised geometrically in some $\\mathbb{R}^n$. Is $K \\times [0, 1]$ collapsible?\n\nCollapsibility of $K \\times [0, 1]$ is meant in the PL sense: some subdivision of the prism\ncomplex $K \\times [0, 1]$ is a collapsible simplicial complex. By the theorem of Adiprasito\nand Benedetti [AB] this is equivalent to $K \\times [0, 1]$ being PL homeomorphic to a collapsible\ncomplex, and to some iterated barycentric subdivision of $K \\times [0, 1]$ being collapsible.\n\"$2$-dimensional\" is read as \"of dimension at most $2$\", i.e. every face has at most $3$\nvertices; the cases of dimension at most $1$ are trivially true.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔ ∀ (n : ℕ) (K : SimplicialComplex ℝ (Fin n → ℝ)),\n      K.faces.Finite → (∀ s ∈ K.faces, s.card ≤ 3) → ContractibleSpace K.space →\n        ∃ L : SimplicialComplex ℝ ((Fin n → ℝ) × ℝ),\n          IsSubdivisionOfProdUnitInterval K L ∧ Collapsible L := by\n  sorry\n\nend ZeemanConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot table is appropriate; I followed its instruction to read 'collapsible' in the PL sense and not to fix a cell structure on K × [0,1]. The only (minor) note is that the table's parenthetical 'CW/polyhedral complex' had to be resolved in favour of simplicial/polyhedral complexes, since collapsibility is not defined for general CW complexes.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The Wikipedia entry says 'finite contractible two-dimensional CW complex'. Collapsibility (and barycentric subdivision, used in Wikipedia's own restatement) requires a polyhedral/simplicial structure, and the conjecture as stated by Zeeman and in the literature (Adiprasito–Benedetti, Matveev) is about 2-dimensional polyhedra / simplicial complexes. I therefore model K as a finite geometric simplicial complex `Geometry.SimplicialComplex ℝ (Fin n → ℝ)` for arbitrary n (every finite simplicial complex embeds linearly in some ℝ^n, and all notions involved are invariant under such embeddings).",
+    "'Collapsible' for K × [0,1] is taken in the PL sense, per the decomposition notes: there exists a simplicial complex L in (Fin n → ℝ) × ℝ whose underlying space is |K| × [0,1] and each of whose simplices lies in a prism σ × [0,1] (i.e. L is a subdivision of the prism complex K × [0,1], in the Rourke–Sanderson sense), such that L is collapsible. By Adiprasito–Benedetti (arXiv:1202.6606, 'a complex is PL homeomorphic to a collapsible complex iff some iterated derived subdivision is collapsible', together with the common-subdivision lemma) this is equivalent both to 'K × [0,1] is PL homeomorphic to a collapsible complex' and to 'some iterated barycentric subdivision of K × [0,1] is collapsible' (Wikipedia's restatement). Formalizing general PL homeomorphisms or barycentric subdivisions of prisms would have been much heavier and more error-prone. Note that a fixed cell structure is deliberately NOT prescribed, as required.",
+    "'Two-dimensional' is read as 'of dimension at most 2' (`∀ s ∈ K.faces, s.card ≤ 3`). The extra cases (dimension ≤ 1: a point or a tree) are trivially true theorems, so this is equivalent to requiring dimension exactly 2; it also matches the common usage of '2-complex'.",
+    "Contractibility is `ContractibleSpace K.space`, i.e. of the polyhedron |K| ⊆ ℝ^n with the subspace topology (which is the standard topology for a finite complex). Since `ContractibleSpace` requires nonemptiness, the empty complex is excluded automatically; the hypotheses are satisfiable (e.g. a single vertex, where the conclusion holds).",
+    "Collapsibility is defined combinatorially: an elementary collapse removes a free face σ (a face that is a proper face of exactly one other face τ — τ is then a facet and σ has codimension one, both consequences of downward closure) together with τ; a complex is collapsible if a finite sequence (`Relation.ReflTransGen`) of elementary collapses reduces it to a single vertex (`L.faces = {{v}}`). Finiteness of L is implied by collapsibility.",
+    "The bespoke definitions (`ElementaryCollapse`, `Collapsible`, `IsSubdivisionOfProdUnitInterval`) are generic enough that a reviewer might prefer them in `FormalConjecturesForMathlib/`; since the deliverable is a single problem file, they are placed inside `namespace ZeemanConjecture`, with three short API/test lemmas exercising them (an elementary collapse yields a subcomplex; a single-vertex complex is collapsible; the empty complex is not collapsible).",
+    "The theorem quantifies over the ambient dimension n inside the statement (rather than having a section variable E) so that `answer(sorry)` is a closed Prop not depending on any parameter."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Geometry.SimplicialComplex.facets` and the `≤` (subcomplex) order on `Geometry.SimplicialComplex`; nothing in Mathlib or FormalConjecturesForMathlib (grepped for 'collaps') covers collapses.",
+     "name": "ZeemanConjecture.ElementaryCollapse",
+     "why_needed": "Mathlib has no notion of a free face / elementary (simplicial) collapse for `Geometry.SimplicialComplex`; needed to define collapsibility."
+    },
+    {
+     "closest_existing_considered": "`ContractibleSpace` (a purely topological, strictly weaker notion — the dunce hat is contractible but not collapsible, so it cannot be substituted); `Relation.ReflTransGen` is reused for the finite sequence of collapses.",
+     "name": "ZeemanConjecture.Collapsible",
+     "why_needed": "'Collapsible' (reducible to a single vertex by a finite sequence of elementary collapses) does not exist in Mathlib or the repository."
+    },
+    {
+     "closest_existing_considered": "`Geometry.SimplicialComplex.space` and the `≤` order between simplicial complexes (which only expresses subcomplexes, not subdivisions); Mathlib's `Topology.CWComplex` (no collapsibility or product-of-complexes API).",
+     "name": "ZeemanConjecture.IsSubdivisionOfProdUnitInterval",
+     "why_needed": "There is no notion of the product polyhedral complex K × [0,1], of subdivision of a polyhedral complex, or of PL homeomorphism in Mathlib/the repo. This predicate says L is a linear simplicial subdivision of the prism complex K × [0,1] (|L| = |K| × [0,1], each simplex inside a prism σ × [0,1]), which is what is needed to express collapsibility of K × [0,1] up to subdivision (the PL sense)."
+    }
+   ],
+   "per_slot": {
+    "zeeman_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ n (K : SimplicialComplex ℝ (Fin n → ℝ)), K.faces.Finite → (∀ s ∈ K.faces, s.card ≤ 3) → ContractibleSpace K.space → ∃ L, IsSubdivisionOfProdUnitInterval K L ∧ Collapsible L`. Mathlib has geometric simplicial complexes and ContractibleSpace but no notion of (elementary) collapse, collapsibility, or subdivision of the prism complex K × [0,1]; these were added as bespoke definitions in the file. 'Collapsible' is taken in the PL sense as required by the notes: some simplicial subdivision of the polyhedral complex K × [0,1] is collapsible (no cell structure on K × [0,1] is fixed)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "zeeman_conjecture": "/--\n**Zeeman conjecture.** Let $K$ be a finite contractible $2$-dimensional simplicial complex,\nrealised geometrically in some $\\mathbb{R}^n$. Is $K \\times [0, 1]$ collapsible?\n\nCollapsibility of $K \\times [0, 1]$ is meant in the PL sense: some subdivision of the prism\ncomplex $K \\times [0, 1]$ is a collapsible simplicial complex. By the theorem of Adiprasito\nand Benedetti [AB] this is equivalent to $K \\times [0, 1]$ being PL homeomorphic to a collapsible\ncomplex, and to some iterated barycentric subdivision of $K \\times [0, 1]$ being collapsible.\n\"$2$-dimensional\" is read as \"of dimension at most $2$\", i.e. every face has at most $3$\nvertices; the cases of dimension at most $1$ are trivially true.\n-/\n@[category research open, AMS 57]\ntheorem zeeman_conjecture :\n    answer(sorry) ↔ ∀ (n : ℕ) (K : SimplicialComplex ℝ (Fin n → ℝ)),\n      K.faces.Finite → (∀ s ∈ K.faces, s.card ≤ 3) → ContractibleSpace K.space →\n        ∃ L : SimplicialComplex ℝ ((Fin n → ℝ) × ℝ),\n          IsSubdivisionOfProdUnitInterval K L ∧ Collapsible L := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "zeeman_conjecture": "c07"
+ },
+ "id": "wp-zeeman-conjecture",
+ "main_attempt": "c07"
+}

@@ -1,0 +1,576 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reinhardt's conjecture\n\nReinhardt's conjecture (1934), found independently by Mahler (1947), states that the\n*smoothed octagon* has the lowest maximum packing density of all centrally symmetric convex\nsets in the plane. The smoothed octagon is obtained from a regular octagon by replacing each\ncorner with an arc of a hyperbola that is tangent to the two sides adjacent to the corner and\nasymptotic to the two sides adjacent to these. Its maximum packing density is\n$$\\frac{8 - 4\\sqrt 2 - \\ln 2}{2\\sqrt 2 - 1} \\approx 0.902414,$$\nwhich is slightly less than the maximum packing density $\\pi/\\sqrt{12} \\approx 0.906899$ of the\ncircular disk.\n\nThe maximum (or *greatest*) packing density $\\delta(K)$ of a convex disk $K$ is the supremum of\nthe densities of all packings of the plane by congruent copies of $K$. By a theorem of\nL. Fejes Tóth, for a centrally symmetric convex disk it coincides with the greatest\n*lattice* packing density $\\delta_L(K)$, so the conjecture can equivalently be stated for\nlattice packings, which is how Reinhardt originally formulated it.\n\n*References:*\n- [Wikipedia, Reinhardt's conjecture](https://en.wikipedia.org/wiki/Reinhardt%27s_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Re34] Reinhardt, K., *Über die dichteste gitterförmige Lagerung kongruenter Bereiche in der\n  Ebene und eine besondere Art konvexer Kurven*, Abh. Math. Sem. Univ. Hamburg 10 (1934),\n  216–230.\n- [Ma47] Mahler, K., *On the minimum determinant and the circumscribed hexagons of a convex\n  domain*, Indag. Math. 9 (1947), 326–337.\n- [FT50] Fejes Tóth, L., *Some packing and covering theorems*, Acta Sci. Math. Szeged 12\n  (1950), 62–67.\n- [HV24] Hales, T., Vajjha, K., *Packings of Smoothed Polygons*,\n  [arXiv:2405.04331](https://arxiv.org/abs/2405.04331).\n-/\n\nnamespace ReinhardtsConjecture\n\nopen MeasureTheory Filter Topology\nopen scoped EuclideanGeometry ENNReal Pointwise Real\n\n/-\n## Centrally symmetric convex disks and packings\n-/\n\n/-- A **centrally symmetric convex disk** is a compact convex subset of the plane with nonempty\ninterior that is symmetric about some point $c$, i.e. invariant under the point reflection\n$v \\mapsto 2c - v$. This is the class $\\mathfrak{K}_{ccs}$ of [HV24], except that the\ncentre of symmetry is not required to be the origin. -/\nstructure IsCentrallySymmetricConvexDisk (K : Set ℝ²) : Prop where\n  isCompact : IsCompact K\n  convex : Convex ℝ K\n  nonempty_interior : (interior K).Nonempty\n  centrallySymmetric : ∃ c : ℝ², ∀ v ∈ K, 2 • c - v ∈ K\n\n/-- A family `P` of subsets of the plane is a **packing with congruent copies of `K`** if every\nmember of `P` is the image of `K` under an isometry of the plane and any two distinct members of\n`P` do not overlap, i.e. have disjoint interiors. -/\nstructure IsPacking (K : Set ℝ²) (P : Set (Set ℝ²)) : Prop where\n  congruent : ∀ K' ∈ P, ∃ g : ℝ² ≃ᵢ ℝ², K' = g '' K\n  pairwise_disjoint : P.Pairwise fun K₁ K₂ => Disjoint (interior K₁) (interior K₂)\n\n/-- The fraction of the disk $B_r$ of radius `r` about the origin that is covered by the family\n`P` of subsets of the plane:\n$$\\frac{1}{\\mathrm{area}(B_r)} \\sum_{K' \\in P} \\mathrm{area}(K' \\cap B_r).$$ -/\nnoncomputable def coveredFraction (P : Set (Set ℝ²)) (r : ℝ) : ℝ≥0∞ :=\n  (∑' K' : P, volume ((K' : Set ℝ²) ∩ Metric.ball 0 r)) / volume (Metric.ball (0 : ℝ²) r)\n\n/-- A family `P` of subsets of the plane has **density** `d` if the fraction of $B_r$ covered by\n`P` tends to `d` as $r \\to \\infty$; that is, the upper density (the `limsup`) and the lower\ndensity (the `liminf`) of `P` both exist and are equal to `d`. -/\ndef HasDensity (P : Set (Set ℝ²)) (d : ℝ≥0∞) : Prop :=\n  Tendsto (coveredFraction P) atTop (𝓝 d)\n\n/-- The **greatest packing density** $\\delta(K)$ of a subset `K` of the plane is the supremum of\nthe densities of all packings with congruent copies of `K` whose density exists\n[HV24]. -/\nnoncomputable def packingDensity (K : Set ℝ²) : ℝ≥0∞ :=\n  sSup {d | ∃ P, IsPacking K P ∧ HasDensity P d}\n\n/-- The translates $K + l$, $l \\in L$, of `K` by the vectors of the `ℤ`-submodule `L` form a\n**lattice packing** if any two distinct translates have disjoint interiors. -/\ndef IsLatticePacking (K : Set ℝ²) (L : Submodule ℤ ℝ²) : Prop :=\n  (L : Set ℝ²).Pairwise fun l l' => Disjoint (interior (l +ᵥ K)) (interior (l' +ᵥ K))\n\n/-- The **greatest lattice packing density** $\\delta_L(K)$ of a subset `K` of the plane is the\nsupremum of $\\mathrm{area}(K) / \\det(L)$ over all lattices `L` (discrete `ℤ`-submodules of full\nrank) such that the translates of `K` by `L` form a packing [HV24]. Here\n$\\det(L)$ is the covolume of `L`, i.e. the area of a fundamental domain. -/\nnoncomputable def latticePackingDensity (K : Set ℝ²) : ℝ≥0∞ :=\n  sSup {d | ∃ (L : Submodule ℤ ℝ²) (_ : DiscreteTopology L), IsZLattice ℝ L ∧\n    IsLatticePacking K L ∧ d = volume K / ENNReal.ofReal (ZLattice.covolume L)}\n\n/-\n## The smoothed octagon\n\nWe follow the construction on Wikipedia, translated and reflected so that the octagon is centred\nat the origin. Start with the regular octagon of circumradius $\\sqrt 2$ centred at the origin,\nwith vertices $\\sqrt 2 (\\cos(k\\pi/4), \\sin(k\\pi/4))$, $k = 0, \\dots, 7$. The vertex\n$(\\sqrt 2, 0)$ is replaced by an arc of the hyperbola\n$$\\ell^2 (x - 2 - \\sqrt 2)^2 - y^2 = m^2, \\qquad \\ell = \\sqrt 2 - 1,\\quad m = (1/2)^{1/4},$$\nwhich is tangent to the two sides $y = \\pm(\\sqrt 2 + 1)(x - \\sqrt 2)$ of the octagon at this\nvertex and asymptotic to the lines $y = \\pm(\\sqrt 2 - 1)(x - 2 - \\sqrt 2)$ containing the two\nsides adjacent to these. The other seven corners are treated in the same way, by rotating this\narc about the origin through the angles $k\\pi/4$.\n-/\n\n/-- Rotation of the plane about the origin through the angle `θ`. -/\nnoncomputable def rotate (θ : ℝ) (p : ℝ²) : ℝ² :=\n  !₂[Real.cos θ * p 0 - Real.sin θ * p 1, Real.sin θ * p 0 + Real.cos θ * p 1]\n\n/-- The hyperbolic arc that replaces the vertex $(\\sqrt 2, 0)$ of the regular octagon of\ncircumradius $\\sqrt 2$ centred at the origin. With $\\ell = \\sqrt 2 - 1$ and $m = (1/2)^{1/4}$,\nit is the portion $|t| \\le \\frac{\\ln 2}{4}$ of the branch\n$$t \\mapsto \\left(2 + \\sqrt 2 - \\frac{m}{\\ell} \\cosh t,\\ m \\sinh t\\right)$$\nof the hyperbola $\\ell^2 (x - 2 - \\sqrt 2)^2 - y^2 = m^2$. Its endpoints\n$\\left(\\frac{4 + \\sqrt 2}{4}, \\pm\\frac{2 - \\sqrt 2}{4}\\right)$ are the points where the\nhyperbola touches the two sides of the octagon adjacent to the vertex $(\\sqrt 2, 0)$. -/\nnoncomputable def cornerArc : Set ℝ² :=\n  (fun t : ℝ => !₂[2 + √2 - (1 / 2 : ℝ) ^ (1 / 4 : ℝ) / (√2 - 1) * Real.cosh t,\n    (1 / 2 : ℝ) ^ (1 / 4 : ℝ) * Real.sinh t]) '' Set.Icc (-(Real.log 2 / 4)) (Real.log 2 / 4)\n\n/-- The **smoothed octagon** of Reinhardt, centred at the origin: the convex hull of the eight\nhyperbolic arcs obtained by rotating `cornerArc` through the angles $k\\pi/4$, $k = 0, \\dots, 7$.\nIts boundary consists of these eight arcs together with the eight straight segments of the sides\nof the regular octagon between the endpoints of consecutive arcs, so it is exactly the regular\noctagon of circumradius $\\sqrt 2$ with each corner clipped by a hyperbolic arc. -/\nnoncomputable def smoothedOctagon : Set ℝ² :=\n  convexHull ℝ (⋃ k : Fin 8, rotate (k * π / 4) '' cornerArc)\n\n/-- The smoothed octagon is convex. -/\n@[category test, AMS 52]\ntheorem convex_smoothedOctagon : Convex ℝ smoothedOctagon :=\n  convex_convexHull ℝ _\n\n/-- The smoothed octagon is a centrally symmetric convex disk. -/\n@[category API, AMS 52]\ntheorem isCentrallySymmetricConvexDisk_smoothedOctagon :\n    IsCentrallySymmetricConvexDisk smoothedOctagon := by\n  sorry\n\n/-- The greatest packing density of the smoothed octagon is\n$$\\delta(K_{oct}) = \\frac{8 - 4\\sqrt 2 - \\ln 2}{2\\sqrt 2 - 1} \\approx 0.902414.$$\nThe value was computed by Reinhardt [Re34]; see also the smoothed octagon example in [HV24]. -/\n@[category research solved, AMS 52]\ntheorem packingDensity_smoothedOctagon :\n    packingDensity smoothedOctagon =\n      ENNReal.ofReal ((8 - 4 * √2 - Real.log 2) / (2 * √2 - 1)) := by\n  sorry\n\n/-\n## The conjecture\n-/\n\n/-- **Reinhardt's conjecture** (Reinhardt [Re34], Mahler [Ma47]): the smoothed octagon has the\nlowest maximum packing density of all centrally symmetric convex sets in the plane. That is,\nfor every centrally symmetric convex disk $K$ (compact, convex, with nonempty interior) the\ngreatest packing density of $K$ by congruent copies satisfies\n$$\\delta(K) \\ge \\delta(K_{oct}) = \\frac{8 - 4\\sqrt 2 - \\ln 2}{2\\sqrt 2 - 1} \\approx 0.902414,$$\nwhere $K_{oct}$ is the smoothed octagon. -/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture (K : Set ℝ²) (hK : IsCentrallySymmetricConvexDisk K) :\n    packingDensity smoothedOctagon ≤ packingDensity K := by\n  sorry\n\n/-- **Reinhardt's conjecture**, with the explicit value of the greatest packing density of the\nsmoothed octagon: every centrally symmetric convex disk $K$ in the plane satisfies\n$$\\delta(K) \\ge \\frac{8 - 4\\sqrt 2 - \\ln 2}{2\\sqrt 2 - 1} \\approx 0.902414.$$\nBy `packingDensity_smoothedOctagon` this is equivalent to `reinhardts_conjecture`. -/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture.variants.explicit_bound (K : Set ℝ²)\n    (hK : IsCentrallySymmetricConvexDisk K) :\n    ENNReal.ofReal ((8 - 4 * √2 - Real.log 2) / (2 * √2 - 1)) ≤ packingDensity K := by\n  sorry\n\n/-- **Reinhardt's conjecture** for lattice packings, as originally formulated by Reinhardt\n[Re34]: the smoothed octagon has the lowest greatest lattice packing density of all centrally\nsymmetric convex disks in the plane, i.e. $\\delta_L(K_{oct}) \\le \\delta_L(K)$ for every\ncentrally symmetric convex disk $K$. By Fejes Tóth's theorem $\\delta(K) = \\delta_L(K)$ for\ncentrally symmetric convex disks [FT50], this is equivalent to `reinhardts_conjecture`. -/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture.variants.lattice (K : Set ℝ²)\n    (hK : IsCentrallySymmetricConvexDisk K) :\n    latticePackingDensity smoothedOctagon ≤ latticePackingDensity K := by\n  sorry\n\nend ReinhardtsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate. The notes' 'i.e. ≥ (8 − 4√2 − ln 2)/(2√2 − 1)' is a known consequence (δ(K_oct) equals that constant) rather than part of the conjecture's text, so the slot compares with δ(smoothedOctagon) literally, and the explicit-constant form is provided as a variant together with the solved theorem giving δ(K_oct).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Plane = EuclideanSpace ℝ (Fin 2) (repo notation ℝ²); 'congruent copies' = images under isometries ℝ² ≃ᵢ ℝ² (all isometries of Euclidean space are affine, so this is exactly the congruence group incl. reflections).",
+    "A packing is a *set* P of subsets (family of disks), each a congruent copy of K, with distinct members having disjoint interiors (Set.Pairwise) — matches Hales–Vajjha's 'family of convex disks ... do not overlap, i.e. have disjoint interiors'.",
+    "Density of a packing follows Hales–Vajjha literally: coveredFraction P r = (∑' K'∈P, area(K' ∩ B_r)) / area(B_r) in ℝ≥0∞, and HasDensity P d means this tends to d as r → ∞ (equivalently limsup = liminf = d in ℝ≥0∞). packingDensity K = sSup {d | ∃ P, IsPacking K P ∧ HasDensity P d}, i.e. sup over packings whose density exists (HV24's definition). Other sources use sup of upper densities; the values agree, but a reviewer should confirm they accept the HV24 convention. Empty packing has density 0 so the sSup set is nonempty.",
+    "Densities live in ℝ≥0∞ (so division and sSup are total); consequently the explicit constant appears as ENNReal.ofReal ((8 - 4√2 - log 2)/(2√2 - 1)).",
+    "IsCentrallySymmetricConvexDisk allows the centre of symmetry to be any point c (∃ c, ∀ v ∈ K, 2•c - v ∈ K) rather than forcing the origin as in HV24's K_ccs normalisation; this matches the Wikipedia wording 'centrally-symmetric convex plane sets' and is equivalent by translation invariance of packing density.",
+    "The main theorem compares with packingDensity smoothedOctagon (literal statement). The known value δ(K_oct) = (8 − 4√2 − ln 2)/(2√2 − 1) is recorded as a separate `research solved` theorem packingDensity_smoothedOctagon, and reinhardts_conjecture.variants.explicit_bound states the conjecture with that explicit constant, as suggested by the decomposition notes.",
+    "smoothedOctagon is the convex hull of the eight rotations (by kπ/4, explicit rotation matrix) of cornerArc, where cornerArc is Wikipedia's parametrised hyperbolic arc t ↦ (2+√2 − (m/ℓ)cosh t, m sinh t), |t| ≤ ln2/4, ℓ = √2−1, m = (1/2)^{1/4}, translated/reflected so the regular octagon (circumradius √2) is centred at the origin with a vertex at (√2,0). I checked analytically and numerically that the arc endpoints ((4+√2)/4, ±(2−√2)/4) lie on the octagon sides y = ∓(√2+1)(x−√2) with matching tangent slope and that the asymptotes y = ±(√2−1)(x−2−√2) contain the next sides. The convex hull of the closed arcs equals the region bounded by the arcs and the side segments between consecutive arcs (the convex hull of the boundary of a convex body is the body), so this is exactly the smoothed octagon. Note: intersecting the octagon with the hyperbolic regions would be WRONG (the hyperbolas are asymptotic to lines through octagon sides), which is why the convex-hull description is used.",
+    "Closed parameter interval Icc (Wikipedia writes strict inequalities) so that the set is compact; the resulting body is the same.",
+    "Added variant reinhardts_conjecture.variants.lattice using latticePackingDensity K = sSup of area(K)/covolume(L) over discrete full-rank ℤ-submodules L (Mathlib IsZLattice, ZLattice.covolume with volume) such that L-translates of K have pairwise disjoint interiors; equivalent to the main statement by Fejes Tóth's theorem δ = δ_L on K_ccs, and is Reinhardt's original lattice formulation.",
+    "AMS tag 52 (convex and discrete geometry) only.",
+    "Sanity statements: convex_smoothedOctagon (proved), isCentrallySymmetricConvexDisk_smoothedOctagon (API, sorry)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Convex ℝ K, IsCompact K, interior K nonempty exist separately; no bundled 'convex body' or central symmetry predicate in Mathlib or FormalConjecturesForMathlib.",
+     "name": "ReinhardtsConjecture.IsCentrallySymmetricConvexDisk",
+     "why_needed": "Hales–Vajjha's class K_ccs (compact, convex, nonempty interior, centrally symmetric) has no Mathlib counterpart."
+    },
+    {
+     "closest_existing_considered": "SquarePacking.Packing in FormalConjectures/Wikipedia/SquarePacking.lean (finite packings inside a container, disjoint sets rather than disjoint interiors) — not reusable for infinite packings of the plane.",
+     "name": "ReinhardtsConjecture.IsPacking",
+     "why_needed": "Packing of the plane by congruent copies of K with pairwise disjoint interiors; not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.volume and tsum; no density-of-a-family notion in Mathlib.",
+     "name": "ReinhardtsConjecture.coveredFraction",
+     "why_needed": "The ratio (∑_{K'∈P} area(K' ∩ B_r)) / area(B_r) used to define upper/lower density."
+    },
+    {
+     "closest_existing_considered": "Filter.Tendsto (used); no packing-density notion exists.",
+     "name": "ReinhardtsConjecture.HasDensity",
+     "why_needed": "Density of a packing = limit of the covered fraction as r → ∞ (limsup = liminf)."
+    },
+    {
+     "closest_existing_considered": "None; Mathlib has no packing density.",
+     "name": "ReinhardtsConjecture.packingDensity",
+     "why_needed": "Greatest packing density δ(K) of Hales–Vajjha; absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "Set.vadd (pointwise +ᵥ) and Submodule coercion used; no lattice packing predicate exists.",
+     "name": "ReinhardtsConjecture.IsLatticePacking",
+     "why_needed": "For the lattice variant: translates of K by lattice vectors have pairwise disjoint interiors."
+    },
+    {
+     "closest_existing_considered": "Reuses IsZLattice and ZLattice.covolume from Mathlib; the supremum itself is new.",
+     "name": "ReinhardtsConjecture.latticePackingDensity",
+     "why_needed": "Greatest lattice packing density δ_L(K) = sup area(K)/det(L) for the lattice variant."
+    },
+    {
+     "closest_existing_considered": "EuclideanGeometry.o.rotation (Orientation.rotation) as used in MovingSofa.lean; an explicit matrix formula was preferred for transparency (the set of eight rotations is orientation-independent).",
+     "name": "ReinhardtsConjecture.rotate",
+     "why_needed": "Explicit rotation of ℝ² about the origin, to generate the eight corner arcs."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "ReinhardtsConjecture.cornerArc",
+     "why_needed": "The hyperbolic arc replacing one octagon vertex (Wikipedia's explicit parametrisation, recentred)."
+    },
+    {
+     "closest_existing_considered": "convexHull ℝ (used); no smoothed octagon in Mathlib or the repo.",
+     "name": "ReinhardtsConjecture.smoothedOctagon",
+     "why_needed": "Reinhardt's smoothed octagon, required explicitly by the decomposition notes; defined as convex hull of the eight corner arcs."
+    }
+   ],
+   "per_slot": {
+    "reinhardts_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every K : Set ℝ² with IsCentrallySymmetricConvexDisk K (compact, convex, nonempty interior, symmetric about some centre), packingDensity smoothedOctagon ≤ packingDensity K, where packingDensity is Hales–Vajjha's greatest packing density (sup of densities of packings by congruent copies whose density exists) and smoothedOctagon is defined explicitly as the convex hull of the eight hyperbolic corner arcs from the Wikipedia construction. Non-strict bound; no uniqueness claim. Mathlib has no notion of packing density or of the smoothed octagon, so bespoke definitions were required."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reinhardts_conjecture": "/-- **Reinhardt's conjecture** (Reinhardt [Re34], Mahler [Ma47]): the smoothed octagon has the\nlowest maximum packing density of all centrally symmetric convex sets in the plane. That is,\nfor every centrally symmetric convex disk $K$ (compact, convex, with nonempty interior) the\ngreatest packing density of $K$ by congruent copies satisfies\n$$\\delta(K) \\ge \\delta(K_{oct}) = \\frac{8 - 4\\sqrt 2 - \\ln 2}{2\\sqrt 2 - 1} \\approx 0.902414,$$\nwhere $K_{oct}$ is the smoothed octagon. -/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture (K : Set ℝ²) (hK : IsCentrallySymmetricConvexDisk K) :\n    packingDensity smoothedOctagon ≤ packingDensity K := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reinhardt's conjecture\n\nReinhardt's conjecture states that the smoothed octagon has the lowest maximum packing density\nof all centrally symmetric convex plane sets.\n\nThe *smoothed octagon* is obtained from a regular octagon by replacing each corner with an arc\nof a hyperbola that is tangent to the two sides adjacent to the corner and asymptotic to the two\nsides adjacent to these. Its maximum packing density is\n$$\\frac{8 - 4\\sqrt{2} - \\ln 2}{2\\sqrt{2} - 1} \\approx 0.902414.$$\n\nFollowing [HV24], the maximum (or *greatest*) packing density $\\delta(K)$ of a convex disk $K$\nis the supremum of the densities of all packings of the plane by congruent copies of $K$.\nBy a theorem of L. Fejes Tóth [FT50], for a centrally symmetric convex disk this equals the\ngreatest *lattice* packing density, which is how the problem was originally posed by Reinhardt.\n\n*References:*\n- [Wikipedia, Smoothed octagon](https://en.wikipedia.org/wiki/Reinhardt%27s_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [HV24] Hales, T., Vajjha, K., _Packings of Smoothed Polygons_,\n  [arXiv:2405.04331](https://arxiv.org/abs/2405.04331) (2024), Section 2.2.\n- [Re34] Reinhardt, K., _Über die dichteste gitterförmige Lagerung kongruenter Bereiche in der\n  Ebene und eine besondere Art konvexer Kurven_, Abh. Math. Sem. Univ. Hamburg 10 (1934), 216–230.\n- [Ma47] Mahler, K., _On the minimum determinant and the circumscribed hexagons of a convex\n  domain_, Indagationes Mathematicae 9 (1947), 326–337.\n- [FT50] Fejes Tóth, L., _Some packing and covering theorems_,\n  Acta Sci. Math. Szeged 12 (1950), 62–67.\n-/\n\nnamespace ReinhardtsConjecture\n\nopen MeasureTheory Filter Topology Real\nopen scoped EuclideanGeometry\n\n/--\nA set $K \\subseteq \\mathbb{R}^2$ is a **centrally symmetric convex disk** if it is compact, convex,\nhas nonempty interior, and is symmetric about some point $c$ (i.e. $2c - v \\in K$ whenever\n$v \\in K$).\n\nThis is the class $\\mathfrak{K}_{ccs}$ of [HV24], except that we allow an arbitrary centre of\nsymmetry rather than insisting that it be the origin. Since the greatest packing density is\ninvariant under translations this makes no difference to the conjecture.\n-/\ndef IsCentrallySymmetricConvexDisk (K : Set ℝ²) : Prop :=\n  IsCompact K ∧ Convex ℝ K ∧ (interior K).Nonempty ∧ ∃ c : ℝ², ∀ v ∈ K, (2 : ℝ) • c - v ∈ K\n\n/--\nA family `P` of subsets of the plane is a **packing by congruent copies of `K`** if every member\nof `P` is a congruent copy of `K`, that is the image `g '' K` of `K` under an isometry `g` of the\nplane, and any two distinct members of `P` have disjoint interiors.\n-/\ndef IsPackingOfCongruentCopies (K : Set ℝ²) (P : Set (Set ℝ²)) : Prop :=\n  (∀ K' ∈ P, ∃ g : ℝ² ≃ᵢ ℝ², K' = g '' K) ∧\n    P.Pairwise fun K₁ K₂ => Disjoint (interior K₁) (interior K₂)\n\n/--\nThe proportion of the disk $B_r$ of radius $r$ about the origin covered by the members of the\nfamily `P`, namely\n$$\\frac{1}{\\operatorname{area}(B_r)} \\sum_{K' \\in P} \\operatorname{area}(K' \\cap B_r).$$\n-/\nnoncomputable def coveredProportion (P : Set (Set ℝ²)) (r : ℝ) : ℝ :=\n  (∑' K' : P, volume ((K' : Set ℝ²) ∩ Metric.ball 0 r)).toReal /\n    (volume (Metric.ball (0 : ℝ²) r)).toReal\n\n/--\nA family `P` of subsets of the plane **has density `d`** if the proportion of the disk $B_r$\ncovered by `P` tends to `d` as $r \\to \\infty$. Equivalently, the upper and lower densities\n(the $\\limsup$ and $\\liminf$ of these proportions) both exist and coincide, in which case their\ncommon value is the density of the packing (see [HV24], Section 2.2).\n-/\ndef HasDensity (P : Set (Set ℝ²)) (d : ℝ) : Prop :=\n  Tendsto (coveredProportion P) atTop (𝓝 d)\n\n/--\nThe **greatest packing density** $\\delta(K)$ of a set $K \\subseteq \\mathbb{R}^2$: the supremum of\nthe densities of all packings of the plane by congruent copies of $K$ whose density exists\n(see [HV24], Section 2.2).\n\nThe empty family is a packing of density $0$, and every packing has density at most $1$, so for a\nconvex disk $K$ the supremum is over a nonempty set bounded above.\n-/\nnoncomputable def greatestPackingDensity (K : Set ℝ²) : ℝ :=\n  sSup {d | ∃ P, IsPackingOfCongruentCopies K P ∧ HasDensity P d}\n\nnamespace SmoothedOctagon\n\n/-- The constant $\\ell = \\sqrt{2} - 1$ of the Wikipedia article: the absolute value of the slopes\nof the asymptotes of the corner hyperbolas. -/\nnoncomputable def ℓ : ℝ := √2 - 1\n\n/-- The constant $m = (1/2)^{1/4}$ of the Wikipedia article. -/\nnoncomputable def m : ℝ := (1 / 2 : ℝ) ^ (1 / 4 : ℝ)\n\n/--\nThe hyperbolic arc that replaces one corner of the regular octagon.\n\nWe start from the regular octagon of circumradius $\\sqrt{2}$ centred at the origin with vertices\n$(\\pm\\sqrt{2}, 0)$, $(0, \\pm\\sqrt{2})$ and $(\\pm 1, \\pm 1)$. (The Wikipedia article places the\ncentre at $(2 + \\sqrt{2}, 0)$ and the corner under consideration at $(2, 0)$; we have translated\nthe picture so that the centre is the origin.) The corner $(\\sqrt{2}, 0)$ is replaced by the arc\n$$t \\mapsto \\left(2 + \\sqrt{2} - \\frac{m}{\\ell}\\cosh t,\\ m \\sinh t\\right),\n\\qquad -\\frac{\\ln 2}{4} \\le t \\le \\frac{\\ln 2}{4},$$\nof the hyperbola $\\ell^2 (x - 2 - \\sqrt{2})^2 - y^2 = m^2$. This hyperbola is tangent to the\ntwo sides of the octagon through $(\\sqrt{2}, 0)$, namely $y = \\mp(\\sqrt{2} + 1)(x - \\sqrt{2})$,\nat the two endpoints of the arc, and its asymptotes $y = \\pm \\ell (x - 2 - \\sqrt{2})$ are the\nlines containing the two sides adjacent to these.\n\nWe use the closed parameter interval so that the arc contains its two points of tangency.\n-/\nnoncomputable def cornerArc : Set ℝ² :=\n  (fun t : ℝ => !₂[2 + √2 - m / ℓ * cosh t, m * sinh t]) '' Set.Icc (-(log 2 / 4)) (log 2 / 4)\n\nend SmoothedOctagon\n\n/--\nThe **smoothed octagon**, centred at the origin: the convex hull of the eight hyperbolic arcs\nobtained by rotating `SmoothedOctagon.cornerArc` about the origin through the angles\n$k\\pi/4$, $k = 0, \\dots, 7$.\n\nIts boundary consists of these eight arcs together with the eight straight segments of the sides\nof the regular octagon lying between consecutive points of tangency, so this is exactly the\nregion bounded by the smoothed octagon curve of the Wikipedia article.\n-/\nnoncomputable def smoothedOctagon : Set ℝ² :=\n  convexHull ℝ (⋃ k : Fin 8,\n    EuclideanGeometry.o.rotation (((k : ℕ) : ℝ) * (π / 4) : ℝ) '' SmoothedOctagon.cornerArc)\n\n/-- The greatest packing density is a nonnegative number. -/\n@[category API, AMS 52]\ntheorem greatestPackingDensity_nonneg (K : Set ℝ²) : 0 ≤ greatestPackingDensity K := by\n  refine Real.sSup_nonneg fun d ⟨P, _, hP⟩ => ?_\n  exact ge_of_tendsto' hP fun r => by unfold coveredProportion; positivity\n\n/-- The empty family is a packing by congruent copies of any set, of density zero. -/\n@[category test, AMS 52]\ntheorem isPackingOfCongruentCopies_empty_and_hasDensity_zero (K : Set ℝ²) :\n    IsPackingOfCongruentCopies K ∅ ∧ HasDensity ∅ 0 := by\n  refine ⟨⟨by simp, by simp⟩, ?_⟩\n  have : coveredProportion ∅ = fun _ => 0 := by\n    funext r\n    simp [coveredProportion]\n  simp [HasDensity, this]\n\n/-- The apex $(2 + \\sqrt{2} - m/\\ell, 0)$ of the corner arc lies in the smoothed octagon. -/\n@[category test, AMS 52]\ntheorem apex_mem_smoothedOctagon :\n    !₂[2 + √2 - SmoothedOctagon.m / SmoothedOctagon.ℓ, 0] ∈ smoothedOctagon := by\n  refine subset_convexHull ℝ _ (Set.mem_iUnion.2 ⟨0, ?_⟩)\n  have h : 0 ≤ log 2 / 4 := by positivity\n  refine ⟨_, ⟨0, ⟨by linarith, h⟩, rfl⟩, ?_⟩\n  simp\n\n/-- The smoothed octagon is a centrally symmetric convex disk. -/\n@[category API, AMS 52]\ntheorem isCentrallySymmetricConvexDisk_smoothedOctagon :\n    IsCentrallySymmetricConvexDisk smoothedOctagon := by\n  sorry\n\n/--\nThe greatest packing density of the smoothed octagon is\n$$\\frac{8 - 4\\sqrt{2} - \\ln 2}{2\\sqrt{2} - 1} \\approx 0.902414.$$\nThis was computed by Reinhardt [Re34] for lattice packings; by Fejes Tóth's theorem [FT50] the\ngreatest packing density of a centrally symmetric convex disk equals its greatest lattice packing\ndensity. See also [HV24], Section 2.2.\n-/\n@[category research solved, AMS 52]\ntheorem greatestPackingDensity_smoothedOctagon :\n    greatestPackingDensity smoothedOctagon = (8 - 4 * √2 - log 2) / (2 * √2 - 1) := by\n  sorry\n\n/--\n**Reinhardt's conjecture** [Re34] (also conjectured independently by Mahler [Ma47]):\nthe smoothed octagon has the lowest maximum packing density of all centrally symmetric convex\nplane sets. That is, for every centrally symmetric convex disk $K$ in the plane, the greatest\npacking density of $K$ is at least that of the smoothed octagon:\n$$\\delta(K) \\ge \\delta(\\text{smoothed octagon}) = \\frac{8 - 4\\sqrt{2} - \\ln 2}{2\\sqrt{2} - 1}\n\\approx 0.902414.$$\n\nThe uniqueness of the smoothed octagon (up to affine transformations) as the most unpackable\ncentrally symmetric convex disk is a separate conjecture and is not part of this statement.\n-/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture (K : Set ℝ²) (hK : IsCentrallySymmetricConvexDisk K) :\n    greatestPackingDensity smoothedOctagon ≤ greatestPackingDensity K := by\n  sorry\n\nend ReinhardtsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The single-slot decomposition matches the statement; the notes' explicit constant is recorded as a separate `research solved` companion theorem rather than being substituted into the conjecture, which literally compares δ(K) with δ(smoothed octagon).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Greatest packing density δ(K) follows Hales–Vajjha (arXiv:2405.04331, §2.2): sSup of {d | ∃ packing P by congruent copies of K with density d}, where density d means the proportion of the origin-centred disk B_r covered by P tends to d as r → ∞ (equivalent to limsup = liminf = d). The empty packing has density 0 and all packings have density ≤ 1, so sSup is a genuine supremum (no junk value) for convex disks.",
+    "Packings are modelled as a Set (Set ℝ²) of copies (rather than an indexed family of isometries), each copy being g '' K for some isometry g : ℝ² ≃ᵢ ℝ², with pairwise disjoint interiors. Congruent copies include reflected copies (all isometries); this is standard and, by Fejes Tóth's theorem, immaterial for centrally symmetric convex disks.",
+    "Lattice packings are not formalized; the conjecture is stated directly in terms of δ(K) over all packings by congruent copies, as in the Wikipedia article ('maximum packing density') and Hales–Vajjha. Fejes Tóth's theorem δ = δ_L is mentioned in docstrings only.",
+    "IsCentrallySymmetricConvexDisk allows an arbitrary centre of symmetry (∃ c, ∀ v ∈ K, 2•c − v ∈ K) rather than forcing the origin as in Hales–Vajjha's K_ccs; this is more literal to 'all centrally-symmetric convex plane sets' and equivalent because δ is translation invariant. 'Convex plane set' is read as convex disk (compact, nonempty interior) per the decomposition table; degenerate sets would have δ = 0 and make the statement false.",
+    "The smoothed octagon uses the Wikipedia article's coordinates (octagon of circumradius √2, ℓ = √2 − 1, m = (1/2)^{1/4}, arc (m/ℓ cosh t, m sinh t), |t| ≤ ln2/4) translated so that the octagon's centre is the origin; the corner arc is placed at the vertex (√2, 0) and the other seven arcs are obtained by rotating through kπ/4 via Mathlib's EuclideanGeometry.o.rotation (direction of rotation is irrelevant by symmetry). Tangency of the arc endpoints to the adjacent sides and the asymptotes lying on the next sides were checked numerically.",
+    "The smoothed octagon is defined as the convex hull of the eight closed arcs; this equals the region bounded by the arcs and the straight side segments between consecutive tangency points, because that boundary curve is convex and C¹. The closed parameter interval (Wikipedia writes an open one) is used so that the set is compact.",
+    "The main theorem compares δ(smoothedOctagon) with δ(K) literally, as in the Wikipedia statement, rather than substituting the explicit constant. The known value δ(smoothed octagon) = (8 − 4√2 − ln 2)/(2√2 − 1) is recorded as a separate `research solved` theorem (sorry'd), and membership of the smoothed octagon in the class as a sorry'd `API` theorem, plus two proved `test`/`API` sanity statements.",
+    "AMS tag 52 (convex and discrete geometry) only."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "ConvexBody (Mathlib.Analysis.Convex.Body) — lacks nonempty-interior and symmetry conditions.",
+     "name": "ReinhardtsConjecture.IsCentrallySymmetricConvexDisk",
+     "why_needed": "Hales–Vajjha's class K_ccs (compact, convex, nonempty interior, centrally symmetric) is not in Mathlib; Mathlib's ConvexBody does not require nonempty interior or symmetry."
+    },
+    {
+     "closest_existing_considered": "SquarePacking.Packing (finite packings inside a container, indexed by isometries) — finite and container-based, not suitable for plane packings.",
+     "name": "ReinhardtsConjecture.IsPackingOfCongruentCopies",
+     "why_needed": "No notion of a packing of the plane by congruent copies of a set (isometric images with disjoint interiors) exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "Set.partialDensity / upperDensity in FormalConjecturesForMathlib/Data/Set/Density.lean — counting densities in discrete orders, not area densities in the plane.",
+     "name": "ReinhardtsConjecture.coveredProportion",
+     "why_needed": "The ratio Σ_{K'∈P} area(K' ∩ B_r) / area(B_r) needed to define packing density."
+    },
+    {
+     "closest_existing_considered": "Filter.Tendsto directly (used in the definition); no packing-density notion exists.",
+     "name": "ReinhardtsConjecture.HasDensity",
+     "why_needed": "Density of a packing as the limit of covered proportions as r → ∞ (Hales–Vajjha Def. of packing density)."
+    },
+    {
+     "closest_existing_considered": "None; Mathlib has no packing density.",
+     "name": "ReinhardtsConjecture.greatestPackingDensity",
+     "why_needed": "δ(K), the supremum of densities of packings by congruent copies of K, is the central quantity of the conjecture and absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "ReinhardtsConjecture.SmoothedOctagon.ℓ, ReinhardtsConjecture.SmoothedOctagon.m, ReinhardtsConjecture.SmoothedOctagon.cornerArc",
+     "why_needed": "Explicit constants and the hyperbolic arc of the Wikipedia construction, needed to define the smoothed octagon explicitly via its hyperbolic-arc corners."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "ReinhardtsConjecture.smoothedOctagon",
+     "why_needed": "The smoothed octagon itself does not exist in Mathlib or the repo."
+    }
+   ],
+   "per_slot": {
+    "reinhardts_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every centrally symmetric convex disk K in the plane (compact, convex, nonempty interior, symmetric about some centre), greatestPackingDensity smoothedOctagon ≤ greatestPackingDensity K, with δ defined per Hales–Vajjha §2.2 (sup of densities of packings by congruent copies whose density exists) and the smoothed octagon defined explicitly as the convex hull of eight hyperbolic corner arcs with Wikipedia's constants. Bound is non-strict; uniqueness is not included. No packing-density or smoothed-octagon primitives exist in Mathlib or FormalConjecturesForMathlib, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reinhardts_conjecture": "/--\n**Reinhardt's conjecture** [Re34] (also conjectured independently by Mahler [Ma47]):\nthe smoothed octagon has the lowest maximum packing density of all centrally symmetric convex\nplane sets. That is, for every centrally symmetric convex disk $K$ in the plane, the greatest\npacking density of $K$ is at least that of the smoothed octagon:\n$$\\delta(K) \\ge \\delta(\\text{smoothed octagon}) = \\frac{8 - 4\\sqrt{2} - \\ln 2}{2\\sqrt{2} - 1}\n\\approx 0.902414.$$\n\nThe uniqueness of the smoothed octagon (up to affine transformations) as the most unpackable\ncentrally symmetric convex disk is a separate conjecture and is not part of this statement.\n-/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture (K : Set ℝ²) (hK : IsCentrallySymmetricConvexDisk K) :\n    greatestPackingDensity smoothedOctagon ≤ greatestPackingDensity K := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reinhardt's conjecture\n\nReinhardt (1934) conjectured that the *smoothed octagon* has the lowest maximum packing density\nof all centrally symmetric convex plane sets. The smoothed octagon is obtained from a regular\noctagon by replacing each corner with an arc of a hyperbola that is tangent to the two sides\nadjacent to the corner and asymptotic to the two sides adjacent to these. The same conjecture\nwas made independently by Mahler (1947).\n\nThe *maximum packing density* $\\delta(K)$ of a convex disk $K$ is the supremum of the densities\nof packings of the plane by congruent copies of $K$, following the definitions of [HV24]. By a\ntheorem of L. Fejes Tóth [FT50], for centrally symmetric convex disks it coincides with the\ngreatest lattice packing density. The maximum packing density of the smoothed octagon is\n$$\\frac{8 - 4\\sqrt{2} - \\ln 2}{2\\sqrt{2} - 1} \\approx 0.902414,$$\nwhich is slightly lower than the maximum packing density $\\pi / \\sqrt{12} \\approx 0.906899$ of the\ncircular disk.\n\n*References:*\n- [Wikipedia, Smoothed octagon](https://en.wikipedia.org/wiki/Reinhardt%27s_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [HV24] Hales, T., Vajjha, K., *Packings of smoothed polygons*,\n  [arXiv:2405.04331](https://arxiv.org/abs/2405.04331)\n- [Re34] Reinhardt, K., *Über die dichteste gitterförmige Lagerung kongruenter Bereiche in der\n  Ebene und eine besondere Art konvexer Kurven*, Abh. Math. Sem. Univ. Hamburg 10 (1934), 216–230.\n- [Ma47] Mahler, K., *On the minimum determinant and the circumscribed hexagons of a convex\n  domain*, Indag. Math. 9 (1947), 326–337.\n- [FT50] Fejes Tóth, L., *Some packing and covering theorems*, Acta Sci. Math. Szeged 12 (1950),\n  62–67.\n-/\n\nnamespace ReinhardtsConjecture\n\nopen MeasureTheory Topology Filter\nopen scoped Real EuclideanGeometry\n\nnoncomputable section\n\n/-- A *centrally symmetric convex disk* is a compact convex subset of the plane with nonempty\ninterior that is symmetric under the reflection $v \\mapsto -v$ through the origin. This is the\nclass $\\mathfrak{K}_{ccs}$ of [HV24]. -/\nstructure IsCentrallySymmetricConvexDisk (K : Set ℝ²) : Prop where\n  isCompact : IsCompact K\n  convex : Convex ℝ K\n  nonempty_interior : (interior K).Nonempty\n  neg_mem : ∀ v ∈ K, -v ∈ K\n\n/-- A *packing by congruent copies* of `K` is a family `P` of subsets of the plane, each of which\nis the image of `K` under an isometry of the plane, such that any two distinct members of `P` have\ndisjoint interiors. -/\ndef IsPacking (K : Set ℝ²) (P : Set (Set ℝ²)) : Prop :=\n  (∀ K' ∈ P, ∃ g : ℝ² ≃ᵢ ℝ², K' = g '' K) ∧\n    P.Pairwise fun K₁ K₂ => Disjoint (interior K₁) (interior K₂)\n\n/-- A family `P` of subsets of the plane has *density* `d` if the proportion of the disk of\nradius $r$ centred at the origin that is covered by the members of `P` tends to `d` as\n$r \\to \\infty$. For a packing by convex disks this is the limit of\n$\\frac{1}{\\operatorname{area}(B_r)} \\sum_{K' \\in P} \\operatorname{area}(K' \\cap B_r)$ used in\n[HV24], since distinct members have disjoint interiors and boundaries of area zero. -/\ndef HasDensity (P : Set (Set ℝ²)) (d : ℝ) : Prop :=\n  Tendsto (fun r : ℝ =>\n    (volume (⋃₀ P ∩ Metric.ball 0 r)).toReal / (volume (Metric.ball (0 : ℝ²) r)).toReal)\n    atTop (𝓝 d)\n\n/-- The *maximum (greatest) packing density* $\\delta(K)$ of a subset `K` of the plane: the\nsupremum of the densities of all packings by congruent copies of `K` whose density exists. -/\ndef packingDensity (K : Set ℝ²) : ℝ :=\n  sSup {d | ∃ P, IsPacking K P ∧ HasDensity P d}\n\n/-- The hyperbolic arc that replaces the corner at the vertex $(\\sqrt{2}, 0)$ of the regular\noctagon of circumradius $\\sqrt{2}$ centred at the origin (whose vertices are the points at\ndistance $\\sqrt{2}$ from the origin in the directions $k\\pi/4$, $k = 0, \\dots, 7$).\n\nFollowing [Wikipedia], let $\\ell = \\sqrt{2} - 1$ and $m = (1/2)^{1/4}$. The arc is the part\n$-\\frac{\\ln 2}{4} \\le t \\le \\frac{\\ln 2}{4}$ of the branch $x = (m/\\ell)\\cosh t$, $y = m \\sinh t$\nof the hyperbola $\\ell^2 x^2 - y^2 = m^2$, in coordinates in which the centre of the hyperbola is\nthe origin and the centre of the octagon is $(2 + \\sqrt{2}, 0)$; this arc is tangent to the two\nsides of the octagon at the clipped vertex and asymptotic to the two sides adjacent to these.\nHere the octagon is centred at the origin instead, so the hyperbola is centred at\n$(2 + \\sqrt{2}, 0)$ and the arc is $x = 2 + \\sqrt{2} - (m/\\ell)\\cosh t$, $y = m \\sinh t$. -/\ndef smoothedOctagonArc : Set ℝ² :=\n  (fun t : ℝ => !₂[2 + √2 - ((1 / 2 : ℝ) ^ ((1 : ℝ) / 4) / (√2 - 1)) * Real.cosh t,\n    (1 / 2 : ℝ) ^ ((1 : ℝ) / 4) * Real.sinh t]) '' Set.Icc (-(Real.log 2 / 4)) (Real.log 2 / 4)\n\n/-- The *smoothed octagon* of Reinhardt, centred at the origin: the regular octagon of\ncircumradius $\\sqrt{2}$ with each of its eight corners replaced by a hyperbolic arc. The eight arcs\nare the images of `smoothedOctagonArc` under the rotations about the origin through the angles\n$k\\pi/4$, $k = 0, \\dots, 7$, and the smoothed octagon is the convex hull of their union (the\nstraight parts of its boundary are the segments between the endpoints of consecutive arcs). -/\ndef smoothedOctagon : Set ℝ² :=\n  convexHull ℝ\n    (⋃ k : Fin 8, EuclideanGeometry.o.rotation ((k : ℝ) * (π / 4) : ℝ) '' smoothedOctagonArc)\n\n/-- The closed unit disk is a centrally symmetric convex disk. -/\n@[category test, AMS 52]\ntheorem isCentrallySymmetricConvexDisk_closedBall :\n    IsCentrallySymmetricConvexDisk (Metric.closedBall 0 1) where\n  isCompact := isCompact_closedBall 0 1\n  convex := convex_closedBall 0 1\n  nonempty_interior := by\n    rw [interior_closedBall 0 one_ne_zero]\n    exact ⟨0, Metric.mem_ball_self one_pos⟩\n  neg_mem v hv := by simpa using hv\n\n/-- The empty family is a packing by congruent copies of any set, and it has density `0`. In\nparticular the set of densities of packings by congruent copies of `K` is nonempty. -/\n@[category test, AMS 52]\ntheorem isPacking_empty_and_hasDensity_empty_zero (K : Set ℝ²) :\n    IsPacking K ∅ ∧ HasDensity ∅ 0 := by\n  refine ⟨⟨fun _ h => h.elim, Set.pairwise_empty _⟩, ?_⟩\n  simp [HasDensity]\n\n/-- The density of a family of subsets of the plane, if it exists, is at most `1`. -/\n@[category API, AMS 52]\ntheorem HasDensity.le_one {P : Set (Set ℝ²)} {d : ℝ} (h : HasDensity P d) : d ≤ 1 := by\n  refine le_of_tendsto' h fun _ => ?_\n  apply div_le_one_of_le₀ _ ENNReal.toReal_nonneg\n  exact ENNReal.toReal_mono measure_ball_lt_top.ne (measure_mono Set.inter_subset_right)\n\n/-- The maximum packing density of any subset of the plane is a genuine supremum of a nonempty\nbounded set of densities, and lies in `[0, 1]`. -/\n@[category API, AMS 52]\ntheorem packingDensity_mem_Icc (K : Set ℝ²) : packingDensity K ∈ Set.Icc 0 1 := by\n  have h0 : (0 : ℝ) ∈ {d | ∃ P, IsPacking K P ∧ HasDensity P d} :=\n    ⟨∅, isPacking_empty_and_hasDensity_empty_zero K⟩\n  exact ⟨le_csSup ⟨1, fun d ⟨_, _, hd⟩ => hd.le_one⟩ h0,\n    csSup_le ⟨0, h0⟩ fun d ⟨_, _, hd⟩ => hd.le_one⟩\n\n/-- **Reinhardt's conjecture.** The smoothed octagon has the lowest maximum packing density of\nall centrally symmetric convex plane sets: for every centrally symmetric convex disk $K$ in the\nplane, $\\delta(\\text{smoothed octagon}) \\le \\delta(K)$, where $\\delta$ denotes the maximum packing\ndensity (the supremum of the densities of packings by congruent copies). -/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture (K : Set ℝ²) (hK : IsCentrallySymmetricConvexDisk K) :\n    packingDensity smoothedOctagon ≤ packingDensity K := by\n  sorry\n\n/-- The maximum packing density of the smoothed octagon is\n$$\\frac{8 - 4\\sqrt{2} - \\ln 2}{2\\sqrt{2} - 1} \\approx 0.902414.$$\nIt is attained by a one-parameter family of lattice packings [Re34], and by Fejes Tóth's theorem\n[FT50] no packing by congruent copies does better. -/\n@[category research solved, AMS 52]\ntheorem packingDensity_smoothedOctagon :\n    packingDensity smoothedOctagon = (8 - 4 * √2 - Real.log 2) / (2 * √2 - 1) := by\n  sorry\n\nend\n\nend ReinhardtsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition matches the statement. Minor note: the notes say 'i.e. ≥ (8 − 4√2 − ln 2)/(2√2 − 1)'; I stated the slot literally as δ(smoothed octagon) ≤ δ(K) (as the statement mentions the smoothed octagon, not the constant) and recorded the constant in a separate research-solved theorem, so the two readings are provably equivalent within the file.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Centrally-symmetric convex plane set' is read as a convex disk (compact, convex, nonempty interior) symmetric about the origin, i.e. Hales–Vajjha's class K_ccs, as instructed by the decomposition notes. Centering at the origin is without loss of generality because packing density (defined via all isometries) is translation invariant; compactness/nonempty interior exclude degenerate sets for which the statement would be meaningless or false.",
+    "'Maximum packing density' is formalized as δ(K) = sSup of the densities of packings by congruent copies of K whose density exists (Hales–Vajjha Definition 'Greatest packing density'), not as the lattice packing density; the two agree by Fejes Tóth's theorem, but the general definition is the literal one. sSup is a genuine supremum: the API lemma packingDensity_mem_Icc proves the density set is nonempty (empty packing) and bounded by 1.",
+    "'Congruent copies' = images under isometries of the plane (ℝ² ≃ᵢ ℝ²), which includes reflections and translations, following the standard meaning used in Fejes Tóth's theorem and the SquarePacking file's Packing structure.",
+    "A packing is encoded as a family P : Set (Set ℝ²) of isometric copies with pairwise disjoint interiors (distinct members), literally following Hales–Vajjha's 'family of convex disks with disjoint interiors'.",
+    "The density of a packing is the limit as r → ∞ of area(⋃P ∩ B_r)/area(B_r) (open balls centred at the origin). Hales–Vajjha write the numerator as Σ_{K'∈P} area(K' ∩ B_r); for packings by convex disks these coincide since the members have disjoint interiors and null boundaries. The limit is required to exist (Tendsto), as in the source, rather than using an upper density.",
+    "The smoothed octagon is defined via Wikipedia's explicit construction: octagon of circumradius √2, ℓ = √2 − 1, m = (1/2)^{1/4}, corner arc x = (m/ℓ)cosh t, y = m sinh t for |t| ≤ ln2/4 on the hyperbola ℓ²x² − y² = m² whose centre is at distance 2+√2 from the octagon's centre. I recentred the octagon at the origin (so the arc is x = 2+√2 − (m/ℓ)cosh t, y = m sinh t near the vertex (√2,0)) and took the eight rotations by kπ/4 (Mathlib's Orientation.rotation; orientation sign is irrelevant since all eight multiples are used). The set is the convex hull of the union of the arcs; this equals the region bounded by the arcs and the remaining straight pieces of the octagon's sides. I verified numerically (C program) that the arc endpoints are the tangent points (1+√2/4, (2−√2)/4), that the boundary is convex, and that area/(4·Δ) for this shape equals (8−4√2−ln2)/(2√2−1) = 0.90241418 to 8 digits, with the inscribed-hexagon determinant constant (the known one-parameter family of optimal lattices).",
+    "The bound is non-strict and no uniqueness/affine-equivalence clause is included, per the statement and decomposition notes.",
+    "The known value of the smoothed octagon's density is recorded as a separate @[category research solved] theorem packingDensity_smoothedOctagon (it is stated as fact by Wikipedia and Hales–Vajjha, following Reinhardt's computation and Fejes Tóth's theorem); it is not part of the conjecture slot but pins down the definitions.",
+    "Two @[category test] and two @[category API] lemmas with complete proofs check the definitions are not vacuous (closed unit disk is in the class; empty packing has density 0; densities are ≤ 1; packingDensity ∈ [0,1])."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Convex ℝ K, IsCompact K, interior K nonempty (used as the fields); Mathlib has no ConvexBody-with-symmetry predicate for Set (Mathlib's ConvexBody type is a bundled structure without central symmetry and not used elsewhere in the repo for this purpose).",
+     "name": "ReinhardtsConjecture.IsCentrallySymmetricConvexDisk",
+     "why_needed": "The class K_ccs (compact convex subsets of the plane with nonempty interior, symmetric about the origin) over which the conjecture quantifies; Mathlib has no bundled 'convex body' or 'centrally symmetric convex disk' predicate."
+    },
+    {
+     "closest_existing_considered": "SquarePacking.Packing in FormalConjectures/Wikipedia/SquarePacking.lean, which is for finitely many copies (Fin n) inside a container and requires disjointness of the sets rather than of interiors; not suitable for infinite packings of the whole plane.",
+     "name": "ReinhardtsConjecture.IsPacking",
+     "why_needed": "A packing of the plane by congruent copies of K (family of isometric images with pairwise disjoint interiors). Mathlib has no packing notion."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.Measure / volume and Filter.Tendsto (used to build it); Mathlib's density notions (Schnirelmann, edge density, Lebesgue density) are unrelated.",
+     "name": "ReinhardtsConjecture.HasDensity",
+     "why_needed": "The density of a family of plane sets as the limit of the covered proportion of the ball B_r as r → ∞; no such notion exists in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Green42.CohnElkiesOptimal (sphere packing centre density bounds, not a packing density of a body); ZLattice.covolume (could give lattice packing density only, which would rely on Fejes Tóth's theorem).",
+     "name": "ReinhardtsConjecture.packingDensity",
+     "why_needed": "The greatest packing density δ(K) = sup of densities of packings by congruent copies of K; absent from Mathlib and the repo."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib; Real.cosh/Real.sinh and !₂[·,·] used to build it.",
+     "name": "ReinhardtsConjecture.smoothedOctagonArc",
+     "why_needed": "The explicit hyperbolic corner arc of the smoothed octagon (Wikipedia's parametrisation), required since the decomposition demands an explicit hyperbolic-arc definition."
+    },
+    {
+     "closest_existing_considered": "convexHull ℝ and Orientation.rotation (EuclideanGeometry.o.rotation) used to build it; no regular-octagon or smoothed-polygon definitions exist.",
+     "name": "ReinhardtsConjecture.smoothedOctagon",
+     "why_needed": "Reinhardt's smoothed octagon: convex hull of the eight rotated corner arcs. Not in Mathlib or the repo."
+    }
+   ],
+   "per_slot": {
+    "reinhardts_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every K with IsCentrallySymmetricConvexDisk K (compact, convex, nonempty interior, symmetric about the origin = Hales–Vajjha's K_ccs), packingDensity smoothedOctagon ≤ packingDensity K (non-strict). packingDensity is the supremum over packings by congruent (isometric) copies whose density exists, exactly the definition of δ(K) in Hales–Vajjha; the smoothed octagon is defined explicitly as the convex hull of the eight hyperbolic corner arcs given by Wikipedia's parametrisation. Mathlib and the repo have no packing-density or smoothed-octagon notion, so bespoke definitions were required."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reinhardts_conjecture": "/-- **Reinhardt's conjecture.** The smoothed octagon has the lowest maximum packing density of\nall centrally symmetric convex plane sets: for every centrally symmetric convex disk $K$ in the\nplane, $\\delta(\\text{smoothed octagon}) \\le \\delta(K)$, where $\\delta$ denotes the maximum packing\ndensity (the supremum of the densities of packings by congruent copies). -/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture (K : Set ℝ²) (hK : IsCentrallySymmetricConvexDisk K) :\n    packingDensity smoothedOctagon ≤ packingDensity K := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reinhardt's Conjecture\n\n*Reference:* [Wikipedia, Reinhardt's conjecture](https://en.wikipedia.org/wiki/Reinhardt%27s_conjecture)\n-/\n\nopen MeasureTheory Set\n\nnamespace ReinhardtsConjecture\n\n/-- A centrally symmetric convex disk is a compact convex planar set with nonempty interior\nwhich is invariant under reflection in some point. -/\ndef IsCentrallySymmetricConvexDisk (K : Set (ℝ × ℝ)) : Prop :=\n  IsCompact K ∧ Convex ℝ K ∧ (interior K).Nonempty ∧\n    ∃ c : ℝ × ℝ, ∀ x, x ∈ K ↔ (2 * c.1 - x.1, 2 * c.2 - x.2) ∈ K\n\n/-- Translation of a planar set by a vector. -/\ndef translate (v : ℝ × ℝ) (K : Set (ℝ × ℝ)) : Set (ℝ × ℝ) :=\n  (fun x ↦ (x.1 + v.1, x.2 + v.2)) '' K\n\n/-- The vector in the lattice generated by `u` and `v` with integer coordinates `z`. -/\ndef latticeVector (u v : ℝ × ℝ) (z : ℤ × ℤ) : ℝ × ℝ :=\n  ((z.1 : ℝ) * u.1 + (z.2 : ℝ) * v.1,\n    (z.1 : ℝ) * u.2 + (z.2 : ℝ) * v.2)\n\n/-- The absolute determinant, or covolume, of two planar vectors. -/\ndef covolume (u v : ℝ × ℝ) : ℝ :=\n  |u.1 * v.2 - u.2 * v.1|\n\n/-- The translates of `K` by the lattice generated by `u` and `v` form a packing when the\nbasis is nondegenerate and the interiors of every two distinct translates are disjoint. -/\ndef IsLatticePacking (K : Set (ℝ × ℝ)) (u v : ℝ × ℝ) : Prop :=\n  covolume u v ≠ 0 ∧ ∀ z : ℤ × ℤ, z ≠ 0 →\n    Disjoint (interior K) (translate (latticeVector u v z) (interior K))\n\n/-- The greatest lattice-packing density of a planar set. For centrally symmetric convex disks,\nthis equals their unrestricted greatest packing density by the planar theorem of Fejes Tóth. -/\nnoncomputable def packingDensity (K : Set (ℝ × ℝ)) : ℝ :=\n  sSup {d : ℝ | ∃ u v : ℝ × ℝ, IsLatticePacking K u v ∧\n    d = (volume K).toReal / covolume u v}\n\n/-- Rotation counterclockwise by `π / 4` about the center `(2 + √2, 0)` of the octagon used in\nthe explicit construction of the smoothed octagon. -/\nnoncomputable def rotateOctant (p : ℝ × ℝ) : ℝ × ℝ :=\n  let c : ℝ := 2 + √2\n  (c + ((p.1 - c) - p.2) / √2, ((p.1 - c) + p.2) / √2)\n\n/-- One closed hyperbolic corner arc in the construction of the smoothed octagon. It lies on\n`(√2 - 1)² x² - y² = √(1 / 2)` and has parameter range\n`-log 2 / 4 ≤ t ≤ log 2 / 4`. -/\nnoncomputable def hyperbolicCorner : Set (ℝ × ℝ) :=\n  let l : ℝ := √2 - 1\n  let m : ℝ := √(√(1 / 2))\n  {p | ∃ t ∈ Set.Icc (-Real.log 2 / 4) (Real.log 2 / 4),\n    p = (m / l * Real.cosh t, m * Real.sinh t)}\n\n/-- The smoothed octagon: the convex hull of the eight hyperbolic corner arcs obtained from\n`hyperbolicCorner` by successive rotations through `π / 4` about `(2 + √2, 0)`. -/\nnoncomputable def smoothedOctagon : Set (ℝ × ℝ) :=\n  convexHull ℝ {p | ∃ n : Fin 8, ∃ q ∈ hyperbolicCorner,\n    p = (rotateOctant^[n.val]) q}\n\n/-- **Reinhardt's conjecture.**\n\nThe smoothed octagon has packing density\n`(8 - 4 * √2 - log 2) / (2 * √2 - 1)`, and this is a non-strict lower bound for\nthe greatest packing density of every centrally symmetric convex disk in the plane.\n-/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture :\n    packingDensity smoothedOctagon =\n        (8 - 4 * √2 - Real.log 2) / (2 * √2 - 1) ∧\n      ∀ K : Set (ℝ × ℝ), IsCentrallySymmetricConvexDisk K →\n        (8 - 4 * √2 - Real.log 2) / (2 * √2 - 1) ≤ packingDensity K := by\n  sorry\n\nend ReinhardtsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A convex disk is modeled as a compact convex subset of ℝ × ℝ with nonempty interior, matching the cited primary literature's convex-body convention and Hales–Vajjha's K_ccs domain.",
+    "Central symmetry is allowed about an arbitrary point c and is expressed as invariance under x ↦ 2c − x, rather than assuming the body is centered at the origin.",
+    "Packing density is defined using lattice translates with pairwise-disjoint interiors. For centrally symmetric convex planar bodies this equals unrestricted maximum packing density by the Fejes Tóth theorem cited in the background sources.",
+    "A lattice is represented by two vectors with nonzero determinant. It suffices to require the original interior to be disjoint from every translate indexed by a nonzero integer pair, since translating this condition gives pairwise disjointness for all distinct lattice translates.",
+    "The smoothed octagon is the convex hull of eight hyperbolic corner arcs. The base arc uses the article's coordinates, constants ℓ = √2 − 1 and m = (1/2)^(1/4), and the other arcs are successive 45-degree rotations about (2 + √2, 0).",
+    "The parameter interval for each hyperbolic arc is closed. Although the article displays strict endpoint inequalities, the endpoints are the tangency points belonging to the boundary of the compact smoothed octagon; excluding them before taking an ordinary convex hull could fail to produce the intended compact disk.",
+    "The conjecture declaration includes the established explicit density formula as a conjunct, thereby formally connecting the numerical benchmark to the explicitly defined smoothed octagon, followed by the conjectural universal non-strict lower bound. No uniqueness-up-to-affine-maps assertion is included."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib provides IsCompact, Convex, interior, and point reflection ingredients, but no predicate combining them into this convex-disk domain.",
+     "name": "IsCentrallySymmetricConvexDisk",
+     "why_needed": "Packages the exact domain of centrally symmetric compact convex planar sets with nonempty interior."
+    },
+    {
+     "closest_existing_considered": "Mathlib has general set addition/vadd operations, but no existing problem-level packing translation predicate; an explicit image avoids coercion and torsor ambiguity for ℝ × ℝ.",
+     "name": "translate",
+     "why_needed": "Defines planar set translation used to express lattice packings transparently."
+    },
+    {
+     "closest_existing_considered": "Mathlib has abstract ZSpan and lattice-related geometry-of-numbers APIs, but no directly suitable two-generator coordinate function for this packing-density statement.",
+     "name": "latticeVector",
+     "why_needed": "Converts an integer coordinate pair into the corresponding vector generated by two planar basis vectors."
+    },
+    {
+     "closest_existing_considered": "Mathlib has matrix and linear-map determinants, but constructing matrices or linear equivalences would add substantial machinery; no direct determinant primitive for two vectors in ℝ × ℝ was found.",
+     "name": "covolume",
+     "why_needed": "Defines the fundamental-cell area of a planar lattice basis as the absolute determinant."
+    },
+    {
+     "closest_existing_considered": "No lattice-packing predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsLatticePacking",
+     "why_needed": "States nondegeneracy and disjointness of interiors for all distinct lattice translates."
+    },
+    {
+     "closest_existing_considered": "No geometric packing-density definition was found in Mathlib or FormalConjecturesForMathlib; existing density APIs concern other notions such as set density.",
+     "name": "packingDensity",
+     "why_needed": "Defines the supremum of area-to-covolume ratios over lattice packings."
+    },
+    {
+     "closest_existing_considered": "Mathlib has abstract linear isometries and rotations, but no existing affine rotation specialized to these coordinates that makes the eight-arc construction comparably explicit.",
+     "name": "rotateOctant",
+     "why_needed": "Gives the explicit 45-degree rotation about the center used in the article's smoothed-octagon coordinates."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides Real.cosh and Real.sinh but no primitive for this specific bounded hyperbola arc.",
+     "name": "hyperbolicCorner",
+     "why_needed": "Defines the article's exact parameterized hyperbolic corner arc and parameter interval."
+    },
+    {
+     "closest_existing_considered": "No smoothed-octagon definition exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "smoothedOctagon",
+     "why_needed": "Explicitly constructs the named extremal shape from its eight hyperbolic arcs."
+    }
+   ],
+   "per_slot": {
+    "reinhardts_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reinhardts_conjecture": "/-- **Reinhardt's conjecture.**\n\nThe smoothed octagon has packing density\n`(8 - 4 * √2 - log 2) / (2 * √2 - 1)`, and this is a non-strict lower bound for\nthe greatest packing density of every centrally symmetric convex disk in the plane.\n-/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture :\n    packingDensity smoothedOctagon =\n        (8 - 4 * √2 - Real.log 2) / (2 * √2 - 1) ∧\n      ∀ K : Set (ℝ × ℝ), IsCentrallySymmetricConvexDisk K →\n        (8 - 4 * √2 - Real.log 2) / (2 * √2 - 1) ≤ packingDensity K := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reinhardt's conjecture\n\nReinhardt's conjecture concerns the least possible greatest packing density of a centrally\nsymmetric convex disk in the Euclidean plane.\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Reinhardt%27s_conjecture)\n-/\n\nopen Filter MeasureTheory\nopen scoped BigOperators EuclideanGeometry\n\nnamespace ReinhardtsConjecture\n\n/-- A convex disk is a compact convex planar set with nonempty interior. -/\ndef IsConvexDisk (K : Set ℝ²) : Prop :=\n  IsCompact K ∧ Convex ℝ K ∧ (interior K).Nonempty\n\n/-- A planar set has central symmetry if it is invariant under reflection through some point. -/\ndef IsCentrallySymmetric (K : Set ℝ²) : Prop :=\n  ∃ c : ℝ², ∀ x, x ∈ K ↔ 2 • c - x ∈ K\n\n/-- `P` is a packing by congruent copies of `K`: every member is an isometric image of `K`,\nand distinct members have disjoint interiors. -/\ndef IsPackingOf (K : Set ℝ²) (P : Set (Set ℝ²)) : Prop :=\n  (∀ L ∈ P, ∃ e : ℝ² ≃ᵢ ℝ², e '' K = L) ∧\n    P.Pairwise fun L M => Disjoint (interior L) (interior M)\n\n/-- A packing `P` has density `d` if the sum of the areas of its members inside a ball,\ndivided by the area of the ball, tends to `d` as the radius tends to infinity. -/\ndef HasPackingDensity (P : Set (Set ℝ²)) (d : ENNReal) : Prop :=\n  Tendsto\n    (fun r : ℝ =>\n      (∑' L : P, volume ((L : Set ℝ²) ∩ Metric.closedBall (0 : ℝ²) r)) /\n        volume (Metric.closedBall (0 : ℝ²) r))\n    atTop (nhds d)\n\n/-- The greatest packing density of `K`, taken over packings by congruent copies of `K` whose\nasymptotic density exists. -/\nnoncomputable def greatestPackingDensity (K : Set ℝ²) : ENNReal :=\n  sSup {d | ∃ P : Set (Set ℝ²), IsPackingOf K P ∧ HasPackingDensity P d}\n\n/-- Rotation through `θ` in the Euclidean plane. -/\nnoncomputable def rotate (θ : ℝ) (p : ℝ²) : ℝ² :=\n  !₂[Real.cos θ * p 0 - Real.sin θ * p 1,\n    Real.sin θ * p 0 + Real.cos θ * p 1]\n\n/-- The smoothed octagon in the normalization used by the reference article. It is the convex\nhull of the eight rotations, about the center of a regular octagon, of the indicated hyperbolic\narc. The arc satisfies `(√2 - 1)² x² - y² = (1/2)^(1/2)`, is tangent to the two incident sides,\nand has the two neighboring sides as asymptotes. -/\nnoncomputable def smoothedOctagon : Set ℝ² :=\n  let l : ℝ := Real.sqrt 2 - 1\n  let m : ℝ := (2 : ℝ) ^ (-(1 : ℝ) / 4)\n  let c : ℝ² := !₂[2 + Real.sqrt 2, 0]\n  convexHull ℝ {p | ∃ k : Fin 8, ∃ t : ℝ,\n    |t| ≤ Real.log 2 / 4 ∧\n      p = c + rotate (((k : ℕ) : ℝ) * Real.pi / 4)\n        (!₂[m / l * Real.cosh t, m * Real.sinh t] - c)}\n\n/--\n**Reinhardt's conjecture.** The explicitly defined smoothed octagon has greatest packing density\n$$(8-4\\sqrt 2-\\log 2)/(2\\sqrt 2-1),$$\nand no centrally symmetric convex disk in the plane has smaller greatest packing density. The\ninequality is non-strict; uniqueness up to affine equivalence is not asserted.\n-/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture :\n    greatestPackingDensity smoothedOctagon =\n        ENNReal.ofReal ((8 - 4 * Real.sqrt 2 - Real.log 2) / (2 * Real.sqrt 2 - 1)) ∧\n      ∀ K : Set ℝ², IsConvexDisk K → IsCentrallySymmetric K →\n        greatestPackingDensity smoothedOctagon ≤ greatestPackingDensity K := by\n  sorry\n\nend ReinhardtsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “centrally-symmetric convex plane sets” as convex disks: compact convex subsets of the Euclidean plane with nonempty interior, following Hales–Vajjha's definition of K_ccs, but allowed the center of symmetry to be any point rather than fixing it at the origin.",
+    "Defined greatest packing density exactly via the primary source's general congruent-copy packings, not only lattice packings: distinct copies have disjoint interiors, a packing density is the limit of the sum of areas inside origin-centered balls divided by the ball area, and the greatest density is the supremum over packings for which this limit exists.",
+    "Used ENNReal for areas and densities, with the displayed real constant embedded by ENNReal.ofReal.",
+    "Defined the smoothed octagon in Wikipedia's normalization: center (2+√2,0), l=√2−1, m=2^(−1/4), parameter interval |t|≤log(2)/4, and the convex hull of the eight rotations by multiples of π/4 of the hyperbolic arc (m/l cosh t,m sinh t). Closed endpoints are used so the resulting convex disk includes the tangency points.",
+    "Bundled the known exact density of the smoothed octagon with the conjectural non-strict minimality comparison. No uniqueness-up-to-affine-maps assertion is included."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib provides IsCompact, Convex, and interior separately, but no combined convex-disk predicate.",
+     "name": "IsConvexDisk",
+     "why_needed": "The conjecture quantifies over compact convex planar sets with nonempty interior as one domain predicate."
+    },
+    {
+     "closest_existing_considered": "No reusable Mathlib or FormalConjecturesForMathlib predicate was found; a similarly named definition exists only locally inside an unrelated conjecture namespace.",
+     "name": "IsCentrallySymmetric",
+     "why_needed": "The conjecture requires invariance under reflection through some center."
+    },
+    {
+     "closest_existing_considered": "Mathlib's packingNumber concerns separated points, and Wikipedia.SquarePacking.Packing is finite and container-specific.",
+     "name": "IsPackingOf",
+     "why_needed": "The statement requires packings by arbitrary congruent copies with pairwise disjoint interiors."
+    },
+    {
+     "closest_existing_considered": "Mathlib has measures, infinite sums, filters, and limits, but no geometric packing-density definition.",
+     "name": "HasPackingDensity",
+     "why_needed": "The source defines a packing's asymptotic planar density by areas in expanding balls."
+    },
+    {
+     "closest_existing_considered": "No packing-density extremum exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "greatestPackingDensity",
+     "why_needed": "The conjecture compares the supremal density over all congruent-copy packings whose density exists."
+    },
+    {
+     "closest_existing_considered": "Mathlib's orientation-based rotation API was considered, but the coordinate formula is substantially simpler for this fixed normalized construction and avoids introducing angle/orientation representation details.",
+     "name": "rotate",
+     "why_needed": "A transparent coordinate rotation is used to generate the eight explicitly specified hyperbolic corners."
+    },
+    {
+     "closest_existing_considered": "No smoothed-octagon definition exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "smoothedOctagon",
+     "why_needed": "The decomposition explicitly requires the conjectured minimizer to be defined through its hyperbolic-arc corners."
+    }
+   ],
+   "per_slot": {
+    "reinhardts_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Faithfully states that the explicitly constructed smoothed octagon has the displayed greatest packing density and that every centrally symmetric convex disk has greatest packing density at least as large."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reinhardts_conjecture": "/--\n**Reinhardt's conjecture.** The explicitly defined smoothed octagon has greatest packing density\n$$(8-4\\sqrt 2-\\log 2)/(2\\sqrt 2-1),$$\nand no centrally symmetric convex disk in the plane has smaller greatest packing density. The\ninequality is non-strict; uniqueness up to affine equivalence is not asserted.\n-/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture :\n    greatestPackingDensity smoothedOctagon =\n        ENNReal.ofReal ((8 - 4 * Real.sqrt 2 - Real.log 2) / (2 * Real.sqrt 2 - 1)) ∧\n      ∀ K : Set ℝ², IsConvexDisk K → IsCentrallySymmetric K →\n        greatestPackingDensity smoothedOctagon ≤ greatestPackingDensity K := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reinhardt's conjecture\n\nThe conjecture concerns the least possible greatest packing density of a centrally symmetric\nconvex disk in the Euclidean plane. By the theorem of Fejes Tóth, the greatest packing density\nof such a disk equals its greatest lattice-packing density.\n\n*References:*\n- [Wikipedia, *Reinhardt's conjecture*](https://en.wikipedia.org/wiki/Reinhardt%27s_conjecture)\n- Thomas Hales and Koundinya Vajjha,\n  [*Packings of Smoothed Polygons*](https://arxiv.org/abs/2405.04331)\n-/\n\nnamespace ReinhardtsConjecture\n\nopen MeasureTheory\nopen scoped ENNReal\n\nabbrev Plane := Fin 2 → ℝ\n\n/-- The determinant of the ordered pair of planar vectors `u`, `v`. -/\ndef determinant (u v : Plane) : ℝ :=\n  u 0 * v 1 - u 1 * v 0\n\n/-- The translate of `K` by the lattice vector with integer coordinates `z`. -/\ndef latticeCopy (K : Set Plane) (u v : Plane) (z : ℤ × ℤ) : Set Plane :=\n  (fun x ↦ (z.1 : ℝ) • u + (z.2 : ℝ) • v + x) '' K\n\n/--\nThe vectors `u` and `v` generate a lattice packing of `K` when they are linearly independent\nand the interiors of distinct integer translates of `K` are disjoint. Boundary contact is\nallowed.\n-/\ndef IsLatticePacking (K : Set Plane) (u v : Plane) : Prop :=\n  determinant u v ≠ 0 ∧\n    Pairwise fun z w : ℤ × ℤ ↦\n      Disjoint (interior (latticeCopy K u v z)) (interior (latticeCopy K u v w))\n\n/--\nThe greatest lattice-packing density of a planar set: the supremum, over all of its lattice\npackings, of its area divided by the area of a fundamental parallelogram.\n-/\nnoncomputable def greatestPackingDensity (K : Set Plane) : ℝ :=\n  sSup {d : ℝ | ∃ u v, IsLatticePacking K u v ∧\n    d = (volume K).toReal / |determinant u v|}\n\n/-- Rotation through `θ` about the origin in the oriented Euclidean plane. -/\nnoncomputable def rotate (θ : ℝ) (p : Plane) : Plane :=\n  ![Real.cos θ * p 0 - Real.sin θ * p 1,\n    Real.sin θ * p 0 + Real.cos θ * p 1]\n\n/-- The center used in Wikipedia's coordinate construction of the smoothed octagon. -/\nnoncomputable def octagonCenter : Plane := ![2 + Real.sqrt 2, 0]\n\n/--\nOne hyperbolic corner arc in Wikipedia's construction. Here\n`ℓ = √2 - 1`, `m = (1/2)^(1/4)`, and\n`(x(t), y(t)) = ((m/ℓ) cosh t, m sinh t)` for `|t| ≤ log(2)/4`.\n-/\nnoncomputable def hyperbolicCornerArc : Set Plane :=\n  let ℓ : ℝ := Real.sqrt 2 - 1\n  let m : ℝ := Real.sqrt (Real.sqrt (1 / 2))\n  {p | ∃ t ∈ Set.Icc (-(Real.log 2 / 4)) (Real.log 2 / 4),\n    p = ![(m / ℓ) * Real.cosh t, m * Real.sinh t]}\n\n/--\nThe smoothed octagon, explicitly constructed as the convex region enclosed by the eight copies\nof `hyperbolicCornerArc` obtained by rotations through multiples of `π/4` about\n`octagonCenter`.\n-/\nnoncomputable def smoothedOctagon : Set Plane :=\n  convexHull ℝ {p | ∃ k : Fin 8, ∃ q ∈ hyperbolicCornerArc,\n    p = octagonCenter + rotate ((k : ℝ) * Real.pi / 4) (q - octagonCenter)}\n\n/--\n**Reinhardt's conjecture.** The smoothed octagon has the lowest greatest packing density among\nall centrally symmetric convex disks in the plane (compact convex sets with nonempty interior).\nIts greatest packing density is\n$$(8 - 4\\sqrt 2 - \\log 2)/(2\\sqrt 2 - 1),$$\nso every such disk has greatest packing density at least this value. The inequality is\nnon-strict; no uniqueness claim is included.\n-/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture :\n    greatestPackingDensity smoothedOctagon =\n        (8 - 4 * Real.sqrt 2 - Real.log 2) / (2 * Real.sqrt 2 - 1) ∧\n      ∀ K : Set Plane, Convex ℝ K → IsCompact K → (interior K).Nonempty →\n        (∃ c : Plane, ∀ x, x ∈ K ↔ 2 • c - x ∈ K) →\n        greatestPackingDensity smoothedOctagon ≤ greatestPackingDensity K := by\n  sorry\n\nend ReinhardtsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “convex plane sets” as convex disks in the standard discrete-geometry sense used by Hales–Vajjha: compact convex subsets of ℝ² with nonempty interior.",
+    "Allowed the center of central symmetry to be arbitrary, formalizing it as membership invariance under x ↦ 2c − x; the statement does not assume the disk has first been translated to the origin.",
+    "Used greatest lattice-packing density as the packing-density quantity. This is faithful on the conjecture’s domain because Fejes Tóth’s theorem says that the greatest packing density of every centrally symmetric planar convex disk is attained by a lattice packing.",
+    "Defined a lattice packing using all integer translates generated by two vectors of nonzero determinant, requiring distinct copies to have disjoint interiors. Thus boundary contact, as in optimal packings, is allowed.",
+    "Defined the smoothed octagon from Wikipedia’s explicit coordinate construction: the closed hyperbola arc with ℓ = √2 − 1, m = (1/2)^(1/4), and |t| ≤ log(2)/4, rotated eight times about (2 + √2, 0), with the enclosed convex region represented by their convex hull.",
+    "Stated both the known explicit value of the smoothed octagon’s greatest density and the non-strict comparison with every centrally symmetric convex disk. No uniqueness-up-to-affine-maps assertion was added.",
+    "Represented the plane as `Fin 2 → ℝ`; its product Lebesgue measure gives the usual planar area, while the concrete determinant gives the fundamental-parallelogram area."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`EuclideanSpace ℝ (Fin 2)` was considered, but its `WithLp` wrapper makes the explicit coordinate vector notation less direct; `Fin 2 → ℝ` carries the needed topology, vector-space structure, and product Lebesgue measure.",
+     "name": "Plane",
+     "why_needed": "Provides a concrete two-coordinate real plane compatible with coordinate formulas and planar Lebesgue measure."
+    },
+    {
+     "closest_existing_considered": "Mathlib matrix determinants were considered; this concrete 2D formula avoids introducing matrices solely for two column vectors.",
+     "name": "determinant",
+     "why_needed": "Expresses the area of the fundamental parallelogram generated by two planar lattice vectors."
+    },
+    {
+     "closest_existing_considered": "Mathlib pointwise set translation was considered; an explicit image makes the rigid translation and its dependence on integer coordinates unambiguous.",
+     "name": "latticeCopy",
+     "why_needed": "Defines the copy of a planar set translated by an integer combination of two lattice generators."
+    },
+    {
+     "closest_existing_considered": "`SquarePacking.Packing` handles only finitely many isometric embeddings inside a container and cannot represent an infinite planar lattice packing.",
+     "name": "IsLatticePacking",
+     "why_needed": "No repository or Mathlib primitive defines lattice packings of a planar body with boundary contact allowed."
+    },
+    {
+     "closest_existing_considered": "Metric-space packing numbers and finite container-packing definitions were found, but neither represents asymptotic geometric packing density. The lattice supremum is faithful here by Fejes Tóth’s theorem.",
+     "name": "greatestPackingDensity",
+     "why_needed": "No Mathlib or FormalConjecturesForMathlib primitive defines the greatest packing density of a planar body."
+    },
+    {
+     "closest_existing_considered": "Mathlib affine/Euclidean rotation APIs were considered; the direct 2D trigonometric formula is simpler for the chosen concrete plane representation.",
+     "name": "rotate",
+     "why_needed": "Gives the explicit coordinate rotation needed to generate all eight hyperbolic corner arcs."
+    },
+    {
+     "closest_existing_considered": "No existing named smoothed-octagon construction or corresponding center constant was found.",
+     "name": "octagonCenter",
+     "why_needed": "Records the center `(2 + √2, 0)` of Wikipedia’s explicit smoothed-octagon coordinate model."
+    },
+    {
+     "closest_existing_considered": "No hyperbolic-corner-arc or smoothed-polygon primitive was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "hyperbolicCornerArc",
+     "why_needed": "Explicitly defines the hyperbolic arc replacing one corner, as required for a faithful identification of the smoothed octagon."
+    },
+    {
+     "closest_existing_considered": "No smoothed-octagon primitive was found. The convex hull of the eight explicitly rotated boundary arcs models the enclosed convex disk.",
+     "name": "smoothedOctagon",
+     "why_needed": "The conjecture’s distinguished minimizer must be identified as a specific geometric set rather than left as an informal name."
+    }
+   ],
+   "per_slot": {
+    "reinhardts_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reinhardts_conjecture": "/--\n**Reinhardt's conjecture.** The smoothed octagon has the lowest greatest packing density among\nall centrally symmetric convex disks in the plane (compact convex sets with nonempty interior).\nIts greatest packing density is\n$$(8 - 4\\sqrt 2 - \\log 2)/(2\\sqrt 2 - 1),$$\nso every such disk has greatest packing density at least this value. The inequality is\nnon-strict; no uniqueness claim is included.\n-/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture :\n    greatestPackingDensity smoothedOctagon =\n        (8 - 4 * Real.sqrt 2 - Real.log 2) / (2 * Real.sqrt 2 - 1) ∧\n      ∀ K : Set Plane, Convex ℝ K → IsCompact K → (interior K).Nonempty →\n        (∃ c : Plane, ∀ x, x ∈ K ↔ 2 • c - x ∈ K) →\n        greatestPackingDensity smoothedOctagon ≤ greatestPackingDensity K := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reinhardt's conjecture\n\nReinhardt's conjecture states that the smoothed octagon has the lowest greatest packing density\namong all centrally symmetric convex disks in the plane.\n\n*Reference:* [Wikipedia, Reinhardt's conjecture](https://en.wikipedia.org/wiki/Reinhardt%27s_conjecture)\n-/\n\nopen MeasureTheory Set\n\nnamespace ReinhardtsConjecture\n\n/-- The translate of a planar set by a vector. -/\ndef translate (K : Set (ℝ × ℝ)) (v : ℝ × ℝ) : Set (ℝ × ℝ) :=\n  {x | x - v ∈ K}\n\n/-- The determinant of the two planar vectors `u` and `v`. -/\ndef determinant (u v : ℝ × ℝ) : ℝ :=\n  u.1 * v.2 - u.2 * v.1\n\n/-- The vectors `u` and `v` generate a full-rank lattice whose translates of `K` have pairwise\n disjoint interiors. -/\ndef IsLatticePacking (K : Set (ℝ × ℝ)) (u v : ℝ × ℝ) : Prop :=\n  determinant u v ≠ 0 ∧\n    ∀ a b : ℤ × ℤ, a ≠ b →\n      Disjoint (interior (translate K ((a.1 : ℝ) • u + (a.2 : ℝ) • v)))\n        (interior (translate K ((b.1 : ℝ) • u + (b.2 : ℝ) • v)))\n\n/-- The greatest lattice packing density of a planar set. A lattice generated by `u` and `v`\nhas covolume `|determinant u v|`. -/\nnoncomputable def greatestLatticePackingDensity (K : Set (ℝ × ℝ)) : ℝ :=\n  sSup {d : ℝ | ∃ u v : ℝ × ℝ, IsLatticePacking K u v ∧\n    d = (volume K).toReal / |determinant u v|}\n\n/-- Counterclockwise rotation through angle `θ` in the plane. -/\nnoncomputable def rotate (θ : ℝ) (p : ℝ × ℝ) : ℝ × ℝ :=\n  (Real.cos θ * p.1 - Real.sin θ * p.2,\n    Real.sin θ * p.1 + Real.cos θ * p.2)\n\n/-- Reinhardt's smoothed octagon in the normalization used by the reference article.\n\nStart with the regular octagon of circumradius `√2`, center `(2 + √2, 0)`, and left vertex\n`(2, 0)`. Its left corner is replaced by the arc\n`((m / ℓ) cosh t, m sinh t)`, where `ℓ = √2 - 1`, `m = (1/2)^(1/4)`, and\n`|t| ≤ log 2 / 4`. The other seven arcs are rotations of this arc through multiples of `π / 4`.\nThe convex hull of these eight closed arcs is the smoothed octagon. -/\nnoncomputable def smoothedOctagon : Set (ℝ × ℝ) :=\n  let ℓ := Real.sqrt 2 - 1\n  let m := Real.sqrt (Real.sqrt (1 / 2 : ℝ))\n  let c : ℝ × ℝ := (2 + Real.sqrt 2, 0)\n  convexHull ℝ {p | ∃ (n : Fin 8) (t : ℝ),\n    |t| ≤ Real.log 2 / 4 ∧\n      p = c + rotate ((n.val : ℝ) * Real.pi / 4)\n        ((m / ℓ * Real.cosh t, m * Real.sinh t) - c)}\n\n/-- Reinhardt's conjecture: the smoothed octagon has greatest packing density\n`(8 - 4 * √2 - log 2) / (2 * √2 - 1)`, and every compact convex planar set with nonempty\ninterior and a center of symmetry has greatest packing density at least this value. By the\nFejes Tóth theorem, for centrally symmetric convex disks the greatest packing density equals\nthe greatest lattice packing density used here. -/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture :\n    greatestLatticePackingDensity smoothedOctagon =\n        (8 - 4 * Real.sqrt 2 - Real.log 2) / (2 * Real.sqrt 2 - 1) ∧\n      ∀ K : Set (ℝ × ℝ), IsCompact K → Convex ℝ K → (interior K).Nonempty →\n        (∃ c : ℝ × ℝ, ∀ x, x ∈ K ↔ 2 • c - x ∈ K) →\n          greatestLatticePackingDensity smoothedOctagon ≤ greatestLatticePackingDensity K := by\n  sorry\n\nend ReinhardtsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled a convex disk as a subset of ℝ × ℝ that is compact, convex, and has nonempty interior, matching Hales–Vajjha's definition rather than Mathlib's weaker `ConvexBody`, which only requires the carrier to be nonempty.",
+    "Allowed the center of symmetry to be arbitrary (`∃ c, x ∈ K ↔ 2 • c - x ∈ K`) rather than fixing it at the origin; this covers all centrally symmetric plane sets and is equivalent up to translation to Hales–Vajjha's origin-centered convention.",
+    "Used greatest lattice packing density in place of greatest unrestricted congruent-copy packing density, relying on the Fejes Tóth equality for centrally symmetric convex disks explicitly identified in the supplied source and decomposition.",
+    "Represented a full-rank planar lattice by two generators with nonzero determinant. A lattice packing requires all distinct integer translates to have disjoint interiors, and its density is area divided by the absolute determinant.",
+    "Defined the smoothed octagon as the convex hull of the eight rotations of the explicitly parameterized hyperbola arc in Wikipedia's normalization. Used the closed interval `|t| ≤ log 2 / 4` because the compact convex disk includes the tangent endpoints of the displayed arc.",
+    "Included the established exact density of the explicitly defined smoothed octagon as a conjunct, thereby formally connecting the geometric shape to the numerical lower bound rather than leaving the shape definition unused.",
+    "Stated a non-strict lower bound and did not add the separate uniqueness-up-to-affine-maps conjecture or any of the article's partial results."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib pointwise set addition/translation; a local preimage-style definition gives the exact additive translate without extra singleton notation.",
+     "name": "ReinhardtsConjecture.translate",
+     "why_needed": "Expresses the lattice translates whose interiors must be pairwise disjoint."
+    },
+    {
+     "closest_existing_considered": "`Matrix.det`; using it would require packaging each pair of concrete vectors into a matrix and would not supply a higher-level planar lattice-density API.",
+     "name": "ReinhardtsConjecture.determinant",
+     "why_needed": "Gives the covolume of a lattice generated by two vectors in the concrete plane ℝ × ℝ."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Disjoint`, `Set.PairwiseDisjoint`, additive subgroups, and lattice-related algebra APIs; none combines full-rank planar lattices with nonoverlapping interiors.",
+     "name": "ReinhardtsConjecture.IsLatticePacking",
+     "why_needed": "No packing predicate for lattice translates of planar sets was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib Lebesgue `volume`, `sSup`, additive subgroup/lattice searches, and repository density searches; there is no existing geometric packing-density primitive.",
+     "name": "ReinhardtsConjecture.greatestLatticePackingDensity",
+     "why_needed": "No greatest packing-density notion was found. This definition directly implements the source's supremum of area/covolume over admissible full-rank lattice packings."
+    },
+    {
+     "closest_existing_considered": "Mathlib linear isometries and rotation-related APIs; the elementary coordinate formula is local, transparent, and avoids coercion-heavy packaging.",
+     "name": "ReinhardtsConjecture.rotate",
+     "why_needed": "Constructs all eight hyperbolic corners of the explicitly normalized smoothed octagon."
+    },
+    {
+     "closest_existing_considered": "Searches for octagons, regular polygons, smoothed polygons, Reinhardt, and hyperbolic-arc shapes in Mathlib, FormalConjecturesForMathlib, and FormalConjectures found no suitable primitive.",
+     "name": "ReinhardtsConjecture.smoothedOctagon",
+     "why_needed": "The statement requires the named extremal shape to be defined explicitly, and no existing smoothed-octagon definition was found."
+    }
+   ],
+   "per_slot": {
+    "reinhardts_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reinhardts_conjecture": "/-- Reinhardt's conjecture: the smoothed octagon has greatest packing density\n`(8 - 4 * √2 - log 2) / (2 * √2 - 1)`, and every compact convex planar set with nonempty\ninterior and a center of symmetry has greatest packing density at least this value. By the\nFejes Tóth theorem, for centrally symmetric convex disks the greatest packing density equals\nthe greatest lattice packing density used here. -/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture :\n    greatestLatticePackingDensity smoothedOctagon =\n        (8 - 4 * Real.sqrt 2 - Real.log 2) / (2 * Real.sqrt 2 - 1) ∧\n      ∀ K : Set (ℝ × ℝ), IsCompact K → Convex ℝ K → (interior K).Nonempty →\n        (∃ c : ℝ × ℝ, ∀ x, x ∈ K ↔ 2 • c - x ∈ K) →\n          greatestLatticePackingDensity smoothedOctagon ≤ greatestLatticePackingDensity K := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Reinhardt's conjecture\n\nReinhardt's conjecture: the smoothed octagon has the lowest maximum packing density of all\ncentrally-symmetric convex plane sets.\n\nThe *smoothed octagon* is obtained from a regular octagon by replacing each corner with an arc\nof a hyperbola that is tangent to the two sides adjacent to the corner and asymptotic to the\ntwo sides adjacent to these. Its maximum packing density is\n$\\frac{8 - 4\\sqrt{2} - \\ln 2}{2\\sqrt{2} - 1} \\approx 0.902414$, which is slightly less than the\nmaximum packing density $\\pi / \\sqrt{12} \\approx 0.906899$ of the circular disk.\n\n*References:*\n- [Wikipedia, Smoothed octagon](https://en.wikipedia.org/wiki/Reinhardt%27s_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Re34] Reinhardt, K., _Über die dichteste gitterförmige Lagerung kongruenter Bereiche in der\n  Ebene und eine besondere Art konvexer Kurven_, Abh. Math. Sem. Univ. Hamburg 10 (1934), 216–230.\n- [Ma47] Mahler, K., _On the minimum determinant and the circumscribed hexagons of a convex\n  domain_, Indag. Math. 9 (1947), 326–337.\n- [FT50] Fejes Tóth, L., _Some packing and covering theorems_, Acta Sci. Math. Szeged 12 (1950),\n  62–67.\n- [HV24] Hales, T., Vajjha, K., _Packings of Smoothed Polygons_,\n  [arXiv:2405.04331](https://arxiv.org/abs/2405.04331).\n-/\n\nnamespace ReinhardtsConjecture\n\nopen MeasureTheory Filter Topology\nopen scoped EuclideanGeometry Real\n\n/-- A set $K \\subseteq \\mathbb{R}^2$ is a *centrally symmetric convex disk* if it is compact,\nconvex, has nonempty interior and is symmetric with respect to some point $c$\n(that is, the point reflection $v \\mapsto c - (v - c)$ maps $K$ to itself).\nThis is the class $\\mathfrak{K}_{ccs}$ of [HV24, Section 2.1], except that there the centre of\nsymmetry is normalised to be the origin, which does not affect packing densities.\n\nThe nonempty interior condition excludes degenerate sets (such as segments) whose packing\ndensities are all zero. -/\ndef IsCentrallySymmetricConvexDisk (K : Set ℝ²) : Prop :=\n  IsCompact K ∧ Convex ℝ K ∧ (interior K).Nonempty ∧ ∃ c : ℝ², ∀ v ∈ K, c - (v - c) ∈ K\n\n/-- A family `P` of subsets of the plane is a *packing with congruent copies of `K`* if every\nmember of `P` is the image of `K` under an isometry of the plane and any two distinct members of\n`P` have disjoint interiors. -/\ndef IsPackingOf (K : Set ℝ²) (P : Set (Set ℝ²)) : Prop :=\n  (∀ C ∈ P, ∃ g : ℝ² ≃ᵢ ℝ², C = g '' K) ∧ P.Pairwise fun C D => Disjoint (interior C) (interior D)\n\n/-- The proportion of the disk $B_r$ of radius `r` about the origin that is taken up by the\nmembers of the family `P`, namely\n$$\\frac{1}{\\operatorname{area}(B_r)}\\sum_{C \\in P} \\operatorname{area}(C \\cap B_r).$$ -/\nnoncomputable def densityIn (P : Set (Set ℝ²)) (r : ℝ) : ℝ :=\n  (∑' C : P, volume ((C : Set ℝ²) ∩ Metric.ball 0 r)).toReal /\n    (volume (Metric.ball (0 : ℝ²) r)).toReal\n\n/-- The family `P` has *density* `d` if the proportion of the disk of radius `r` about the\norigin taken up by `P` tends to `d` as $r \\to \\infty$, that is, if the upper and lower\ndensities of `P` (the `limsup` and `liminf` of this proportion) both exist and equal `d`. -/\ndef HasDensity (P : Set (Set ℝ²)) (d : ℝ) : Prop :=\n  Tendsto (densityIn P) atTop (𝓝 d)\n\n/-- The *greatest packing density* $\\delta(K)$ of `K` is the supremum of the densities of all\npackings with congruent copies of `K` which have a density, see [HV24, Section 2.1].\n\nBy a theorem of L. Fejes Tóth [FT50], for a centrally symmetric convex disk this is equal to\nthe greatest density of a lattice packing of `K`. -/\nnoncomputable def greatestPackingDensity (K : Set ℝ²) : ℝ :=\n  sSup {d | ∃ P, IsPackingOf K P ∧ HasDensity P d}\n\n/-- The empty family is a packing with congruent copies of any set. -/\n@[category test, AMS 52]\ntheorem isPackingOf_empty (K : Set ℝ²) : IsPackingOf K ∅ := by\n  simp [IsPackingOf]\n\n/-- The empty family has density `0`. -/\n@[category test, AMS 52]\ntheorem hasDensity_empty : HasDensity ∅ 0 := by\n  have : densityIn ∅ = fun _ => 0 := by\n    ext r\n    simp [densityIn]\n  rw [HasDensity, this]\n  exact tendsto_const_nhds\n\n/-- The closed unit disk is a centrally symmetric convex disk. -/\n@[category test, AMS 52]\ntheorem isCentrallySymmetricConvexDisk_closedBall :\n    IsCentrallySymmetricConvexDisk (Metric.closedBall (0 : ℝ²) 1) := by\n  refine ⟨isCompact_closedBall _ _, convex_closedBall _ _, ?_, 0, fun v hv => ?_⟩\n  · rw [interior_closedBall _ one_ne_zero]\n    exact ⟨0, Metric.mem_ball_self one_pos⟩\n  · simpa using hv\n\n/-- The hyperbolic arc that forms one corner of the smoothed octagon.\n\nConsider the regular octagon of circumradius $\\sqrt{2}$ centred at the origin with a vertex at\n$(-\\sqrt{2}, 0)$. Following the construction on the Wikipedia page (translated by\n$-(2 + \\sqrt{2}, 0)$ so that the octagon is centred at the origin), the corner at this vertex is\nreplaced by the arc\n$$t \\mapsto \\left(\\frac{m}{\\ell}\\cosh t - (2 + \\sqrt{2}),\\ m \\sinh t\\right),\n\\qquad -\\frac{\\ln 2}{4} \\le t \\le \\frac{\\ln 2}{4},$$\nwhere $\\ell = \\sqrt{2} - 1$ and $m = (1/2)^{1/4}$, of the hyperbola\n$\\ell^2 (x + 2 + \\sqrt{2})^2 - y^2 = m^2$. At its endpoints this arc is tangent to the two sides\nof the octagon that meet at the vertex $(-\\sqrt{2}, 0)$, and its asymptotes are the lines of the\ntwo sides of the octagon adjacent to these. -/\nnoncomputable def smoothedOctagonArc (t : ℝ) : ℝ² :=\n  !₂[(1 / 2 : ℝ) ^ (1 / 4 : ℝ) / (√2 - 1) * Real.cosh t - (2 + √2),\n    (1 / 2 : ℝ) ^ (1 / 4 : ℝ) * Real.sinh t]\n\n/-- The *smoothed octagon*: the regular octagon of circumradius $\\sqrt{2}$ centred at the origin\nwith a vertex at $(-\\sqrt{2}, 0)$, whose eight corners have been replaced by the hyperbolic arcs\nobtained from `smoothedOctagonArc` by rotating about the origin through the angles\n$k\\pi/4$, $k = 0, \\dots, 7$. Since the arcs are tangent to the sides of the octagon at their\nendpoints, the smoothed octagon is the convex hull of these eight arcs: its boundary consists of\nthe arcs together with the segments of the sides of the octagon joining consecutive arcs. -/\nnoncomputable def smoothedOctagon : Set ℝ² :=\n  convexHull ℝ <| ⋃ k : Fin 8,\n    (EuclideanGeometry.o : Orientation ℝ ℝ² (Fin 2)).rotation (((k : ℕ) : ℝ) * π / 4 : ℝ) ''\n      (smoothedOctagonArc '' Set.Icc (-(Real.log 2 / 4)) (Real.log 2 / 4))\n\n/-- The smoothed octagon is convex. -/\n@[category API, AMS 52]\ntheorem convex_smoothedOctagon : Convex ℝ smoothedOctagon :=\n  convex_convexHull ℝ _\n\n/-- **Reinhardt's conjecture** [Re34] (also conjectured independently by Mahler [Ma47]):\nthe smoothed octagon has the lowest maximum packing density of all centrally symmetric convex\nplane sets. That is, for every centrally symmetric convex disk $K$ in the plane, the greatest\npacking density of $K$ is at least that of the smoothed octagon, which is\n$\\frac{8 - 4\\sqrt{2} - \\ln 2}{2\\sqrt{2} - 1} \\approx 0.902414$. -/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture (K : Set ℝ²) (hK : IsCentrallySymmetricConvexDisk K) :\n    greatestPackingDensity smoothedOctagon ≤ greatestPackingDensity K := by\n  sorry\n\n/-- The greatest packing density of the smoothed octagon is\n$\\frac{8 - 4\\sqrt{2} - \\ln 2}{2\\sqrt{2} - 1} \\approx 0.902414$. Reinhardt [Re34] computed the\ngreatest lattice packing density of the smoothed octagon, and by Fejes Tóth's theorem [FT50]\nthis is its greatest packing density. See also [HV24, Section 1.1]. -/\n@[category research solved, AMS 52]\ntheorem greatestPackingDensity_smoothedOctagon :\n    greatestPackingDensity smoothedOctagon = (8 - 4 * √2 - Real.log 2) / (2 * √2 - 1) := by\n  sorry\n\n/-- Numerical sanity check of the value of the packing density of the smoothed octagon,\nwhich is approximately `0.902414`. -/\n@[category test, AMS 52]\ntheorem smoothedOctagon_density_bounds :\n    0.9024 < (8 - 4 * √2 - Real.log 2) / (2 * √2 - 1) ∧\n      (8 - 4 * √2 - Real.log 2) / (2 * √2 - 1) < 0.9025 := by\n  have h1 : 1.41421356 < √2 := (Real.lt_sqrt (by norm_num)).2 (by norm_num)\n  have h2 : √2 < 1.41421357 := (Real.sqrt_lt' (by norm_num)).2 (by norm_num)\n  have h3 := Real.log_two_gt_d9\n  have h4 := Real.log_two_lt_d9\n  have hd : 0 < 2 * √2 - 1 := by linarith\n  constructor\n  · rw [lt_div_iff₀ hd]; nlinarith\n  · rw [div_lt_iff₀ hd]; nlinarith\n\nend ReinhardtsConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate. One remark: the notes phrase the bound as \\\"≥ that of the smoothed octagon, i.e. ≥ (8 − 4√2 − ln 2)/(2√2 − 1)\\\"; I stated the conjecture in the first (literal) form, δ(smoothed octagon) ≤ δ(K), and recorded the equality δ(smoothed octagon) = (8 − 4√2 − ln 2)/(2√2 − 1) as a separate `research solved` theorem, since that value is an established result rather than part of the conjecture.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Plane = ℝ² := EuclideanSpace ℝ (Fin 2) with Lebesgue measure `volume`, following repo convention.",
+    "\"Centrally-symmetric convex plane set\" is formalized as Hales–Vajjha's K_ccs (compact, convex, nonempty interior) but with an arbitrary centre of symmetry c (∃ c, ∀ v ∈ K, c − (v − c) ∈ K) rather than normalising c = 0; this is equivalent since congruent-copy packings are translation invariant. The nonempty-interior condition is essential (degenerate sets have density 0) and is explained in the docstring.",
+    "A packing is a set P of subsets of the plane, each an image of K under an isometry `ℝ² ≃ᵢ ℝ²` (congruent copies, reflections allowed), with pairwise disjoint interiors. Using a set of sets (not an indexed family of isometries) avoids spurious constraints when two different isometries give the same copy (e.g. rotation by π of a centrally symmetric set).",
+    "Density of a packing: `densityIn P r = (∑' C : P, volume (C ∩ ball 0 r)).toReal / (volume (ball 0 r)).toReal` (Hales–Vajjha's formula literally: sum over members of area(C ∩ B_r) divided by area(B_r)); `HasDensity P d` is `Tendsto (densityIn P) atTop (𝓝 d)`, which for this bounded real function is exactly \"upper and lower densities (limsup/liminf) both exist and coincide with d\". The greatest packing density δ(K) is `sSup {d | ∃ P, IsPackingOf K P ∧ HasDensity P d}`; the set is nonempty (empty packing has density 0) and bounded by 1 for convex disks, so sSup is well-behaved. The sup is over all packings by congruent copies (Wikipedia's \"maximum packing density\"), not only lattice packings; Fejes Tóth's theorem (δ = δ_L for K_ccs) is mentioned in the docstring only.",
+    "Smoothed octagon: the regular octagon of circumradius √2 centred at the origin, vertex at (−√2, 0); the corner arc is Wikipedia's parametrization t ↦ ((m/ℓ) cosh t − (2+√2), m sinh t), |t| ≤ ln 2 / 4, with ℓ = √2 − 1, m = (1/2)^{1/4} (Wikipedia's coordinates translated by −(2+√2, 0)); the other seven arcs are its rotations about the origin by kπ/4 via Mathlib's `Orientation.rotation` (sign convention irrelevant as all eight multiples are taken). The smoothed octagon is then the convex hull of the eight arcs, which equals the region bounded by the arcs and the octagon side segments because the arcs are tangent to the sides at their endpoints. Verified numerically: the arc endpoints lie on the octagon sides with matching tangent slope, the asymptotes are the adjacent side lines, and the min-area circumscribed centrally symmetric hexagon gives density 0.902413… matching (8 − 4√2 − ln 2)/(2√2 − 1) ≈ 0.902414.",
+    "The main statement compares δ(K) to δ(smoothedOctagon) (literal reading of the statement). The explicit value (8 − 4√2 − ln 2)/(2√2 − 1) is recorded as a separate `research solved` theorem `greatestPackingDensity_smoothedOctagon` (Reinhardt 1934 + Fejes Tóth 1950; stated as fact on the Wikipedia page and in Hales–Vajjha), plus a `test` lemma bounding the constant numerically.",
+    "Bound is non-strict (≤); uniqueness up to affine maps is not stated, per the decomposition notes.",
+    "AMS tag 52 (convex and discrete geometry)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "ConvexBody (Mathlib.Analysis.Convex.Body), Convex/IsCompact predicates",
+     "name": "ReinhardtsConjecture.IsCentrallySymmetricConvexDisk",
+     "why_needed": "Mathlib has no notion of centrally symmetric convex body; `ConvexBody` requires only nonemptiness, not nonempty interior, and has no symmetry condition."
+    },
+    {
+     "closest_existing_considered": "SquarePacking.Packing (FormalConjectures/Wikipedia/SquarePacking.lean), Mathoverflow34145.Configuration.IsPacking",
+     "name": "ReinhardtsConjecture.IsPackingOf",
+     "why_needed": "No Mathlib/repo notion of a packing of the plane by congruent copies of a set (the repo's SquarePacking.Packing is finite and confined to a container)."
+    },
+    {
+     "closest_existing_considered": "MeasureTheory.volume, tsum",
+     "name": "ReinhardtsConjecture.densityIn",
+     "why_needed": "Fraction of the disk of radius r covered by a family of sets; no existing primitive."
+    },
+    {
+     "closest_existing_considered": "Filter.Tendsto / limsup, liminf",
+     "name": "ReinhardtsConjecture.HasDensity",
+     "why_needed": "Existence of the (asymptotic) density of a packing; no existing primitive."
+    },
+    {
+     "closest_existing_considered": "sSup over a set of reals; Green42's Cohn–Elkies bound definitions (different notion)",
+     "name": "ReinhardtsConjecture.greatestPackingDensity",
+     "why_needed": "The greatest packing density δ(K) of Hales–Vajjha; not in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "none (no hyperbola/octagon primitives in Mathlib)",
+     "name": "ReinhardtsConjecture.smoothedOctagonArc",
+     "why_needed": "Explicit hyperbolic corner arc of the smoothed octagon (required by the decomposition notes)."
+    },
+    {
+     "closest_existing_considered": "convexHull, Orientation.rotation (used as building blocks)",
+     "name": "ReinhardtsConjecture.smoothedOctagon",
+     "why_needed": "The smoothed octagon itself, as the convex hull of its eight hyperbolic corner arcs."
+    }
+   ],
+   "per_slot": {
+    "reinhardts_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every centrally symmetric convex disk K in ℝ² (compact, convex, nonempty interior, symmetric about some point), greatestPackingDensity smoothedOctagon ≤ greatestPackingDensity K, with δ(K) defined as the supremum of densities (limit as r → ∞ of the fraction of the disk B_r covered) of packings by congruent (isometric) copies of K, following Hales–Vajjha's definitions, and the smoothed octagon defined explicitly as the convex hull of the eight hyperbolic corner arcs from the Wikipedia construction (translated to be centred at the origin). Non-strict bound; uniqueness not included."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "reinhardts_conjecture": "/-- **Reinhardt's conjecture** [Re34] (also conjectured independently by Mahler [Ma47]):\nthe smoothed octagon has the lowest maximum packing density of all centrally symmetric convex\nplane sets. That is, for every centrally symmetric convex disk $K$ in the plane, the greatest\npacking density of $K$ is at least that of the smoothed octagon, which is\n$\\frac{8 - 4\\sqrt{2} - \\ln 2}{2\\sqrt{2} - 1} \\approx 0.902414$. -/\n@[category research open, AMS 52]\ntheorem reinhardts_conjecture (K : Set ℝ²) (hK : IsCentrallySymmetricConvexDisk K) :\n    greatestPackingDensity smoothedOctagon ≤ greatestPackingDensity K := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "reinhardts_conjecture": "c02"
+ },
+ "id": "wp-reinhardts-conjecture",
+ "main_attempt": "c02"
+}

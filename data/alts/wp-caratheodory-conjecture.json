@@ -1,0 +1,383 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Carathéodory conjecture\n\nThe **Carathéodory conjecture** states that any convex, closed and twice-differentiable surface\nin three-dimensional Euclidean space admits at least two umbilical points, i.e. points at which\nthe two principal curvatures coincide (equivalently, the second fundamental form is a scalar\nmultiple of the first fundamental form).\n\nA closed convex surface is modelled as the boundary $\\partial K$ of a compact convex body\n$K \\subseteq \\mathbb{R}^3$ with nonempty interior. The surface is $C^2$ when it is locally a\nregular level set of a $C^2$ function $F$; a point $p$ of such a surface is umbilical when the\nHessian of $F$ at $p$, restricted to the tangent plane $\\ker dF_p$, is a scalar multiple of the\ninner product. This is the classical notion: the second fundamental form at $p$ is\n$-\\mathrm{Hess}\\,F_p / \\|\\nabla F(p)\\|$ on the tangent plane, for any local defining function\n$F$. Flat points (both principal curvatures zero) count as umbilical.\n\nThe conjecture is known for real-analytic surfaces (Hamburger). Guilfoyle and Klingenberg\nhave claimed a proof for $C^{3,\\alpha}$ surfaces, and Alpöge has announced a $C^\\infty$\ncounterexample; the conjecture is currently listed as open.\n\n*References:*\n- [Wikipedia: Carathéodory conjecture](https://en.wikipedia.org/wiki/Carath%C3%A9odory_conjecture)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- M. Ghomi, R. Howard, *Normal curvatures of asymptotically constant graphs and Carathéodory's\n  conjecture*, Proc. Amer. Math. Soc. 140 (2012), [arXiv:1101.3031](https://arxiv.org/abs/1101.3031)\n- B. Guilfoyle, W. Klingenberg, *Proof of the Carathéodory conjecture*,\n  [arXiv:0808.0851](https://arxiv.org/abs/0808.0851)\n-/\n\nopen Topology\nopen scoped EuclideanGeometry InnerProductSpace\n\nnamespace CaratheodoryConjecture\n\n/-- `F` is a *local $C^2$ defining function* for the set `S ⊆ ℝ³` at the point `p`: `F` is twice\ncontinuously differentiable near `p`, its derivative at `p` is nonzero (so its zero set is a\nregular surface near `p`), and `S` coincides with the zero set of `F` in a neighbourhood of `p`. -/\nstructure IsLocalDefiningFunction (S : Set ℝ³) (p : ℝ³) (F : ℝ³ → ℝ) : Prop where\n  contDiffAt : ContDiffAt ℝ 2 F p\n  fderiv_ne_zero : fderiv ℝ F p ≠ 0\n  eventually_mem_iff : ∀ᶠ x in 𝓝 p, x ∈ S ↔ F x = 0\n\n/-- A set `S ⊆ ℝ³` is a *$C^2$ surface* (an embedded, twice continuously differentiable surface)\nif near each of its points it is a regular level set of a $C^2$ function. -/\ndef IsC2Surface (S : Set ℝ³) : Prop :=\n  ∀ p ∈ S, ∃ F : ℝ³ → ℝ, IsLocalDefiningFunction S p F\n\n/-- A point `p` of a set `S ⊆ ℝ³` is an *umbilical point* of `S` if `S` has a local $C^2$ defining\nfunction `F` at `p` whose Hessian at `p`, restricted to the tangent plane $\\ker dF_p$, is a scalar\nmultiple `κ` of the inner product. Since the second fundamental form of a $C^2$ surface at `p` is\n$-\\mathrm{Hess}\\,F_p / \\|\\nabla F(p)\\|$ on the tangent plane, this says exactly that the two\nprincipal curvatures of `S` at `p` coincide (including the case where both vanish). -/\ndef IsUmbilicalPoint (S : Set ℝ³) (p : ℝ³) : Prop :=\n  p ∈ S ∧ ∃ F : ℝ³ → ℝ, IsLocalDefiningFunction S p F ∧ ∃ κ : ℝ,\n    ∀ v w : ℝ³, fderiv ℝ F p v = 0 → fderiv ℝ F p w = 0 →\n      fderiv ℝ (fderiv ℝ F) p v w = κ * ⟪v, w⟫_ℝ\n\n/-- The function $x \\mapsto \\|x\\|^2 - 1$ is a local defining function for the unit sphere at each\nof its points. -/\n@[category test, AMS 53]\ntheorem isLocalDefiningFunction_sphere (p : ℝ³) (hp : p ∈ Metric.sphere (0 : ℝ³) 1) :\n    IsLocalDefiningFunction (Metric.sphere (0 : ℝ³) 1) p (fun x ↦ ‖x‖ ^ 2 - 1) where\n  contDiffAt := ((contDiff_id.norm_sq ℝ).sub contDiff_const).contDiffAt\n  fderiv_ne_zero := by\n    have h : fderiv ℝ (fun x : ℝ³ ↦ ‖x‖ ^ 2 - 1) p = 2 • innerSL ℝ p :=\n      ((hasStrictFDerivAt_norm_sq p).hasFDerivAt.sub_const 1).fderiv\n    rw [h]\n    intro h0\n    have := congrArg (fun L : ℝ³ →L[ℝ] ℝ ↦ L p) h0\n    simp [mem_sphere_zero_iff_norm.mp hp] at this\n  eventually_mem_iff := Filter.Eventually.of_forall fun x ↦ by\n    simp [sub_eq_zero, pow_eq_one_iff_of_nonneg (norm_nonneg x) two_ne_zero]\n\n/-- The unit sphere is a $C^2$ surface. -/\n@[category test, AMS 53]\ntheorem isC2Surface_sphere : IsC2Surface (Metric.sphere (0 : ℝ³) 1) :=\n  fun p hp ↦ ⟨_, isLocalDefiningFunction_sphere p hp⟩\n\n/-- Every point of the unit sphere is umbilical. -/\n@[category test, AMS 53]\ntheorem isUmbilicalPoint_sphere (p : ℝ³) (hp : p ∈ Metric.sphere (0 : ℝ³) 1) :\n    IsUmbilicalPoint (Metric.sphere (0 : ℝ³) 1) p := by\n  refine ⟨hp, _, isLocalDefiningFunction_sphere p hp, 2, fun v w _ _ ↦ ?_⟩\n  have h : fderiv ℝ (fun x : ℝ³ ↦ ‖x‖ ^ 2 - 1) = fun x ↦ (2 • innerSL ℝ) x := by\n    ext x : 1\n    exact ((hasStrictFDerivAt_norm_sq x).hasFDerivAt.sub_const 1).fderiv\n  rw [h, ContinuousLinearMap.fderiv]\n  simp\n\n/--\n**Carathéodory conjecture.** Any convex, closed and twice-differentiable surface in\nthree-dimensional Euclidean space admits at least two umbilical points.\n\nPrecisely: let $K \\subseteq \\mathbb{R}^3$ be a compact convex set with nonempty interior whose\nboundary $\\partial K$ is a $C^2$ surface. Then $\\partial K$ has at least two distinct umbilical\npoints, i.e. points at which the two principal curvatures coincide.\n-/\n@[category research open, AMS 52 53]\ntheorem caratheodory_conjecture (K : Set ℝ³) (hK : Convex ℝ K) (hKc : IsCompact K)\n    (hKi : (interior K).Nonempty) (hS : IsC2Surface (frontier K)) :\n    ∃ p q, p ≠ q ∧ IsUmbilicalPoint (frontier K) p ∧ IsUmbilicalPoint (frontier K) q := by\n  sorry\n\nend CaratheodoryConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (compact convex body with nonempty interior, C² boundary, umbilic = second fundamental form proportional to the first with flat points included, distinct points not counted with index, category research open) were followed exactly.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Convex, closed surface' is modelled as the boundary `frontier K` of a compact convex set K ⊆ ℝ³ with nonempty interior (as prescribed by the decomposition table). The nonempty-interior hypothesis is essential: for K = ∅ the frontier is empty, `IsC2Surface ∅` holds vacuously and the conclusion would be false; degenerate lower-dimensional convex sets are also excluded. Strict convexity is NOT assumed (only 'convex' in the statement), so flat pieces are allowed.",
+    "'Twice-differentiable' is formalised as C² (ContDiffAt ℝ 2 F p for a local defining function), following the decomposition table and Ghomi–Howard's C² formulation, rather than mere twice-differentiability without continuity of the second derivative.",
+    "The surface regularity is expressed via local regular level sets (IsLocalDefiningFunction) rather than local graphs after a rigid motion or a C² embedding of S²; these are all equivalent for embedded C² surfaces (implicit function theorem), and the level-set form avoids coordinate bookkeeping. ContDiffAt (C² on some neighbourhood of p) is used rather than global ContDiff; the two are equivalent by cutting off with a bump function.",
+    "Umbilic is defined as: the Hessian fderiv ℝ (fderiv ℝ F) p of a local defining function F, restricted to the tangent plane ker (fderiv ℝ F p), equals κ·⟪·,·⟫ for some real κ. For a C² surface this is independent of the choice of F (if G is another defining function then dG_p = c·dF_p and Hess G|_T = c·Hess F|_T), and equals the classical condition κ₁ = κ₂ because II = −Hess F|_T/‖∇F‖. The definition uses ∃ F (a witness) rather than ∀ F, which avoids vacuous truth at non-C² points; both readings coincide on C² surfaces. The sign convention is irrelevant since κ is existentially quantified. Flat points (κ = 0) count as umbilical, consistent with the table.",
+    "'At least two umbilical points' is formalised as ∃ p q, p ≠ q ∧ IsUmbilicalPoint (frontier K) p ∧ IsUmbilicalPoint (frontier K) q — distinct points, no index/multiplicity counting.",
+    "Category kept as `research open` per the task despite the Wikipedia article's mention of an announced C^∞ counterexample (Alpöge) and a claimed C^{3,α} proof (Guilfoyle–Klingenberg); the module docstring records these as claims/announcements only.",
+    "Three `category test` theorems (with proofs) check the definitions on the unit sphere: ‖x‖²−1 is a local defining function, the sphere is a C² surface, and every point of the sphere is umbilical (κ = 2). These show the hypotheses of the conjecture are satisfiable and the umbilic notion is not vacuous."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's IsImmersion / IsImmersionAt (Geometry/Manifold/Immersion.lean) and ContMDiff on the sphere manifold; these describe maps, not subsets of ℝ³, carry no C² submanifold-of-ℝ³ API and no second fundamental form, so a level-set description was used instead. Also the repo's PompeiuProblem.HasLipschitzBoundary (local graph idiom), which is Lipschitz rather than C².",
+     "name": "CaratheodoryConjecture.IsLocalDefiningFunction",
+     "why_needed": "Expresses that a set S ⊆ ℝ³ is, near a point p, the regular zero set of a function F that is C² near p (ContDiffAt ℝ 2 F p, fderiv ℝ F p ≠ 0, and x ∈ S ↔ F x = 0 eventually near p). Mathlib has no embedded-submanifold / hypersurface predicate for subsets of Euclidean space."
+    },
+    {
+     "closest_existing_considered": "IsManifold / ChartedSpace structures in Mathlib apply to abstract types, not to subsets of ℝ³ with the induced geometry; no Mathlib predicate for 'C² embedded surface in ℝ³' exists.",
+     "name": "CaratheodoryConjecture.IsC2Surface",
+     "why_needed": "S ⊆ ℝ³ is a C² (twice continuously differentiable, embedded) surface: every point of S admits a local C² defining function. This is the standard regular-level-set characterisation, equivalent to local C² graphs by the implicit function theorem."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjecturesForMathlib for umbilic / SecondFundamental / principal curvature / shape operator / Weingarten / mean curvature: nothing exists. Mathlib's fderiv/ContDiffAt were used as the underlying primitives.",
+     "name": "CaratheodoryConjecture.IsUmbilicalPoint",
+     "why_needed": "p ∈ S is umbilical iff for some local C² defining function F at p there is κ with D²F_p(v,w) = κ⟪v,w⟫ for all v,w in the tangent plane ker dF_p. Since the second fundamental form of a C² surface is −Hess F|_T/‖∇F‖ for any defining function F, this is exactly 'both principal curvatures coincide' (flat points included). Mathlib has no second fundamental form, shape operator, principal curvatures or umbilics."
+    }
+   ],
+   "per_slot": {
+    "caratheodory_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every compact convex K ⊆ ℝ³ with nonempty interior whose boundary is a C² surface (locally a regular level set of a C² function), there exist two distinct umbilical points on the boundary. Mathlib has no notion of embedded C² surface in ℝ³, second fundamental form, principal curvature or umbilic, so three bespoke definitions were added in the problem file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "caratheodory_conjecture": "/--\n**Carathéodory conjecture.** Any convex, closed and twice-differentiable surface in\nthree-dimensional Euclidean space admits at least two umbilical points.\n\nPrecisely: let $K \\subseteq \\mathbb{R}^3$ be a compact convex set with nonempty interior whose\nboundary $\\partial K$ is a $C^2$ surface. Then $\\partial K$ has at least two distinct umbilical\npoints, i.e. points at which the two principal curvatures coincide.\n-/\n@[category research open, AMS 52 53]\ntheorem caratheodory_conjecture (K : Set ℝ³) (hK : Convex ℝ K) (hKc : IsCompact K)\n    (hKi : (interior K).Nonempty) (hS : IsC2Surface (frontier K)) :\n    ∃ p q, p ≠ q ∧ IsUmbilicalPoint (frontier K) p ∧ IsUmbilicalPoint (frontier K) q := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Carathéodory conjecture\n\nThe Carathéodory conjecture asserts that a closed convex $C^2$ surface in Euclidean\nthree-space has at least two umbilic points.\n\n*References:*\n- [Wikipedia, Carathéodory conjecture](https://en.wikipedia.org/wiki/Carath%C3%A9odory_conjecture)\n-/\n\nnamespace CaratheodoryConjecture\n\nlocal notation \"E2\" => EuclideanSpace ℝ (Fin 2)\nlocal notation \"E3\" => EuclideanSpace ℝ (Fin 3)\n\n/--\n`IsLocalC2Parametrization S p φ q` says that `φ` regularly and injectively parametrizes an\nopen piece of `S` around `p`, with `φ q = p`, and is twice continuously differentiable there.\n-/\ndef IsLocalC2Parametrization (S : Set E3) (p : E3) (φ : E2 → E3) (q : E2) : Prop :=\n  ∃ U : Set E2, ∃ V : Set E3,\n    IsOpen U ∧ q ∈ U ∧ IsOpen V ∧ p ∈ V ∧\n      ContDiffOn ℝ 2 φ U ∧ Set.InjOn φ U ∧\n      Function.Injective (fderiv ℝ φ q) ∧ φ q = p ∧ φ '' U = S ∩ V\n\n/-- A subset of Euclidean three-space which is locally a $C^2$ embedded surface. -/\ndef IsC2EmbeddedSurface (S : Set E3) : Prop :=\n  ∀ p ∈ S, ∃ (φ : E2 → E3) (q : E2), IsLocalC2Parametrization S p φ q\n\n/--\nA point is umbilic when, in a local regular parametrization, the second fundamental form is a\nscalar multiple of the first fundamental form. The normal is not normalized, so its scaling is\nabsorbed by the scalar. This definition includes flat points.\n-/\ndef IsUmbilicPoint (S : Set E3) (p : E3) : Prop :=\n  ∃ (φ : E2 → E3) (q : E2), IsLocalC2Parametrization S p φ q ∧\n    ∃ n : E3, n ≠ 0 ∧\n      (∀ u : E2, inner ℝ (fderiv ℝ φ q u) n = 0) ∧\n      ∃ κ : ℝ, ∀ u v : E2,\n        inner ℝ (fderiv ℝ (fderiv ℝ φ) q u v) n =\n          κ * inner ℝ (fderiv ℝ φ q u) (fderiv ℝ φ q v)\n\n/--\nThe **Carathéodory conjecture**: the $C^2$ boundary of every compact convex subset of\nthree-dimensional Euclidean space with nonempty interior has at least two distinct umbilic\npoints.\n-/\n@[category research open, AMS 53]\ntheorem caratheodory_conjecture :\n    ∀ K : Set E3, Convex ℝ K → IsCompact K → (interior K).Nonempty →\n      IsC2EmbeddedSurface (frontier K) →\n        ∃ p ∈ frontier K, ∃ q ∈ frontier K,\n          p ≠ q ∧ IsUmbilicPoint (frontier K) p ∧ IsUmbilicPoint (frontier K) q := by\n  sorry\n\nend CaratheodoryConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Following the decomposition and the background article's C² formulation, a closed convex surface is represented as the frontier of a compact convex subset of Euclidean ℝ³ with nonempty interior; compactness supplies closedness.",
+    "A C² embedded surface is expressed by injective local regular parametrizations from Euclidean ℝ² whose images are the intersection of the surface with an ambient open neighborhood. `ContDiffOn ℝ 2` formalizes twice continuous differentiability.",
+    "An umbilic point is defined in a local regular parametrization by requiring the normal component of the second derivative (the second fundamental form, up to normalization of the normal) to be a scalar multiple of the pullback Euclidean inner product (the first fundamental form). The normal is required to be nonzero and orthogonal to all tangent vectors.",
+    "The umbilic definition is existential in the choice of local parametrization. The defining proportionality is invariant under regular changes of coordinates and normal rescaling.",
+    "Flat points are included: the scalar in the proportionality condition may be zero.",
+    "At least two points is represented by two surface points with an explicit inequality, ensuring distinctness without relying on the default behavior of `Set.ncard` for infinite sets.",
+    "The declaration remains tagged `research open` as required, notwithstanding the background article's mention of an announced future C∞ counterexample."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `ContDiffOn` and manifold `IsImmersion` APIs; these provide smoothness or immersion data but do not package a local parametrization whose image is a specified subset.",
+     "name": "IsLocalC2Parametrization",
+     "why_needed": "Mathlib has no predicate saying that a map regularly and injectively parametrizes a local piece of a subset of Euclidean space as a C² embedded surface."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsManifold` and charted-space APIs; these concern types already equipped with manifold structures and do not assert that a given subset is an embedded C² surface.",
+     "name": "IsC2EmbeddedSurface",
+     "why_needed": "The conjecture quantifies over C² embedded surfaces represented as subsets, and no existing Mathlib predicate captures this property for a subset of Euclidean space."
+    },
+    {
+     "closest_existing_considered": "Mathlib's inner-product, Fréchet derivative, iterated derivative, and manifold immersion APIs; there is no existing extrinsic second-fundamental-form or umbilic predicate.",
+     "name": "IsUmbilicPoint",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines umbilic points, principal curvatures, shape operators, or the second fundamental form for embedded surfaces."
+    }
+   ],
+   "per_slot": {
+    "caratheodory_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "caratheodory_conjecture": "/--\nThe **Carathéodory conjecture**: the $C^2$ boundary of every compact convex subset of\nthree-dimensional Euclidean space with nonempty interior has at least two distinct umbilic\npoints.\n-/\n@[category research open, AMS 53]\ntheorem caratheodory_conjecture :\n    ∀ K : Set E3, Convex ℝ K → IsCompact K → (interior K).Nonempty →\n      IsC2EmbeddedSurface (frontier K) →\n        ∃ p ∈ frontier K, ∃ q ∈ frontier K,\n          p ≠ q ∧ IsUmbilicPoint (frontier K) p ∧ IsUmbilicPoint (frontier K) q := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Carathéodory conjecture\n\nThe Carathéodory conjecture states that any convex, closed and twice-differentiable surface in\nthree-dimensional Euclidean space admits at least two umbilical points, i.e. points at which the\ntwo principal curvatures coincide.\n\nHere a convex closed surface is the boundary $\\partial K$ of a compact convex set\n$K \\subseteq \\mathbb{R}^3$ with nonempty interior. It is twice differentiable if it is a regular\n$C^2$ surface, i.e. it is covered by regular $C^2$ local parametrisations. A point of a regular\n$C^2$ surface is umbilical if the second fundamental form is a scalar multiple of the first\nfundamental form there; this includes flat points, where both principal curvatures vanish.\n\nThe conjecture is proved for real-analytic surfaces (Hamburger). Guilfoyle and Klingenberg have\nclaimed a proof for $C^{3,\\alpha}$ surfaces, and a $C^\\infty$ counterexample has been announced,\nbut neither is accepted by the community, so the conjecture is recorded as open.\n\n*References:*\n- [Wikipedia, Carathéodory conjecture](https://en.wikipedia.org/wiki/Carath%C3%A9odory_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- M. Ghomi, R. Howard, *Normal curvatures of asymptotically constant graphs and Carathéodory's\n  conjecture*, Proc. Amer. Math. Soc. 140 (2012), [arXiv:1101.3031](https://arxiv.org/abs/1101.3031)\n- B. Guilfoyle, W. Klingenberg, *Proof of the Carathéodory conjecture*,\n  [arXiv:0808.0851](https://arxiv.org/abs/0808.0851)\n-/\n\nopen Topology\nopen scoped EuclideanGeometry InnerProductSpace\n\nnamespace CaratheodoryConjecture\n\n/-- `φ` is a regular `C²` local parametrisation of the set `S ⊆ ℝ³` around the point `p`, defined\non the open set `U ⊆ ℝ²`: it is `C²` on `U`, its derivative is injective at every point of `U`,\nand it is a homeomorphism from `U` onto `S ∩ W` for some open neighbourhood `W` of `p` in `ℝ³`.\nSets admitting such a parametrisation around each of their points are exactly the regular\n`C²` surfaces (do Carmo, *Differential Geometry of Curves and Surfaces*, §2-2). -/\nstructure IsLocalParam (S : Set ℝ³) (p : ℝ³) (U : Set ℝ²) (φ : ℝ² → ℝ³) : Prop where\n  isOpen : IsOpen U\n  contDiffOn : ContDiffOn ℝ 2 φ U\n  fderiv_injective : ∀ u ∈ U, Function.Injective (fderiv ℝ φ u)\n  isEmbedding : IsEmbedding (U.restrict φ)\n  exists_image_eq : ∃ W : Set ℝ³, IsOpen W ∧ p ∈ W ∧ φ '' U = S ∩ W\n\n/-- A set `S ⊆ ℝ³` is a regular `C²` surface if it admits a regular `C²` local parametrisation\naround each of its points. -/\ndef IsC2Surface (S : Set ℝ³) : Prop :=\n  ∀ p ∈ S, ∃ U φ, IsLocalParam S p U φ\n\n/-- A point `p` of a set `S ⊆ ℝ³` is an umbilical point of `S` if, for a regular `C²` local\nparametrisation `φ` of `S` around `p` with `φ u = p`, the second fundamental form at `u`,\n$(v, w) \\mapsto \\langle D^2\\varphi(u)(v, w), n\\rangle$ where `n` is a unit normal vector, is a\nscalar multiple of the first fundamental form\n$(v, w) \\mapsto \\langle D\\varphi(u)v, D\\varphi(u)w\\rangle$.\nEquivalently, the two principal curvatures of `S` at `p` coincide. The condition does not depend\non the choice of the parametrisation or of the sign of the unit normal. Flat points, where both\nprincipal curvatures vanish, are umbilical points. -/\ndef IsUmbilicalPoint (S : Set ℝ³) (p : ℝ³) : Prop :=\n  ∃ (U : Set ℝ²) (φ : ℝ² → ℝ³) (u : ℝ²), IsLocalParam S p U φ ∧ u ∈ U ∧ φ u = p ∧\n    ∃ n : ℝ³, ‖n‖ = 1 ∧ (∀ v, ⟪fderiv ℝ φ u v, n⟫_ℝ = 0) ∧\n      ∃ c : ℝ, ∀ v w, ⟪fderiv ℝ (fderiv ℝ φ) u v w, n⟫_ℝ = c * ⟪fderiv ℝ φ u v, fderiv ℝ φ u w⟫_ℝ\n\n/-- An umbilical point of `S` lies on `S`. -/\n@[category API, AMS 53]\ntheorem IsUmbilicalPoint.mem {S : Set ℝ³} {p : ℝ³} (h : IsUmbilicalPoint S p) : p ∈ S := by\n  obtain ⟨U, φ, u, hφ, hu, rfl, -⟩ := h\n  obtain ⟨W, -, -, hW⟩ := hφ.exists_image_eq\n  exact (hW ▸ Set.mem_image_of_mem φ hu).1\n\n/-- **Carathéodory conjecture.** Any convex, closed and twice-differentiable surface in\nthree-dimensional Euclidean space admits at least two umbilical points.\n\nThe surface is the boundary $\\partial K$ of a convex body $K \\subseteq \\mathbb{R}^3$ (a compact\nconvex set) with nonempty interior, and $\\partial K$ is assumed to be a regular $C^2$ surface.\nThe conclusion is that $\\partial K$ has at least two distinct umbilical points, counted without\nmultiplicity or index. -/\n@[category research open, AMS 52 53]\ntheorem caratheodory_conjecture (K : ConvexBody ℝ³) (hK : (interior (K : Set ℝ³)).Nonempty)\n    (hS : IsC2Surface (frontier (K : Set ℝ³))) :\n    2 ≤ {p | IsUmbilicalPoint (frontier (K : Set ℝ³)) p}.encard := by\n  sorry\n\nend CaratheodoryConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's single slot and its notes (compact convex body with nonempty interior, C² boundary, non-strict convexity with flat points included, cardinality ≥ 2 as distinct points, category research open) were followed exactly.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Convex, closed surface' is modelled as the boundary `frontier K` of a compact convex set `K : ConvexBody ℝ³` with nonempty interior (so the boundary is a genuine closed surface, homeomorphic to S²). Convexity is non-strict (`Convex ℝ K`), as in the Wikipedia statement; hence flat points (κ₁ = κ₂ = 0) count as umbilical points, unlike the 'strictly convex' formulation of Guilfoyle–Klingenberg.",
+    "'Twice-differentiable' is modelled as C² (`ContDiffOn ℝ 2`), following the Ghomi–Howard C² formulation and the article's remark that C² is the minimal regularity for umbilics to be well defined. A reviewer may want to check that C² (rather than merely twice differentiable) is the intended reading.",
+    "'Surface' is modelled as a regular C² surface in the sense of do Carmo: around each point there is a map φ from an open U ⊆ ℝ² that is C² on U, has injective derivative at every point of U, and is a homeomorphism (`IsEmbedding (U.restrict φ)`) from U onto `S ∩ W` for an open neighbourhood W of the point. This encodes 'embedded C² surface without boundary'.",
+    "Umbilical point is defined via an existentially chosen regular C² local parametrisation φ with φ u = p: there is a unit normal n (⟪Dφ(u) v, n⟫ = 0 for all v, ‖n‖ = 1) and a scalar c with ⟪D²φ(u)(v, w), n⟫ = c · ⟪Dφ(u) v, Dφ(u) w⟫ for all v, w, i.e. II = c·I. This is parametrisation-independent (I and II transform tensorially under C² reparametrisations) and sign-of-normal-independent, so the ∃-form is equivalent to the ∀-form for points of a regular C² surface, while additionally implying p ∈ S (proved as the API lemma `IsUmbilicalPoint.mem`). The second derivative is written `fderiv ℝ (fderiv ℝ φ) u`, which is the true second derivative for u ∈ U since φ is C² on the open set U.",
+    "'At least two umbilical points' is `2 ≤ Set.encard {p | IsUmbilicalPoint (frontier K) p}` in ℕ∞, so infinitely many umbilics (e.g. the round sphere) satisfy the conclusion; points are counted as distinct points, not with index/multiplicity.",
+    "Category kept as `research open` per the task instructions, despite the announced (unrefereed) C^∞ counterexample and the Guilfoyle–Klingenberg claimed proof; AMS tags 52 (convex geometry) and 53 (differential geometry).",
+    "An extra sorry-free `@[category API]` lemma `IsUmbilicalPoint.mem` (an umbilical point of S lies on S) is included as a basic API test of the bespoke definition, per CONTRIBUTING.md."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `IsImmersionAt`/`IsSmoothEmbedding` and `ContMDiff (𝓡 2) (𝓡 3)` for abstract manifolds; these would still require a bespoke second fundamental form in charts and add heavy typeclass overhead, so the classical do Carmo definition on subsets of ℝ³ was preferred.",
+     "name": "CaratheodoryConjecture.IsLocalParam",
+     "why_needed": "Mathlib has no notion of a regular C² parametrised surface in ℝ³ (charts on a subset with injective derivative and homeomorphism onto a relatively open piece). Needed both to say the boundary is a C² surface and to define umbilics concretely."
+    },
+    {
+     "closest_existing_considered": "`IsManifold`/`ChartedSpace` on an abstract type (used in BingBorsuk.lean, HilbertProblems/5.lean), which does not directly express that a given subset of ℝ³ is a C² embedded surface.",
+     "name": "CaratheodoryConjecture.IsC2Surface",
+     "why_needed": "Predicate 'S ⊆ ℝ³ is a regular C² surface' (a local parametrisation around each point); absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib for umbilic, principal curvature, second fundamental form, Gauss curvature: nothing exists. Alternative parametrisation-free characterisation (second-order contact with a sphere or plane via `IsLittleO`) was considered but rejected as less recognisable than the literal 'II = λ·I' condition.",
+     "name": "CaratheodoryConjecture.IsUmbilicalPoint",
+     "why_needed": "Umbilical points (second fundamental form proportional to the first / equal principal curvatures) do not exist in Mathlib or the repo; the decomposition table explicitly requires the formalizer to supply it."
+    }
+   ],
+   "per_slot": {
+    "caratheodory_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every convex body K ⊆ ℝ³ (Mathlib `ConvexBody`: convex, compact, nonempty) with nonempty interior whose boundary `frontier K` is a regular C² surface, the set of umbilical points of `frontier K` has `encard ≥ 2`. Umbilical points and regular C² surfaces are absent from Mathlib/the repo and are defined in the file via regular C² local parametrisations (do Carmo's definition) and the condition 'second fundamental form is a scalar multiple of the first fundamental form'."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "caratheodory_conjecture": "/-- **Carathéodory conjecture.** Any convex, closed and twice-differentiable surface in\nthree-dimensional Euclidean space admits at least two umbilical points.\n\nThe surface is the boundary $\\partial K$ of a convex body $K \\subseteq \\mathbb{R}^3$ (a compact\nconvex set) with nonempty interior, and $\\partial K$ is assumed to be a regular $C^2$ surface.\nThe conclusion is that $\\partial K$ has at least two distinct umbilical points, counted without\nmultiplicity or index. -/\n@[category research open, AMS 52 53]\ntheorem caratheodory_conjecture (K : ConvexBody ℝ³) (hK : (interior (K : Set ℝ³)).Nonempty)\n    (hS : IsC2Surface (frontier (K : Set ℝ³))) :\n    2 ≤ {p | IsUmbilicalPoint (frontier (K : Set ℝ³)) p}.encard := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Carathéodory conjecture\n\nThe Carathéodory conjecture states that any convex, closed, and twice-differentiable surface in\nthree-dimensional Euclidean space admits at least two umbilical points, i.e. points at which the\ntwo principal curvatures coincide. The spheroid, with exactly two umbilical points, and the sphere,\nall of whose points are umbilical, show that the bound two is sharp and that the number of\numbilical points can be infinite.\n\nThe conjecture was attributed to Carathéodory by Hamburger in 1924. For a surface to have\nwell-defined umbilical points it must be at least twice differentiable; following the literature\n(e.g. Ghomi–Howard) we assume the surface is $C^2$. The general $C^2$ case is open.\n\n*References:*\n- [Wikipedia, Carathéodory conjecture](https://en.wikipedia.org/wiki/Carath%C3%A9odory_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [arXiv/1101.3031](https://arxiv.org/abs/1101.3031) M. Ghomi and R. Howard, *Normal curvatures of\n  asymptotically constant graphs and Carathéodory's conjecture*\n-/\n\nopen scoped EuclideanGeometry RealInnerProductSpace\n\nnamespace CaratheodoryConjecture\n\n/-- `f` is a *local $C^2$ defining function* for the set $S ⊆ ℝ^3$ on the open set `U`:\n`f` is $C^2$ on `U`, its derivative vanishes nowhere on `U`, and $S ∩ U$ is the zero set of `f`\nin `U`. By the implicit function theorem, $S ∩ U$ is then an embedded $C^2$ surface. -/\nstructure IsLocalDefiningFun (S U : Set ℝ³) (f : ℝ³ → ℝ) : Prop where\n  isOpen : IsOpen U\n  contDiffOn : ContDiffOn ℝ 2 f U\n  fderiv_ne_zero : ∀ x ∈ U, fderiv ℝ f x ≠ 0\n  inter_eq : S ∩ U = {x ∈ U | f x = 0}\n\n/-- A set $S ⊆ ℝ^3$ is a *$C^2$ surface* if every point of `S` has an open neighbourhood `U`\non which `S` is the regular zero set of a $C^2$ function. This is the usual notion of an embedded,\ntwice continuously differentiable surface (without boundary) in $ℝ^3$. -/\ndef IsC2Surface (S : Set ℝ³) : Prop :=\n  ∀ p ∈ S, ∃ U f, IsLocalDefiningFun S U f ∧ p ∈ U\n\n/-- A point `p` of a $C^2$ surface $S ⊆ ℝ^3$ is an *umbilical point* of `S` if the two principal\ncurvatures of `S` at `p` coincide, i.e. the second fundamental form of `S` at `p` is a scalar\nmultiple of the first fundamental form. If `f` is a local $C^2$ defining function for `S`\nnear `p`, then the tangent plane at `p` is $T_p = \\ker Df_p$ and the second fundamental form with\nrespect to the unit normal $∇f_p / \\lVert ∇f_p \\rVert$ is $-D^2f_p / \\lVert Df_p \\rVert$\nrestricted to $T_p$, so `p` is umbilical iff the Hessian $D^2f_p$\nrestricted to $T_p$ is a scalar multiple of the inner product. This condition does not depend on\nthe choice of `f`. Flat points, where both principal curvatures vanish, count as umbilical. -/\ndef IsUmbilicalPoint (S : Set ℝ³) (p : ℝ³) : Prop :=\n  p ∈ S ∧ ∃ U f, IsLocalDefiningFun S U f ∧ p ∈ U ∧ ∃ c : ℝ, ∀ v w : ℝ³,\n    fderiv ℝ f p v = 0 → fderiv ℝ f p w = 0 → fderiv ℝ (fderiv ℝ f) p v w = c * ⟪v, w⟫\n\n/-- **Carathéodory conjecture.** Any convex, closed, and twice-differentiable surface in\nthree-dimensional Euclidean space admits at least two umbilical points.\n\nHere a convex closed surface is the boundary `frontier K` of a compact convex set $K ⊆ ℝ^3$ with\nnonempty interior, and twice-differentiable means that this boundary is a $C^2$ surface. -/\n@[category research open, AMS 52 53]\ntheorem caratheodory_conjecture (K : Set ℝ³) (hK : Convex ℝ K) (hKc : IsCompact K)\n    (hKi : (interior K).Nonempty) (hS : IsC2Surface (frontier K)) :\n    ∃ p q, p ≠ q ∧ IsUmbilicalPoint (frontier K) p ∧ IsUmbilicalPoint (frontier K) q := by\n  sorry\n\n/-- The function $x ↦ \\lVert x \\rVert^2 - 1$ is a local $C^2$ defining function for the unit\nsphere on the complement of the origin. -/\n@[category test, AMS 53]\ntheorem isLocalDefiningFun_unitSphere :\n    IsLocalDefiningFun (Metric.sphere (0 : ℝ³) 1) {0}ᶜ (fun x => ‖x‖ ^ 2 - 1) where\n  isOpen := isOpen_compl_singleton\n  contDiffOn := ((contDiff_norm_sq ℝ).sub contDiff_const).contDiffOn\n  fderiv_ne_zero x hx := by\n    rw [((hasStrictFDerivAt_norm_sq x).hasFDerivAt.sub_const 1).fderiv]\n    intro h\n    have := congrArg (· x) h\n    simp [Set.mem_compl_singleton_iff.mp hx] at this\n  inter_eq := by\n    ext x\n    simp only [Set.mem_inter_iff, Set.mem_setOf_eq, mem_sphere_zero_iff_norm, sub_eq_zero,\n      pow_eq_one_iff_of_nonneg (norm_nonneg x) two_ne_zero]\n    exact and_comm\n\n/-- The unit sphere is a $C^2$ surface. -/\n@[category test, AMS 53]\ntheorem isC2Surface_unitSphere : IsC2Surface (Metric.sphere (0 : ℝ³) 1) := fun p hp =>\n  ⟨_, _, isLocalDefiningFun_unitSphere, ne_zero_of_mem_unit_sphere ⟨p, hp⟩⟩\n\n/-- Every point of the unit sphere is an umbilical point. -/\n@[category test, AMS 53]\ntheorem isUmbilicalPoint_unitSphere (p : ℝ³) (hp : p ∈ Metric.sphere (0 : ℝ³) 1) :\n    IsUmbilicalPoint (Metric.sphere (0 : ℝ³) 1) p := by\n  refine ⟨hp, _, _, isLocalDefiningFun_unitSphere, ne_zero_of_mem_unit_sphere ⟨p, hp⟩, 2,\n    fun v w _ _ => ?_⟩\n  have : fderiv ℝ (fun x : ℝ³ => ‖x‖ ^ 2 - 1) = ⇑((2 : ℕ) • innerSL ℝ) := by\n    funext x\n    exact ((hasStrictFDerivAt_norm_sq x).hasFDerivAt.sub_const 1).fderiv\n  rw [this, ContinuousLinearMap.fderiv]\n  simp\n\nend CaratheodoryConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (compact convex body with nonempty interior, C² boundary, umbilic = II proportional to I including flat points, at least two distinct points, category research open) are all followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Convex closed surface' is modeled as `frontier K` for `K : Set ℝ³` with `Convex ℝ K`, `IsCompact K`, `(interior K).Nonempty` (a convex body). Nonempty interior is required (per the decomposition notes) so that the boundary is a genuine closed surface homeomorphic to S²; without it the boundary would be a degenerate lower-dimensional set.",
+    "'Twice-differentiable' is taken to mean C² (twice continuously differentiable), `ContDiffOn ℝ 2 f U`, as in the decomposition notes and Ghomi–Howard's C² formulation. A C² surface is defined as a set that is locally the zero set of a C² function with nowhere-vanishing derivative (`IsLocalDefiningFun` + `IsC2Surface`); by the implicit function theorem this is equivalent to being an embedded C² surface without boundary.",
+    "Umbilical point: `IsUmbilicalPoint S p` requires `p ∈ S` and, for some local C² defining function f near p, the existence of a scalar c with `D²f_p(v,w) = c⟪v,w⟫` for all v, w in the tangent plane `ker Df_p`. This encodes 'second fundamental form is a scalar multiple of the first fundamental form' since II = -D²f/‖Df‖ on the tangent plane (with unit normal ∇f/‖∇f‖). The condition is independent of the choice of defining function (two defining functions have proportional Hessians on the tangent plane), so the `∃ f` formulation is equivalent to a `∀ f` formulation given the surface hypothesis; a reviewer should check they agree. c = 0 is allowed, so flat points count as umbilical (only 'convex', not 'strictly convex', is assumed).",
+    "The Hessian is written as `fderiv ℝ (fderiv ℝ f) p v w`; because f is C² on the open set U ∋ p this is the true second derivative (no junk value), and since it is symmetric for C² functions the bilinear condition is equivalent to the quadratic-form condition on principal curvatures.",
+    "'At least two umbilical points' is formalized as `∃ p q, p ≠ q ∧ IsUmbilicalPoint (frontier K) p ∧ IsUmbilicalPoint (frontier K) q` — two distinct points, not counted with index/multiplicity.",
+    "Category kept as `research open` per the decomposition table; the article's mention of an announced C^∞ counterexample is not recorded in the file. AMS tags 52 (convex geometry) and 53 (differential geometry).",
+    "Three `category test` lemmas are included and fully proved: `x ↦ ‖x‖² − 1` is a local defining function for the unit sphere on `{0}ᶜ`, the unit sphere is a C² surface, and every point of the unit sphere is umbilical (with c = 2). These verify that the hypotheses of the conjecture are satisfiable (closed unit ball) and that the umbilic definition behaves as expected."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `IsManifold`/`ContMDiff`/`IsImmersion`/`IsSmoothEmbedding` (manifold machinery) — these give abstract C² manifolds/embeddings but no second fundamental form, and a parametrized approach would require charts; `ContDiffOn` alone does not encode 'level set with nonvanishing gradient'.",
+     "name": "CaratheodoryConjecture.IsLocalDefiningFun",
+     "why_needed": "Mathlib has no notion of a (C²) embedded surface in ℝ³ given by a local regular defining function; needed to express both the C² regularity of the surface and the tangent plane / Hessian used for umbilics."
+    },
+    {
+     "closest_existing_considered": "`IsManifold 𝓘(ℝ, ℝ²) 2 S` on a subtype with a `ChartedSpace` instance (as used in Mathoverflow/1973.lean) — abstract, and does not tie the smooth structure to the ambient embedding needed for curvature.",
+     "name": "CaratheodoryConjecture.IsC2Surface",
+     "why_needed": "Expresses that a subset of ℝ³ is an embedded C² surface without boundary (locally a regular C² level set); no such predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib; `fderiv ℝ (fderiv ℝ f) p` and `inner ℝ` are the primitives used to build it.",
+     "name": "CaratheodoryConjecture.IsUmbilicalPoint",
+     "why_needed": "Mathlib has no second fundamental form, principal curvatures, or umbilic points (grep for umbilic/secondFundamental/principal curvature returned nothing). Defined via the Hessian of a local defining function restricted to the tangent plane being a scalar multiple of the inner product."
+    }
+   ],
+   "per_slot": {
+    "caratheodory_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every K ⊆ ℝ³ convex, compact, with nonempty interior, whose boundary `frontier K` is a C² surface (locally the regular zero set of a C² function), there exist two distinct umbilical points of `frontier K`. Mathlib has no notion of umbilic / second fundamental form / C² surface in ℝ³, so three bespoke definitions were added in the problem file (namespace CaratheodoryConjecture) and validated by fully proved `test` lemmas on the unit sphere."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "caratheodory_conjecture": "/-- **Carathéodory conjecture.** Any convex, closed, and twice-differentiable surface in\nthree-dimensional Euclidean space admits at least two umbilical points.\n\nHere a convex closed surface is the boundary `frontier K` of a compact convex set $K ⊆ ℝ^3$ with\nnonempty interior, and twice-differentiable means that this boundary is a $C^2$ surface. -/\n@[category research open, AMS 52 53]\ntheorem caratheodory_conjecture (K : Set ℝ³) (hK : Convex ℝ K) (hKc : IsCompact K)\n    (hKi : (interior K).Nonempty) (hS : IsC2Surface (frontier K)) :\n    ∃ p q, p ≠ q ∧ IsUmbilicalPoint (frontier K) p ∧ IsUmbilicalPoint (frontier K) q := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Carathéodory conjecture\n\nThe Carathéodory conjecture asserts that every closed convex `C²` surface in three-dimensional\nEuclidean space has at least two umbilical points.\n\n*References:*\n- [Wikipedia, Carathéodory conjecture](https://en.wikipedia.org/wiki/Carath%C3%A9odory_conjecture)\n-/\n\nopen Set Topology\nopen scoped ContDiff InnerProductSpace\n\nnamespace CaratheodoryConjecture\n\nlocal notation \"E3\" => EuclideanSpace ℝ (Fin 3)\n\n/-- `F` is a regular `C²` local defining function for `S` at `p`: near `p`, the set `S` is the\nzero set of `F`, and the derivative of `F` at `p` is nonzero. -/\ndef IsRegularLevelSetAt (S : Set E3) (p : E3) (F : E3 → ℝ) : Prop :=\n  ∃ U : Set E3, IsOpen U ∧ p ∈ U ∧ ContDiffOn ℝ 2 F U ∧\n    (∀ x ∈ U, (x ∈ S ↔ F x = 0)) ∧ fderiv ℝ F p ≠ 0\n\n/-- A subset of three-dimensional Euclidean space is a `C²` embedded surface if it is locally a\nregular level set of a `C²` real-valued function. -/\ndef IsC2EmbeddedSurface (S : Set E3) : Prop :=\n  ∀ p ∈ S, ∃ F : E3 → ℝ, IsRegularLevelSetAt S p F\n\n/-- A point of a `C²` embedded surface is umbilical if, for a regular local defining function,\nthe Hessian restricted to the tangent plane is a scalar multiple of the Euclidean first\nfundamental form. This includes flat points, for which the scalar may be zero. -/\ndef IsUmbilic (S : Set E3) (p : E3) : Prop :=\n  p ∈ S ∧ ∃ (F : E3 → ℝ) (c : ℝ), IsRegularLevelSetAt S p F ∧\n    ∀ v w : E3, fderiv ℝ F p v = 0 → fderiv ℝ F p w = 0 →\n      iteratedFDeriv ℝ 2 F p ![v, w] = c * ⟪v, w⟫_ℝ\n\n/--\n**Carathéodory conjecture.** The boundary of every compact convex body in three-dimensional\nEuclidean space with nonempty interior, when it is a twice continuously differentiable embedded\nsurface, contains at least two distinct umbilical points.\n-/\n@[category research open, AMS 53]\ntheorem caratheodory_conjecture :\n    ∀ K : Set E3, Convex ℝ K → IsCompact K → (interior K).Nonempty →\n      IsC2EmbeddedSurface (frontier K) →\n        ∃ p q : E3, p ≠ q ∧ IsUmbilic (frontier K) p ∧ IsUmbilic (frontier K) q := by\n  sorry\n\nend CaratheodoryConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled a closed convex surface as the frontier of a compact convex set in `EuclideanSpace ℝ (Fin 3)` with nonempty interior, following the fixed decomposition's compact-convex-body reading. Compactness supplies closedness, and nonempty interior excludes lower-dimensional convex sets.",
+    "Interpreted twice differentiable as `C²` (twice continuously differentiable), using local regular level-set equations with `ContDiffOn ℝ 2`, as required by the decomposition and the article's well-posedness discussion.",
+    "Defined the tangent plane at a regular level-set point as the kernel of the defining function's Fréchet derivative. Defined umbilicity by requiring the Hessian restricted to this tangent plane to be a scalar multiple of the Euclidean inner product. This is equivalent to the second fundamental form being a scalar multiple of the first; normalization and orientation of the normal only alter the scalar.",
+    "Allowed the scalar in the umbilic condition to be zero, thereby including flat points as required for merely convex rather than strictly convex surfaces.",
+    "Expressed cardinality at least two by two explicitly distinct umbilical boundary points, with no index or multiplicity.",
+    "Kept the theorem tagged `research open` as directed, despite the background article's mention of an announced future counterexample."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `ContDiffOn`, `fderiv`, `iteratedFDeriv`, and manifold embedding APIs, but no predicate for a subset being locally a regular hypersurface level set.",
+     "name": "IsRegularLevelSetAt",
+     "why_needed": "Packages the local regular `C²` level-set data needed both to express an embedded surface and to define its tangent plane and Hessian-based second fundamental form."
+    },
+    {
+     "closest_existing_considered": "Mathlib's abstract charted-manifold and smooth-embedding APIs do not directly characterize a given subset of Euclidean space as a `C²` embedded surface.",
+     "name": "IsC2EmbeddedSurface",
+     "why_needed": "States that every surface point has a regular `C²` local defining function, giving a faithful subset-based notion of a twice continuously differentiable embedded surface."
+    },
+    {
+     "closest_existing_considered": "Hard searches for umbilics, principal curvatures, shape operators, Weingarten maps, and second fundamental forms found no applicable differential-geometric primitive; the definition therefore uses existing `fderiv`, `iteratedFDeriv`, and Euclidean inner product primitives.",
+     "name": "IsUmbilic",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no umbilical-point predicate. The definition supplies the equality of the two fundamental forms on the tangent plane."
+    }
+   ],
+   "per_slot": {
+    "caratheodory_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "caratheodory_conjecture": "/--\n**Carathéodory conjecture.** The boundary of every compact convex body in three-dimensional\nEuclidean space with nonempty interior, when it is a twice continuously differentiable embedded\nsurface, contains at least two distinct umbilical points.\n-/\n@[category research open, AMS 53]\ntheorem caratheodory_conjecture :\n    ∀ K : Set E3, Convex ℝ K → IsCompact K → (interior K).Nonempty →\n      IsC2EmbeddedSurface (frontier K) →\n        ∃ p q : E3, p ≠ q ∧ IsUmbilic (frontier K) p ∧ IsUmbilic (frontier K) q := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Carathéodory conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Carath%C3%A9odory_conjecture)\n-/\n\nnamespace CaratheodoryConjecture\n\nopen Set\n\nlocal notation \"Plane\" => EuclideanSpace ℝ (Fin 2)\nlocal notation \"Space\" => EuclideanSpace ℝ (Fin 3)\n\n/-- A regular embedded $C^2$ parametrization of a neighborhood of `p` in `S`,\nwith the parameter value $0$ corresponding to `p`. -/\ndef IsC2SurfaceChart (S : Set Space) (p : Space) (V : Set Plane) (φ : Plane → Space) : Prop :=\n  IsOpen V ∧\n  0 ∈ V ∧\n  ContDiffOn ℝ 2 φ V ∧\n  φ 0 = p ∧\n  Topology.IsEmbedding (Set.restrict V φ) ∧\n  (∀ x ∈ V, Function.Injective (fderiv ℝ φ x)) ∧\n  ∃ U : Set Space, IsOpen U ∧ p ∈ U ∧ S ∩ U = φ '' V\n\n/-- A subset of Euclidean three-space which is locally a regular embedded $C^2$ surface. -/\ndef IsC2EmbeddedSurface (S : Set Space) : Prop :=\n  ∀ p ∈ S, ∃ V : Set Plane, ∃ φ : Plane → Space, IsC2SurfaceChart S p V φ\n\n/-- A point `p` of a $C^2$ surface `S` is umbilic if, in a local regular parametrization\n`φ` centered at `p`, the second fundamental form is a scalar multiple of the first fundamental\nform. Flat umbilics, for which the scalar is zero, are included. -/\ndef IsUmbilic (S : Set Space) (p : Space) : Prop :=\n  ∃ (V : Set Plane) (φ : Plane → Space), IsC2SurfaceChart S p V φ ∧\n    ∃ (n : Space) (κ : ℝ),\n      ‖n‖ = 1 ∧\n      (∀ u : Plane, inner ℝ n (fderiv ℝ φ 0 u) = 0) ∧\n      ∀ u v : Plane,\n        inner ℝ n ((fderiv ℝ (fderiv ℝ φ) 0 u) v) =\n          κ * inner ℝ (fderiv ℝ φ 0 u) (fderiv ℝ φ 0 v)\n\n/--\nThe Carathéodory conjecture: the $C^2$ boundary of every compact convex body in\nthree-dimensional Euclidean space with nonempty interior has at least two distinct umbilic\npoints. An umbilic is a point where the two principal curvatures coincide; flat points are\nincluded.\n-/\n@[category research open, AMS 53]\ntheorem caratheodory_conjecture :\n    ∀ K : Set Space,\n      Convex ℝ K →\n      IsCompact K →\n      (interior K).Nonempty →\n      IsC2EmbeddedSurface (frontier K) →\n      ∃ p q : Space,\n        p ≠ q ∧ IsUmbilic (frontier K) p ∧ IsUmbilic (frontier K) q := by\n  sorry\n\nend CaratheodoryConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted a convex, closed surface as the frontier of a compact convex body in `EuclideanSpace ℝ (Fin 3)` with nonempty interior, as prescribed by the decomposition table. Compactness captures closedness/boundedness, while nonempty interior excludes degenerate lower-dimensional convex sets.",
+    "Interpreted “twice-differentiable” as `C²`: every boundary point has a regular topologically embedded parametrization from an open subset of `EuclideanSpace ℝ (Fin 2)` satisfying `ContDiffOn ℝ 2`.",
+    "Defined an umbilic by the chart formula `II = κ I`: for a unit normal `n`, the normal component of the second derivative of the parametrization equals a real scalar times the pullback Euclidean inner product for every pair of tangent vectors. This is equivalent to equality of the two principal curvatures and includes flat points by allowing `κ = 0`.",
+    "Expressed “at least two” using two witnesses with an explicit inequality, so points are distinct and are not counted with multiplicity or index.",
+    "Kept the conjecture tagged `research open`, following the supplied status despite the background article's discussion of an announced counterexample."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib provides `ContDiffOn`, `fderiv`, and `Topology.IsEmbedding`, but no combined regular C² surface-chart predicate.",
+     "name": "IsC2SurfaceChart",
+     "why_needed": "Packages the local regular embedded C² parametrizations needed to describe a C² surface boundary and evaluate its first and second fundamental forms."
+    },
+    {
+     "closest_existing_considered": "Mathlib's manifold APIs describe abstract charted manifolds and smooth maps, but no predicate was found saying that an arbitrary subset is a C² embedded hypersurface.",
+     "name": "IsC2EmbeddedSurface",
+     "why_needed": "States that every point of a subset of Euclidean three-space admits a regular embedded C² surface chart."
+    },
+    {
+     "closest_existing_considered": "The closest available primitives are `fderiv`, the iterated derivative `fderiv ℝ (fderiv ℝ φ)`, and the Euclidean inner product; these are used directly to state that the second fundamental form is a scalar multiple of the first.",
+     "name": "IsUmbilic",
+     "why_needed": "Mathlib has no definition of an umbilical point, second fundamental form, shape operator, normal curvature, or principal curvature suitable for this conjecture."
+    }
+   ],
+   "per_slot": {
+    "caratheodory_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "caratheodory_conjecture": "/--\nThe Carathéodory conjecture: the $C^2$ boundary of every compact convex body in\nthree-dimensional Euclidean space with nonempty interior has at least two distinct umbilic\npoints. An umbilic is a point where the two principal curvatures coincide; flat points are\nincluded.\n-/\n@[category research open, AMS 53]\ntheorem caratheodory_conjecture :\n    ∀ K : Set Space,\n      Convex ℝ K →\n      IsCompact K →\n      (interior K).Nonempty →\n      IsC2EmbeddedSurface (frontier K) →\n      ∃ p q : Space,\n        p ≠ q ∧ IsUmbilic (frontier K) p ∧ IsUmbilic (frontier K) q := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Carathéodory conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Carath%C3%A9odory_conjecture)\n-/\n\nopen Filter Topology\n\nnamespace CaratheodoryConjecture\n\nabbrev E := EuclideanSpace ℝ (Fin 3)\n\n/-- A function regularly defines `S` near `p` if it is `C²` near `p`, has nonzero derivative\nat `p`, and its zero set agrees with `S` in a neighbourhood of `p`. -/\ndef IsLocalDefiningFunction (S : Set E) (p : E) (f : E → ℝ) : Prop :=\n  ContDiffAt ℝ 2 f p ∧ fderiv ℝ f p ≠ 0 ∧ S =ᶠ[𝓝 p] {x | f x = 0}\n\n/-- A subset of three-dimensional Euclidean space is a `C²` embedded surface if it has a regular\nlocal defining function at every one of its points. -/\ndef IsC2Surface (S : Set E) : Prop :=\n  ∀ p ∈ S, ∃ f : E → ℝ, IsLocalDefiningFunction S p f\n\n/-- A point `p` of a `C²` embedded surface `S` is umbilical if, for a regular local defining\nfunction, its Hessian restricted to the tangent plane is a scalar multiple of the Euclidean inner\nproduct. Equivalently, the two principal curvatures at `p` coincide. The scalar may be zero, so\nflat umbilical points are included. -/\ndef IsUmbilicalPoint (S : Set E) (p : E) : Prop :=\n  p ∈ S ∧ ∃ (f : E → ℝ), IsLocalDefiningFunction S p f ∧ ∃ c : ℝ, ∀ v w : E,\n    fderiv ℝ f p v = 0 → fderiv ℝ f p w = 0 →\n      iteratedFDeriv ℝ 2 f p ![v, w] = c * inner ℝ v w\n\n/-- **Carathéodory conjecture.** The boundary of every compact convex body in three-dimensional\nEuclidean space with nonempty interior, when it is a twice continuously differentiable embedded\nsurface, has at least two distinct umbilical points. -/\n@[category research open, AMS 53]\ntheorem caratheodory_conjecture :\n    ∀ K : Set E, Convex ℝ K → IsCompact K → (interior K).Nonempty →\n      IsC2Surface (frontier K) → ∃ p q : E, p ≠ q ∧\n        IsUmbilicalPoint (frontier K) p ∧ IsUmbilicalPoint (frontier K) q := by\n  sorry\n\nend CaratheodoryConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modelled a convex closed surface as the frontier of a compact convex subset `K` of three-dimensional Euclidean space, with `(interior K).Nonempty` excluding lower-dimensional degenerate convex sets, following the fixed decomposition.",
+    "Interpreted twice differentiable as `C²`: every boundary point has a local `ContDiffAt ℝ 2` regular defining function whose derivative is nonzero and whose zero set locally equals the boundary.",
+    "Defined umbilicity using a regular local defining function: its Hessian, restricted to the tangent plane (the kernel of the derivative), is a scalar multiple of the ambient Euclidean inner product. This is the defining-function form of the second fundamental form being a scalar multiple of the first fundamental form.",
+    "Allowed the scalar in the umbilic condition to be zero, thereby including flat points as required for merely convex rather than strictly convex surfaces.",
+    "Expressed 'at least two' by existentially quantifying two unequal points, so points are distinct and are not counted with index or multiplicity.",
+    "Kept the declaration in category `research open` despite the background article's mention of an announced future counterexample, as explicitly required."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `ContDiffAt`, `fderiv`, neighborhood filters, and manifold APIs; none combines local zero-set agreement with the regular-value condition.",
+     "name": "IsLocalDefiningFunction",
+     "why_needed": "Mathlib has differential calculus but no predicate saying that a function regularly defines a hypersurface near a point."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `ContDiffAt`, `ContDiffOn`, and `IsManifold` infrastructure; there is no ready set-level `C²` embedded hypersurface predicate applicable here.",
+     "name": "IsC2Surface",
+     "why_needed": "A faithful hypothesis must say that the boundary is a twice continuously differentiable embedded surface; no directly suitable set-level predicate was found."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `iteratedFDeriv` Hessian and Euclidean `inner`; the bespoke predicate builds the standard regular-level-set characterization from these existing primitives.",
+     "name": "IsUmbilicalPoint",
+     "why_needed": "Umbilical points, principal curvatures, and second fundamental forms are absent from Mathlib and FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "caratheodory_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "caratheodory_conjecture": "/-- **Carathéodory conjecture.** The boundary of every compact convex body in three-dimensional\nEuclidean space with nonempty interior, when it is a twice continuously differentiable embedded\nsurface, has at least two distinct umbilical points. -/\n@[category research open, AMS 53]\ntheorem caratheodory_conjecture :\n    ∀ K : Set E, Convex ℝ K → IsCompact K → (interior K).Nonempty →\n      IsC2Surface (frontier K) → ∃ p q : E, p ≠ q ∧\n        IsUmbilicalPoint (frontier K) p ∧ IsUmbilicalPoint (frontier K) q := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Carathéodory conjecture\n\nThe Carathéodory conjecture states that any convex, closed and twice-differentiable surface in\nthree-dimensional Euclidean space admits at least two umbilical points, i.e. points at which the\ntwo principal curvatures coincide.\n\nFollowing Ghomi–Howard, a *closed convex surface* is the boundary of a compact convex set with\nnonempty interior in $\\mathbb{R}^3$, and the surface is required to be of class $C^2$, the\nminimal regularity for which umbilical points are well defined. A point $p$ of a $C^2$ surface\n$S$ is *umbilical* if the second fundamental form of $S$ at $p$ is a scalar multiple of the first\nfundamental form; flat points (both principal curvatures zero) are included.\n\nMathlib has no notion of the second fundamental form, so we describe $C^2$ surfaces by local\ndefining functions: near each of its points, $S$ is the regular zero set of a $C^2$ function\n$F$. The tangent plane at $p$ is then $\\ker dF_p$, and the second fundamental form of $S$ at $p$\n(with respect to the unit normal $\\nabla F_p / \\|\\nabla F_p\\|$) is $-D^2F_p / \\|\\nabla F_p\\|$\nrestricted to the tangent plane. Hence $p$ is umbilical iff $D^2F_p(v, w) = c \\langle v, w\\rangle$\nfor all tangent vectors $v, w$ and some constant $c$; this does not depend on the choice of $F$.\n\n*References:*\n- [Wikipedia, Carathéodory conjecture](https://en.wikipedia.org/wiki/Carath%C3%A9odory_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- M. Ghomi, R. Howard, *Normal curvatures of asymptotically constant graphs and Carathéodory's\n  conjecture*, [arXiv:1101.3031](https://arxiv.org/abs/1101.3031)\n- B. Guilfoyle, W. Klingenberg, *Proof of the Carathéodory conjecture*,\n  [arXiv:0808.0851](https://arxiv.org/abs/0808.0851)\n-/\n\nopen scoped EuclideanGeometry InnerProductSpace\n\nnamespace CaratheodoryConjecture\n\n/-- `F` is a *local `C²` defining function* of the set `S ⊆ ℝ³` at `p` on `V`: the set `V` is an\nopen neighbourhood of `p`, `F` is `C²` on `V` with nowhere vanishing derivative on `V`, and the\npoints of `S` in `V` are exactly the zeros of `F` in `V`. -/\nstructure IsLocalDefiningFun (S : Set ℝ³) (p : ℝ³) (F : ℝ³ → ℝ) (V : Set ℝ³) : Prop where\n  isOpen : IsOpen V\n  mem : p ∈ V\n  contDiffOn : ContDiffOn ℝ 2 F V\n  fderiv_ne_zero : ∀ x ∈ V, fderiv ℝ F x ≠ 0\n  mem_iff : ∀ x ∈ V, x ∈ S ↔ F x = 0\n\n/-- A set `S ⊆ ℝ³` is a *`C²` surface* if near each of its points it is the regular zero set of\na `C²` function, i.e. `S` is a `C²` embedded submanifold of `ℝ³` of dimension two. -/\ndef IsC2Surface (S : Set ℝ³) : Prop :=\n  ∀ p ∈ S, ∃ F V, IsLocalDefiningFun S p F V\n\n/-- A point `p` of a set `S ⊆ ℝ³` is an *umbilical point* of `S` if `S` is a `C²` surface near\n`p` and the second fundamental form of `S` at `p` is a scalar multiple of the first fundamental\nform, i.e. the two principal curvatures of `S` at `p` coincide. In terms of a local defining\nfunction `F` of `S` at `p`, this says that `D²F_p (v, w) = c * ⟪v, w⟫` for some constant `c` and\nall `v, w` in the tangent plane `ker dF_p`. Flat points (`c = 0`) are umbilical. -/\ndef IsUmbilicalPoint (S : Set ℝ³) (p : ℝ³) : Prop :=\n  p ∈ S ∧ ∃ F V, IsLocalDefiningFun S p F V ∧ ∃ c : ℝ, ∀ v w : ℝ³,\n    fderiv ℝ F p v = 0 → fderiv ℝ F p w = 0 → iteratedFDeriv ℝ 2 F p ![v, w] = c * ⟪v, w⟫_ℝ\n\n/-- **Carathéodory conjecture.** Any convex, closed and twice-differentiable surface in\nthree-dimensional Euclidean space admits at least two umbilical points.\n\nPrecisely: if $K \\subseteq \\mathbb{R}^3$ is a compact convex set with nonempty interior whose\nboundary $\\partial K$ is a $C^2$ surface, then $\\partial K$ has at least two distinct umbilical\npoints, i.e. points at which the two principal curvatures of $\\partial K$ coincide. -/\n@[category research open, AMS 52 53]\ntheorem caratheodory_conjecture (K : ConvexBody ℝ³) (hK : (interior (K : Set ℝ³)).Nonempty)\n    (hS : IsC2Surface (frontier (K : Set ℝ³))) :\n    ∃ p q, p ≠ q ∧ IsUmbilicalPoint (frontier (K : Set ℝ³)) p ∧\n      IsUmbilicalPoint (frontier (K : Set ℝ³)) q := by\n  sorry\n\n/-- The function `x ↦ ‖x‖² - 1` is a local `C²` defining function of the unit sphere at each of\nits points. -/\n@[category test, AMS 52 53]\ntheorem isLocalDefiningFun_sphere (p : ℝ³) (hp : p ∈ Metric.sphere (0 : ℝ³) 1) :\n    IsLocalDefiningFun (Metric.sphere (0 : ℝ³) 1) p (fun x => ‖x‖ ^ 2 - 1) {0}ᶜ where\n  isOpen := isOpen_compl_singleton\n  mem := by\n    simp only [Set.mem_compl_iff, Set.mem_singleton_iff]\n    rintro rfl\n    simp at hp\n  contDiffOn := ((contDiff_norm_sq ℝ).sub contDiff_const).contDiffOn\n  fderiv_ne_zero x hx h := by\n    rw [((hasStrictFDerivAt_norm_sq x).hasFDerivAt.sub_const 1).fderiv] at h\n    have := congrArg (fun f => f x) h\n    simp at this\n    exact hx this\n  mem_iff x _ := by\n    rw [mem_sphere_zero_iff_norm, sub_eq_zero, pow_eq_one_iff_of_nonneg (norm_nonneg x) two_ne_zero]\n\n/-- The unit sphere is a `C²` surface. -/\n@[category test, AMS 52 53]\ntheorem isC2Surface_sphere : IsC2Surface (Metric.sphere (0 : ℝ³) 1) :=\n  fun p hp => ⟨_, _, isLocalDefiningFun_sphere p hp⟩\n\n/-- Every point of the unit sphere is umbilical. -/\n@[category test, AMS 52 53]\ntheorem isUmbilicalPoint_sphere (p : ℝ³) (hp : p ∈ Metric.sphere (0 : ℝ³) 1) :\n    IsUmbilicalPoint (Metric.sphere (0 : ℝ³) 1) p := by\n  refine ⟨hp, _, _, isLocalDefiningFun_sphere p hp, 2, fun v w _ _ => ?_⟩\n  have h1 : fderiv ℝ (fun x : ℝ³ => ‖x‖ ^ 2 - 1) = fun x => 2 • innerSL ℝ x := by\n    ext x : 1\n    exact ((hasStrictFDerivAt_norm_sq x).hasFDerivAt.sub_const 1).fderiv\n  have h2 : (fun x : ℝ³ => 2 • innerSL ℝ x) = ⇑(2 • innerSL ℝ) := by\n    ext x : 1\n    simp\n  rw [iteratedFDeriv_two_apply, h1, h2, ContinuousLinearMap.fderiv]\n  simp\n\nend CaratheodoryConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The single-slot decomposition matches the statement; the notes' choices (compact convex body with nonempty interior, C² boundary, umbilic = equal principal curvatures including flat points, at least two distinct points, category research open) were all followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Convex, closed surface' is read (following Ghomi–Howard, arXiv:1101.3031, and the decomposition notes) as the boundary `frontier K` of a compact convex set `K ⊆ ℝ³ = EuclideanSpace ℝ (Fin 3)` with nonempty interior; `K` is taken as a Mathlib `ConvexBody ℝ³` plus the hypothesis `(interior K).Nonempty`. Only convexity (not strict convexity) is assumed, as in the Wikipedia statement.",
+    "'Twice-differentiable' is read as C² (`ContDiffOn ℝ 2`), per the article ('at least twice differentiable' is needed for umbilics to be well defined) and Ghomi–Howard's C² formulation, as the decomposition notes prescribe.",
+    "A C² surface is defined as a set that is locally the regular zero set of a C² function (`IsLocalDefiningFun`: open neighbourhood `V`, `ContDiffOn ℝ 2 F V`, `fderiv ℝ F x ≠ 0` on `V`, `S ∩ V = {F = 0} ∩ V`). This is one of the standard equivalent definitions of a C² embedded 2-dimensional submanifold of ℝ³ (equivalent to local C² regular parametrisations / local C² graphs by the implicit function theorem). Mathlib's `IsSmoothEmbedding` was considered but rejected because computing the second fundamental form through manifold charts would be far heavier and less transparent.",
+    "Umbilical point: `p ∈ S` and there is a local defining function `F` of `S` at `p` and a constant `c` with `D²F_p(v, w) = c * ⟪v, w⟫` for all `v, w ∈ ker dF_p`. Since the second fundamental form of `{F = 0}` w.r.t. the normal `∇F/‖∇F‖` is `-D²F_p/‖∇F_p‖` on the tangent plane, this is exactly 'second fundamental form is a scalar multiple of the first', i.e. equal principal curvatures; it is independent of the choice of `F` (different local defining functions give the same restricted Hessian up to a nonzero factor), so the existential quantifier over `F` is harmless. Flat points (`c = 0`) count as umbilical, as required since only convexity is assumed.",
+    "The second derivative is taken as the global `iteratedFDeriv ℝ 2 F p`; since `F` is C² on an open neighbourhood of `p`, this is the genuine second derivative (no junk values are reachable).",
+    "'At least two umbilical points' is formalised as `∃ p q, p ≠ q ∧ IsUmbilicalPoint (frontier K) p ∧ IsUmbilicalPoint (frontier K) q` (distinct points, no index/multiplicity).",
+    "The hypothesis `(interior K).Nonempty` is likely implied by `IsC2Surface (frontier K)` for a compact convex `K`, but it is kept because it is part of the standard definition of a closed convex surface and of the decomposition notes.",
+    "Category kept as `research open` despite the article's mention of an announced (2026) C^∞ counterexample, as instructed.",
+    "Three `category test` lemmas with full proofs are included as sanity checks of the bespoke definitions: `x ↦ ‖x‖² - 1` is a local defining function of the unit sphere, the unit sphere is a C² surface, and every point of the unit sphere is umbilical (matching the article's remark that the sphere is the maximal-umbilic case)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Manifold.IsSmoothEmbedding` / `IsImmersion` (charted-space based; would require chart computations to express the second fundamental form), and Mathlib's `ContDiffOn`/`fderiv` (used as building blocks).",
+     "name": "CaratheodoryConjecture.IsLocalDefiningFun",
+     "why_needed": "Mathlib has no notion of a C^k hypersurface given as a regular level set; this structure records that `F` is C² on an open neighbourhood `V` of `p`, has nonvanishing derivative on `V`, and that `S ∩ V` is the zero set of `F` in `V`."
+    },
+    {
+     "closest_existing_considered": "Mathlib `Manifold.IsSmoothEmbedding (𝓡 2) 𝓘(ℝ, E) 2 φ` for a map from the sphere; rejected in favour of the local-defining-function formulation for transparency.",
+     "name": "CaratheodoryConjecture.IsC2Surface",
+     "why_needed": "Needed to state that the boundary of the convex body is a C² surface; Mathlib has no predicate 'this subset of ℝ³ is a C² embedded 2-submanifold'."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or FormalConjecturesForMathlib; searched for curvature/umbilic/second fundamental form. Built from `fderiv`, `iteratedFDeriv` and the real inner product.",
+     "name": "CaratheodoryConjecture.IsUmbilicalPoint",
+     "why_needed": "Umbilical points (equal principal curvatures / second fundamental form proportional to the first) are absent from Mathlib, which has no second fundamental form, shape operator or principal curvatures."
+    }
+   ],
+   "per_slot": {
+    "caratheodory_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every `K : ConvexBody ℝ³` (compact, convex, nonempty) with nonempty interior whose boundary `frontier K` is a C² surface, there exist two distinct points `p ≠ q` of `frontier K` that are umbilical. C² surfaces and umbilical points are not in Mathlib or FormalConjecturesForMathlib, so they are defined in the file via local C² defining functions (regular level sets); the umbilic condition is that the Hessian of a local defining function restricted to the tangent plane `ker dF_p` is a scalar multiple of the inner product, i.e. second fundamental form ∝ first fundamental form (flat points included). Category `research open`, AMS 52 53."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "caratheodory_conjecture": "/-- **Carathéodory conjecture.** Any convex, closed and twice-differentiable surface in\nthree-dimensional Euclidean space admits at least two umbilical points.\n\nPrecisely: if $K \\subseteq \\mathbb{R}^3$ is a compact convex set with nonempty interior whose\nboundary $\\partial K$ is a $C^2$ surface, then $\\partial K$ has at least two distinct umbilical\npoints, i.e. points at which the two principal curvatures of $\\partial K$ coincide. -/\n@[category research open, AMS 52 53]\ntheorem caratheodory_conjecture (K : ConvexBody ℝ³) (hK : (interior (K : Set ℝ³)).Nonempty)\n    (hS : IsC2Surface (frontier (K : Set ℝ³))) :\n    ∃ p q, p ≠ q ∧ IsUmbilicalPoint (frontier (K : Set ℝ³)) p ∧\n      IsUmbilicalPoint (frontier (K : Set ℝ³)) q := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "caratheodory_conjecture": "c01"
+ },
+ "id": "wp-caratheodory-conjecture",
+ "main_attempt": "c01"
+}

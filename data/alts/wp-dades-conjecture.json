@@ -1,0 +1,783 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dade's conjecture\n\nDade's conjecture relates the numbers of irreducible characters in the $p$-blocks of a finite\ngroup $G$ to the numbers of irreducible characters in $p$-blocks of local subgroups, namely the\nnormalizers of chains of $p$-subgroups of $G$. This file states Dade's *ordinary conjecture*\n(Dade 1992, Conjecture 6.3), the form referred to by the Wikipedia list entry.\n\nWe use the classical set-up of block theory (Isaacs, *Character theory of finite groups*, Ch. 15;\nNavarro, *Characters and blocks of finite groups*, Ch. 3): fix a maximal ideal $M$ of the ring\n$\\mathbf{R}$ of algebraic integers in $\\mathbb{C}$ with $p \\in M$, so that $\\mathbf{R}/M$ is an\nalgebraically closed field of characteristic $p$.\n\n* For $\\chi \\in \\operatorname{Irr}(G)$ the central character $\\omega_\\chi$ sends the class sum\n  $K^+$ of a conjugacy class $K$ of $G$ to $\\omega_\\chi(K^+) = \\sum_{x \\in K} \\chi(x)/\\chi(1)\n  = |K| \\chi(g)/\\chi(1) \\in \\mathbf{R}$ (for $g \\in K$). Two irreducible characters of $G$ lie in\n  the same $p$-block iff their central characters agree modulo $M$ on all class sums.\n* For a subgroup $H \\le G$, a $p$-block $b$ of $H$ and a $p$-block $B$ of $G$, the Brauer induced\n  block $b^G$ is defined and equals $B$ iff\n  $\\omega_\\chi(K^+) \\equiv \\omega_\\psi((K \\cap H)^+) \\pmod M$ for all conjugacy classes $K$ of\n  $G$, where $\\psi \\in b$, $\\chi \\in B$ and $(K \\cap H)^+ = \\sum_{h \\in K \\cap H} h$.\n* The $p$-defect $d(\\psi)$ of $\\psi \\in \\operatorname{Irr}(H)$ is defined by\n  $p^{d(\\psi)} = |H|_p / \\psi(1)_p$. The defect of a block is the maximum of the defects of its\n  irreducible characters; in particular a block has positive defect iff it contains an\n  irreducible character of positive defect.\n* $O_p(H)$ denotes the largest normal $p$-subgroup of $H$.\n* A *radical $p$-chain* of $G$ is a strictly increasing chain $C : P_0 < P_1 < \\dots < P_n$ of\n  $p$-subgroups of $G$ with $P_0 = O_p(G)$ and $P_i = O_p(N_G(P_0) \\cap \\dots \\cap N_G(P_i))$ for\n  all $i$. Its length is $|C| = n$ and its normalizer is\n  $N_G(C) = N_G(P_0) \\cap \\dots \\cap N_G(P_n)$. The group $G$ acts on the set $\\mathcal{R}(G)$ of\n  radical $p$-chains by conjugation.\n* For $H \\le G$, a block $B$ of $G$ and $d \\ge 0$, $k(H, B, d)$ is the number of\n  $\\psi \\in \\operatorname{Irr}(H)$ with $d(\\psi) = d$ whose block $b$ satisfies $b^G = B$.\n\n**Dade's ordinary conjecture.** Let $G$ be a finite group and $p$ a prime with $O_p(G) = 1$. Then\nfor every $p$-block $B$ of $G$ of positive defect and every integer $d \\ge 0$,\n$$\\sum_{C \\in \\mathcal{R}(G)/G} (-1)^{|C|} k(N_G(C), B, d) = 0,$$\nwhere $C$ runs over a set of representatives of the $G$-conjugacy classes of radical $p$-chains.\n\n*References:*\n* [Wikipedia, Dade's conjecture](https://en.wikipedia.org/wiki/Dade%27s_conjecture)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* E. C. Dade, *Counting characters in blocks. I*, Invent. Math. 109 (1992), 187–210.\n  [doi:10.1007/BF01232023](https://doi.org/10.1007/BF01232023)\n* E. C. Dade, *Counting characters in blocks. II*, J. reine angew. Math. 448 (1994), 97–190.\n  [doi:10.1515/crll.1994.448.97](https://doi.org/10.1515/crll.1994.448.97)\n* E. C. Dade, *Counting characters in blocks. II.9*, in: Representation theory of finite groups\n  (Columbus, OH, 1995), de Gruyter, Berlin, 1997, 45–59.\n-/\n\nnamespace DadesConjecture\n\nopen scoped Pointwise\n\nvariable {G : Type*} [Group G]\n\n/-- `O_p(H)` for a subgroup `H` of `G`, regarded as a subgroup of `G`: the largest normal\n`p`-subgroup of `H`, i.e. the join of all `p`-subgroups `P ≤ H` that are normalized by `H`. -/\ndef pCore (p : ℕ) (H : Subgroup G) : Subgroup G :=\n  sSup {P : Subgroup G | P ≤ H ∧ H ≤ P.normalizer ∧ IsPGroup p P}\n\n/-- The normalizer `N_G(C) = N_G(P₀) ∩ ⋯ ∩ N_G(Pₙ)` of a chain `C = [P₀, …, Pₙ]` of\nsubgroups. -/\ndef chainNormalizer (C : List (Subgroup G)) : Subgroup G :=\n  ⨅ P ∈ C, P.normalizer\n\n/-- A radical `p`-chain of `G` in the sense of Dade: a strictly increasing chain\n`P₀ < P₁ < ⋯ < Pₙ` of `p`-subgroups of `G` such that `P₀ = O_p(G)` and\n`Pᵢ = O_p(N_G(P₀) ∩ ⋯ ∩ N_G(Pᵢ))` for every `i`. The chain is recorded as the list\n`[P₀, …, Pₙ]`. -/\nstructure RadicalPChain (p : ℕ) (G : Type*) [Group G] where\n  /-- The subgroups `P₀, …, Pₙ` of the chain, in increasing order. -/\n  toList : List (Subgroup G)\n  /-- The chain is nonempty. -/\n  ne_nil : toList ≠ []\n  /-- The chain is strictly increasing. -/\n  sorted : toList.Pairwise (· < ·)\n  /-- Every member of the chain is a `p`-subgroup. -/\n  isPGroup : ∀ P ∈ toList, IsPGroup p P\n  /-- `P₀ = O_p(G)`. -/\n  head_eq : toList.head ne_nil = pCore p ⊤\n  /-- `Pᵢ = O_p(N_G(Cᵢ))` where `Cᵢ : P₀ < ⋯ < Pᵢ` is the initial subchain. -/\n  radical : ∀ i (hi : i < toList.length),\n    toList[i] = pCore p (chainNormalizer (toList.take (i + 1)))\n\nnamespace RadicalPChain\n\nvariable {p : ℕ}\n\n/-- The length `|C| = n` of the radical `p`-chain `C : P₀ < ⋯ < Pₙ`. -/\ndef length (C : RadicalPChain p G) : ℕ := C.toList.length - 1\n\n/-- The normalizer `N_G(C) = N_G(P₀) ∩ ⋯ ∩ N_G(Pₙ)` of the radical `p`-chain `C`. -/\ndef normalizer (C : RadicalPChain p G) : Subgroup G := chainNormalizer C.toList\n\n/-- Two radical `p`-chains are conjugate if some `g ∈ G` maps the first onto the second by\nconjugation, `Pᵢ ↦ g Pᵢ g⁻¹`. -/\ndef IsConj (C C' : RadicalPChain p G) : Prop :=\n  ∃ g : G, C'.toList = C.toList.map (MulAut.conj g • ·)\n\n/-- A set `S` of radical `p`-chains is a set of representatives of the `G`-conjugacy classes of\nradical `p`-chains if every radical `p`-chain is conjugate to exactly one element of `S`. -/\ndef IsConjClassRepresentatives (S : Set (RadicalPChain p G)) : Prop :=\n  ∀ C : RadicalPChain p G, ∃! C', C' ∈ S ∧ C.IsConj C'\n\nend RadicalPChain\n\n/-- `χ : G → ℂ` is the character of an irreducible complex representation of `G` of degree\n`n`, that is, `χ(g)` is the trace of `ρ(g)` for an irreducible representation `ρ` of `G` on\n`ℂⁿ`. -/\ndef IsIrrCharOfDegree (n : ℕ) (χ : G → ℂ) : Prop :=\n  ∃ ρ : Representation ℂ G (Fin n → ℂ), ρ.IsIrreducible ∧\n    ∀ g, χ g = LinearMap.trace ℂ (Fin n → ℂ) (ρ g)\n\n/-- `χ : G → ℂ` is an irreducible complex character of `G` of `p`-defect `d`, i.e.\n$p^d = |G|_p / \\chi(1)_p$. -/\ndef IsIrrCharOfDefect (p d : ℕ) (χ : G → ℂ) : Prop :=\n  ∃ n, IsIrrCharOfDegree n χ ∧ padicValNat p (Nat.card G) = padicValNat p n + d\n\n/-- The value $\\omega_\\chi(K^+) = \\sum_{x \\in K} \\chi(x)/\\chi(1)$ of the central character of\n`χ` on the class sum of the conjugacy class `K` of `g` in `G`. -/\nnoncomputable def centralChar (χ : G → ℂ) (g : G) : ℂ :=\n  ∑ᶠ x ∈ {x : G | IsConj g x}, χ x / χ 1\n\n/-- For a character `ψ` of a subgroup `H ≤ G` and `g ∈ G` with `G`-conjugacy class `K`, the\nvalue $\\omega_\\psi((K \\cap H)^+) = \\sum_{h \\in K \\cap H} \\psi(h)/\\psi(1)$ of the central character\nof `ψ` on the sum of the elements of `H` that are conjugate in `G` to `g`. -/\nnoncomputable def centralCharInter (H : Subgroup G) (ψ : H → ℂ) (g : G) : ℂ :=\n  ∑ᶠ h ∈ {h : H | IsConj g (h : G)}, ψ h / ψ 1\n\n/-- Brauer induction of blocks, with respect to the maximal ideal `M` of the algebraic integers:\nthe `p`-block `b` of `H ≤ G` containing the irreducible character `ψ` satisfies `b^G = B`, where\n`B` is the `p`-block of `G` containing the irreducible character `χ`. This holds iff the central\ncharacters satisfy $\\omega_\\chi(K^+) \\equiv \\omega_\\psi((K \\cap H)^+) \\pmod M$ for every\nconjugacy class `K` of `G`. -/\ndef BlockInducesTo (M : Ideal (integralClosure ℤ ℂ)) (H : Subgroup G) (ψ : H → ℂ)\n    (χ : G → ℂ) : Prop :=\n  ∀ g : G, ∃ r ∈ M, (r : ℂ) = centralChar χ g - centralCharInter H ψ g\n\n/-- The number `k(H, B, d)` of irreducible characters `ψ` of the subgroup `H ≤ G` of `p`-defect\n`d` whose `p`-block `b` satisfies `b^G = B`, where `B` is the `p`-block of `G` containing the\nirreducible character `χ` of `G`. -/\nnoncomputable def numChars (p : ℕ) (M : Ideal (integralClosure ℤ ℂ)) (H : Subgroup G)\n    (χ : G → ℂ) (d : ℕ) : ℕ :=\n  {ψ : H → ℂ | IsIrrCharOfDefect p d ψ ∧ BlockInducesTo M H ψ χ}.ncard\n\n/-- `O_p(H)` is contained in `H`. -/\n@[category API, AMS 20]\ntheorem pCore_le (p : ℕ) (H : Subgroup G) : pCore p H ≤ H :=\n  sSup_le fun _ hP => hP.1\n\n/-- Every radical `p`-chain is conjugate to itself. -/\n@[category API, AMS 20]\ntheorem RadicalPChain.isConj_self {p : ℕ} (C : RadicalPChain p G) : C.IsConj C :=\n  ⟨1, by simp⟩\n\n/-- If `O_p(G) = 1`, the chain `1` of length `0` is a radical `p`-chain of `G`. -/\ndef RadicalPChain.trivial {p : ℕ} (h : pCore p (⊤ : Subgroup G) = ⊥) : RadicalPChain p G where\n  toList := [⊥]\n  ne_nil := by simp\n  sorted := List.pairwise_singleton _ _\n  isPGroup := by simpa using IsPGroup.of_bot\n  head_eq := by simpa using h.symm\n  radical i hi := by\n    obtain rfl : i = 0 := by simpa using hi\n    simpa [chainNormalizer, Subgroup.normalizer_eq_top] using h.symm\n\n/-- The chain `1` has length `0`. -/\n@[category test, AMS 20]\ntheorem RadicalPChain.length_trivial {p : ℕ} (h : pCore p (⊤ : Subgroup G) = ⊥) :\n    (RadicalPChain.trivial h).length = 0 := rfl\n\n/-- The normalizer of the chain `1` is `G`. -/\n@[category test, AMS 20]\ntheorem RadicalPChain.normalizer_trivial {p : ℕ} (h : pCore p (⊤ : Subgroup G) = ⊥) :\n    (RadicalPChain.trivial h).normalizer = ⊤ := by\n  simp [RadicalPChain.trivial, RadicalPChain.normalizer, chainNormalizer,\n    Subgroup.normalizer_eq_top]\n\n/-- An irreducible character of degree `n` takes the value `n` at the identity. -/\n@[category API, AMS 20]\ntheorem IsIrrCharOfDegree.apply_one {n : ℕ} {χ : G → ℂ} (h : IsIrrCharOfDegree n χ) :\n    χ 1 = n := by\n  obtain ⟨ρ, -, hχ⟩ := h\n  simp [hχ]\n\n/-- The central character takes the value `1` on the class sum of the identity. -/\n@[category API, AMS 20]\ntheorem centralChar_one {χ : G → ℂ} (hχ : χ 1 ≠ 0) : centralChar χ 1 = 1 := by\n  simp [centralChar, hχ]\n\n/--\n**Dade's ordinary conjecture** (Dade 1992, Conjecture 6.3). Let $G$ be a finite group and $p$ a\nprime such that $O_p(G) = 1$. Let $B$ be a $p$-block of $G$ of positive defect and let $d \\ge 0$.\nThen\n$$\\sum_{C \\in \\mathcal{R}(G)/G} (-1)^{|C|} k(N_G(C), B, d) = 0,$$\nwhere $C$ runs over a set of representatives of the $G$-conjugacy classes of radical $p$-chains\nof $G$, $N_G(C)$ is the normalizer of $C$, and $k(N_G(C), B, d)$ is the number of irreducible\ncharacters of $N_G(C)$ of $p$-defect $d$ lying in blocks $b$ of $N_G(C)$ with $b^G = B$.\n\nHere blocks are taken with respect to a maximal ideal $M$ of the algebraic integers containing\n$p$. The block $B$ is specified by an irreducible character $\\chi \\in B$; since the defect of a\nblock is the maximum of the defects of its characters, the blocks of positive defect are exactly\nthe blocks of the irreducible characters $\\chi$ of positive defect.\n-/\n@[category research open, AMS 20]\ntheorem dades_conjecture {G : Type*} [Group G] [Finite G] {p : ℕ} (hp : p.Prime)\n    (hG : pCore p (⊤ : Subgroup G) = ⊥)\n    (M : Ideal (integralClosure ℤ ℂ)) [M.IsMaximal] (hpM : (p : integralClosure ℤ ℂ) ∈ M)\n    {χ : G → ℂ} {e : ℕ} (hχ : IsIrrCharOfDefect p e χ) (he : 0 < e) (d : ℕ)\n    {S : Set (RadicalPChain p G)} (hS : RadicalPChain.IsConjClassRepresentatives S) :\n    ∑ᶠ C ∈ S, (-1 : ℤ) ^ C.length * numChars p M C.normalizer χ d = 0 := by\n  sorry\n\nend DadesConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's single slot and its notes (Dade's ordinary conjecture, hypothesis O_p(G)=1, positive defect, radical chains, Brauer induction, need for bespoke block-theoretic definitions) match the primary source and were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The Wikipedia list entry is a one-line description; following the decomposition table it is formalized as Dade's ordinary conjecture (Dade 1992, Conjecture 6.3), with radical p-chains (Dade's own chain family), hypothesis O_p(G)=1, blocks of positive defect, and all d ≥ 0. The projective/invariant/inductive refinements are not stated.",
+    "p-modular system: blocks are defined via the classical Isaacs/Navarro set-up — a maximal ideal M of the ring integralClosure ℤ ℂ of algebraic integers with p ∈ M (so R/M is an algebraically closed field of characteristic p). The theorem is universally quantified over such M. Dade's conjecture is asserted for an arbitrary (large enough) p-modular system, so quantifying over all M is faithful; it is also standard that the block partition does not depend on M.",
+    "Brauer induction b^G = B is encoded by BlockInducesTo: for all g ∈ G, ω_χ(K_g^+) − ω_ψ((K_g ∩ H)^+) ∈ M, i.e. λ_B(K^+) = λ_b((K∩H)^+) on every class sum; this is the standard definition of b^G (b^G is defined iff λ_b^G is an algebra homomorphism, i.e. equals some λ_B). When b^G is undefined no B satisfies the condition, matching the convention that such characters are not counted. For chain normalizers b^G is in fact always defined (transitivity along the chain).",
+    "A block B is specified by an irreducible character χ ∈ B; 'B has positive defect' is rendered as 'χ has positive p-defect'. Since the defect of a block is the maximum of the defects of its characters (every block contains a height-zero character; Isaacs even takes this as the definition of d(B)), the blocks of positive defect are exactly the blocks B(χ) with d(χ) > 0, and the sum depends only on B(χ).",
+    "Irreducible characters are represented as functions χ : G → ℂ given by traces of an irreducible representation (Representation.IsIrreducible) on Fin n → ℂ; every irreducible complex character arises this way, and n = χ(1) gives the degree. The p-defect is encoded as padicValNat p |H| = padicValNat p n + d (no truncated subtraction). Counting characters via Set.ncard on functions identifies isomorphic representations, as required for k(H,B,d).",
+    "O_p(H) (for H ≤ G, as a subgroup of G) is defined as the sSup of all p-subgroups P ≤ H normalized by H; for finite groups this is the largest normal p-subgroup.",
+    "Radical p-chains are lists [P₀,…,Pₙ] of p-subgroups, strictly increasing, with P₀ = O_p(G) and Pᵢ = O_p(N_G(P₀) ∩ ⋯ ∩ N_G(Pᵢ)) for every i (Dade's definition; for i = 0 the condition is automatic). Length |C| = n and N_G(C) = ⋂ N_G(Pᵢ), which is the stabilizer of C under conjugation.",
+    "The sum over R(G)/G is formalized as a sum over an arbitrary set S of representatives of the conjugacy classes of radical p-chains (∀ S, IsConjClassRepresentatives S → Σ_{C∈S} … = 0), with conjugation given by the pointwise MulAut.conj action on subgroups. The sum uses finsum (∑ᶠ C ∈ S); S is finite because a finite group has finitely many strictly increasing chains of subgroups, so finsum agrees with the actual sum.",
+    "Primality is a hypothesis (hp : p.Prime) rather than a Fact instance, since no instance needs it; the theorem is universe-polymorphic in G."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Sylow, IsPGroup, Subgroup.normalCore, Subgroup.normalizer (none gives the p-core).",
+     "name": "DadesConjecture.pCore",
+     "why_needed": "Mathlib has no O_p(G) (largest normal p-subgroup); needed for the chain definition and the hypothesis O_p(G)=1."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalizer, iInf (combined directly).",
+     "name": "DadesConjecture.chainNormalizer",
+     "why_needed": "N_G(C) = ⋂ N_G(Pᵢ) for a list of subgroups; used both in the radical condition and for N_G(C)."
+    },
+    {
+     "closest_existing_considered": "List.Pairwise / List.Chain', Sylow's MulAut.conj pointwise action on subgroups, MulAction.orbitRel (would need a MulAction instance with nontrivial proofs).",
+     "name": "DadesConjecture.RadicalPChain (with length, normalizer, IsConj, IsConjClassRepresentatives, trivial)",
+     "why_needed": "Dade's radical p-chains, their length, normalizer, conjugation and sets of orbit representatives do not exist in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "FDRep.character with CategoryTheory.Simple (forces G : Type 0), Representation.IsIrreducible, LinearMap.trace, padicValNat.",
+     "name": "DadesConjecture.IsIrrCharOfDegree / IsIrrCharOfDefect",
+     "why_needed": "Irreducible complex characters with their degree and p-defect; Mathlib has FDRep.character and Representation.IsIrreducible but no notion of 'irreducible character as a function' nor of p-defect."
+    },
+    {
+     "closest_existing_considered": "IsConj, ConjClasses, finsum.",
+     "name": "DadesConjecture.centralChar / centralCharInter",
+     "why_needed": "Values ω_χ(K⁺) and ω_ψ((K∩H)⁺) of central characters on class sums, the ingredients of Brauer's definition of blocks and block induction; absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "integralClosure ℤ ℂ, Ideal.IsMaximal (used as building blocks).",
+     "name": "DadesConjecture.BlockInducesTo",
+     "why_needed": "Brauer induction of blocks b^G = B (via central characters modulo a maximal ideal of the algebraic integers); Mathlib has no block theory."
+    },
+    {
+     "closest_existing_considered": "Set.ncard (used).",
+     "name": "DadesConjecture.numChars",
+     "why_needed": "The count k(H, B, d) of irreducible characters of H of defect d in blocks inducing to B."
+    }
+   ],
+   "per_slot": {
+    "dades_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Dade's ordinary conjecture (Dade 1992, Conj. 6.3): for finite G, prime p with O_p(G)=1, every p-block B of positive defect (given by an irreducible character χ ∈ B of positive defect) and every d ≥ 0, the alternating sum over a set of G-orbit representatives of radical p-chains C of (-1)^{|C|} k(N_G(C),B,d) vanishes. Mathlib has no blocks/defect/Brauer induction/O_p, so these were built from central characters of complex irreducible characters modulo a maximal ideal of the algebraic integers containing p (Isaacs Ch. 15 / Navarro Ch. 3 set-up)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dades_conjecture": "/--\n**Dade's ordinary conjecture** (Dade 1992, Conjecture 6.3). Let $G$ be a finite group and $p$ a\nprime such that $O_p(G) = 1$. Let $B$ be a $p$-block of $G$ of positive defect and let $d \\ge 0$.\nThen\n$$\\sum_{C \\in \\mathcal{R}(G)/G} (-1)^{|C|} k(N_G(C), B, d) = 0,$$\nwhere $C$ runs over a set of representatives of the $G$-conjugacy classes of radical $p$-chains\nof $G$, $N_G(C)$ is the normalizer of $C$, and $k(N_G(C), B, d)$ is the number of irreducible\ncharacters of $N_G(C)$ of $p$-defect $d$ lying in blocks $b$ of $N_G(C)$ with $b^G = B$.\n\nHere blocks are taken with respect to a maximal ideal $M$ of the algebraic integers containing\n$p$. The block $B$ is specified by an irreducible character $\\chi \\in B$; since the defect of a\nblock is the maximum of the defects of its characters, the blocks of positive defect are exactly\nthe blocks of the irreducible characters $\\chi$ of positive defect.\n-/\n@[category research open, AMS 20]\ntheorem dades_conjecture {G : Type*} [Group G] [Finite G] {p : ℕ} (hp : p.Prime)\n    (hG : pCore p (⊤ : Subgroup G) = ⊥)\n    (M : Ideal (integralClosure ℤ ℂ)) [M.IsMaximal] (hpM : (p : integralClosure ℤ ℂ) ∈ M)\n    {χ : G → ℂ} {e : ℕ} (hχ : IsIrrCharOfDefect p e χ) (he : 0 < e) (d : ℕ)\n    {S : Set (RadicalPChain p G)} (hS : RadicalPChain.IsConjClassRepresentatives S) :\n    ∑ᶠ C ∈ S, (-1 : ℤ) ^ C.length * numChars p M C.normalizer χ d = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dade's conjecture\n\nDade's ordinary conjecture relates the numbers of irreducible ordinary characters in a block of a\nfinite group to corresponding character counts for normalizers of radical chains.\n\n*References:*\n- [Wikipedia, Dade's conjecture](https://en.wikipedia.org/wiki/Dade%27s_conjecture)\n- E. C. Dade, *Counting characters in blocks. I*, Invent. Math. 109 (1992), 187–210,\n  Conjecture 6.3.\n-/\n\nnamespace DadesConjecture\n\nuniverse u\n\n/-- A nonzero primitive central idempotent of a ring. -/\ndef IsPrimitiveCentralIdempotent {R : Type u} [Ring R] (e : R) : Prop :=\n  IsIdempotentElem e ∧ e ≠ 0 ∧ (∀ x : R, e * x = x * e) ∧\n    ∀ f : R, IsIdempotentElem f → (∀ x : R, f * x = x * f) → f * e = f → f = 0 ∨ f = e\n\n/-- The conditions on the coefficient rings used below: `O` is a local integral ring with\nfraction field `K`, and `π` is its residue map onto `k`. The surrounding typeclasses specify that\n`K` and `k` are algebraically closed and have characteristics zero and `p`, respectively. -/\ndef IsPModularSystem (O K k : Type u) [CommRing O] [Field K] [Field k] [Algebra O K]\n    [IsLocalRing O] (π : O →+* k) : Prop :=\n  Function.Injective (algebraMap O K) ∧ Function.Surjective π ∧\n    RingHom.ker π = IsLocalRing.maximalIdeal O\n\n/-- A `p`-block of `H`, represented by its primitive central idempotent over `O`. Its reduction is\nrequired to remain a primitive central idempotent over the residue field. -/\nstructure Block (O k : Type u) [CommRing O] [Field k] (π : O →+* k)\n    {G : Type u} [Group G] (H : Subgroup G) where\n  idempotent : MonoidAlgebra O H\n  primitive : IsPrimitiveCentralIdempotent idempotent\n  primitive_mod_p : IsPrimitiveCentralIdempotent\n    (MonoidAlgebra.mapRangeRingHom H π idempotent)\n\n/-- An irreducible ordinary character, recorded as a character function and its degree. The\nexistence field prevents different models of the same representation from being counted more than\nonce. -/\nstructure OrdinaryIrreducibleCharacter (K : Type u) [Field K] (H : Type u) [Group H] where\n  toFun : H → K\n  degree : ℕ\n  realizes : ∃ V : FDRep K H, CategoryTheory.Simple V ∧\n    toFun = V.character ∧ degree = Module.finrank K V\n\ninstance {K : Type u} [Field K] {H : Type u} [Group H] :\n    CoeFun (OrdinaryIrreducibleCharacter K H) (fun _ ↦ H → K) where\n  coe χ := χ.toFun\n\n/-- An ordinary irreducible character belongs to a block when the lifted block idempotent acts as\nthe identity. This is detected by saying that its trace equals the character degree. -/\ndef CharacterBelongsToBlock {O K k G : Type u} [CommRing O] [Field K] [Field k] [Group G]\n    [Fintype G] [Algebra O K] (π : O →+* k) (H : Subgroup G) (b : Block O k π H)\n    (χ : OrdinaryIrreducibleCharacter K H) : Prop :=\n  open scoped Classical in\n  ∑ h : H, algebraMap O K (b.idempotent h) * χ h = χ 1\n\n/-- The coefficient at `g` of the Brauer image at `D` of a block idempotent of `H`, after extending\nit by zero from `H` to the ambient group. -/\nnoncomputable def brauerCoefficient {O k G : Type u} [CommRing O] [Field k] [Group G] (π : O →+* k)\n    (H D : Subgroup G) (b : Block O k π H) (g : G) : k :=\n  open scoped Classical in\n  if hg : g ∈ H ∧ g ∈ Subgroup.centralizer (D : Set G) then\n    π (b.idempotent ⟨g, hg.1⟩)\n  else 0\n\n/-- A defect group of a block is a maximal `p`-subgroup on which the Brauer image of its block\nidempotent is nonzero. -/\ndef IsDefectGroup {O k G : Type u} [CommRing O] [Field k] [Group G] (p : ℕ) (π : O →+* k)\n    (H : Subgroup G) (b : Block O k π H) (D : Subgroup G) : Prop :=\n  D ≤ H ∧ IsPGroup p D ∧ (∃ g : G, brauerCoefficient π H D b g ≠ 0) ∧\n    ∀ Q : Subgroup G, D ≤ Q → Q ≤ H → IsPGroup p Q →\n      (∃ g : G, brauerCoefficient π H Q b g ≠ 0) → Q = D\n\n/-- Brauer block induction from `H` to the ambient group. A defect group `D` of `b` must have its\ncentralizer in `H`, and the two Brauer images at `D` must have nonzero product. -/\ndef BrauerInduces {O k G : Type u} [CommRing O] [Field k] [Group G] [Fintype G] (p : ℕ) (π : O →+* k)\n    (H : Subgroup G) (b : Block O k π H) (B : Block O k π (⊤ : Subgroup G)) : Prop :=\n  ∃ D : Subgroup G, IsDefectGroup p π H b D ∧\n    Subgroup.centralizer (D : Set G) ≤ H ∧\n    ∃ x : G, (∑ y : G, brauerCoefficient π H D b y *\n      brauerCoefficient π (⊤ : Subgroup G) D B (y⁻¹ * x)) ≠ 0\n\n/-- A subgroup is normalized by every element of another subgroup. -/\ndef IsNormalizedBy {G : Type u} [Group G] (H Q : Subgroup G) : Prop :=\n  ∀ h : G, h ∈ H → ∀ q : G, q ∈ Q → h * q * h⁻¹ ∈ Q\n\n/-- The largest normal `p`-subgroup of `H`, denoted `O_p(H)`. -/\ndef pCore {G : Type u} [Group G] (p : ℕ) (H : Subgroup G) : Subgroup G :=\n  sSup {Q : Subgroup G | Q ≤ H ∧ IsPGroup p Q ∧ IsNormalizedBy H Q}\n\n/-- A radical `p`-chain `1 = P₀ < ⋯ < Pₙ`. Radicality means that each `Pᵢ` is the `p`-core of the\nintersection of the normalizers of all preceding terms, including `Pᵢ`. -/\nstructure RadicalPChain (p : ℕ) (G : Type u) [Group G] where\n  length : ℕ\n  subgroup : Fin (length + 1) → Subgroup G\n  starts_at_one : subgroup 0 = ⊥\n  strict : ∀ i j, i < j → subgroup i < subgroup j\n  radical : ∀ i, subgroup i =\n    pCore p (⨅ j : {j : Fin (length + 1) // j ≤ i}, (subgroup j.1).normalizer)\n\n/-- The common normalizer `N_G(C)` of all terms in a radical chain. -/\ndef chainNormalizer {p : ℕ} {G : Type u} [Group G] (C : RadicalPChain p G) : Subgroup G :=\n  ⨅ i, (C.subgroup i).normalizer\n\n/-- Two radical chains are conjugate under `G`. -/\ndef ConjugateChains {p : ℕ} {G : Type u} [Group G]\n    (C D : RadicalPChain p G) : Prop :=\n  ∃ g : G, ∃ h : C.length = D.length, ∀ i : Fin (C.length + 1),\n    D.subgroup (Fin.cast (congrArg (· + 1) h) i) =\n      (C.subgroup i).map (MulAut.conj g).toMonoidHom\n\n/-- A finset containing exactly one representative from every `G`-conjugacy orbit of radical\n`p`-chains. -/\ndef IsChainOrbitTransversal {p : ℕ} {G : Type u} [Group G]\n    (R : Finset (RadicalPChain p G)) : Prop :=\n  ∀ C : RadicalPChain p G, ∃! D : RadicalPChain p G, D ∈ R ∧ ConjugateChains C D\n\n/-- The number `k(N_G(C), B, d)`: irreducible ordinary characters of `N_G(C)` of `p`-defect `d`\nwhich belong to a block Brauer-inducing to `B`. -/\nnoncomputable def localCharacterCount {O K k G : Type u} [CommRing O] [Field K] [Field k] [Group G]\n    [Fintype G] [Algebra O K] (p : ℕ) (π : O →+* k) (B : Block O k π (⊤ : Subgroup G))\n    (d : ℕ) (C : RadicalPChain p G) : ℕ :=\n  Set.ncard {x : Block O k π (chainNormalizer C) ×\n      OrdinaryIrreducibleCharacter K (chainNormalizer C) |\n    CharacterBelongsToBlock π (chainNormalizer C) x.1 x.2 ∧\n    padicValNat p (Nat.card (chainNormalizer C)) - padicValNat p x.2.degree = d ∧\n    BrauerInduces p π (chainNormalizer C) x.1 B}\n\n/-- **Dade's ordinary conjecture.** Let `p` be prime and let `G` be finite with `O_p(G)=1`.\nFor every positive-defect `p`-block `B`, every `d ≥ 0`, and any set `R` of representatives of the\n`G`-orbits of radical `p`-chains `C = (1=P₀<⋯<Pₙ)`, one has\n`∑ C ∈ R, (-1)ⁿ k(N_G(C), B, d) = 0`. Here `k(N_G(C), B, d)` counts the irreducible ordinary\ncharacters of `N_G(C)` of `p`-defect `d` in blocks whose Brauer-induced block is `B`. -/\n@[category research open, AMS 20]\ntheorem dades_conjecture :\n    ∀ {p : ℕ}, p.Prime → ∀ {G O K k : Type u},\n    [Fintype G] → [Group G] → [CommRing O] → [IsDomain O] → [IsLocalRing O] →\n    [Field K] → [Field k] → [Algebra O K] → [IsFractionRing O K] →\n    [CharZero K] → [IsAlgClosed K] → [CharP k p] → [IsAlgClosed k] →\n    ∀ (π : O →+* k), IsPModularSystem O K k π → pCore p (⊤ : Subgroup G) = ⊥ →\n    ∀ (B : Block O k π (⊤ : Subgroup G)),\n    (∃ D : Subgroup G, IsDefectGroup p π (⊤ : Subgroup G) B D ∧ D ≠ ⊥) →\n    ∀ d : ℕ, ∀ R : Finset (RadicalPChain p G), IsChainOrbitTransversal R →\n    ∑ C ∈ R, (-1 : ℤ) ^ C.length * (localCharacterCount (O := O) (K := K) (k := k) (G := G) p π B d C : ℤ) = 0 := by\n  sorry\n\nend DadesConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry was resolved as Dade's ordinary conjecture (Dade 1992, Conjecture 6.3), following the fixed decomposition: no later projective, invariant, or inductive refinements are included.",
+    "A sufficiently large p-modular system is represented by a local integral coefficient ring O with fraction field K and a surjective residue map to k, while K and k are algebraically closed of characteristics zero and p. Blocks are lifted primitive central idempotents whose reductions remain primitive.",
+    "Irreducible ordinary characters are counted as character functions with a representation-realizability witness, rather than as representation objects, so isomorphic models of one character are not overcounted.",
+    "Membership of an ordinary character in a block is expressed by the trace of the lifted central idempotent being the character degree.",
+    "Brauer induction is modeled by the standard defect-group criterion: a maximal p-subgroup with nonzero Brauer image, ambient centralizer contained in the local subgroup, and nonzero product of the local and global Brauer images.",
+    "The alternating sum is taken over any finite transversal containing exactly one chain from each conjugacy orbit. This avoids making the local character-count function definitionally descend to a quotient while retaining the precise orbit-representative statement.",
+    "Character p-defect is v_p(|N_G(C)|) - v_p(χ(1)); natural subtraction is appropriate because irreducible character degrees divide the finite group order.",
+    "Positive block defect is stated as existence of a nontrivial defect group. The condition O_p(G)=1 is stated using the supremum of relatively normal p-subgroups."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's IsIdempotentElem and idempotent APIs; no primitive-central predicate exists.",
+     "name": "IsPrimitiveCentralIdempotent",
+     "why_needed": "Defines the ring-theoretic primitive central idempotents underlying modular blocks."
+    },
+    {
+     "closest_existing_considered": "Mathlib local rings, IsFractionRing, CharZero, and CharP; no p-modular-system definition exists.",
+     "name": "IsPModularSystem",
+     "why_needed": "Packages the compatibility conditions for the characteristic-zero fraction field and characteristic-p residue field."
+    },
+    {
+     "closest_existing_considered": "Mathlib group algebras and central idempotents; its group-action blocks are unrelated.",
+     "name": "Block",
+     "why_needed": "Represents a p-block by a primitive central idempotent over O with primitive reduction over k."
+    },
+    {
+     "closest_existing_considered": "FDRep.character and CategoryTheory.Simple; Mathlib has no bundled type of irreducible ordinary characters.",
+     "name": "OrdinaryIrreducibleCharacter",
+     "why_needed": "Provides countable character functions realized by irreducible finite-dimensional representations without counting representation models."
+    },
+    {
+     "closest_existing_considered": "FDRep.character; Mathlib has no block membership relation.",
+     "name": "CharacterBelongsToBlock",
+     "why_needed": "Defines ordinary-character membership in a lifted modular block via the block idempotent trace."
+    },
+    {
+     "closest_existing_considered": "MonoidAlgebra coefficients and mapRangeRingHom; no Brauer homomorphism exists.",
+     "name": "brauerCoefficient",
+     "why_needed": "Defines coefficients of the Brauer image of a reduced block idempotent at a p-subgroup."
+    },
+    {
+     "closest_existing_considered": "Mathlib IsPGroup and Sylow; no block defect notion exists.",
+     "name": "IsDefectGroup",
+     "why_needed": "Defines block defect groups as maximal p-subgroups with nonzero Brauer image."
+    },
+    {
+     "closest_existing_considered": "No Brauer correspondence or block-induction primitive exists in Mathlib or the helper library.",
+     "name": "BrauerInduces",
+     "why_needed": "Defines the Brauer-induced ambient block using a defect group and nonzero product of Brauer images."
+    },
+    {
+     "closest_existing_considered": "Subgroup.Normal concerns normality in the whole group; subgroupOf encodings were less direct for the supremum used here.",
+     "name": "IsNormalizedBy",
+     "why_needed": "Expresses normality of an ambient subgroup Q relative to another ambient subgroup H."
+    },
+    {
+     "closest_existing_considered": "Mathlib IsPGroup, subgroup lattices, and Sylow theory; no p-core definition exists.",
+     "name": "pCore",
+     "why_needed": "Defines O_p(H), the largest relatively normal p-subgroup of H."
+    },
+    {
+     "closest_existing_considered": "Mathlib subgroup normalizers and finite index types; no radical p-chain type exists.",
+     "name": "RadicalPChain",
+     "why_needed": "Defines chains satisfying P_i=O_p(intersection of preceding normalizers)."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalizer and lattice infimum.",
+     "name": "chainNormalizer",
+     "why_needed": "Defines N_G(C) as the common normalizer of all chain terms."
+    },
+    {
+     "closest_existing_considered": "MulAut.conj and Subgroup.map; no action on dependent-length chain structures exists.",
+     "name": "ConjugateChains",
+     "why_needed": "Defines the G-conjugacy relation on radical p-chains, including transport across equal lengths."
+    },
+    {
+     "closest_existing_considered": "General quotient/orbit APIs; a transversal predicate keeps the representative-dependent local normalizers explicit.",
+     "name": "IsChainOrbitTransversal",
+     "why_needed": "Specifies a finite set containing exactly one representative of each chain orbit."
+    },
+    {
+     "closest_existing_considered": "Set.ncard and padicValNat; no modular local character-count function exists.",
+     "name": "localCharacterCount",
+     "why_needed": "Defines k(N_G(C),B,d) from block membership, character defect, and Brauer induction."
+    }
+   ],
+   "per_slot": {
+    "dades_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "The file states Dade's ordinary conjecture with the hypotheses O_p(G)=1 and positive block defect, quantifies over d ≥ 0 and radical p-chain orbit transversals, and gives the alternating character-count sum. Bespoke modular block and Brauer-induction definitions were necessary because neither Mathlib nor FormalConjecturesForMathlib contains this theory."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dades_conjecture": "/-- **Dade's ordinary conjecture.** Let `p` be prime and let `G` be finite with `O_p(G)=1`.\nFor every positive-defect `p`-block `B`, every `d ≥ 0`, and any set `R` of representatives of the\n`G`-orbits of radical `p`-chains `C = (1=P₀<⋯<Pₙ)`, one has\n`∑ C ∈ R, (-1)ⁿ k(N_G(C), B, d) = 0`. Here `k(N_G(C), B, d)` counts the irreducible ordinary\ncharacters of `N_G(C)` of `p`-defect `d` in blocks whose Brauer-induced block is `B`. -/\n@[category research open, AMS 20]\ntheorem dades_conjecture :\n    ∀ {p : ℕ}, p.Prime → ∀ {G O K k : Type u},\n    [Fintype G] → [Group G] → [CommRing O] → [IsDomain O] → [IsLocalRing O] →\n    [Field K] → [Field k] → [Algebra O K] → [IsFractionRing O K] →\n    [CharZero K] → [IsAlgClosed K] → [CharP k p] → [IsAlgClosed k] →\n    ∀ (π : O →+* k), IsPModularSystem O K k π → pCore p (⊤ : Subgroup G) = ⊥ →\n    ∀ (B : Block O k π (⊤ : Subgroup G)),\n    (∃ D : Subgroup G, IsDefectGroup p π (⊤ : Subgroup G) B D ∧ D ≠ ⊥) →\n    ∀ d : ℕ, ∀ R : Finset (RadicalPChain p G), IsChainOrbitTransversal R →\n    ∑ C ∈ R, (-1 : ℤ) ^ C.length * (localCharacterCount (O := O) (K := K) (k := k) (G := G) p π B d C : ℤ) = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dade's conjecture\n\nDade's ordinary conjecture relates the numbers of ordinary irreducible characters in a block of a\nfinite group to the corresponding numbers for blocks of normalizers of radical $p$-chains.\n\n*References:*\n- [Wikipedia, Dade's conjecture](https://en.wikipedia.org/wiki/Dade%27s_conjecture)\n- E. C. Dade, *Counting characters in blocks. I*, Invent. Math. 109 (1992), Conjecture 6.3.\n-/\n\nopen scoped BigOperators\nopen CategoryTheory\n\nnamespace DadesConjecture\n\nuniverse u\n\n/-- A nonzero central idempotent which is not the sum of two nonzero orthogonal central\nidempotents. -/\ndef IsCentralPrimitiveIdempotent {R : Type*} [Ring R] (e : R) : Prop :=\n  IsIdempotentElem e ∧ e ≠ 0 ∧ (∀ x : R, Commute e x) ∧\n    ∀ f g : R, IsIdempotentElem f → IsIdempotentElem g →\n      (∀ x : R, Commute f x) → (∀ x : R, Commute g x) →\n      f * g = 0 → e = f + g → f = 0 ∨ g = 0\n\n/-- A $p$-block, represented by a central primitive idempotent over a modular coefficient ring\nand its coefficientwise reduction to the residue field. -/\nstructure Block (O k H : Type*) [CommRing O] [Field k] [Group H] (residue : O →+* k) where\n  idempotent : MonoidAlgebra O H\n  isPrimitive : IsCentralPrimitiveIdempotent idempotent\n  reduction_isPrimitive : IsCentralPrimitiveIdempotent\n    (MonoidAlgebra.mapRangeRingHom H residue idempotent)\n\n/-- An ordinary irreducible character, recorded as a character function and its degree. The\nrealization field is assumed to be a splitting field in the conjecture. -/\nstructure OrdinaryCharacter (K H : Type u) [Field K] [Group H] where\n  toFun : H → K\n  degree : ℕ\n  realized : ∃ V : FDRep K H, Simple V ∧\n    toFun = V.character ∧ degree = Module.finrank K V\n\ninstance {K H : Type u} [Field K] [Group H] : CoeFun (OrdinaryCharacter K H) (fun _ ↦ H → K) :=\n  ⟨OrdinaryCharacter.toFun⟩\n\n/-- An ordinary character belongs to a block when the lifted block idempotent acts as the\nidentity in a simple representation affording that character. -/\ndef OrdinaryCharacter.LiesInBlock {O K k H : Type u} [CommRing O] [Field K] [Field k] [Group H]\n    [Algebra O K] (residue : O →+* k) (χ : OrdinaryCharacter K H) (B : Block O k H residue) : Prop :=\n  ∃ V : FDRep K H, Simple V ∧ χ.toFun = V.character ∧ χ.degree = Module.finrank K V ∧\n    ∀ v : V, MonoidAlgebra.lift K (V →ₗ[K] V) H V.ρ\n      (MonoidAlgebra.mapRangeRingHom H (algebraMap O K) B.idempotent) v = v\n\n/-- The $p$-defect of an ordinary character is $d$ when\n$v_p(|H|)=v_p(χ(1))+d$. -/\ndef OrdinaryCharacter.HasDefect {K H : Type u} [Field K] [Group H]\n    (p d : ℕ) (χ : OrdinaryCharacter K H) : Prop :=\n  padicValNat p (Nat.card H) = padicValNat p χ.degree + d\n\n/-- Normality of an ambient subgroup `P` inside another ambient subgroup `H`. -/\ndef IsNormalIn {G : Type*} [Group G] (P H : Subgroup G) : Prop :=\n  P ≤ H ∧ ∀ h ∈ H, ∀ x ∈ P, h * x * h⁻¹ ∈ P\n\n/-- The largest normal $p$-subgroup of `H`, regarded as a subgroup of the ambient group. -/\ndef pCore {G : Type*} [Group G] (p : ℕ) (H : Subgroup G) : Subgroup G :=\n  sSup {P : Subgroup G | IsPGroup p P ∧ IsNormalIn P H}\n\n/-- The intersection of the normalizers of the first `i + 1` entries of a chain. -/\ndef chainNormalizerUpTo {G : Type*} [Group G] {n : ℕ}\n    (P : Fin (n + 1) → Subgroup G) (i : Fin (n + 1)) : Subgroup G :=\n  sInf {N : Subgroup G | ∃ j : Fin (n + 1), j ≤ i ∧ N = (P j).normalizer}\n\n/-- A radical $p$-chain $1=P_0<\\cdots<P_n$. Radicality means\n$P_i=O_p(\\bigcap_{j\\leq i}N_G(P_j))$ for every `i`. -/\nstructure RadicalPChain (p : ℕ) (G : Type*) [Group G] where\n  length : ℕ\n  subgroup : Fin (length + 1) → Subgroup G\n  isPGroup : ∀ i, IsPGroup p (subgroup i)\n  bot : subgroup 0 = ⊥\n  strictMono : StrictMono subgroup\n  radical : ∀ i, subgroup i = pCore p (chainNormalizerUpTo subgroup i)\n\n/-- The common normalizer $N_G(C)=\\bigcap_iN_G(P_i)$ of a radical chain. -/\ndef RadicalPChain.normalizer {p : ℕ} {G : Type*} [Group G]\n    (C : RadicalPChain p G) : Subgroup G :=\n  ⨅ i, (C.subgroup i).normalizer\n\n/-- Conjugacy of radical chains under the ambient group. -/\ndef RadicalPChain.IsConjugate {p : ℕ} {G : Type*} [Group G]\n    (C D : RadicalPChain p G) : Prop :=\n  ∃ g : G, ∃ h : C.length = D.length,\n    ∀ i : Fin (C.length + 1),\n      D.subgroup (Fin.cast (congrArg (· + 1) h) i) =\n        (C.subgroup i).map (MulAut.conj g).toMonoidHom\n\n/-- `R` contains exactly one representative of every ambient-group orbit of radical\n$p$-chains. -/\ndef IsOrbitRepresentativeSet {p : ℕ} {G : Type*} [Group G]\n    (R : Finset (RadicalPChain p G)) : Prop :=\n  ∀ C : RadicalPChain p G, ∃! D : RadicalPChain p G, D ∈ R ∧ C.IsConjugate D\n\n/-- The Brauer map at `P`: retain exactly the coefficients on elements centralizing `P`. -/\nnoncomputable def brauerMap {k G : Type*} [Field k] [Group G] [Fintype G]\n    (P : Subgroup G) (a : MonoidAlgebra k G) : MonoidAlgebra k G := by\n  classical\n  exact ∑ g : G, if (∀ x ∈ P, g * x = x * g) then MonoidAlgebra.single g (a g) else 0\n\n/-- Brauer induction of a block of the chain normalizer to an ambient block. It is characterized\nby the nonzero product of the embedded local block idempotent with the Brauer image of the ambient\nblock at the terminal subgroup of the chain. -/\ndef BlockInduces {O k G : Type*} [CommRing O] [Field k] [Group G] [Fintype G]\n    (residue : O →+* k) (C : RadicalPChain p G)\n    (b : Block O k C.normalizer residue) (B : Block O k G residue) : Prop :=\n  let localReduction := MonoidAlgebra.mapRangeRingHom C.normalizer residue b.idempotent\n  let inAmbient := MonoidAlgebra.mapDomainRingHom k C.normalizer.subtype localReduction\n  let ambientReduction := MonoidAlgebra.mapRangeRingHom G residue B.idempotent\n  inAmbient * brauerMap (C.subgroup (Fin.last C.length)) ambientReduction ≠ 0\n\n/-- The number $k(N_G(C),B,d)$ of ordinary irreducible characters of defect `d` in blocks of the\nchain normalizer whose Brauer-induced block is `B`. -/\nnoncomputable def characterCount {O K k G : Type u} [CommRing O] [Field K] [Field k]\n    [Group G] [Fintype G] [Algebra O K] (residue : O →+* k) (p d : ℕ)\n    (B : Block O k G residue) (C : RadicalPChain p G) : ℕ :=\n  Nat.card {χ : OrdinaryCharacter K C.normalizer //\n    χ.HasDefect p d ∧ ∃ b : Block O k C.normalizer residue,\n      χ.LiesInBlock residue b ∧ BlockInduces residue C b B}\n\n/-- A block has positive defect when it contains an ordinary irreducible character of positive\n$p$-defect. -/\ndef Block.HasPositiveDefect {O K k G : Type u} [CommRing O] [Field K] [Field k]\n    [Group G] [Algebra O K] (residue : O →+* k) (p : ℕ)\n    (B : Block O k G residue) : Prop :=\n  ∃ χ : OrdinaryCharacter K G, χ.LiesInBlock residue B ∧\n    ∃ d > 0, χ.HasDefect p d\n\n/--\n**Dade's ordinary conjecture.** Let $G$ be a finite group, let $p$ be a prime with\n$O_p(G)=1$, and let $B$ be a $p$-block of positive defect. For every $d\\geq0$,\n$$\n  \\sum_C(-1)^{|C|}k(N_G(C),B,d)=0.\n$$\nwhere $C$ runs through one representative of each $G$-orbit of radical $p$-chains\n$1=P_0<\\cdots<P_n$, $|C|=n$, and\n$P_i=O_p(\\bigcap_{j\\leq i}N_G(P_j))$. Here $k(N_G(C),B,d)$ counts the ordinary irreducible\ncharacters of $N_G(C)$ of $p$-defect $d$ lying in blocks whose Brauer-induced block is $B$.\n-/\n@[category research open, AMS 20]\ntheorem dades_conjecture\n    (p : ℕ) (hp : p.Prime)\n    (O K k G : Type u) [CommRing O] [IsDomain O] [Field K] [Field k] [Group G] [Fintype G]\n    [Algebra O K] [IsFractionRing O K] [IsLocalRing O] [IsAlgClosed K] [IsAlgClosed k]\n    (residue : O →+* k) (residue_surjective : Function.Surjective residue)\n    (residue_ker : RingHom.ker residue = IsLocalRing.maximalIdeal O)\n    [CharP O 0] [CharP k p]\n    (hcore : pCore p (⊤ : Subgroup G) = ⊥)\n    (B : Block O k G residue) (hB : B.HasPositiveDefect (K := K) residue p)\n    (d : ℕ) (R : Finset (RadicalPChain p G)) (hR : IsOrbitRepresentativeSet R) :\n    ∑ C ∈ R, (if Even C.length then (characterCount (K := K) residue p d B C : ℤ)\n      else -(characterCount (K := K) residue p d B C : ℤ)) = 0 := by\n  sorry\n\nend DadesConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.87,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry is read as Dade's ordinary conjecture (Dade 1992, Conjecture 6.3), rather than any later projective, invariant, or inductive refinement.",
+    "A modular coefficient system is supplied explicitly by a characteristic-zero local domain O with algebraically closed fraction/splitting field K, algebraically closed residue field k of characteristic p, and a surjective residue homomorphism whose kernel is the maximal ideal. Blocks are lifted central primitive idempotents whose reductions remain central primitive.",
+    "Ordinary irreducible characters are character functions of simple finite-dimensional K-representations, bundled with their degree. Using functions collapses isomorphic realizations and avoids counting multiple models of the same character.",
+    "Character p-defect d is encoded by v_p(|H|) = v_p(chi(1)) + d. Positive block defect is encoded by the existence of a character in the block having positive defect.",
+    "The p-core of an ambient subgroup H is the supremum of its ambient normal p-subgroups. A radical chain explicitly starts at the trivial subgroup, is strictly increasing, and satisfies P_i = O_p(intersection_{j <= i} N_G(P_j)) at every index.",
+    "Rather than making an arbitrary canonical choice of orbit representatives, the theorem quantifies a finite set satisfying a unique-representative predicate. The summand is invariant under conjugacy and has sign (-1)^n for a chain ending at P_n.",
+    "Brauer induction b^G = B is modeled by the standard criterion that the reduced local block idempotent has nonzero product with the Brauer image of the reduced ambient block idempotent at the terminal p-subgroup. Both are embedded in the ambient residue-field group algebra.",
+    "The hypotheses O_p(G)=1 and positive defect are explicit, so the length-zero and defect-zero degeneracies are handled as in the precise ordinary conjecture."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "IsIdempotentElem",
+     "name": "IsCentralPrimitiveIdempotent",
+     "why_needed": "Blocks require nonzero primitive central idempotents, for which Mathlib has only the basic predicate IsIdempotentElem."
+    },
+    {
+     "closest_existing_considered": "MonoidAlgebra and IsIdempotentElem",
+     "name": "Block",
+     "why_needed": "Mathlib has no modular representation-theoretic blocks; this bundles a lifted central primitive idempotent and its primitive residue-field reduction."
+    },
+    {
+     "closest_existing_considered": "FDRep.character and CategoryTheory.Simple",
+     "name": "OrdinaryCharacter",
+     "why_needed": "Mathlib defines the character of an FDRep but has no type of ordinary irreducible character functions modulo realization."
+    },
+    {
+     "closest_existing_considered": "MonoidAlgebra.lift and FDRep",
+     "name": "OrdinaryCharacter.LiesInBlock",
+     "why_needed": "Mathlib has no relation assigning ordinary irreducible characters to modular blocks."
+    },
+    {
+     "closest_existing_considered": "padicValNat",
+     "name": "OrdinaryCharacter.HasDefect",
+     "why_needed": "Mathlib has p-adic valuations but no character-defect notion."
+    },
+    {
+     "closest_existing_considered": "Subgroup.Normal, which applies to a subgroup of a bundled group rather than two ambient subgroups directly",
+     "name": "IsNormalIn",
+     "why_needed": "The p-core is needed as an ambient subgroup of G normal in another ambient subgroup H."
+    },
+    {
+     "closest_existing_considered": "IsPGroup and complete-lattice operations on Subgroup",
+     "name": "pCore",
+     "why_needed": "Mathlib has IsPGroup and Sylow subgroups but no largest normal p-subgroup O_p(H)."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalizer and sInf",
+     "name": "chainNormalizerUpTo",
+     "why_needed": "Radicality uses the intersection of the normalizers through a specified chain index."
+    },
+    {
+     "closest_existing_considered": "Finite indexed families of Subgroup",
+     "name": "RadicalPChain",
+     "why_needed": "Mathlib has no bundled radical p-chain with the precise Dade radicality condition."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalizer and iInf",
+     "name": "RadicalPChain.normalizer",
+     "why_needed": "Dade's local subgroup N_G(C) is the common normalizer of all entries of a chain."
+    },
+    {
+     "closest_existing_considered": "MulAut.conj and Subgroup.map",
+     "name": "RadicalPChain.IsConjugate",
+     "why_needed": "The alternating sum is indexed by ambient-group orbits of entire subgroup chains."
+    },
+    {
+     "closest_existing_considered": "Finset and existential uniqueness",
+     "name": "IsOrbitRepresentativeSet",
+     "why_needed": "The statement must sum over exactly one representative of every G-orbit without choosing a noncanonical quotient enumeration."
+    },
+    {
+     "closest_existing_considered": "MonoidAlgebra coefficients and finite sums",
+     "name": "brauerMap",
+     "why_needed": "Mathlib has no Brauer homomorphism on a modular group algebra."
+    },
+    {
+     "closest_existing_considered": "brauerMap and MonoidAlgebra.mapDomainRingHom",
+     "name": "BlockInduces",
+     "why_needed": "Mathlib has no Brauer-induced block relation b^G = B."
+    },
+    {
+     "closest_existing_considered": "Nat.card of a subtype",
+     "name": "characterCount",
+     "why_needed": "The conjecture uses the specialized number k(N_G(C), B, d), absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "OrdinaryCharacter.HasDefect",
+     "name": "Block.HasPositiveDefect",
+     "why_needed": "Mathlib has neither blocks nor block defect."
+    }
+   ],
+   "per_slot": {
+    "dades_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "The ordinary Dade conjecture is stated with all required hypotheses, radical p-chains, G-orbit representatives, character defects, local block induction, and the alternating sum. Mathlib lacks modular blocks, Brauer correspondence, and a bundled type of ordinary irreducible characters, so problem-local definitions were necessary."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dades_conjecture": "/--\n**Dade's ordinary conjecture.** Let $G$ be a finite group, let $p$ be a prime with\n$O_p(G)=1$, and let $B$ be a $p$-block of positive defect. For every $d\\geq0$,\n$$\n  \\sum_C(-1)^{|C|}k(N_G(C),B,d)=0.\n$$\nwhere $C$ runs through one representative of each $G$-orbit of radical $p$-chains\n$1=P_0<\\cdots<P_n$, $|C|=n$, and\n$P_i=O_p(\\bigcap_{j\\leq i}N_G(P_j))$. Here $k(N_G(C),B,d)$ counts the ordinary irreducible\ncharacters of $N_G(C)$ of $p$-defect $d$ lying in blocks whose Brauer-induced block is $B$.\n-/\n@[category research open, AMS 20]\ntheorem dades_conjecture\n    (p : ℕ) (hp : p.Prime)\n    (O K k G : Type u) [CommRing O] [IsDomain O] [Field K] [Field k] [Group G] [Fintype G]\n    [Algebra O K] [IsFractionRing O K] [IsLocalRing O] [IsAlgClosed K] [IsAlgClosed k]\n    (residue : O →+* k) (residue_surjective : Function.Surjective residue)\n    (residue_ker : RingHom.ker residue = IsLocalRing.maximalIdeal O)\n    [CharP O 0] [CharP k p]\n    (hcore : pCore p (⊤ : Subgroup G) = ⊥)\n    (B : Block O k G residue) (hB : B.HasPositiveDefect (K := K) residue p)\n    (d : ℕ) (R : Finset (RadicalPChain p G)) (hR : IsOrbitRepresentativeSet R) :\n    ∑ C ∈ R, (if Even C.length then (characterCount (K := K) residue p d B C : ℤ)\n      else -(characterCount (K := K) residue p d B C : ℤ)) = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dade's conjecture\n\n*References:*\n- [Wikipedia, Dade's conjecture](https://en.wikipedia.org/wiki/Dade%27s_conjecture)\n- [E. C. Dade, “Counting characters in blocks. I”, *Inventiones Mathematicae* **109**\n  (1992), 187–210](https://doi.org/10.1007/BF01232023), Conjecture 6.3.\n-/\n\nopen scoped MonoidAlgebra\nopen CategoryTheory\n\nnamespace DadesConjecture\n\nuniverse u\n\n/-- A primitive central idempotent of a ring. -/\ndef IsPrimitiveCentralIdempotent {A : Type*} [Ring A] (e : A) : Prop :=\n  IsIdempotentElem e ∧ e ≠ 0 ∧ e ∈ Subring.center A ∧\n    ∀ f : A, IsIdempotentElem f → f ∈ Subring.center A → f * e = f → f = 0 ∨ f = e\n\n/-- A block of a finite group over a complete discrete valuation ring `O`, represented by its\nprimitive central idempotent in the group algebra. -/\ndef Block (O H : Type u) [CommRing O] [Group H] :=\n  {e : O[H] // IsPrimitiveCentralIdempotent e}\n\n/-- An ordinary irreducible character, bundled with its degree. Characters are represented as\nfunctions, so isomorphic irreducible representations give the same object. -/\nstructure OrdinaryCharacter (K H : Type u) [Field K] [Group H] where\n  /-- The character as a class function. -/\n  value : H → K\n  /-- The degree of the character. -/\n  degree : ℕ\n  /-- Realization by a simple finite-dimensional representation. -/\n  realization : ∃ V : FDRep K H, Simple V ∧ V.character = value ∧ Module.finrank K V = degree\n\n/-- An ordinary character belongs to a block when the block idempotent, after extension from `O`\nto its fraction field `K`, acts as the identity in a realizing irreducible representation. -/\ndef OrdinaryCharacter.BelongsToBlock {O K H : Type u} [CommRing O] [Field K] [Algebra O K]\n    [Group H] (χ : OrdinaryCharacter K H) (B : Block O H) : Prop :=\n  ∃ V : FDRep K H, Simple V ∧ V.character = χ.value ∧ Module.finrank K V = χ.degree ∧\n    Representation.asAlgebraHom V.ρ\n      (MonoidAlgebra.mapRangeRingHom H (algebraMap O K) B.1) = LinearMap.id\n\n/-- The `p`-defect of an ordinary irreducible character of a finite group. -/\nnoncomputable def OrdinaryCharacter.defect {K H : Type u} [Field K] [Group H]\n    (p : ℕ) (χ : OrdinaryCharacter K H) : ℕ :=\n  padicValNat p (Nat.card H / χ.degree)\n\n/-- A block has positive defect if it contains an ordinary character of positive `p`-defect. -/\ndef Block.HasPositiveDefect {O K H : Type u} [CommRing O] [Field K] [Algebra O K]\n    [Group H] (p : ℕ) (B : Block O H) : Prop :=\n  ∃ χ : OrdinaryCharacter K H, χ.BelongsToBlock B ∧ 0 < χ.defect p\n\n\n/-- Reduction of a block idempotent modulo the maximal ideal acts as the identity on a modular\nrepresentation precisely when that representation belongs to the block. -/\ndef Block.ModularRepresentationBelongs {O H : Type u} [CommRing O] [IsLocalRing O] [Group H]\n    (B : Block O H) (V : FDRep (IsLocalRing.ResidueField O) H) : Prop :=\n  Simple V ∧ Representation.asAlgebraHom V.ρ\n    (MonoidAlgebra.mapRangeRingHom H (IsLocalRing.residue O) B.1) = LinearMap.id\n\n/-- The value `a` of the modular central character of a block at a group-algebra element `z`.\nIt is characterized by the scalar through which `z` acts on a simple module in the block. -/\ndef Block.HasCentralCharacterValue {O H : Type u} [CommRing O] [IsLocalRing O] [Group H]\n    (B : Block O H) (z : (IsLocalRing.ResidueField O)[H])\n    (a : IsLocalRing.ResidueField O) : Prop :=\n  ∃ V : FDRep (IsLocalRing.ResidueField O) H, B.ModularRepresentationBelongs V ∧\n    Representation.asAlgebraHom V.ρ z = a • LinearMap.id\n\n/-- Restrict a group-algebra element to a subgroup by discarding coefficients outside the\nsubgroup. On a class sum this gives the intersection of that conjugacy class with the subgroup. -/\nnoncomputable def restrictToSubgroup {k G : Type u} [Semiring k] [Group G] (H : Subgroup G) :\n    k[G] →+ k[H] :=\n  Finsupp.subtypeDomainAddMonoidHom\n\n/-- Brauer block induction `b^G = B`, expressed by the defining equality of modular central\ncharacters on restrictions of central elements (equivalently, on conjugacy-class sums). -/\ndef Block.BrauerInducesTo {O G : Type u} [CommRing O] [IsLocalRing O] [Group G]\n    {H : Subgroup G} (b : Block O H) (B : Block O G) : Prop :=\n  ∀ z : (IsLocalRing.ResidueField O)[G], z ∈ Subring.center _ →\n    ∀ a : IsLocalRing.ResidueField O,\n      B.HasCentralCharacterValue z a ↔\n        b.HasCentralCharacterValue (restrictToSubgroup H z) a\n/-- A subgroup `P` is normal in a subgroup `H` of the same ambient group. -/\ndef IsNormalIn {G : Type u} [Group G] (P H : Subgroup G) : Prop :=\n  P ≤ H ∧ ∀ h : H, ∀ x ∈ P, (h : G) * x * (h : G)⁻¹ ∈ P\n\n/-- The `p`-core `O_p(H)`: the largest normal `p`-subgroup of `H`, regarded as a subgroup of the\nambient group. -/\ndef pCore {G : Type u} [Group G] (p : ℕ) (H : Subgroup G) : Subgroup G :=\n  sSup {P : Subgroup G | IsPGroup p P ∧ IsNormalIn P H}\n\n/-- A radical `p`-chain is a chain `1 = P₀ < ⋯ < Pₙ` such that each `Pᵢ` is the `p`-core of the\nintersection of the normalizers of `P₀, …, Pᵢ`. -/\nstructure RadicalPChain (G : Type*) [Group G] (p : ℕ) where\n  /-- The integer `n` in `1 = P₀ < ⋯ < Pₙ`. -/\n  length : ℕ\n  /-- The subgroups in the chain. -/\n  subgroup : Fin (length + 1) → Subgroup G\n  /-- The chain starts at the trivial subgroup. -/\n  first : subgroup 0 = ⊥\n  /-- Successive terms are strictly increasing. -/\n  strict : ∀ i : Fin length, subgroup i.castSucc < subgroup i.succ\n  /-- Each term is radical in the common normalizer of the preceding terms. -/\n  radical : ∀ i : Fin (length + 1), subgroup i = pCore p\n    (⨅ j : Fin (i.val + 1), (subgroup ⟨j.val, lt_of_lt_of_le j.isLt\n      (Nat.succ_le_succ (Nat.le_of_lt_succ i.isLt))⟩).normalizer)\n\n/-- The common normalizer `N_G(C)` of all terms in a radical chain. -/\ndef RadicalPChain.normalizer {G : Type u} [Group G] {p : ℕ} (C : RadicalPChain G p) :\n    Subgroup G :=\n  ⨅ i, (C.subgroup i).normalizer\n\n/-- Two radical chains are conjugate under `G`. -/\ndef RadicalPChain.IsConjugate {G : Type u} [Group G] {p : ℕ}\n    (C D : RadicalPChain G p) : Prop :=\n  C.length = D.length ∧ ∃ g : G, ∀ (i : ℕ) (hi : i ≤ C.length) (hi' : i ≤ D.length),\n    D.subgroup ⟨i, Nat.lt_succ_iff.mpr hi'⟩ =\n      (C.subgroup ⟨i, Nat.lt_succ_iff.mpr hi⟩).map (MulAut.conj g).toMonoidHom\n\n/-- A finset containing exactly one member of every `G`-conjugacy class of radical `p`-chains. -/\ndef IsOrbitRepresentatives {G : Type u} [Group G] {p : ℕ}\n    (R : Finset (RadicalPChain G p)) : Prop :=\n  ∀ C : RadicalPChain G p, ∃! D : RadicalPChain G p, D ∈ R ∧ C.IsConjugate D\n\n/-- The number `k(N_G(C), B, d)`: irreducible ordinary characters of `N_G(C)` of `p`-defect `d`\nwhich lie in a block Brauer-inducing to `B`. -/\nnoncomputable def characterCount {O K G : Type u} [CommRing O] [IsLocalRing O] [Field K] [Algebra O K] [Group G]\n    {p : ℕ} (C : RadicalPChain G p) (B : Block O G) (d : ℕ) : ℕ :=\n  Nat.card {χ : OrdinaryCharacter K C.normalizer //\n    ∃ b : Block O C.normalizer,\n      χ.BelongsToBlock b ∧ χ.defect p = d ∧ b.BrauerInducesTo B}\n\n/-- **Dade's ordinary conjecture (Dade 1992, Conjecture 6.3).** Let `G` be a finite group, let `p`\nbe prime, and suppose `O_p(G) = 1`. Choose a sufficiently large `p`-modular system: `O` is a\ncomplete discrete valuation ring with residue characteristic `p`, and its characteristic-zero\nfraction field `K` contains a primitive `|G|`-th root of unity. For every `p`-block `B` of positive\ndefect and every `d ≥ 0`, the alternating sum\n\n`∑_C (-1) ^ |C| k(N_G(C), B, d)`\n\nover representatives `C : 1 = P₀ < ⋯ < Pₙ` of the `G`-orbits of radical `p`-chains is zero.\nHere `|C| = n`, `N_G(C) = ⋂ᵢ N_G(Pᵢ)`, and `k(N_G(C), B, d)` counts the irreducible ordinary\ncharacters of `N_G(C)` of `p`-defect `d` which belong to blocks `b` with Brauer-induced block\n`b^G = B`.\n-/\n@[category research open, AMS 20]\ntheorem dades_conjecture :\n    ∀ (G O K : Type) [Fintype G] [Group G] (p : ℕ) (hp : p.Prime)\n      [CommRing O] [IsDomain O] [IsLocalRing O] [IsPrincipalIdealRing O]\n      [IsAdicComplete (IsLocalRing.maximalIdeal O) O]\n      [Field K] [Algebra O K] [IsFractionRing O K] [CharZero K],\n       (∃ ζ : K, IsPrimitiveRoot ζ (Nat.card G)) →\n      ringChar (IsLocalRing.ResidueField O) = p → pCore p (⊤ : Subgroup G) = ⊥ →\n      ∀ (B : Block O G), B.HasPositiveDefect (K := K) p → ∀ d : ℕ,\n      ∀ R : Finset (RadicalPChain G p), IsOrbitRepresentatives R →\n        ∑ C ∈ R, (if Even C.length then (characterCount (O := O) (K := K) C B d : ℤ)\n          else -(characterCount (O := O) (K := K) C B d : ℤ)) = 0 := by\n  sorry\n\nend DadesConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse Wikipedia list entry was interpreted as Dade's ordinary conjecture, specifically Dade (1992), Conjecture 6.3, following the fixed decomposition: the alternating sum is indexed by conjugacy classes of radical p-chains and is asserted separately for every character defect d.",
+    "A p-modular system is represented by a complete local principal ideal domain O with residue characteristic p and characteristic-zero fraction field K. The hypothesis that K contains a primitive |G|-th root of unity makes it a sufficiently large splitting field for G and all chain normalizers. Algebraic closedness was deliberately not required, since combining it with a complete DVR fraction field would make the hypotheses vacuous.",
+    "Blocks are primitive central idempotents of O[H]. An ordinary character belongs to a block when the scalar extension of that idempotent acts as the identity on a simple finite-dimensional K-representation realizing the character.",
+    "Brauer block induction b^G = B is modeled by its central-character definition: the modular central character of B on every central element of the residue-field group algebra agrees with that of b after restriction to H. Restriction discards coefficients outside H; on class sums this is intersection of the G-conjugacy class with H.",
+    "Ordinary irreducible characters are represented by their character functions together with their natural-number degree and existence of a realizing simple finite-dimensional representation. This avoids counting multiple isomorphic representations.",
+    "The p-defect of χ is v_p(|H| / χ(1)); positive block defect is expressed by existence of a character in the block with positive defect.",
+    "Rather than introducing a quotient type and proving conjugation preserves all dependent chain fields, the theorem quantifies over any finite set containing exactly one chain in each G-conjugacy class. The sum is therefore literally over orbit representatives.",
+    "The p-core is constructed as the supremum of normal p-subgroups in the ambient subgroup. This is used verbatim in the radical condition P_i = O_p(⋂_{j≤i} N_G(P_j)).",
+    "The equivalent normal-chain and elementary-abelian-chain versions, and later projective/invariant/inductive refinements, were omitted because the requested slot is the ordinary radical-chain conjecture."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "IsIdempotentElem and Subring.center",
+     "name": "IsPrimitiveCentralIdempotent",
+     "why_needed": "Mathlib has idempotents and ring centers but no predicate for primitive central idempotents suitable for block theory."
+    },
+    {
+     "closest_existing_considered": "Primitive central idempotents in a group algebra; no bundled Mathlib notion exists",
+     "name": "Block",
+     "why_needed": "Mathlib has no representation-theoretic blocks of finite groups."
+    },
+    {
+     "closest_existing_considered": "FDRep.character and CategoryTheory.Simple",
+     "name": "OrdinaryCharacter",
+     "why_needed": "Mathlib defines the character of an FDRep but has no finite type of irreducible ordinary character functions with degrees."
+    },
+    {
+     "closest_existing_considered": "Representation.asAlgebraHom acting on scalar-extended block idempotents",
+     "name": "OrdinaryCharacter.BelongsToBlock",
+     "why_needed": "Mathlib has no assignment of ordinary irreducible characters to p-blocks."
+    },
+    {
+     "closest_existing_considered": "padicValNat",
+     "name": "OrdinaryCharacter.defect",
+     "why_needed": "Mathlib has p-adic valuations but no character-defect notion."
+    },
+    {
+     "closest_existing_considered": "Positive p-defect of characters belonging to the block",
+     "name": "Block.HasPositiveDefect",
+     "why_needed": "Mathlib has no block-defect notion."
+    },
+    {
+     "closest_existing_considered": "Representation.asAlgebraHom and IsLocalRing.ResidueField",
+     "name": "Block.ModularRepresentationBelongs",
+     "why_needed": "Needed to recover a block's modular central character from simple residue-field representations."
+    },
+    {
+     "closest_existing_considered": "Scalar action of central group-algebra elements on simple modules",
+     "name": "Block.HasCentralCharacterValue",
+     "why_needed": "Mathlib has no modular central characters of blocks."
+    },
+    {
+     "closest_existing_considered": "Finsupp.subtypeDomainAddMonoidHom",
+     "name": "restrictToSubgroup",
+     "why_needed": "Brauer block induction restricts class sums to their intersection with a subgroup; no named group-algebra map provides this nonmultiplicative operation."
+    },
+    {
+     "closest_existing_considered": "Equality of modular central characters after restricting conjugacy-class sums",
+     "name": "Block.BrauerInducesTo",
+     "why_needed": "Mathlib has no Brauer correspondence or induced-block relation."
+    },
+    {
+     "closest_existing_considered": "Subgroup.Normal applies to a subgroup of the group's own carrier type rather than two subgroups of one ambient group",
+     "name": "IsNormalIn",
+     "why_needed": "A predicate was needed for a subgroup of an ambient group to be normal inside another ambient subgroup."
+    },
+    {
+     "closest_existing_considered": "IsPGroup, subgroup supremum, and normality under conjugation",
+     "name": "pCore",
+     "why_needed": "Mathlib has p-groups and Sylow subgroups but no O_p(H) construction."
+    },
+    {
+     "closest_existing_considered": "Finite indexed families of Subgroup G and Subgroup.normalizer",
+     "name": "RadicalPChain",
+     "why_needed": "Mathlib has no radical p-chain notion."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalizer and indexed infimum",
+     "name": "RadicalPChain.normalizer",
+     "why_needed": "Needed the common normalizer N_G(C) of every subgroup in a chain."
+    },
+    {
+     "closest_existing_considered": "Conjugation via MulAut.conj on each subgroup",
+     "name": "RadicalPChain.IsConjugate",
+     "why_needed": "Needed the G-orbit relation on radical p-chains."
+    },
+    {
+     "closest_existing_considered": "MulAction.orbitRel; defining the required action would require transporting dependent radical-chain proof fields",
+     "name": "IsOrbitRepresentatives",
+     "why_needed": "Needed to state a finite alternating sum over exactly one representative of each chain orbit without a bespoke dependent conjugation action."
+    },
+    {
+     "closest_existing_considered": "Nat.card of the subtype of ordinary characters satisfying block-induction and defect conditions",
+     "name": "characterCount",
+     "why_needed": "Mathlib has no k(N_G(C), B, d) character-counting function."
+    }
+   ],
+   "per_slot": {
+    "dades_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dades_conjecture": "/-- **Dade's ordinary conjecture (Dade 1992, Conjecture 6.3).** Let `G` be a finite group, let `p`\nbe prime, and suppose `O_p(G) = 1`. Choose a sufficiently large `p`-modular system: `O` is a\ncomplete discrete valuation ring with residue characteristic `p`, and its characteristic-zero\nfraction field `K` contains a primitive `|G|`-th root of unity. For every `p`-block `B` of positive\ndefect and every `d ≥ 0`, the alternating sum\n\n`∑_C (-1) ^ |C| k(N_G(C), B, d)`\n\nover representatives `C : 1 = P₀ < ⋯ < Pₙ` of the `G`-orbits of radical `p`-chains is zero.\nHere `|C| = n`, `N_G(C) = ⋂ᵢ N_G(Pᵢ)`, and `k(N_G(C), B, d)` counts the irreducible ordinary\ncharacters of `N_G(C)` of `p`-defect `d` which belong to blocks `b` with Brauer-induced block\n`b^G = B`.\n-/\n@[category research open, AMS 20]\ntheorem dades_conjecture :\n    ∀ (G O K : Type) [Fintype G] [Group G] (p : ℕ) (hp : p.Prime)\n      [CommRing O] [IsDomain O] [IsLocalRing O] [IsPrincipalIdealRing O]\n      [IsAdicComplete (IsLocalRing.maximalIdeal O) O]\n      [Field K] [Algebra O K] [IsFractionRing O K] [CharZero K],\n       (∃ ζ : K, IsPrimitiveRoot ζ (Nat.card G)) →\n      ringChar (IsLocalRing.ResidueField O) = p → pCore p (⊤ : Subgroup G) = ⊥ →\n      ∀ (B : Block O G), B.HasPositiveDefect (K := K) p → ∀ d : ℕ,\n      ∀ R : Finset (RadicalPChain G p), IsOrbitRepresentatives R →\n        ∑ C ∈ R, (if Even C.length then (characterCount (O := O) (K := K) C B d : ℤ)\n          else -(characterCount (O := O) (K := K) C B d : ℤ)) = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dade's conjecture\n\nDade's ordinary conjecture expresses the number of ordinary irreducible characters in a block\nof a finite group as an alternating sum of corresponding numbers for normalizers of radical\n$p$-chains.\n\n*References:*\n- [Wikipedia, Dade's conjecture](https://en.wikipedia.org/wiki/Dade%27s_conjecture)\n- E. C. Dade, \"Counting characters in blocks. I,\" *Invent. Math.* **109** (1992), 187–210.\n-/\n\nnamespace DadesConjecture\n\nuniverse u\n\nopen CategoryTheory\n\n/-- The largest $p$-subgroup of `G` which is contained and normal in `H`. -/\ndef pCoreIn (p : ℕ) {G : Type u} [Group G] (H : Subgroup G) : Subgroup G :=\n  sSup {P : Subgroup G | P ≤ H ∧ IsPGroup p P ∧ H ≤ P.normalizer}\n\n/-- The largest normal $p$-subgroup $O_p(G)$ of a group $G$. -/\ndef pCore (p : ℕ) (G : Type u) [Group G] : Subgroup G := pCoreIn p ⊤\n\n/-- A radical $p$-chain $1=P_0<\\cdots<P_n$ in a finite group. -/\nstructure RadicalChain (p : ℕ) (G : Type u) [Group G] where\n  /-- The length of the chain. -/\n  length : ℕ\n  /-- The subgroups in the chain. -/\n  subgroup : Fin (length + 1) → Subgroup G\n  startsAtOne : subgroup 0 = ⊥\n  strictlyIncreasing : ∀ i : Fin length, subgroup i.castSucc < subgroup i.succ\n  isPGroup : ∀ i, IsPGroup p (subgroup i)\n  isRadical : ∀ i, subgroup i = pCoreIn p (⨅ j : Fin (i + 1),\n    (subgroup (Fin.castLE (Nat.succ_le_of_lt i.isLt) j)).normalizer)\n\n/-- The common normalizer $N_G(C)$ of all members of a radical chain $C$. -/\ndef chainNormalizer {p : ℕ} {G : Type u} [Group G] (C : RadicalChain p G) : Subgroup G :=\n  ⨅ i, (C.subgroup i).normalizer\n\n/-- Two radical chains are conjugate under $G$. -/\ndef ConjugateChains {p : ℕ} {G : Type u} [Group G]\n    (C D : RadicalChain p G) : Prop :=\n  ∃ h : C.length = D.length, ∃ g : G, ∀ i : Fin (C.length + 1),\n    (C.subgroup i).map (MulAut.conj g).toMonoidHom =\n      D.subgroup (Fin.cast (congrArg (fun n ↦ n + 1) h) i)\n\n/-- A finite set containing exactly one chain from every $G$-conjugacy class. -/\ndef IsChainOrbitRepresentatives {p : ℕ} {G : Type u} [Group G]\n    (S : Finset (RadicalChain p G)) : Prop :=\n  ∀ C, ∃! D, D ∈ S ∧ ConjugateChains C D\n\n/-- A block of $\\mathcal O[H]$, represented by its primitive central idempotent. -/\ndef IsBlock {O H : Type u} [CommRing O] [Group H] (b : MonoidAlgebra O H) : Prop :=\n  b ≠ 0 ∧ b * b = b ∧ (∀ z, b * z = z * b) ∧\n    ∀ e f : MonoidAlgebra O H,\n      e * e = e → f * f = f → (∀ z, e * z = z * e) → (∀ z, f * z = z * f) →\n      e * f = 0 → e + f = b → e = 0 ∨ f = 0\n\n/-- An ordinary irreducible character over a splitting field of characteristic zero. -/\nstructure OrdinaryCharacter (K H : Type u) [Field K] [Group H] where\n  /-- The degree of the character. -/\n  degree : ℕ\n  /-- The character as a class function. -/\n  toFun : H → K\n  isCharacter : ∃ V : FDRep K H, Nonempty (Simple V) ∧\n    degree = Module.finrank K V ∧ toFun = V.character\n\n/-- The action on a representation of an element of a group algebra. -/\nnoncomputable def groupAlgebraAction {O K H : Type u} [CommRing O] [Field K] [Group H]\n    [Algebra O K] (V : FDRep K H) (x : MonoidAlgebra O H) : V →ₗ[K] V :=\n  x.sum fun h a ↦ (algebraMap O K a) • V.ρ h\n\n/-- An ordinary character belongs to a block when the block idempotent acts as the identity. -/\ndef CharacterLiesInBlock {O K H : Type u} [CommRing O] [Field K] [Group H]\n    [Algebra O K] (b : MonoidAlgebra O H) (χ : OrdinaryCharacter K H) : Prop :=\n  ∃ V : FDRep K H, Nonempty (Simple V) ∧ χ.degree = Module.finrank K V ∧\n    χ.toFun = V.character ∧ groupAlgebraAction V b = LinearMap.id\n\n/-- A character has $p$-defect $d$ if $|H|_p=p^d\\chi(1)_p$. -/\ndef HasDefect (p d : ℕ) {K H : Type u} [Field K] [Group H] [Fintype H]\n    (χ : OrdinaryCharacter K H) : Prop :=\n  (Fintype.card H).factorization p = d + χ.degree.factorization p\n\n/-- The number $k(H,b,d)$ of irreducible ordinary characters in $b$ of $p$-defect $d$. -/\nnoncomputable def characterCount {O K H : Type u} [CommRing O] [Field K] [Group H]\n    [Fintype H] [Algebra O K] (p d : ℕ) (b : MonoidAlgebra O H) : ℕ :=\n  {χ : OrdinaryCharacter K H | CharacterLiesInBlock b χ ∧ HasDefect p d χ}.ncard\n\nopen scoped Classical in\n/-- The sum of the elements of the conjugacy class of `g`. -/\nnoncomputable def classSum {O G : Type u} [CommRing O] [Group G] [Fintype G]\n    (g : G) : MonoidAlgebra O G :=\n  ∑ h : G, if IsConj h g then MonoidAlgebra.single h 1 else 0\n\nopen scoped Classical in\n/-- The sum in $\\mathcal O[H]$ of the elements of an ambient $G$-conjugacy class which lie in $H$. -/\nnoncomputable def restrictedClassSum {O G : Type u} [CommRing O] [Group G] [Fintype G]\n    (H : Subgroup G) (g : G) : MonoidAlgebra O H :=\n  ∑ h : H, if IsConj (h : G) g then MonoidAlgebra.single h 1 else 0\n\n/-- The central character of `b` takes the value `a` on `z`, modulo the maximal ideal. -/\ndef HasBlockScalar {O K H : Type u} [CommRing O] [IsLocalRing O] [Field K] [Group H]\n    [Algebra O K] (b z : MonoidAlgebra O H) (a : O) : Prop :=\n  ∃ V : FDRep K H, Nonempty (Simple V) ∧ groupAlgebraAction V b = LinearMap.id ∧\n    ∃ c : O, groupAlgebraAction V z = (algebraMap O K c) • LinearMap.id ∧\n      c - a ∈ IsLocalRing.maximalIdeal O\n\n/-- Brauer's induced block $b^G=B$, expressed by equality of the block central characters on\nambient conjugacy-class sums. -/\ndef BlockInduces {O K G : Type u} [CommRing O] [IsLocalRing O] [Field K] [Group G]\n    [Fintype G] [Algebra O K] (H : Subgroup G) (b : MonoidAlgebra O H)\n    (B : MonoidAlgebra O G) : Prop :=\n  ∀ g : G, ∀ a : O,\n    HasBlockScalar (K := K) B (classSum g) a ↔\n      HasBlockScalar (K := K) b (restrictedClassSum H g) a\n\n/-- The number $k(N_G(C),B,d)$, summed over all blocks of the chain normalizer which Brauer-induce\nto $B$. -/\nnoncomputable def localCharacterCount {O K G : Type u} [CommRing O] [Field K] [Group G]\n    [Fintype G] [Algebra O K] [IsLocalRing O] (p d : ℕ) (B : MonoidAlgebra O G)\n    (C : RadicalChain p G) : ℕ :=\n  letI : Fintype (chainNormalizer C) := Fintype.ofFinite _\n  {χ : OrdinaryCharacter K (chainNormalizer C) |\n    HasDefect p d χ ∧ ∃ b : MonoidAlgebra O (chainNormalizer C),\n      IsBlock b ∧ BlockInduces (K := K) _ b B ∧ CharacterLiesInBlock b χ}.ncard\n\n/--\n**Dade's ordinary conjecture (Dade 1992, Conjecture 6.3).** Let $G$ be a finite group and\n$p$ a prime such that $O_p(G)=1$. For every $p$-block $B$ of positive defect and every $d\\geq0$,\n$$\n  \\sum_C(-1)^{|C|}k(N_G(C),B,d)=0,\n$$\nwhere $C$ runs over representatives of the $G$-orbits of radical $p$-chains\n$1=P_0<\\cdots<P_n$, $|C|=n$, $N_G(C)=\\bigcap_iN_G(P_i)$, and the count includes precisely\nthe blocks $b$ of $N_G(C)$ whose Brauer-induced block $b^G$ is $B$.\n-/\n@[category research open, AMS 20]\ntheorem dades_conjecture :\n    ∀ (p : ℕ), p.Prime → ∀ (G O K : Type u) [Group G] [Fintype G]\n      [CommRing O] [IsDomain O] [IsDiscreteValuationRing O] [IsLocalRing O]\n      [Field K] [Algebra O K] [IsFractionRing O K],\n      ringChar K = 0 → (∃ ζ : K, IsPrimitiveRoot ζ (Fintype.card G)) →\n      ringChar (O ⧸ IsLocalRing.maximalIdeal O) = p →\n      pCore p G = ⊥ → ∀ B : MonoidAlgebra O G, IsBlock B →\n      (∃ χ : OrdinaryCharacter K G, CharacterLiesInBlock B χ ∧ ∃ d > 0, HasDefect p d χ) →\n      ∀ d : ℕ, ∀ S : Finset (RadicalChain p G), IsChainOrbitRepresentatives S →\n      ∑ C ∈ S, (-1 : ℤ) ^ C.length * (localCharacterCount (O := O) (K := K) p d B C : ℤ) = 0 := by\n  sorry\n\nend DadesConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse Wikipedia list entry as Dade's ordinary conjecture (Dade 1992, Conjecture 6.3), as specified by the decomposition: the alternating sum over conjugacy classes of radical p-chains, rather than a later projective, invariant, or inductive refinement.",
+    "Modeled O_p(H), for H an ambient subgroup, as the supremum of ambient p-subgroups contained and normal in H. Thus radicality states P_i = O_p(⋂_{j≤i} N_G(P_j)) exactly, including i = 0.",
+    "Represented a p-block by an indecomposable nonzero central idempotent of the group algebra over a discrete valuation ring O in a p-modular system.",
+    "Used a characteristic-zero splitting field K that contains a primitive |G|-th root of unity, instead of requiring K to be algebraically closed; the latter would be incompatible with K being the fraction field of a DVR. The residue characteristic is explicitly p.",
+    "Represented irreducible ordinary characters by their K-valued character functions and degrees, realized by categorically simple finite-dimensional representations. This counts characters rather than representation objects and therefore avoids duplicate isomorphic realizations.",
+    "Defined character p-defect d by v_p(|H|) = d + v_p(χ(1)). Positive block defect is expressed by the existence in the block of a character of positive defect, equivalently the block's maximal character defect is positive.",
+    "Modeled membership in a block by requiring its central idempotent to act as the identity on a simple representation realizing the character.",
+    "Modeled Brauer block induction b^G = B through equality modulo the maximal ideal of block central characters on every G-conjugacy-class sum and its intersection with H. Central-character values are obtained as the integral scalars by which these central sums act on simple modules in the block.",
+    "Defined k(N_G(C), B, d) as the number of defect-d irreducible characters for which there exists a block b of N_G(C) containing the character and satisfying b^G = B. This is equivalent to summing k(N_G(C), b, d) over the inducing blocks because blocks partition irreducible characters.",
+    "Quantified over every finite set containing exactly one representative of each G-conjugacy class of radical chains; the asserted sum is consequently independent of the chosen representatives."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's IsPGroup, Sylow, Subgroup.normalizer, and complete lattice structure on Subgroup.",
+     "name": "pCoreIn",
+     "why_needed": "Mathlib has p-groups and subgroup normalizers but no largest normal p-subgroup of an ambient subgroup."
+    },
+    {
+     "closest_existing_considered": "No Mathlib p-core definition was found; it specializes pCoreIn to the top subgroup.",
+     "name": "pCore",
+     "why_needed": "Provides the standard O_p(G) used in the conjecture's hypothesis."
+    },
+    {
+     "closest_existing_considered": "Fin-indexed subgroup families, IsPGroup, and Subgroup.normalizer.",
+     "name": "RadicalChain",
+     "why_needed": "Mathlib has no radical p-chain object encoding the initial-common-normalizer condition."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Subgroup.normalizer and indexed infimum.",
+     "name": "chainNormalizer",
+     "why_needed": "Defines N_G(C) as the intersection of normalizers of all chain members."
+    },
+    {
+     "closest_existing_considered": "Mathlib's MulAut.conj and subgroup map.",
+     "name": "ConjugateChains",
+     "why_needed": "No action/orbit API specialized to dependent-length subgroup chains exists."
+    },
+    {
+     "closest_existing_considered": "Mathlib's general MulAction orbit relation; a direct representative predicate avoids descending a dependent local count through a quotient.",
+     "name": "IsChainOrbitRepresentatives",
+     "why_needed": "The alternating sum must range over exactly one representative from every G-orbit of radical chains."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsIdempotentElem; it does not bundle centrality and primitive indecomposability for group algebras.",
+     "name": "IsBlock",
+     "why_needed": "Mathlib has no representation-theoretic blocks."
+    },
+    {
+     "closest_existing_considered": "FDRep.character and CategoryTheory.Simple.",
+     "name": "OrdinaryCharacter",
+     "why_needed": "Mathlib defines the character of an FDRep but has no type of irreducible ordinary characters suitable for finite counting."
+    },
+    {
+     "closest_existing_considered": "Representation.asAlgebraHom/MonoidAlgebra lifting APIs; the direct Finsupp sum handles the scalar extension O → K explicitly.",
+     "name": "groupAlgebraAction",
+     "why_needed": "Block membership and central characters require evaluating an O-group-algebra element on a K-representation."
+    },
+    {
+     "closest_existing_considered": "FDRep.character, simple objects, and the action of a central idempotent.",
+     "name": "CharacterLiesInBlock",
+     "why_needed": "Mathlib has no relation between ordinary characters and modular blocks."
+    },
+    {
+     "closest_existing_considered": "Nat.factorization supplies the p-adic exponent of the group order and character degree.",
+     "name": "HasDefect",
+     "why_needed": "Mathlib has no p-defect of an ordinary character."
+    },
+    {
+     "closest_existing_considered": "Set.ncard applied to the bespoke irreducible-character predicate.",
+     "name": "characterCount",
+     "why_needed": "Provides k(H,b,d), absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsConj and MonoidAlgebra.single.",
+     "name": "classSum",
+     "why_needed": "Block central characters are evaluated on conjugacy-class sums, for which no suitable group-algebra definition was found."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsConj, subgroup coercions, and MonoidAlgebra.single.",
+     "name": "restrictedClassSum",
+     "why_needed": "Brauer block induction evaluates the intersection of an ambient conjugacy class with a subgroup."
+    },
+    {
+     "closest_existing_considered": "FDRep, LinearMap.id, IsLocalRing.maximalIdeal, and the bespoke groupAlgebraAction.",
+     "name": "HasBlockScalar",
+     "why_needed": "Mathlib has no modular block central character. This records its value modulo the DVR maximal ideal via scalar action on a simple module in the block."
+    },
+    {
+     "closest_existing_considered": "The standard central-character characterization using ambient class sums and their subgroup restrictions.",
+     "name": "BlockInduces",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no Brauer block induction or correspondence."
+    },
+    {
+     "closest_existing_considered": "characterCount; the direct ncard formulation avoids requiring an unavailable Fintype instance for the set of block idempotents.",
+     "name": "localCharacterCount",
+     "why_needed": "Provides Dade's k(N_G(C),B,d), including the union over local blocks whose Brauer-induced block is B."
+    }
+   ],
+   "per_slot": {
+    "dades_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dades_conjecture": "/--\n**Dade's ordinary conjecture (Dade 1992, Conjecture 6.3).** Let $G$ be a finite group and\n$p$ a prime such that $O_p(G)=1$. For every $p$-block $B$ of positive defect and every $d\\geq0$,\n$$\n  \\sum_C(-1)^{|C|}k(N_G(C),B,d)=0,\n$$\nwhere $C$ runs over representatives of the $G$-orbits of radical $p$-chains\n$1=P_0<\\cdots<P_n$, $|C|=n$, $N_G(C)=\\bigcap_iN_G(P_i)$, and the count includes precisely\nthe blocks $b$ of $N_G(C)$ whose Brauer-induced block $b^G$ is $B$.\n-/\n@[category research open, AMS 20]\ntheorem dades_conjecture :\n    ∀ (p : ℕ), p.Prime → ∀ (G O K : Type u) [Group G] [Fintype G]\n      [CommRing O] [IsDomain O] [IsDiscreteValuationRing O] [IsLocalRing O]\n      [Field K] [Algebra O K] [IsFractionRing O K],\n      ringChar K = 0 → (∃ ζ : K, IsPrimitiveRoot ζ (Fintype.card G)) →\n      ringChar (O ⧸ IsLocalRing.maximalIdeal O) = p →\n      pCore p G = ⊥ → ∀ B : MonoidAlgebra O G, IsBlock B →\n      (∃ χ : OrdinaryCharacter K G, CharacterLiesInBlock B χ ∧ ∃ d > 0, HasDefect p d χ) →\n      ∀ d : ℕ, ∀ S : Finset (RadicalChain p G), IsChainOrbitRepresentatives S →\n      ∑ C ∈ S, (-1 : ℤ) ^ C.length * (localCharacterCount (O := O) (K := K) p d B C : ℤ) = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dade's conjecture\n\nDade's (ordinary) conjecture relates the numbers of irreducible characters of given $p$-defect\nin a $p$-block $B$ of a finite group $G$ to the corresponding numbers for the blocks of the\n\"local subgroups\" $N_G(C)$, $C$ a radical $p$-chain of $G$: it predicts that the alternating sum\n$$\\sum_{C \\in \\mathcal{R}/G} (-1)^{|C|}\\, k(N_G(C), B, d) = 0$$\nvanishes whenever $O_p(G) = 1$ and $B$ has positive defect.\n\nMathlib has no theory of $p$-blocks, so the block-theoretic notions (blocks, defect, Brauer's\ninduced block $b^G$) are defined here in the character-theoretic way used in Navarro's book,\nvia the central characters $\\omega_\\chi(\\hat K) = |K|\\chi(x_K)/\\chi(1)$ reduced modulo a fixed\nmaximal ideal $\\mathfrak{p}$ of the ring of algebraic integers containing $p$.\n\n*References:*\n* [Wikipedia, *Dade's conjecture*](https://en.wikipedia.org/wiki/Dade%27s_conjecture)\n* [Wikipedia, *List of unsolved problems in\n  mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* E. C. Dade, *Counting characters in blocks. I*, Invent. Math. **109** (1992), 187–210,\n  Conjecture 6.3. [doi:10.1007/BF01232023](https://doi.org/10.1007/BF01232023)\n* E. C. Dade, *Counting characters in blocks. II*, J. reine angew. Math. **448** (1994), 97–190.\n  [doi:10.1515/crll.1994.448.97](https://doi.org/10.1515/crll.1994.448.97)\n* G. Navarro, *Characters and Blocks of Finite Groups*, LMS Lecture Note Series 250,\n  Cambridge University Press (1998), Chapters 3 and 4 (definitions of blocks, defect and\n  induced blocks).\n-/\n\nnamespace DadesConjecture\n\nopen CategoryTheory\nopen scoped Pointwise\n\nsection Chains\n\nvariable (p : ℕ) {G : Type*} [Group G]\n\n/-- The `p`-core `O_p(H)` of a subgroup `H` of `G`, viewed as a subgroup of `G`: the largest\nnormal `p`-subgroup of `H`, i.e. the join of all normal `p`-subgroups of `H`. -/\ndef pCore (H : Subgroup G) : Subgroup G :=\n  sSup {Q : Subgroup G | Q ≤ H ∧ IsPGroup p Q ∧ H ≤ Q.normalizer}\n\nvariable (G) in\n/-- A **radical `p`-chain** of `G` (Dade, *Counting characters in blocks I*, §1) is a strictly\nincreasing chain $C : P_0 < P_1 < \\dots < P_n$ of $p$-subgroups of $G$ such that\n$P_0 = O_p(G)$ and $P_i = O_p(N_G(C_i))$ for every $i$, where\n$N_G(C_i) = N_G(P_0) \\cap N_G(P_1) \\cap \\dots \\cap N_G(P_i)$ is the normalizer of the\nsubchain $C_i : P_0 < \\dots < P_i$. The **length** of $C$ is $|C| = n$. -/\nstructure RadicalPChain where\n  /-- The length `n` of the chain `P₀ < P₁ < ⋯ < Pₙ`. -/\n  n : ℕ\n  /-- The terms `P₀ < P₁ < ⋯ < Pₙ` of the chain. -/\n  P : Fin (n + 1) → Subgroup G\n  strictMono : StrictMono P\n  isPGroup : ∀ i, IsPGroup p (P i)\n  zero : P 0 = pCore p ⊤\n  radical : ∀ i, P i = pCore p (⨅ j ≤ i, (P j).normalizer)\n\nnamespace RadicalPChain\n\nvariable {p}\n\n/-- The normalizer `N_G(C) = N_G(P₀) ∩ N_G(P₁) ∩ ⋯ ∩ N_G(Pₙ)` of a chain `C`. -/\ndef normalizer (C : RadicalPChain p G) : Subgroup G :=\n  ⨅ i, (C.P i).normalizer\n\n/-- Two chains `C`, `C'` are **`G`-conjugate** if `C' = ᵍC` for some `g ∈ G`, i.e. the\nterms of `C'` are the conjugates `g Pᵢ g⁻¹` of the terms `Pᵢ` of `C`. (A strictly increasing\nchain is determined by the set of its terms.) -/\ndef IsConjugate (C C' : RadicalPChain p G) : Prop :=\n  ∃ g : G, Set.range C'.P = (fun P : Subgroup G => MulAut.conj g • P) '' Set.range C.P\n\n/-- A finite set `S` of radical `p`-chains is a **system of representatives** `𝓡/G` of the\n`G`-conjugacy classes of radical `p`-chains of `G` if every radical `p`-chain is conjugate to\nexactly one chain in `S`. -/\ndef IsTransversal (S : Finset (RadicalPChain p G)) : Prop :=\n  ∀ C : RadicalPChain p G, ∃! C', C' ∈ S ∧ IsConjugate C C'\n\nend RadicalPChain\n\n/-- `O_p(H)` is contained in `H`. -/\n@[category API, AMS 20]\ntheorem pCore_le (H : Subgroup G) : pCore p H ≤ H :=\n  sSup_le fun _ hQ => hQ.1\n\n/-- Every normal `p`-subgroup of `H` is contained in `O_p(H)`. -/\n@[category API, AMS 20]\ntheorem le_pCore {H Q : Subgroup G} (hQH : Q ≤ H) (hQ : IsPGroup p Q) (hN : H ≤ Q.normalizer) :\n    Q ≤ pCore p H :=\n  le_sSup ⟨hQH, hQ, hN⟩\n\nend Chains\n\nsection Blocks\n\nvariable (p : ℕ) (𝔭 : Ideal (integralClosure ℤ ℂ))\n\n/-- The set `Irr(H)` of irreducible (complex) characters of a group `H`, i.e. the characters of\nthe simple objects of `FDRep ℂ H`. -/\ndef Irr (H : Type) [Group H] : Set (H → ℂ) :=\n  {χ | ∃ V : FDRep ℂ H, Simple V ∧ V.character = χ}\n\n/-- A complex number `z` lies in the ideal `𝔭` of the ring of algebraic integers\n(in particular, `z` is an algebraic integer). -/\ndef MemIdeal (z : ℂ) : Prop :=\n  ∃ a ∈ 𝔭, (a : ℂ) = z\n\nvariable {H : Type} [Group H]\n\n/-- The central character `ω_χ` of `χ ∈ Irr(H)` evaluated at the class sum of `h`:\n`ω_χ(K̂) = |K| χ(h) / χ(1)`, where `K` is the conjugacy class of `h` in `H`. -/\nnoncomputable def centralCharacter (χ : H → ℂ) (h : H) : ℂ :=\n  ((ConjClasses.mk h).carrier.ncard : ℂ) * χ h / χ 1\n\n/-- Two irreducible characters `χ, ψ` of `H` lie in the **same `p`-block** if their central\ncharacters agree modulo `𝔭`, i.e. `λ_χ = λ_ψ` where `λ_χ(K̂) = ω_χ(K̂) mod 𝔭`\n(Navarro, Chapter 3). The `p`-blocks of `H` are the equivalence classes of this relation on\n`Irr(H)`. -/\ndef SameBlock (χ ψ : H → ℂ) : Prop :=\n  ∀ h : H, MemIdeal 𝔭 (centralCharacter χ h - centralCharacter ψ h)\n\n/-- An irreducible character `χ` of `H` has **`p`-defect `d`** if `p^d · χ(1)_p = |H|_p`,\ni.e. `ν_p(|H|) = ν_p(χ(1)) + d`. -/\ndef HasDefect (χ : H → ℂ) (d : ℕ) : Prop :=\n  ∃ n : ℕ, χ 1 = n ∧ padicValNat p (Nat.card H) = padicValNat p n + d\n\n/-- The block `B` of `H` containing `θ ∈ Irr(H)` has **positive defect** `d(B) > 0`. Here we use\nthat the defect `d(B)` of a block is the maximum of the defects `d(χ)` of the irreducible\ncharacters `χ ∈ Irr(B)` (Navarro, Chapter 4); so `d(B) > 0` iff some `χ ∈ Irr(B)` has\npositive defect. -/\ndef BlockHasPositiveDefect (θ : H → ℂ) : Prop :=\n  ∃ χ ∈ Irr H, SameBlock 𝔭 χ θ ∧ ∃ d, 0 < d ∧ HasDefect p χ d\n\nvariable {G : Type} [Group G] [Fintype G]\n\nopen scoped Classical in\n/-- **Brauer's induced block.** Let `H ≤ G`, let `b` be the `p`-block of `H` containing\n`ψ ∈ Irr(H)` and `B` the `p`-block of `G` containing `θ ∈ Irr(G)`. Following Navarro\n(Chapter 4), define `λ_b^G : Z(FG) → F` on class sums by `λ_b^G(K̂) = λ_b((K ∩ H)^)`, where `F`\nis the residue field of `𝔭`; `b^G` is defined if `λ_b^G` is an algebra homomorphism, and then\n`b^G` is the unique block `B` of `G` with `λ_B = λ_b^G`. Hence `b^G = B` holds precisely when\n`λ_b^G = λ_B` on all class sums, i.e.\n`∑_{h ∈ K ∩ H} ψ(h)/ψ(1) ≡ |K| θ(g)/θ(1) (mod 𝔭)` for every `g ∈ G` with class `K`.\n(If `λ_b^G` is not an algebra homomorphism, then `b^G` is undefined and this fails for every `B`.)\n-/\ndef InducesTo (N : Subgroup G) (ψ : N → ℂ) (θ : G → ℂ) : Prop :=\n  ∀ g : G,\n    MemIdeal 𝔭 ((∑ h : N, if IsConj g (h : G) then ψ h / ψ 1 else 0) - centralCharacter θ g)\n\n/-- `k(N, B, d)`: the number of irreducible characters `ψ` of the subgroup `N ≤ G` of `p`-defect\n`d` lying in a block `b` of `N` with `b^G = B`, where `B` is the block of `G` containing\n`θ ∈ Irr(G)`. -/\nnoncomputable def numChars (N : Subgroup G) (θ : G → ℂ) (d : ℕ) : ℕ :=\n  {ψ ∈ Irr N | HasDefect p ψ d ∧ InducesTo 𝔭 N ψ θ}.ncard\n\nend Blocks\n\n/-- **Dade's conjecture** (the \"ordinary conjecture\", Dade 1992, Conjecture 6.3).\n\nLet `p` be a prime and let `G` be a finite group with `O_p(G) = 1`. Fix a maximal ideal `𝔭`\nof the ring of algebraic integers with `p ∈ 𝔭`, as in Navarro's book (the conjecture is\nasserted for every such choice). Let `B` be a `p`-block of `G` of positive defect `d(B) > 0`\n(here given by an irreducible character `θ ∈ Irr(B)`). Then for every integer `d ≥ 0`,\n$$\\sum_{C \\in \\mathcal{R}/G} (-1)^{|C|}\\, k(N_G(C), B, d) = 0,$$\nwhere `C` runs over a set of representatives of the `G`-conjugacy classes of radical `p`-chains\n`C : P₀ = O_p(G) = 1 < P₁ < ⋯ < Pₙ` of `G`, `|C| = n` is the length of `C`,\n`N_G(C) = N_G(P₀) ∩ ⋯ ∩ N_G(Pₙ)`, and `k(N_G(C), B, d)` is the number of irreducible\ncharacters of `N_G(C)` of defect `d` lying in blocks `b` of `N_G(C)` with `b^G = B`.\n\nSince the summands are invariant under conjugation, the sum does not depend on the chosen\nsystem of representatives `S`.\n-/\n@[category research open, AMS 20]\ntheorem dades_conjecture {p : ℕ} (hp : p.Prime) {G : Type} [Group G] [Fintype G]\n    (hG : pCore p (⊤ : Subgroup G) = ⊥)\n    (𝔭 : Ideal (integralClosure ℤ ℂ)) [𝔭.IsMaximal] (hp𝔭 : (p : integralClosure ℤ ℂ) ∈ 𝔭)\n    {θ : G → ℂ} (hθ : θ ∈ Irr G) (hB : BlockHasPositiveDefect p 𝔭 θ) (d : ℕ)\n    {S : Finset (RadicalPChain p G)} (hS : RadicalPChain.IsTransversal S) :\n    ∑ C ∈ S, (-1 : ℤ) ^ C.n * (numChars p 𝔭 C.normalizer θ d : ℤ) = 0 := by\n  sorry\n\nend DadesConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's expansion (Dade's ordinary conjecture with O_p(G)=1, positive defect, radical p-chains) is the standard reading of the list entry and was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The terse list entry was expanded to Dade's ordinary conjecture (Dade 1992, Conj. 6.3), as instructed by the decomposition notes: hypotheses O_p(G)=1 and d(B)>0, sum over G-orbit representatives of radical p-chains, sign (-1)^{|C|} with |C| = n the chain length, k(N_G(C),B,d) counting characters of N_G(C) of defect d (defect computed in N_G(C)) in blocks b with b^G = B.",
+    "Ordinary characters are taken over ℂ, via FDRep ℂ H and CategoryTheory.Simple; this forces G : Type (FDRep requires field and group in the same universe).",
+    "Blocks and Brauer induction are defined character-theoretically following Navarro's book: fix a maximal ideal 𝔭 of the algebraic integers with p ∈ 𝔭; χ ~ ψ iff ω_χ ≡ ω_ψ mod 𝔭 on all class sums; b^G = B iff λ_b^G = λ_B on all class sums (∑_{h∈K∩H} ψ(h)/ψ(1) ≡ |K|θ(g)/θ(1) mod 𝔭). If λ_b^G is not an algebra homomorphism (b^G undefined) the predicate is false for all B, matching Navarro's definition; in the situation P_n C_G(P_n) ≤ N_G(C) ≤ N_G(P_n) induction is always defined anyway. The theorem quantifies over every such 𝔭 (blocks, defects and induced blocks are independent of this choice, so this equals fixing one).",
+    "A block B is given by a representative irreducible character θ ∈ Irr(G) (SameBlock θ); the counts depend only on the block of θ.",
+    "Positive defect of B is encoded as 'some χ in B has positive defect', using the standard theorem d(B) = max_{χ∈Irr(B)} d(χ) (equivalently: B is not a block of defect zero).",
+    "Defect of a character: HasDefect χ d iff χ(1) = n ∈ ℕ and ν_p(|H|) = ν_p(n) + d (a predicate, avoiding truncated subtraction; χ(1) | |H| so d is uniquely determined).",
+    "Radical p-chains are encoded as a structure with a strictly increasing map P : Fin (n+1) → Subgroup G of p-subgroups, P 0 = O_p(G) and P i = O_p(⨅_{j ≤ i} N_G(P j)) for all i (the i = 0 instance is redundant but consistent). O_p(H) is defined as the sSup of the normal p-subgroups of H (as subgroups of G), i.e. the largest one.",
+    "The sum over R/G is formalized as: for every finite set S of radical p-chains such that each radical p-chain is conjugate to exactly one element of S (IsTransversal), the alternating sum over S vanishes. Chain conjugacy is expressed via equality of the set of terms with the conjugated terms (MulAut.conj g • P), which is equivalent to termwise conjugacy for strictly increasing chains. Since the summand is conjugation-invariant, this is equivalent to Dade's sum over any fixed set of representatives.",
+    "Counts use Set.ncard on subsets of Irr(N) (finite sets), avoiding Fintype instances; sums over subgroups use classical decidability (open scoped Classical in).",
+    "Two small proved API lemmas about pCore (pCore_le, le_pCore) were added as basic tests of the bespoke definition; the stronger projective/invariant/inductive refinements of Dade's conjecture were not stated, per the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "IsPGroup, Sylow, Subgroup.normalizer (no p-core/O_p in Mathlib or FormalConjecturesForMathlib).",
+     "name": "DadesConjecture.pCore",
+     "why_needed": "O_p(H) (largest normal p-subgroup of a subgroup H, as a subgroup of G) is needed for the hypothesis O_p(G)=1 and for the radical-chain condition P_i = O_p(N_G(C_i)); Mathlib has no p-core."
+    },
+    {
+     "closest_existing_considered": "IsChain / StrictMono / MulAction.orbitRel (orbit quotients would require proving conjugation preserves radical chains, so a transversal predicate is used instead).",
+     "name": "DadesConjecture.RadicalPChain (with normalizer, IsConjugate, IsTransversal)",
+     "why_needed": "Dade's radical p-chains P_0 = O_p(G) < ... < P_n with P_i = O_p(N_G(P_0) ∩ ... ∩ N_G(P_i)), their normalizers N_G(C), G-conjugacy of chains, and systems of representatives of R/G; none exist in Mathlib."
+    },
+    {
+     "closest_existing_considered": "FDRep.character, CategoryTheory.Simple, Representation.IsIrreducible.",
+     "name": "DadesConjecture.Irr",
+     "why_needed": "The set of irreducible complex characters of a finite group (characters of Simple objects of FDRep ℂ H); Mathlib has FDRep.character and Simple but no set of irreducible characters."
+    },
+    {
+     "closest_existing_considered": "MonoidAlgebra center / primitive idempotents (no block API; the central-character definition is Navarro's textbook definition and avoids p-modular systems).",
+     "name": "DadesConjecture.MemIdeal, centralCharacter, SameBlock",
+     "why_needed": "p-blocks are defined à la Navarro: χ, ψ lie in the same block iff ω_χ(K̂) ≡ ω_ψ(K̂) mod 𝔭 for all class sums, where ω_χ(K̂) = |K|χ(x)/χ(1) and 𝔭 is a maximal ideal of integralClosure ℤ ℂ containing p. Mathlib has no block theory."
+    },
+    {
+     "closest_existing_considered": "padicValNat (used); no defect group API in Mathlib.",
+     "name": "DadesConjecture.HasDefect, BlockHasPositiveDefect",
+     "why_needed": "p-defect of a character (ν_p|H| = ν_p χ(1) + d) and positive defect of a block (some χ in the block has positive defect, using d(B) = max_{χ∈B} d(χ))."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (no Brauer correspondence/induction).",
+     "name": "DadesConjecture.InducesTo, numChars",
+     "why_needed": "Brauer's induced block b^G = B via Navarro's definition λ_b^G(K̂) = λ_b((K∩H)^) = λ_B(K̂) for all classes K, and the count k(N,B,d) of irreducible characters of N of defect d in blocks b with b^G = B."
+    }
+   ],
+   "per_slot": {
+    "dades_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Dade's ordinary conjecture (Dade 1992, Conj. 6.3): for a prime p, a finite group G with O_p(G)=1, a maximal ideal 𝔭 of the algebraic integers containing p, a block B (given by θ ∈ Irr(G)) of positive defect, every d ≥ 0 and every system S of representatives of the G-conjugacy classes of radical p-chains, ∑_{C∈S} (-1)^{|C|} k(N_G(C),B,d) = 0. Mathlib has no blocks/defect/Brauer induction/O_p/radical chains, so these are defined in the file following Navarro's character-theoretic definitions (central characters reduced mod 𝔭)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dades_conjecture": "/-- **Dade's conjecture** (the \"ordinary conjecture\", Dade 1992, Conjecture 6.3).\n\nLet `p` be a prime and let `G` be a finite group with `O_p(G) = 1`. Fix a maximal ideal `𝔭`\nof the ring of algebraic integers with `p ∈ 𝔭`, as in Navarro's book (the conjecture is\nasserted for every such choice). Let `B` be a `p`-block of `G` of positive defect `d(B) > 0`\n(here given by an irreducible character `θ ∈ Irr(B)`). Then for every integer `d ≥ 0`,\n$$\\sum_{C \\in \\mathcal{R}/G} (-1)^{|C|}\\, k(N_G(C), B, d) = 0,$$\nwhere `C` runs over a set of representatives of the `G`-conjugacy classes of radical `p`-chains\n`C : P₀ = O_p(G) = 1 < P₁ < ⋯ < Pₙ` of `G`, `|C| = n` is the length of `C`,\n`N_G(C) = N_G(P₀) ∩ ⋯ ∩ N_G(Pₙ)`, and `k(N_G(C), B, d)` is the number of irreducible\ncharacters of `N_G(C)` of defect `d` lying in blocks `b` of `N_G(C)` with `b^G = B`.\n\nSince the summands are invariant under conjugation, the sum does not depend on the chosen\nsystem of representatives `S`.\n-/\n@[category research open, AMS 20]\ntheorem dades_conjecture {p : ℕ} (hp : p.Prime) {G : Type} [Group G] [Fintype G]\n    (hG : pCore p (⊤ : Subgroup G) = ⊥)\n    (𝔭 : Ideal (integralClosure ℤ ℂ)) [𝔭.IsMaximal] (hp𝔭 : (p : integralClosure ℤ ℂ) ∈ 𝔭)\n    {θ : G → ℂ} (hθ : θ ∈ Irr G) (hB : BlockHasPositiveDefect p 𝔭 θ) (d : ℕ)\n    {S : Finset (RadicalPChain p G)} (hS : RadicalPChain.IsTransversal S) :\n    ∑ C ∈ S, (-1 : ℤ) ^ C.n * (numChars p 𝔭 C.normalizer θ d : ℤ) = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dade's conjecture\n\nDade's conjecture relates the numbers of characters of blocks of a finite group to the numbers\nof characters of blocks of local subgroups. This file states Dade's *ordinary* conjecture\n(Dade 1992, Conjecture 6.3): if $G$ is a finite group with $O_p(G) = 1$, $B$ is a $p$-block of $G$\nof positive defect and $d \\geq 0$, then\n$$\\sum_{C \\in \\mathcal{R}(G)/G} (-1)^{|C|} \\, k(N_G(C), B, d) = 0,$$\nwhere $C$ runs over a set of representatives of the $G$-orbits of radical $p$-chains of $G$ and\n$k(N_G(C), B, d)$ is the number of irreducible characters of $N_G(C)$ of $p$-defect $d$ lying in\n$p$-blocks $b$ of $N_G(C)$ with Brauer induced block $b^G = B$.\n\n*References:*\n- [Wikipedia, *Dade's conjecture*](https://en.wikipedia.org/wiki/Dade%27s_conjecture)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [E. C. Dade, *Counting characters in blocks. I*, Invent. Math. 109 (1992),\n  187–210](https://doi.org/10.1007/BF01232023)\n- [E. C. Dade, *Counting characters in blocks. II*, J. Reine Angew. Math. 448 (1994),\n  97–190](https://doi.org/10.1515/crll.1994.448.97)\n- [G. Navarro, *Characters and Blocks of Finite Groups*, LMS Lecture Note Series 250,\n  Cambridge University Press (1998)](https://doi.org/10.1017/CBO9780511526015) (for the\n  definitions of blocks via central characters and of Brauer induction)\n-/\n\nnamespace DadesConjecture\n\nopen CategoryTheory Pointwise\n\nvariable {G : Type} [Group G]\n\n/- ### Irreducible characters, defects and blocks -/\n\n/-- The set $\\operatorname{Irr}(H)$ of irreducible complex characters of a group $H$: the\ncharacters of the simple objects of `FDRep ℂ H`. -/\ndef Irr (H : Type) [Group H] : Set (H → ℂ) :=\n  {χ | ∃ V : FDRep ℂ H, Simple V ∧ V.character = χ}\n\n/-- `HasDefect p χ d` says that the character $\\chi$ of the finite group $H$ has $p$-defect $d$:\n$\\chi(1)$ is a natural number and $p^d$ is the $p$-part of $|H| / \\chi(1)$, i.e.\n$d = \\nu_p(|H|) - \\nu_p(\\chi(1))$. -/\ndef HasDefect (p : ℕ) {H : Type} [Group H] [Finite H] (χ : H → ℂ) (d : ℕ) : Prop :=\n  ∃ n : ℕ, χ 1 = n ∧ padicValNat p (Nat.card H) = d + padicValNat p n\n\n/-- The value $\\omega_\\theta(\\hat S) = \\sum_{x \\in S} \\theta(x) / \\theta(1)$ of the central\ncharacter $\\omega_\\theta$ of an irreducible character $\\theta$ of $H$ at the sum $\\hat S$ of the\nelements of a subset $S \\subseteq H$. When $S$ is a union of conjugacy classes of $H$, this is an\nalgebraic integer. -/\nnoncomputable def omega {H : Type} [Group H] (θ : H → ℂ) (S : Set H) : ℂ :=\n  ∑ᶠ x ∈ S, θ x / θ 1\n\n/-- `ModEq 𝔪 a b` says $a \\equiv b \\pmod{\\mathfrak m}$ for complex numbers $a$, $b$ and an ideal\n$\\mathfrak m$ of the ring of algebraic integers: $a - b$ is an algebraic integer lying in\n$\\mathfrak m$. -/\ndef ModEq (𝔪 : Ideal (integralClosure ℤ ℂ)) (a b : ℂ) : Prop :=\n  ∃ m ∈ 𝔪, (m : ℂ) = a - b\n\n/-- Let $\\mathfrak m$ be a maximal ideal of the algebraic integers containing the prime $p$, let\n$N \\leq G$, $\\theta \\in \\operatorname{Irr}(N)$ and $\\chi \\in \\operatorname{Irr}(G)$, and let $b$\nand $B$ be the $p$-blocks of $N$ and $G$ containing $\\theta$ and $\\chi$. (Two irreducible\ncharacters lie in the same $p$-block iff their central characters agree modulo $\\mathfrak m$ on all\nclass sums.) `BrauerInducedEq 𝔪 N θ χ` says that the Brauer induced block $b^G$ is defined and\nequals $B$, i.e. $\\lambda_b^G = \\lambda_B$: for every $g \\in G$,\n$$\\omega_\\theta\\big((\\operatorname{Cl}_G(g) \\cap N)^\\wedge\\big) \\equiv\n  \\omega_\\chi\\big(\\operatorname{Cl}_G(g)^\\wedge\\big) \\pmod{\\mathfrak m}.$$\nFor $N = G$ this says exactly that $\\theta$ and $\\chi$ lie in the same $p$-block of $G$. -/\ndef BrauerInducedEq (𝔪 : Ideal (integralClosure ℤ ℂ)) (N : Subgroup G) (θ : N → ℂ)\n    (χ : G → ℂ) : Prop :=\n  ∀ g : G, ModEq 𝔪 (omega θ {x : N | IsConj g (x : G)}) (omega χ {x : G | IsConj g x})\n\n/-- `numChars p 𝔪 N χ d` is $k(N, B, d)$ (Dade 1992, §6), where $B$ is the $p$-block of $G$\ncontaining $\\chi \\in \\operatorname{Irr}(G)$: the number of $\\theta \\in \\operatorname{Irr}(N)$ of\n$p$-defect $d$ lying in a $p$-block $b$ of $N$ with $b^G = B$. -/\nnoncomputable def numChars (p : ℕ) (𝔪 : Ideal (integralClosure ℤ ℂ)) [Finite G]\n    (N : Subgroup G) (χ : G → ℂ) (d : ℕ) : ℕ :=\n  {θ ∈ Irr N | HasDefect p θ d ∧ BrauerInducedEq 𝔪 N θ χ}.ncard\n\n/- ### Radical `p`-chains -/\n\n/-- `pCore p N` is $O_p(N)$, the largest normal $p$-subgroup of the subgroup $N$ of $G$ (the join\nof all normal $p$-subgroups of $N$), regarded as a subgroup of $G$. -/\ndef pCore (p : ℕ) (N : Subgroup G) : Subgroup G :=\n  sSup {P : Subgroup G | P ≤ N ∧ N ≤ P.normalizer ∧ IsPGroup p P}\n\n/-- The normaliser $N_G(C) = \\bigcap_{P \\in C} N_G(P)$ of a set $C$ of subgroups of $G$. -/\ndef chainNormalizer (C : Set (Subgroup G)) : Subgroup G :=\n  ⨅ P ∈ C, P.normalizer\n\n/-- `IsRadicalPChain p C` says that `C` is a radical $p$-chain of $G$ (Dade 1992, §2). A\nstrictly increasing chain $P_0 < P_1 < \\dots < P_n$ of $p$-subgroups of $G$ is encoded as the set\n$C = \\{P_0, \\dots, P_n\\}$, and it is radical if $P_0 = O_p(G)$ and $P_i = O_p(N_G(C_i))$ for all\n$i$, where $C_i$ is the subchain $P_0 < \\dots < P_i$ and $N_G(C_i) = \\bigcap_{j \\leq i} N_G(P_j)$.\nThe length of the chain is $|C| = n$, i.e. `C.ncard - 1`. -/\ndef IsRadicalPChain (p : ℕ) (C : Set (Subgroup G)) : Prop :=\n  IsChain (· ≤ ·) C ∧ pCore p ⊤ ∈ C ∧ (∀ P ∈ C, pCore p ⊤ ≤ P) ∧ (∀ P ∈ C, IsPGroup p P) ∧\n    ∀ P ∈ C, P = pCore p (chainNormalizer {Q ∈ C | Q ≤ P})\n\n/-- The set $\\mathcal{R}(G)/G$ of orbits of radical $p$-chains of $G$ under the conjugation action\nof $G$. -/\nabbrev RadicalPChainOrbit (p : ℕ) (G : Type) [Group G] : Type :=\n  Quotient ((MulAction.orbitRel (ConjAct G) (Set (Subgroup G))).comap\n    (Subtype.val : {C : Set (Subgroup G) // IsRadicalPChain p C} → Set (Subgroup G)))\n\n/- ### The conjecture -/\n\n/-- **Dade's (ordinary) conjecture** (Dade 1992, Conjecture 6.3).\n\nLet $p$ be a prime, let $\\mathfrak m$ be a maximal ideal of the ring of algebraic integers\ncontaining $p$ (this determines the $p$-blocks), let $G$ be a finite group with $O_p(G) = 1$ and\nlet $B$ be a $p$-block of $G$ of positive defect. Then for every integer $d \\geq 0$,\n$$\\sum_{C \\in \\mathcal{R}(G)/G} (-1)^{|C|} \\, k(N_G(C), B, d) = 0,$$\nwhere $C$ runs over a set of representatives of the $G$-orbits of radical $p$-chains of $G$,\n$|C|$ is the length of $C$, $N_G(C)$ is its normaliser and $k(N_G(C), B, d)$ is the number of\nirreducible characters of $N_G(C)$ of $p$-defect $d$ lying in $p$-blocks $b$ of $N_G(C)$ with\n$b^G = B$.\n\nThe block $B$ is specified by an irreducible character $\\chi \\in B$. A block has positive defect\niff it is not a block of defect zero, i.e. iff some (equivalently, every) $\\chi \\in B$ has\n$d(\\chi) > 0$; this is the hypothesis `hB`. The representative of each orbit is chosen by\n`Quotient.out`; the summand does not depend on this choice. -/\n@[category research open, AMS 20]\ntheorem dades_conjecture (p : ℕ) [Fact p.Prime] (𝔪 : Ideal (integralClosure ℤ ℂ))\n    (h𝔪 : 𝔪.IsMaximal) (hp : (p : integralClosure ℤ ℂ) ∈ 𝔪) [Finite G]\n    (hG : pCore p (⊤ : Subgroup G) = ⊥) (χ : G → ℂ) (hχ : χ ∈ Irr G)\n    (hB : ∃ e, 0 < e ∧ HasDefect p χ e) (d : ℕ) :\n    ∑ᶠ C : RadicalPChainOrbit p G,\n      (-1 : ℤ) ^ (C.out.1.ncard - 1) * numChars p 𝔪 (chainNormalizer C.out.1) χ d = 0 := by\n  sorry\n\n/- ### Tests of the definitions -/\n\n/-- If $G$ is a $p$-group then $O_p(G) = G$. -/\n@[category test, AMS 20]\ntheorem pCore_top_of_isPGroup (p : ℕ) (hG : IsPGroup p G) : pCore p (⊤ : Subgroup G) = ⊤ :=\n  le_antisymm le_top (le_sSup ⟨le_rfl, (Subgroup.normalizer_eq_top ⊤).ge, hG.to_subgroup ⊤⟩)\n\n/-- The normaliser of the chain consisting of the trivial subgroup is the whole group. -/\n@[category test, AMS 20]\ntheorem chainNormalizer_singleton_bot : chainNormalizer {(⊥ : Subgroup G)} = ⊤ := by\n  simp [chainNormalizer, Subgroup.normalizer_eq_top]\n\n/-- The central character of $\\theta$ takes the value $1$ on the class sum of the identity. -/\n@[category test, AMS 20]\ntheorem omega_isConj_one {H : Type} [Group H] (θ : H → ℂ) (hθ : θ 1 ≠ 0) :\n    omega θ {x | IsConj 1 x} = 1 := by\n  have : {x : H | IsConj 1 x} = {1} := by ext; simp\n  rw [omega, this, finsum_mem_singleton, div_self hθ]\n\n/-- Congruence modulo $\\mathfrak m$ is reflexive. -/\n@[category test, AMS 20]\ntheorem modEq_refl (𝔪 : Ideal (integralClosure ℤ ℂ)) (a : ℂ) : ModEq 𝔪 a a :=\n  ⟨0, 𝔪.zero_mem, by simp⟩\n\n/-- If $O_p(G) = 1$, the chain of length $0$ consisting of the trivial subgroup is a radical\n$p$-chain of $G$. -/\n@[category test, AMS 20]\ntheorem isRadicalPChain_singleton_bot (p : ℕ) (hG : pCore p (⊤ : Subgroup G) = ⊥) :\n    IsRadicalPChain p {(⊥ : Subgroup G)} := by\n  refine ⟨IsChain.singleton, Set.mem_singleton_iff.mpr hG, by simp [hG],\n    by simpa using IsPGroup.of_bot, ?_⟩\n  intro P hP\n  rw [Set.mem_singleton_iff] at hP\n  subst hP\n  have : {Q ∈ ({⊥} : Set (Subgroup G)) | Q ≤ ⊥} = {⊥} := by ext; simp\n  rw [this, chainNormalizer_singleton_bot, hG]\n\nend DadesConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single slot matches Dade's ordinary conjecture (Dade 1992, Conj. 6.3) as described in the notes. Minor deviation from the notes' suggestion: blocks are defined via central characters modulo a maximal ideal of the algebraic integers (equivalent textbook definition) rather than via central primitive idempotents over a p-modular system, since this avoids constructing a complete p-modular system in Lean and is the definition used by Isaacs and Navarro.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list entry is a one-line description; the precise formulation is taken from Dade 1992 (Counting characters in blocks I, Conjecture 6.3), the paper cited by the Wikipedia article: ordinary conjecture over radical p-chains, with hypotheses O_p(G)=1 and d(B)>0, for all d ≥ 0.",
+    "Blocks are defined via central characters rather than central primitive idempotents of a group algebra over a p-modular system: two irreducible characters lie in the same p-block iff ω_χ(K̂) ≡ ω_ψ(K̂) (mod 𝔪) for all class sums K̂, where 𝔪 is a maximal ideal of the ring of algebraic integers (integralClosure ℤ ℂ) containing p (Isaacs Ch. 15 / Navarro Ch. 3 definition). The theorem is universally quantified over such 𝔪, matching the sources which fix an arbitrary one.",
+    "Brauer induction b^G = B is encoded as λ_b^G = λ_B on all class sums of G: for every g ∈ G, Σ_{x ∈ Cl_G(g) ∩ N} θ(x)/θ(1) ≡ Σ_{x ∈ Cl_G(g)} χ(x)/χ(1) (mod 𝔪), where θ ∈ b, χ ∈ B (Navarro Ch. 4 definition). If λ_b^G is not a block central character then b^G is undefined and θ is not counted, as intended. For radical chains b^G is always defined since P_n C_G(P_n) ≤ N_G(C).",
+    "The block B is specified by an irreducible character χ ∈ B (hχ : χ ∈ Irr G); the positive-defect hypothesis d(B) > 0 is encoded as d(χ) > 0 (hB). These are equivalent: a defect-zero character is alone in a defect-zero block, and d(χ) ≤ d(B) for χ ∈ B, so d(B) > 0 iff every (equivalently some) χ ∈ B has d(χ) > 0.",
+    "p-defect of χ ∈ Irr(H) is relative to H (Dade's definition p^{d(χ)} = |H|_p/χ(1)_p), encoded as HasDefect: ∃ n : ℕ, χ 1 = n ∧ ν_p(|H|) = d + ν_p(n), using Nat.card H.",
+    "Irr(H) is defined as the set of character functions H → ℂ of simple objects of FDRep ℂ H; the count k(N,B,d) is Set.ncard of the (finite) set of such characters with defect d and b^G = B. This forces G : Type (universe of ℂ), as in other repository files.",
+    "O_p(N) for N ≤ G is defined as sSup of the normal p-subgroups of N (as subgroups of G); O_p(G) = 1 is `pCore p ⊤ = ⊥`.",
+    "A radical p-chain P_0 < ... < P_n is encoded as the set {P_0,…,P_n} (IsChain, containing O_p(G) as its minimum, p-subgroups, and P_i = O_p(N_G(C_i)) with N_G(C_i) = ⋂_{j≤i} N_G(P_j)); its length |C| = C.ncard - 1 (C is nonempty). Conjugation orbits are the quotient of this subtype by the orbit relation of ConjAct G acting pointwise on Set (Subgroup G) (via Setoid.comap, avoiding a MulAction instance on the subtype).",
+    "The sum over R(G)/G uses finsum over the (finite) orbit type with representatives chosen by Quotient.out; the summand (-1)^{|C|} k(N_G(C),B,d) is conjugation-invariant, so this equals the sum over any transversal.",
+    "Only the ordinary conjecture is stated; Dade's projective/invariant/inductive refinements and the equivalent normal/elementary-abelian chain versions are omitted, per the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FDRep.character, Representation.IsIrreducible, CategoryTheory.Simple",
+     "name": "DadesConjecture.Irr",
+     "why_needed": "Mathlib has FDRep.character and Simple but no set of irreducible characters of a group."
+    },
+    {
+     "closest_existing_considered": "padicValNat, Nat.factorization",
+     "name": "DadesConjecture.HasDefect",
+     "why_needed": "p-defect of an irreducible character (p^d = |H|_p / χ(1)_p) is absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "FDRep.character, ConjClasses.carrier",
+     "name": "DadesConjecture.omega",
+     "why_needed": "Value of the central character ω_θ on a class sum Σ_{x∈S} x; needed to define blocks and Brauer induction."
+    },
+    {
+     "closest_existing_considered": "Ideal.Quotient.mk, SModEq, Int.ModEq",
+     "name": "DadesConjecture.ModEq",
+     "why_needed": "Congruence of complex (algebraic-integer) numbers modulo an ideal of integralClosure ℤ ℂ; no Mathlib primitive relates ℂ to ideals of the algebraic integers."
+    },
+    {
+     "closest_existing_considered": "none (no block theory in Mathlib)",
+     "name": "DadesConjecture.BrauerInducedEq",
+     "why_needed": "Brauer induced block b^G = B (λ_b^G = λ_B); Mathlib has no blocks or Brauer correspondence."
+    },
+    {
+     "closest_existing_considered": "Set.ncard",
+     "name": "DadesConjecture.numChars",
+     "why_needed": "Dade's count k(N, B, d) of irreducible characters of N of defect d in blocks b with b^G = B."
+    },
+    {
+     "closest_existing_considered": "Sylow, IsPGroup, Subgroup.normalizer, Subgroup.normalCore (searched for pCore/p-core: none)",
+     "name": "DadesConjecture.pCore",
+     "why_needed": "O_p(N), the largest normal p-subgroup of a subgroup N (as a subgroup of G); Mathlib has no p-core."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalizer, iInf",
+     "name": "DadesConjecture.chainNormalizer",
+     "why_needed": "N_G(C) = ⋂_{P∈C} N_G(P) for a chain of subgroups."
+    },
+    {
+     "closest_existing_considered": "IsChain, Flag",
+     "name": "DadesConjecture.IsRadicalPChain",
+     "why_needed": "Dade's radical p-chains are not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "MulAction.orbitRel, MulAction.orbitRel.Quotient, Setoid.comap",
+     "name": "DadesConjecture.RadicalPChainOrbit",
+     "why_needed": "The set R(G)/G of G-conjugacy orbits of radical p-chains, as a quotient type to sum over."
+    }
+   ],
+   "per_slot": {
+    "dades_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Dade's ordinary conjecture (Dade 1992, Conj. 6.3): for a prime p, a maximal ideal 𝔪 of the algebraic integers containing p, a finite group G with O_p(G)=1, a block B (given by χ ∈ Irr(G) with d(χ)>0) and every d ≥ 0, ∑_{C ∈ R(G)/G} (-1)^{|C|} k(N_G(C),B,d) = 0. Mathlib has no blocks, defect, Brauer induction, O_p or radical chains, so these were defined bespoke via textbook definitions (central characters mod 𝔪)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dades_conjecture": "/-- **Dade's (ordinary) conjecture** (Dade 1992, Conjecture 6.3).\n\nLet $p$ be a prime, let $\\mathfrak m$ be a maximal ideal of the ring of algebraic integers\ncontaining $p$ (this determines the $p$-blocks), let $G$ be a finite group with $O_p(G) = 1$ and\nlet $B$ be a $p$-block of $G$ of positive defect. Then for every integer $d \\geq 0$,\n$$\\sum_{C \\in \\mathcal{R}(G)/G} (-1)^{|C|} \\, k(N_G(C), B, d) = 0,$$\nwhere $C$ runs over a set of representatives of the $G$-orbits of radical $p$-chains of $G$,\n$|C|$ is the length of $C$, $N_G(C)$ is its normaliser and $k(N_G(C), B, d)$ is the number of\nirreducible characters of $N_G(C)$ of $p$-defect $d$ lying in $p$-blocks $b$ of $N_G(C)$ with\n$b^G = B$.\n\nThe block $B$ is specified by an irreducible character $\\chi \\in B$. A block has positive defect\niff it is not a block of defect zero, i.e. iff some (equivalently, every) $\\chi \\in B$ has\n$d(\\chi) > 0$; this is the hypothesis `hB`. The representative of each orbit is chosen by\n`Quotient.out`; the summand does not depend on this choice. -/\n@[category research open, AMS 20]\ntheorem dades_conjecture (p : ℕ) [Fact p.Prime] (𝔪 : Ideal (integralClosure ℤ ℂ))\n    (h𝔪 : 𝔪.IsMaximal) (hp : (p : integralClosure ℤ ℂ) ∈ 𝔪) [Finite G]\n    (hG : pCore p (⊤ : Subgroup G) = ⊥) (χ : G → ℂ) (hχ : χ ∈ Irr G)\n    (hB : ∃ e, 0 < e ∧ HasDefect p χ e) (d : ℕ) :\n    ∑ᶠ C : RadicalPChainOrbit p G,\n      (-1 : ℤ) ^ (C.out.1.ncard - 1) * numChars p 𝔪 (chainNormalizer C.out.1) χ d = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dade's conjecture\n\nDade's (ordinary) conjecture relates the numbers of irreducible characters in the $p$-blocks of a\nfinite group $G$ to the numbers of irreducible characters in the $p$-blocks of the normalisers\n$N_G(C)$ of radical $p$-chains $C$ of $G$ (\"local subgroups\").\n\nThroughout, $G$ is a finite group, $p$ is a prime and $\\mathrm{Irr}(H)$ denotes the set of\nirreducible complex characters of a finite group $H$.\n\n* **Blocks.** Let $\\mathbb{A}$ be the ring of algebraic integers in $\\mathbb{C}$ and let $M$ be a\n  maximal ideal of $\\mathbb{A}$ containing $p$. For $\\chi \\in \\mathrm{Irr}(H)$ the *central\n  character* $\\omega_\\chi$ takes the value $\\omega_\\chi(g) = |\\mathrm{Cl}_H(g)|\\chi(g)/\\chi(1)$\n  on the class sum of $g$; this is an algebraic integer. Two characters\n  $\\chi, \\psi \\in \\mathrm{Irr}(H)$ lie in the same *$p$-block* if\n  $\\omega_\\chi(g) \\equiv \\omega_\\psi(g) \\pmod M$ for all $g \\in H$. (It is well known that the\n  resulting partition of $\\mathrm{Irr}(H)$ into $p$-blocks does not depend on the choice of $M$.)\n* **Defect.** The *defect* of $\\chi \\in \\mathrm{Irr}(H)$ is\n  $d(\\chi) = \\nu_p(|H|) - \\nu_p(\\chi(1))$; the defect $d(B)$ of a block $B$ is the largest defect\n  of a character in $B$.\n* **Brauer induction.** For $H \\le G$, a block $b$ of $H$ (with central character $\\lambda_b$, the\n  reduction modulo $M$ of $\\omega_\\theta$ for any $\\theta \\in b$) and a block $B$ of $G$, the\n  induced block $b^G$ is defined and equal to $B$ if and only if\n  $\\lambda_b\\bigl((\\mathrm{Cl}_G(g) \\cap H)^+\\bigr) = \\lambda_B\\bigl(\\mathrm{Cl}_G(g)^+\\bigr)$ for\n  all $g \\in G$, i.e. if and only if\n  $\\sum_{h \\in H \\cap \\mathrm{Cl}_G(g)} \\theta(h)/\\theta(1) \\equiv\n  |\\mathrm{Cl}_G(g)|\\chi(g)/\\chi(1) \\pmod M$ for all $g \\in G$, where $\\chi \\in B$.\n* **Radical $p$-chains.** A *radical $p$-chain* of $G$ is a strictly increasing chain\n  $C : P_0 < P_1 < \\dots < P_n$ of $p$-subgroups of $G$ with $P_0 = O_p(G)$ and\n  $P_i = O_p(N_G(P_0, \\dots, P_i))$ for all $i$, where\n  $N_G(P_0, \\dots, P_i) = \\bigcap_{j \\le i} N_G(P_j)$. Its length is $|C| = n$ and its\n  normaliser is $N_G(C) = \\bigcap_{i} N_G(P_i)$. The group $G$ acts on the set $\\mathcal{R}$ of\n  radical $p$-chains by conjugation, and the stabiliser of $C$ is $N_G(C)$.\n* **Counting.** For $H \\le G$, a block $B$ of $G$ and $d \\ge 0$, $k(H, B, d)$ is the number of\n  $\\theta \\in \\mathrm{Irr}(H)$ with $d(\\theta) = d$ lying in a block $b$ of $H$ with $b^G = B$.\n\n*References:*\n* [Wikipedia, Dade's conjecture](https://en.wikipedia.org/wiki/Dade%27s_conjecture)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* E. C. Dade, *Counting characters in blocks. I*, Invent. Math. 109 (1992), 187–210,\n  Conjecture 6.3. [doi:10.1007/BF01232023](https://doi.org/10.1007/BF01232023)\n* G. Navarro, *Characters and blocks of finite groups*, LMS Lecture Note Series 250, CUP 1998,\n  Chapters 3 and 4 (for the definitions of blocks and Brauer induction used here).\n-/\n\nopen CategoryTheory\n\nnamespace DadesConjecture\n\n/- ### Blocks of finite groups -/\n\nsection Blocks\n\nvariable {H : Type} [Group H]\n\n/-- `χ : H → ℂ` is an irreducible (complex) character of the finite group `H`: it is the\ncharacter of some simple finite-dimensional complex representation of `H`. -/\ndef IsIrreducibleCharacter (χ : H → ℂ) : Prop :=\n  ∃ V : FDRep ℂ H, Simple V ∧ V.character = χ\n\n/-- The `p`-defect `d(V) = ν_p(|H|) - ν_p(dim V)` of a finite-dimensional complex\nrepresentation `V` of the finite group `H`. For an irreducible `V` with character `χ` this is\nthe defect `d(χ)` of `χ`, defined by `p ^ d(χ) = |H|_p / χ(1)_p`. -/\nnoncomputable def pDefect (p : ℕ) (V : FDRep ℂ H) : ℕ :=\n  padicValNat p (Nat.card H) - padicValNat p (Module.finrank ℂ V)\n\n/-- The value `ω_χ(g) = |Cl_H(g)| χ(g) / χ(1)` of the central character `ω_χ` of `χ ∈ Irr(H)`\non the sum of the conjugacy class of `g` in `H`. -/\nnoncomputable def centralCharacter (χ : H → ℂ) (g : H) : ℂ :=\n  ((ConjClasses.mk g).carrier.ncard : ℂ) * χ g / χ 1\n\n/-- `x ≡ y (mod M)`: the complex number `x - y` is an algebraic integer lying in the ideal `M`\nof the ring `integralClosure ℤ ℂ` of algebraic integers. -/\ndef CongruentMod (M : Ideal (integralClosure ℤ ℂ)) (x y : ℂ) : Prop :=\n  ∃ a ∈ M, (a : ℂ) = x - y\n\n/-- The characters `χ ψ : H → ℂ` lie in the same `p`-block (with respect to a maximal ideal `M`\nof the algebraic integers containing `p`): their central characters agree modulo `M`, i.e.\n`ω_χ(g) ≡ ω_ψ(g) (mod M)` for every `g ∈ H`. -/\ndef SameBlock (M : Ideal (integralClosure ℤ ℂ)) (χ ψ : H → ℂ) : Prop :=\n  ∀ g : H, CongruentMod M (centralCharacter χ g) (centralCharacter ψ g)\n\n/-- The defect `d(B)` of the `p`-block `B` of `H` containing `χ`, i.e. the largest defect of an\nirreducible character of `H` lying in the same block as `χ`. -/\nnoncomputable def blockDefect (p : ℕ) (M : Ideal (integralClosure ℤ ℂ)) (χ : H → ℂ) : ℕ :=\n  sSup {d | ∃ V : FDRep ℂ H, Simple V ∧ SameBlock M V.character χ ∧ pDefect p V = d}\n\n@[category API, AMS 20]\nlemma CongruentMod.refl (M : Ideal (integralClosure ℤ ℂ)) (x : ℂ) : CongruentMod M x x :=\n  ⟨0, M.zero_mem, by simp⟩\n\n@[category API, AMS 20]\nlemma CongruentMod.symm {M : Ideal (integralClosure ℤ ℂ)} {x y : ℂ} (h : CongruentMod M x y) :\n    CongruentMod M y x := by\n  obtain ⟨a, ha, h⟩ := h\n  exact ⟨-a, M.neg_mem ha, by simp [h]⟩\n\n@[category API, AMS 20]\nlemma SameBlock.refl (M : Ideal (integralClosure ℤ ℂ)) (χ : H → ℂ) : SameBlock M χ χ :=\n  fun _ => CongruentMod.refl M _\n\nend Blocks\n\nsection Subgroups\n\nvariable {G : Type} [Group G] [Fintype G]\n\nopen scoped Classical in\n/-- For a subgroup `H ≤ G`, a character `θ : H → ℂ` and `g ∈ G`, the value\n`(∑_{h ∈ H ∩ Cl_G(g)} θ(h)) / θ(1)` of the central character `ω_θ` of `θ` on the element\n`(Cl_G(g) ∩ H)^+` of the centre of the group ring of `H`. -/\nnoncomputable def inducedCentralCharacter (H : Subgroup G) (θ : H → ℂ) (g : G) : ℂ :=\n  (∑ h : H, if IsConj g (h : G) then θ h else 0) / θ 1\n\n/-- For a subgroup `H ≤ G`, `θ ∈ Irr(H)` and `χ ∈ Irr(G)`: the block `b` of `H` containing `θ`\nsatisfies `b^G = B`, where `B` is the block of `G` containing `χ` and `b^G` is the Brauer induced\nblock. This means that the induced central character `λ_b^G` coincides with `λ_B`, i.e.\n`(∑_{h ∈ H ∩ Cl_G(g)} θ(h)) / θ(1) ≡ |Cl_G(g)| χ(g) / χ(1) (mod M)` for every `g ∈ G`. -/\ndef BrauerInducesTo (M : Ideal (integralClosure ℤ ℂ)) (H : Subgroup G) (θ : H → ℂ)\n    (χ : G → ℂ) : Prop :=\n  ∀ g : G, CongruentMod M (inducedCentralCharacter H θ g) (centralCharacter χ g)\n\n/-- `k(H, B, d)`: the number of irreducible characters `θ` of the subgroup `H ≤ G` of `p`-defect\n`d` lying in a block `b` of `H` with `b^G = B`, where `B` is the `p`-block of `G` containing\n`χ ∈ Irr(G)`. -/\nnoncomputable def numChars (p : ℕ) (M : Ideal (integralClosure ℤ ℂ)) (H : Subgroup G) (χ : G → ℂ)\n    (d : ℕ) : ℕ :=\n  {θ : H → ℂ | ∃ V : FDRep ℂ H, Simple V ∧ V.character = θ ∧ pDefect p V = d ∧\n    BrauerInducesTo M H θ χ}.ncard\n\nend Subgroups\n\n/- ### Radical `p`-chains -/\n\nsection Chains\n\nvariable {G : Type*} [Group G]\n\n/-- The `p`-core `O_p(G)` of `G`: the largest normal `p`-subgroup of `G`, i.e. the join of all\nnormal `p`-subgroups of `G`. -/\ndef pCore (p : ℕ) (G : Type*) [Group G] : Subgroup G :=\n  ⨆ (P : Subgroup G) (_ : P.Normal ∧ IsPGroup p P), P\n\n/-- The normaliser `N_G(C) = ⋂_{P ∈ C} N_G(P)` of a chain `C` of subgroups of `G`. -/\ndef chainNormalizer (C : List (Subgroup G)) : Subgroup G :=\n  ⨅ P ∈ C, P.normalizer\n\n/-- `C = [P₀, P₁, …, Pₙ]` is a radical `p`-chain of `G`: `P₀ < P₁ < ⋯ < Pₙ`, `P₀ = O_p(G)` and\n`Pᵢ = O_p(N_G(P₀, …, Pᵢ))` for every `i`, where `N_G(P₀, …, Pᵢ) = ⋂_{j ≤ i} N_G(Pⱼ)`. -/\ndef IsRadicalPChain (p : ℕ) (C : List (Subgroup G)) : Prop :=\n  C.head? = some (pCore p G) ∧ C.Pairwise (· < ·) ∧\n    ∀ i (hi : i < C.length),\n      C[i] = (pCore p (chainNormalizer (C.take (i + 1)))).map\n        (chainNormalizer (C.take (i + 1))).subtype\n\n@[category API, AMS 20]\nlemma le_pCore (p : ℕ) (P : Subgroup G) [P.Normal] (hP : IsPGroup p P) : P ≤ pCore p G :=\n  le_iSup₂_of_le P ⟨inferInstance, hP⟩ le_rfl\n\n@[category API, AMS 20]\ninstance pCore_normal (p : ℕ) : (pCore p G).Normal := by\n  constructor\n  intro n hn g\n  refine Subgroup.iSup_induction (C := fun x => g * x * g⁻¹ ∈ pCore p G) _ hn ?_ ?_ ?_\n  · intro P x hx\n    refine Subgroup.iSup_induction (C := fun x => g * x * g⁻¹ ∈ pCore p G) _ hx ?_ ?_ ?_\n    · rintro ⟨hPn, hPp⟩ y hy\n      exact le_pCore p P hPp (hPn.conj_mem y hy g)\n    · simp\n    · intro a b ha hb\n      convert (pCore p G).mul_mem ha hb using 1\n      group\n  · simp\n  · intro a b ha hb\n    convert (pCore p G).mul_mem ha hb using 1\n    group\n\n@[category API, AMS 20]\nlemma chainNormalizer_nil : chainNormalizer ([] : List (Subgroup G)) = ⊤ := by\n  simp [chainNormalizer]\n\n@[category API, AMS 20]\nlemma chainNormalizer_cons (P : Subgroup G) (C : List (Subgroup G)) :\n    chainNormalizer (P :: C) = P.normalizer ⊓ chainNormalizer C := by\n  simp [chainNormalizer, iInf_or, iInf_inf_eq]\n\n@[category API, AMS 20]\nlemma IsRadicalPChain.ne_nil {p : ℕ} {C : List (Subgroup G)} (h : IsRadicalPChain p C) :\n    C ≠ [] := by\n  rintro rfl\n  simp [IsRadicalPChain] at h\n\n/-- In the trivial group, the chain `1 = O_p(G)` of length `0` is a radical `p`-chain. -/\n@[category test, AMS 20]\nlemma isRadicalPChain_bot_of_subsingleton [Subsingleton G] (p : ℕ) :\n    IsRadicalPChain p [(⊥ : Subgroup G)] := by\n  refine ⟨by simp [Subsingleton.elim (pCore p G) ⊥], by simp, ?_⟩\n  intro i hi\n  simp only [List.length_singleton, Nat.lt_one_iff] at hi\n  subst hi\n  exact Subsingleton.elim _ _\n\nend Chains\n\n/-- **Dade's (ordinary) conjecture** (Dade 1992, Conjecture 6.3).\n\nLet `G` be a finite group and `p` a prime with `O_p(G) = 1`. Let `B` be a `p`-block of `G` of\npositive defect (here `B` is the block containing the irreducible character `χ`) and let\n`d ≥ 0`. Then\n$$\\sum_{C \\in \\mathcal{R}/G} (-1)^{|C|} \\, k(N_G(C), B, d) = 0,$$\nwhere the sum runs over a set of representatives of the `G`-orbits (under conjugation) of the\nradical `p`-chains `C` of `G`, `|C|` is the length of `C`, `N_G(C)` is the normaliser of `C`, and\n`k(N_G(C), B, d)` is the number of irreducible characters of `N_G(C)` of defect `d` lying in\nblocks `b` of `N_G(C)` with `b^G = B`.\n\nSince the stabiliser of a radical `p`-chain `C` under conjugation is `N_G(C)`, the orbit of `C`\nhas `|G| / |N_G(C)|` elements, so the sum over orbit representatives equals\n$\\frac{1}{|G|} \\sum_{C \\in \\mathcal{R}} (-1)^{|C|} |N_G(C)| \\, k(N_G(C), B, d)$, the sum over all\nradical `p`-chains. This is the form stated below (multiplied by `|G|`).\n\nThe blocks are taken with respect to a maximal ideal `M` of the ring of algebraic integers\ncontaining `p`; the partition of the irreducible characters into blocks (and hence the statement)\ndoes not depend on this choice. -/\n@[category research open, AMS 20]\ntheorem dades_conjecture (G : Type) [Group G] [Fintype G] (p : ℕ) (hp : p.Prime)\n    (hG : pCore p G = ⊥)\n    (M : Ideal (integralClosure ℤ ℂ)) (hM : M.IsMaximal) (hpM : (p : integralClosure ℤ ℂ) ∈ M)\n    (χ : G → ℂ) (hχ : IsIrreducibleCharacter χ) (hB : 0 < blockDefect p M χ) (d : ℕ) :\n    ∑ᶠ (C : List (Subgroup G)) (_ : IsRadicalPChain p C),\n      ((-1) ^ (C.length - 1) * Nat.card (chainNormalizer C) *\n        numChars p M (chainNormalizer C) χ d : ℤ) = 0 := by\n  sorry\n\nend DadesConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The decomposition table's reading (Dade's ordinary conjecture with hypotheses O_p(G)=1 and d(B)>0, radical p-chains, Brauer induction b^G=B, all d ≥ 0) is the standard precise formulation of the terse list entry and was followed exactly. Minor remark: the table's phrasing suggests defining blocks via central primitive idempotents over a p-modular system; the file instead uses the equivalent textbook definition via central characters modulo a maximal ideal of the algebraic integers (Navarro Ch. 3, Isaacs Ch. 15), which is directly expressible with Mathlib's integralClosure ℤ ℂ and avoids Henselian/completeness subtleties of abstract p-modular systems.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Blocks are defined à la Navarro/Isaacs over ℂ: χ, ψ ∈ Irr(H) lie in the same p-block iff ω_χ(g) ≡ ω_ψ(g) (mod M) for all g, where ω_χ(g) = |Cl_H(g)| χ(g)/χ(1) and M is a maximal ideal of integralClosure ℤ ℂ containing p. The theorem quantifies universally over such M (hM : M.IsMaximal, hpM : (p : _) ∈ M); the standard fact that the block partition is independent of M makes this equivalent to Dade's statement, and it is the safe quantifier in any case. Congruence mod M is expressed as `∃ a ∈ M, (a : ℂ) = x - y` (the relevant quantities are always algebraic integers).",
+    "Brauer induction b^G = B is encoded (BrauerInducesTo) as equality of the induced central character λ_b^G with λ_B on all class sums: for all g ∈ G, (∑_{h ∈ H ∩ Cl_G(g)} θ(h))/θ(1) ≡ |Cl_G(g)| χ(g)/χ(1) (mod M). If λ_b^G equals λ_B it is automatically an algebra homomorphism, so 'b^G is defined and equals B' ⟺ this condition; for radical chains b^G is always defined anyway since P_n C_G(P_n) ≤ N_G(C) ≤ N_G(P_n).",
+    "The block B is represented by an irreducible character χ in it (hχ : IsIrreducibleCharacter χ); quantifying over χ ∈ Irr(G) quantifies over all blocks, and the conclusion depends on χ only through its block.",
+    "Positive defect: blockDefect p M χ := sSup of the p-defects of irreducible characters in the block of χ, i.e. d(B) = max_{ψ∈B} d(ψ) (equivalently p^{d(B)} = |D| for a defect group D). The set is nonempty and bounded by ν_p(|G|), so sSup is the genuine maximum. Equivalently one could require d(χ) > 0 for χ itself (defect-zero characters are alone in their block).",
+    "Defect of a character: pDefect p V = padicValNat p |H| - padicValNat p (dim V) is defined on the representation V : FDRep ℂ H rather than on the function χ (to avoid extracting a natural number from χ(1) : ℂ); truncated subtraction is harmless since χ(1) divides |H|. Irreducibility is `CategoryTheory.Simple V` for V : FDRep ℂ H, Mathlib's notion used in `FDRep.char_orthonormal`. Characters are counted as functions H → ℂ (Set.ncard), i.e. up to isomorphism of representations.",
+    "Because FDRep ℂ H forces H to live in the same universe as ℂ, the group G is taken in `Type` (every finite group is isomorphic to one in Type, so no generality is lost).",
+    "O_p(G) (pCore) is defined as the join of all normal p-subgroups, following Mathlib's `Subgroup.normalCore_eq_iSup` idiom; for a subgroup H ≤ G, O_p(H) is `(pCore p H).map H.subtype`. The file proves pCore is normal and contains every normal p-subgroup as API.",
+    "Radical p-chains are lists C = [P₀, …, Pₙ] of subgroups with C.head? = some (O_p(G)) (= ⊥ under the hypothesis O_p(G)=1), strictly increasing (List.Pairwise (· < ·)), and C[i] = O_p(⋂_{j ≤ i} N_G(P_j)) for every i (Dade's definition; the i = 0 condition is automatic). Length |C| = C.length - 1. N_G(C) = ⨅ P ∈ C, P.normalizer.",
+    "The sum over G-orbit representatives is replaced by the exactly equivalent weighted sum over all radical p-chains ∑_C (-1)^{|C|} |N_G(C)| k(N_G(C),B,d) = 0 (orbit-stabiliser: the stabiliser of C under conjugation is N_G(C), and k(N_G(C),B,d) is conjugation-invariant), avoiding the choice of representatives/quotients. The sum is a `finsum` over `List (Subgroup G)`; the support is finite since strictly increasing lists of subgroups of a finite group are finitely many.",
+    "The stronger projective/invariant/inductive refinements of Dade's later papers and the equivalent Knörr–Robinson (elementary abelian / normal chain) reformulations are not stated, as they are not posed by the list entry."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FDRep.character together with CategoryTheory.Simple (used directly), Representation.IsIrreducible (not tied to characters).",
+     "name": "DadesConjecture.IsIrreducibleCharacter",
+     "why_needed": "Mathlib has no predicate 'χ : H → ℂ is an irreducible character'; defined as the character of some Simple V : FDRep ℂ H."
+    },
+    {
+     "closest_existing_considered": "padicValNat, Module.finrank, Nat.card (used as building blocks).",
+     "name": "DadesConjecture.pDefect",
+     "why_needed": "The p-defect ν_p(|H|) - ν_p(χ(1)) of a character/representation does not exist in Mathlib."
+    },
+    {
+     "closest_existing_considered": "ConjClasses.carrier / Set.ncard (used); no central character API exists.",
+     "name": "DadesConjecture.centralCharacter",
+     "why_needed": "Value |Cl(g)| χ(g)/χ(1) of the central character on class sums; not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Ideal.Quotient.eq / SModEq (require elements of the ring, not of ℂ), Nat.ModEq/Int.ModEq (wrong ring).",
+     "name": "DadesConjecture.CongruentMod",
+     "why_needed": "Congruence of complex numbers modulo an ideal of the ring of algebraic integers integralClosure ℤ ℂ."
+    },
+    {
+     "closest_existing_considered": "None (no blocks/central idempotents API for group algebras in Mathlib or FormalConjecturesForMathlib).",
+     "name": "DadesConjecture.SameBlock",
+     "why_needed": "p-blocks of a finite group are not in Mathlib; defined via agreement of central characters modulo M."
+    },
+    {
+     "closest_existing_considered": "None (no defect groups in Mathlib).",
+     "name": "DadesConjecture.blockDefect",
+     "why_needed": "Defect d(B) of a block, needed for the hypothesis d(B) > 0; defined as the maximal defect of a character in the block."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "DadesConjecture.inducedCentralCharacter",
+     "why_needed": "Value λ_b((Cl_G(g) ∩ H)^+) of the central character of a block of H ≤ G on an intersection of a G-class with H; needed for Brauer induction."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "DadesConjecture.BrauerInducesTo",
+     "why_needed": "Brauer induction of blocks b^G = B is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Set.ncard (used).",
+     "name": "DadesConjecture.numChars",
+     "why_needed": "Dade's count k(H, B, d) of irreducible characters of H of defect d in blocks inducing to B."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalCore (different notion), Sylow / IsPGroup (used as building block), Subgroup.normalCore_eq_iSup idiom (followed).",
+     "name": "DadesConjecture.pCore",
+     "why_needed": "O_p(G), the largest normal p-subgroup, is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalizer (used pointwise).",
+     "name": "DadesConjecture.chainNormalizer",
+     "why_needed": "N_G(C) = ⋂ N_G(P_i) for a chain of subgroups."
+    },
+    {
+     "closest_existing_considered": "List.Pairwise / List.SortedLT for strict chains (Pairwise used); no chain-of-subgroups API.",
+     "name": "DadesConjecture.IsRadicalPChain",
+     "why_needed": "Dade's radical p-chains are not in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "dades_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Dade's ordinary conjecture (Dade 1992, Conj. 6.3): for a finite group G (in Type), prime p with O_p(G)=1, a maximal ideal M of the algebraic integers containing p, an irreducible complex character χ whose p-block B has positive defect, and every d : ℕ, the sum over all radical p-chains C of (-1)^{|C|} · |N_G(C)| · k(N_G(C), B, d) vanishes (this is |G| times the sum over G-orbit representatives, since the conjugation stabiliser of a chain is N_G(C)). Mathlib has no blocks, defect, Brauer induction, p-core or radical chains, so these were defined in the file via central characters modulo M (Navarro Ch. 3-4 / Isaacs Ch. 15 definitions)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dades_conjecture": "/-- **Dade's (ordinary) conjecture** (Dade 1992, Conjecture 6.3).\n\nLet `G` be a finite group and `p` a prime with `O_p(G) = 1`. Let `B` be a `p`-block of `G` of\npositive defect (here `B` is the block containing the irreducible character `χ`) and let\n`d ≥ 0`. Then\n$$\\sum_{C \\in \\mathcal{R}/G} (-1)^{|C|} \\, k(N_G(C), B, d) = 0,$$\nwhere the sum runs over a set of representatives of the `G`-orbits (under conjugation) of the\nradical `p`-chains `C` of `G`, `|C|` is the length of `C`, `N_G(C)` is the normaliser of `C`, and\n`k(N_G(C), B, d)` is the number of irreducible characters of `N_G(C)` of defect `d` lying in\nblocks `b` of `N_G(C)` with `b^G = B`.\n\nSince the stabiliser of a radical `p`-chain `C` under conjugation is `N_G(C)`, the orbit of `C`\nhas `|G| / |N_G(C)|` elements, so the sum over orbit representatives equals\n$\\frac{1}{|G|} \\sum_{C \\in \\mathcal{R}} (-1)^{|C|} |N_G(C)| \\, k(N_G(C), B, d)$, the sum over all\nradical `p`-chains. This is the form stated below (multiplied by `|G|`).\n\nThe blocks are taken with respect to a maximal ideal `M` of the ring of algebraic integers\ncontaining `p`; the partition of the irreducible characters into blocks (and hence the statement)\ndoes not depend on this choice. -/\n@[category research open, AMS 20]\ntheorem dades_conjecture (G : Type) [Group G] [Fintype G] (p : ℕ) (hp : p.Prime)\n    (hG : pCore p G = ⊥)\n    (M : Ideal (integralClosure ℤ ℂ)) (hM : M.IsMaximal) (hpM : (p : integralClosure ℤ ℂ) ∈ M)\n    (χ : G → ℂ) (hχ : IsIrreducibleCharacter χ) (hB : 0 < blockDefect p M χ) (d : ℕ) :\n    ∑ᶠ (C : List (Subgroup G)) (_ : IsRadicalPChain p C),\n      ((-1) ^ (C.length - 1) * Nat.card (chainNormalizer C) *\n        numChars p M (chainNormalizer C) χ d : ℤ) = 0 := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "dades_conjecture": "c01"
+ },
+ "id": "wp-dades-conjecture",
+ "main_attempt": "c01"
+}

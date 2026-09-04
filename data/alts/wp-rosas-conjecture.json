@@ -1,0 +1,433 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rosa's conjecture\n\nRosa's conjecture says that all triangular cacti are graceful or nearly-graceful.\n\n*References:*\n- [Wikipedia/Graceful_labeling](https://en.wikipedia.org/wiki/Graceful_labeling)\n- [Wikipedia/List of unsolved problems](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia/Cactus_graph](https://en.wikipedia.org/wiki/Cactus_graph)\n- A. Rosa, *Cyclic Steiner triple systems and labelings of triangular cacti*,\n  Scientia 1 (1988), 87–95.\n- J. A. Gallian, *A dynamic survey of graph labeling*,\n  [Electron. J. Combin. DS6](https://www.combinatorics.org/ojs/index.php/eljc/article/view/DS6).\n-/\n\nnamespace RosasConjecture\n\nopen SimpleGraph\n\nvariable {V : Type*} [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj]\n\n/-- The label that a vertex labeling `f` induces on the edge `s(u, v)`, namely $|f(u) - f(v)|$. -/\ndef edgeLabel (f : V → ℕ) : Sym2 V → ℕ :=\n  Sym2.lift ⟨fun u v => ((f u : ℤ) - f v).natAbs, fun u v => by\n    dsimp only\n    rw [← Int.natAbs_neg, neg_sub]⟩\n\n/-- A graph with $m$ edges is *graceful* if its vertices can be labeled injectively with\nintegers from $\\{0, \\dots, m\\}$ so that the induced edge labels $|f(u) - f(v)|$ are exactly\n$\\{1, \\dots, m\\}$. -/\ndef IsGraceful : Prop :=\n  ∃ f : V → ℕ, Function.Injective f ∧ (∀ v, f v ≤ G.edgeFinset.card) ∧\n    G.edgeFinset.image (edgeLabel f) = Finset.Icc 1 G.edgeFinset.card\n\n/-- A graph with $m$ edges is *near-graceful* (or *nearly graceful*) if its vertices can be\nlabeled injectively with integers from $\\{0, \\dots, m + 1\\}$ so that each edge is uniquely\nidentified by its induced label $|f(u) - f(v)|$, i.e. distinct edges get distinct labels.\n(These labels then automatically lie in $\\{1, \\dots, m + 1\\}$.) -/\ndef IsNearGraceful : Prop :=\n  ∃ f : V → ℕ, Function.Injective f ∧ (∀ v, f v ≤ G.edgeFinset.card + 1) ∧\n    Set.InjOn (edgeLabel f) G.edgeSet\n\n/-- A *triangular cactus* is a connected graph all of whose blocks are triangles.\nEquivalently, it is a connected graph in which every edge lies on a cycle (i.e. no edge is a\nbridge) and every cycle is a triangle (has length `3`).\n\nNote that this includes the trivial one-vertex graph (which has no edges and is trivially\ngraceful). -/\ndef IsTriangularCactus : Prop :=\n  G.Connected ∧ (∀ e ∈ G.edgeSet, ¬ G.IsBridge e) ∧\n    ∀ ⦃v : V⦄ (p : G.Walk v v), p.IsCycle → p.length = 3\n\nvariable {G}\n\n@[category API, AMS 5]\ntheorem IsGraceful.isNearGraceful (h : IsGraceful G) : IsNearGraceful G := by\n  obtain ⟨f, hf, hle, himg⟩ := h\n  refine ⟨f, hf, fun v => (hle v).trans (Nat.le_succ _), ?_⟩\n  rw [← coe_edgeFinset, ← Finset.card_image_iff, himg]\n  simp\n\n/-- The triangle is a triangular cactus. -/\n@[category test, AMS 5]\ntheorem isTriangularCactus_top_fin_three : IsTriangularCactus (⊤ : SimpleGraph (Fin 3)) := by\n  refine ⟨connected_top, fun e he => ?_, fun v p hp => ?_⟩\n  · induction e using Sym2.ind with\n    | h a b =>\n      rw [isBridge_iff, not_and, not_not, reachable_delete_edges_iff_exists_walk]\n      intro hab\n      obtain ⟨c, hca, hcb⟩ : ∃ c : Fin 3, c ≠ a ∧ c ≠ b := by\n        clear he hab; revert a b; decide\n      refine ⟨Walk.cons (by simpa using hca.symm) (Walk.cons (by simpa using hcb) Walk.nil), ?_⟩\n      simp [hca.symm, hcb.symm]\n  · refine le_antisymm ?_ hp.three_le_length\n    have := hp.support_nodup.length_le_card\n    simpa [Walk.length_support] using this\n\n/-- The triangle is graceful: label its vertices `0`, `1`, `3`. -/\n@[category test, AMS 5]\ntheorem isGraceful_top_fin_three : IsGraceful (⊤ : SimpleGraph (Fin 3)) := by\n  refine ⟨![0, 1, 3], by decide, by decide, ?_⟩\n  decide\n\n/--\n**Rosa's conjecture.** Every triangular cactus (a connected graph all of whose blocks are\ntriangles) is graceful or nearly-graceful.\n\nHere a graph with $m$ edges is *graceful* if its vertices can be labeled injectively with\nintegers from $\\{0, \\dots, m\\}$ so that the induced edge labels $|f(u) - f(v)|$ are exactly\n$\\{1, \\dots, m\\}$, and it is *nearly-graceful* if its vertices can be labeled injectively with\nintegers from $\\{0, \\dots, m + 1\\}$ so that each edge is uniquely identified by its induced\nlabel $|f(u) - f(v)|$ (which then lies in $\\{1, \\dots, m + 1\\}$).\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture (hG : IsTriangularCactus G) : IsGraceful G ∨ IsNearGraceful G := by\n  sorry\n\n/--\nRosa's original (1988) formulation is sharper: a triangular cactus with $t$ triangles is graceful\nwhen $t \\equiv 0, 1 \\pmod 4$, and nearly-graceful when $t \\equiv 2, 3 \\pmod 4$ (in the latter\ncase it has $3t \\equiv 1, 2 \\pmod 4$ edges and is Eulerian, so it cannot be graceful by Rosa's\nparity theorem). This variant records the graceful half; the nearly-graceful half is contained in\n`rosas_conjecture`.\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture.variants.graceful [DecidableEq V] (hG : IsTriangularCactus G)\n    (ht : (G.cliqueFinset 3).card % 4 = 0 ∨ (G.cliqueFinset 3).card % 4 = 1) :\n    IsGraceful G := by\n  sorry\n\nend RosasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate. I followed the notes' fixed (Wikipedia) definition of near-graceful; note only that it is slightly weaker than the Gallian/Rosa notion (which requires the edge-label set to be {1..m} or {1..m-1,m+1}), so a reviewer may wish to decide whether the stricter notion is preferable for the Rosa (1988) formulation.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Literal reading kept: the conclusion is the disjunction `IsGraceful G ∨ IsNearGraceful G`, exactly as the Wikipedia list entry says. Since graceful implies near-graceful (proved in the file as the API lemma `IsGraceful.isNearGraceful`), this is logically equivalent to 'every triangular cactus is near-graceful'. Rosa's sharper 1988 form (t ≡ 0,1 mod 4 ⇒ graceful) is recorded separately as the variant `rosas_conjecture.variants.graceful`, sourced from Gallian's Dynamic Survey; its near-graceful half is already contained in the main statement so it is not repeated.",
+    "Near-graceful uses the Wikipedia article's definition (as fixed by the decomposition notes): injective labels in {0..m+1} with pairwise distinct edge labels (`Set.InjOn (edgeLabel f) G.edgeSet`); the range condition 1 ≤ label ≤ m+1 is automatic and hence not repeated. Note Gallian/Rosa use a slightly stricter notion (induced edge labels equal {1..m} or {1..m-1, m+1}); the Wikipedia notion is weaker, so with it the main statement is a (very slightly) weaker conjecture than Rosa's original. Graceful uses the standard 'edge labels are exactly {1..m}' (Finset.image = Finset.Icc 1 m), matching the existing repo file GracefulLabeling.lean.",
+    "Triangular cactus ('connected graph all of whose blocks are triangles') is encoded without a notion of block, which Mathlib lacks, as: `G.Connected ∧ (∀ e ∈ G.edgeSet, ¬ G.IsBridge e) ∧ ∀ v (p : G.Walk v v), p.IsCycle → p.length = 3`. Equivalence: bridgeless ⇒ every block is 2-connected on ≥ 3 vertices; if such a block contained a vertex outside one of its triangles, the fan lemma gives a cycle of length ≥ 4, so every block is a triangle; conversely, if all blocks are triangles then no edge is a bridge and every cycle (which lies in a single block) is a triangle. This also implies the Wikipedia cactus-graph definition (each edge in at most one cycle), since two triangles sharing an edge form a 4-cycle.",
+    "Degenerate case: the one-vertex graph K1 satisfies `IsTriangularCactus` vacuously (Rosa's block definition would exclude it, since its only block is K1). It is trivially graceful (m = 0, `Icc 1 0 = ∅`), so including it does not change the claim; documented in the definition's docstring. The empty vertex type is excluded by `Connected`.",
+    "Finiteness via `[Fintype V]` plus `[DecidableRel G.Adj]` so that `G.edgeFinset` (the edge count m) is available. `[DecidableEq V]` is only assumed on the variant (needed for `cliqueFinset 3`, which counts the triangles t; in a triangular cactus the 3-cliques are exactly the blocks).",
+    "Edge labels are computed by the bespoke `edgeLabel f : Sym2 V → ℕ := Sym2.lift ⟨fun u v => |(f u : ℤ) - f v|.natAbs, _⟩`, mirroring the inline construction in FormalConjectures/Wikipedia/GracefulLabeling.lean.",
+    "Sanity tests included: K3 is a triangular cactus and is graceful (labels 0,1,3, checked by `decide`). Additional scratch checks (not in the file): the wrong K3 labeling 0,1,2 is refuted; the butterfly graph (two triangles sharing a vertex, m = 6) is accepted as near-graceful with labels 0,1,4,5,7 and a bad labeling is refuted."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Inline `Sym2.lift ⟨fun u v => Int.natAbs ((f u : ℤ) - f v), _⟩` as used in FormalConjectures/Wikipedia/GracefulLabeling.lean; Sym2.map / Nat.dist were also considered but are less readable.",
+     "name": "RosasConjecture.edgeLabel",
+     "why_needed": "The label |f u - f v| induced on an edge s(u,v) by a vertex labeling f, as a function on Sym2 V; needed to talk about the set of edge labels. Mathlib has no graph-labeling API."
+    },
+    {
+     "closest_existing_considered": "The inlined statement in FormalConjectures/Wikipedia/GracefulLabeling.lean (graceful_tree_conjecture).",
+     "name": "RosasConjecture.IsGraceful",
+     "why_needed": "Graceful graph: injective vertex labeling into {0..m} whose induced edge labels are exactly {1..m}. No such notion exists in Mathlib or FormalConjecturesForMathlib (GracefulLabeling.lean inlines it)."
+    },
+    {
+     "closest_existing_considered": "RosasConjecture.IsGraceful (the m-range version); Set.InjOn is used for 'each edge uniquely identified by its label'.",
+     "name": "RosasConjecture.IsNearGraceful",
+     "why_needed": "Near-graceful graph per the Wikipedia article: injective vertex labeling into {0..m+1} with pairwise distinct induced edge labels. Not present anywhere in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.IsBridge, SimpleGraph.Walk.IsCycle, SimpleGraph.IsAcyclic/IsTree, SimpleGraph.cliqueFinset 3 (searched Mathlib for cactus/block/biconnected: none).",
+     "name": "RosasConjecture.IsTriangularCactus",
+     "why_needed": "Mathlib has no notion of block, block-cut tree, or cactus graph. Encoded equivalently as connected + no bridge (SimpleGraph.IsBridge) + every cycle (Walk.IsCycle) has length 3."
+    }
+   ],
+   "per_slot": {
+    "rosas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated literally as: for every finite simple graph G that is a triangular cactus, G is graceful or near-graceful. Triangular cactus, graceful, and near-graceful are bespoke Props in the file (no Mathlib/repo primitives exist for graceful labelings, blocks, or cacti); graceful/near-graceful follow the Wikipedia article's definitions exactly, and triangular cactus is encoded by an equivalent block-free characterization (connected, bridgeless, every cycle has length 3)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "rosas_conjecture": "/--\n**Rosa's conjecture.** Every triangular cactus (a connected graph all of whose blocks are\ntriangles) is graceful or nearly-graceful.\n\nHere a graph with $m$ edges is *graceful* if its vertices can be labeled injectively with\nintegers from $\\{0, \\dots, m\\}$ so that the induced edge labels $|f(u) - f(v)|$ are exactly\n$\\{1, \\dots, m\\}$, and it is *nearly-graceful* if its vertices can be labeled injectively with\nintegers from $\\{0, \\dots, m + 1\\}$ so that each edge is uniquely identified by its induced\nlabel $|f(u) - f(v)|$ (which then lies in $\\{1, \\dots, m + 1\\}$).\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture (hG : IsTriangularCactus G) : IsGraceful G ∨ IsNearGraceful G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rosa's conjecture\n\n*Reference:* [Wikipedia, Graceful labeling](https://en.wikipedia.org/wiki/Graceful_labeling)\n\nRosa's conjecture concerns graceful and near-graceful labelings of triangular cacti.\n-/\n\nnamespace RosasConjecture\n\nopen SimpleGraph\n\n/-- The absolute difference of the labels at the endpoints of an edge. -/\ndef edgeDifference {V : Type*} (f : V → ℕ) (e : Sym2 V) : ℕ :=\n  e.lift ⟨fun u v ↦ Int.natAbs ((f u : ℤ) - (f v : ℤ)), fun u v ↦ by\n    show ((f u : ℤ) - f v).natAbs = ((f v : ℤ) - f u).natAbs\n    rw [← Int.natAbs_neg, neg_sub]⟩\n\n/-- A finite graph is graceful if its vertices have distinct labels in $\\{0,\\ldots,m\\}$,\nwhere $m$ is its number of edges, and its edge differences are exactly $\\{1,\\ldots,m\\}$. -/\ndef IsGraceful {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] : Prop :=\n  let m := G.edgeFinset.card\n  ∃ f : V → ℕ, Function.Injective f ∧ (∀ v, f v ≤ m) ∧\n    G.edgeFinset.image (edgeDifference f) = Finset.Icc 1 m\n\n/-- A finite graph is near-graceful if its vertices have distinct labels in\n$\\{0,\\ldots,m+1\\}$ and its $m$ edge differences are distinct members of\n$\\{1,\\ldots,m+1\\}$. -/\ndef IsNearGraceful {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] : Prop :=\n  let m := G.edgeFinset.card\n  ∃ f : V → ℕ, Function.Injective f ∧ (∀ v, f v ≤ m + 1) ∧\n    Set.InjOn (edgeDifference f) G.edgeSet ∧\n    ∀ e ∈ G.edgeSet, edgeDifference f e ∈ Set.Icc 1 (m + 1)\n\n/-- A triangular cactus is a connected graph all of whose blocks are triangles. Equivalently,\nit has an edge, every edge belongs to exactly one triangle, and every graph-theoretic cycle has\nlength three. -/\ndef IsTriangularCactus {V : Type*} (G : SimpleGraph V) : Prop :=\n  G.Connected ∧ G.edgeSet.Nonempty ∧ G.LocallyLinear ∧\n    ∀ ⦃v : V⦄ (c : G.Walk v v), c.IsCycle → c.length = 3\n\n/--\n**Rosa's conjecture:** Every finite triangular cactus is graceful or near-graceful. Here a\ntriangular cactus is a connected graph whose every block is a triangle. If it has $m$ edges,\na graceful labeling injectively labels its vertices in $\\{0,\\ldots,m\\}$ with edge differences\nexactly $\\{1,\\ldots,m\\}$; a near-graceful labeling uses $\\{0,\\ldots,m+1\\}$ and has $m$ distinct\nedge differences in $\\{1,\\ldots,m+1\\}$.\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] (hG : IsTriangularCactus G) :\n    IsGraceful G ∨ IsNearGraceful G := by\n  sorry\n\nend RosasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Encoded the cited Wikipedia statement literally as `IsGraceful G ∨ IsNearGraceful G`, rather than replacing it by the logically weaker-looking but equivalent near-graceful conclusion or by Rosa's sharper modulo-4 formulation, neither of which is the cited list-entry wording.",
+    "Modeled a triangular cactus by the standard equivalent cycle characterization: the graph is connected and has an edge, every edge lies in exactly one triangle (`SimpleGraph.LocallyLinear`), and every `Walk.IsCycle` has length three. The nonempty-edge clause translates the block condition at the zero-triangle boundary; it excludes the connected singleton whose block is not `K₃`, while retaining the one-triangle cactus.",
+    "Used the number `m = G.edgeFinset.card` of undirected edges. Graceful labelings are injective natural-valued vertex labelings bounded by `m` whose image of edge differences is exactly `{1,...,m}`. Near-graceful labelings are injective vertex labelings bounded by `m+1` whose edge-difference function is injective on `G.edgeSet` and takes values in `{1,...,m+1}`.",
+    "Represented edge differences with `Int.natAbs` after coercing natural labels to integers, ensuring the endpoint order of an undirected `Sym2` edge is irrelevant."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "The existing `FormalConjectures/Wikipedia/GracefulLabeling.lean` repeats an equivalent `Sym2.lift` expression inline but exposes no reusable definition.",
+     "name": "RosasConjecture.edgeDifference",
+     "why_needed": "Provides the absolute difference induced by a natural-valued vertex labeling on an undirected `Sym2` edge, shared by both labeling predicates."
+    },
+    {
+     "closest_existing_considered": "`GracefulLabeling.graceful_tree_conjecture` contains the same labeling conditions inline, but only as part of its tree-conjecture theorem statement.",
+     "name": "RosasConjecture.IsGraceful",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib contain no reusable predicate for graceful graph labelings."
+    },
+    {
+     "closest_existing_considered": "`GracefulLabeling.graceful_tree_conjecture` handles only graceful labelings and has no near-graceful analogue.",
+     "name": "RosasConjecture.IsNearGraceful",
+     "why_needed": "No near-graceful labeling predicate exists in Mathlib, FormalConjecturesForMathlib, or the nearby conjecture files."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `SimpleGraph.LocallyLinear` captures exactly one triangle through every edge, but alone admits cyclic rings of triangles; combining it with connectedness, edge nonemptiness, and the requirement that every `Walk.IsCycle` has length three captures the all-blocks-are-`K₃` condition.",
+     "name": "RosasConjecture.IsTriangularCactus",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib has graph blocks or a triangular-cactus predicate; a faithful domain predicate is therefore needed."
+    }
+   ],
+   "per_slot": {
+    "rosas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "rosas_conjecture": "/--\n**Rosa's conjecture:** Every finite triangular cactus is graceful or near-graceful. Here a\ntriangular cactus is a connected graph whose every block is a triangle. If it has $m$ edges,\na graceful labeling injectively labels its vertices in $\\{0,\\ldots,m\\}$ with edge differences\nexactly $\\{1,\\ldots,m\\}$; a near-graceful labeling uses $\\{0,\\ldots,m+1\\}$ and has $m$ distinct\nedge differences in $\\{1,\\ldots,m+1\\}$.\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] (hG : IsTriangularCactus G) :\n    IsGraceful G ∨ IsNearGraceful G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rosa's conjecture\n\nRosa's conjecture states that all triangular cacti are graceful or nearly graceful.\n\n*References:*\n- [Wikipedia, Graceful labeling](https://en.wikipedia.org/wiki/Graceful_labeling)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- A. Rosa, *Cyclic Steiner Triple Systems and Labelings of Triangular Cacti*,\n  Scientia 1 (1988), 87–95.\n- J. A. Gallian, *A Dynamic Survey of Graph Labeling*, Electron. J. Combin., DS6.\n-/\n\nnamespace RosasConjecture\n\nopen SimpleGraph\n\nvariable {V : Type*} [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj]\n\n/-- The label that a vertex labeling `f` induces on an edge: the absolute difference\n$|f(u) - f(v)|$ of the labels of its two endpoints. -/\ndef edgeLabel (f : V → ℕ) : Sym2 V → ℕ :=\n  Sym2.lift ⟨fun u v => Nat.dist (f u) (f v), fun u v => Nat.dist_comm (f u) (f v)⟩\n\n/-- A vertex labeling `f` of `G` is a *graceful labeling with bound `N`* if\n* no two vertices share a label, i.e. `f` is injective,\n* the vertex labels lie in $\\{0, \\dots, N\\}$,\n* the induced edge labels $|f(u) - f(v)|$ lie in $\\{1, \\dots, N\\}$, and\n* the induced edge labels are pairwise distinct, so that each edge is uniquely identified by\n  its label.\n\nGraceful labelings of a graph with $m$ edges are the case `N = m`; near-graceful labelings are\nthe case `N = m + 1`. -/\ndef IsGracefulLabelingWithBound (N : ℕ) (f : V → ℕ) : Prop :=\n  Function.Injective f ∧ (∀ v, f v ≤ N) ∧\n    (∀ e ∈ G.edgeSet, edgeLabel f e ∈ Set.Icc 1 N) ∧ G.edgeSet.InjOn (edgeLabel f)\n\n/-- A graph `G` with $m$ edges is *graceful* if its vertices can be labeled with distinct\nintegers from $\\{0, \\dots, m\\}$ such that the induced edge labels $|f(u) - f(v)|$ are pairwise\ndistinct and lie in $\\{1, \\dots, m\\}$ (equivalently, they are exactly $1, \\dots, m$). -/\ndef IsGraceful : Prop :=\n  ∃ f : V → ℕ, IsGracefulLabelingWithBound G G.edgeFinset.card f\n\n/-- A graph `G` with $m$ edges is *nearly graceful* (or *near-graceful*) if its vertices can be\nlabeled with distinct integers from $\\{0, \\dots, m + 1\\}$ such that the induced edge labels\n$|f(u) - f(v)|$ are pairwise distinct and lie in $\\{1, \\dots, m + 1\\}$. -/\ndef IsNearGraceful : Prop :=\n  ∃ f : V → ℕ, IsGracefulLabelingWithBound G (G.edgeFinset.card + 1) f\n\n/-- A *triangular cactus* is a connected graph all of whose blocks are triangles.\n\nSince Mathlib has no notion of blocks, we use the equivalent description: `G` is connected,\nevery edge of `G` lies in a triangle, and every cycle of `G` is a triangle (has length `3`).\nUnder this description a triangular cactus with $t$ triangles has exactly $3t$ edges; the\none-vertex graph is the degenerate triangular cactus with $t = 0$. -/\ndef IsTriangularCactus : Prop :=\n  G.Connected ∧ (∀ u v, G.Adj u v → ∃ w, G.Adj u w ∧ G.Adj v w) ∧\n    ∀ ⦃v : V⦄ (c : G.Walk v v), c.IsCycle → c.length = 3\n\nvariable {G}\n\n/-- Every graceful graph is nearly graceful. -/\n@[category API, AMS 5]\ntheorem IsGraceful.isNearGraceful (h : IsGraceful G) : IsNearGraceful G := by\n  obtain ⟨f, hf, hle, hrange, hinj⟩ := h\n  exact ⟨f, hf, fun v => (hle v).trans (Nat.le_succ _),\n    fun e he => Set.Icc_subset_Icc_right (Nat.le_succ _) (hrange e he), hinj⟩\n\nvariable (G)\n\n/-- A single triangle is a triangular cactus. -/\n@[category test, AMS 5]\ntheorem isTriangularCactus_triangle : IsTriangularCactus (⊤ : SimpleGraph (Fin 3)) := by\n  refine ⟨connected_top, by decide, fun v c hc => ?_⟩\n  refine le_antisymm ?_ hc.three_le_length\n  have h₁ := hc.support_nodup.length_le_card\n  have h₂ := c.length_support\n  simp only [List.length_tail, Fintype.card_fin] at h₁ h₂\n  omega\n\n/-- A single edge is not a triangular cactus. -/\n@[category test, AMS 5]\ntheorem not_isTriangularCactus_edge : ¬ IsTriangularCactus (⊤ : SimpleGraph (Fin 2)) := by\n  rintro ⟨-, h, -⟩\n  obtain ⟨w, hw⟩ := h 0 1 (by decide)\n  fin_cases w <;> simp at hw\n\n/-- A single triangle is graceful, with labels `0`, `1`, `3`. -/\n@[category test, AMS 5]\ntheorem isGraceful_triangle : IsGraceful (⊤ : SimpleGraph (Fin 3)) := by\n  refine ⟨![0, 1, 3], ?_⟩\n  simp only [IsGracefulLabelingWithBound, Set.InjOn]\n  decide\n\n/-- The labeling `0`, `1`, `2` of a triangle is not graceful: two edges get the label `1`. -/\n@[category test, AMS 5]\ntheorem not_isGracefulLabelingWithBound_triangle :\n    ¬ IsGracefulLabelingWithBound (⊤ : SimpleGraph (Fin 3)) 3 ![0, 1, 2] := by\n  simp only [IsGracefulLabelingWithBound, Set.InjOn]\n  decide\n\n/-- **Rosa's conjecture** (Rosa, 1988): every triangular cactus is graceful or nearly graceful.\n\nHere a *triangular cactus* is a connected graph all of whose blocks are triangles. A graph with\n$m$ edges is *graceful* if its vertices can be labeled with distinct integers from\n$\\{0, \\dots, m\\}$ such that the induced edge labels $|f(u) - f(v)|$ are pairwise distinct and\nlie in $\\{1, \\dots, m\\}$; it is *nearly graceful* if its vertices can be labeled with distinct\nintegers from $\\{0, \\dots, m + 1\\}$ such that the induced edge labels are pairwise distinct and\nlie in $\\{1, \\dots, m + 1\\}$.\n\nSince every graceful graph is nearly graceful (`IsGraceful.isNearGraceful`), the disjunction is\nequivalent to the claim that every triangular cactus is nearly graceful. -/\n@[category research open, AMS 5]\ntheorem rosas_conjecture (hG : IsTriangularCactus G) : IsGraceful G ∨ IsNearGraceful G := by\n  sorry\n\nvariable [DecidableEq V]\n\n/-- Rosa's original, sharper form of the conjecture, first part: every triangular cactus with\n$t \\equiv 0, 1 \\pmod 4$ triangles is graceful. -/\n@[category research open, AMS 5]\ntheorem rosas_conjecture.variants.graceful (hG : IsTriangularCactus G)\n    (ht : (G.cliqueFinset 3).card % 4 = 0 ∨ (G.cliqueFinset 3).card % 4 = 1) :\n    IsGraceful G := by\n  sorry\n\n/-- Rosa's original, sharper form of the conjecture, second part: every triangular cactus with\n$t \\equiv 2, 3 \\pmod 4$ triangles is nearly graceful (in the sense of `IsNearGraceful`). -/\n@[category research open, AMS 5]\ntheorem rosas_conjecture.variants.near_graceful (hG : IsTriangularCactus G)\n    (ht : (G.cliqueFinset 3).card % 4 = 2 ∨ (G.cliqueFinset 3).card % 4 = 3) :\n    IsNearGraceful G := by\n  sorry\n\n/-- A triangular cactus with $t \\equiv 2, 3 \\pmod 4$ triangles is not graceful. This follows from\nRosa's theorem (1967) that an Eulerian graph with $m \\equiv 1, 2 \\pmod 4$ edges is not graceful:\na triangular cactus is Eulerian and has $m = 3t$ edges. It explains why the conjecture asks only\nfor a nearly graceful labeling in these cases. -/\n@[category research solved, AMS 5]\ntheorem rosas_conjecture.variants.not_graceful (hG : IsTriangularCactus G)\n    (ht : (G.cliqueFinset 3).card % 4 = 2 ∨ (G.cliqueFinset 3).card % 4 = 3) :\n    ¬ IsGraceful G := by\n  sorry\n\nend RosasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The table's single slot matches the source; the note correctly observes that with Wikipedia's definitions the disjunction collapses to 'near-graceful'. I encoded the literal disjunction for the slot and Rosa's sharper mod-4 form as separately named variants rather than choosing only one reading.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Near-graceful follows the Wikipedia article's definition (background article): injective labels in {0..m+1} with pairwise distinct edge labels in {1..m+1}. Rosa's original 1988 notion (as reported in Gallian's survey) appears to be stricter, requiring the edge labels to be {1..m-1,m} or {1..m-1,m+1}, i.e. the one missing label must be m or m+1; the Wikipedia version accepts any m-subset of {1..m+1}. The file follows the assigned source (Wikipedia); a reviewer may want to check whether the stricter notion is preferred.",
+    "The literal disjunction `IsGraceful G ∨ IsNearGraceful G` is kept as in the statement even though it collapses to `IsNearGraceful G` (an API lemma `IsGraceful.isNearGraceful` records the collapse). Rosa's sharper 1988 two-part form (t ≡ 0,1 mod 4 ⇒ graceful; t ≡ 2,3 mod 4 ⇒ near-graceful, with t = number of triangles = (G.cliqueFinset 3).card) is added as `rosas_conjecture.variants.graceful` / `.near_graceful`, and the parity obstruction (t ≡ 2,3 mod 4 ⇒ not graceful, from Rosa's 1967 Eulerian theorem) as the solved variant `rosas_conjecture.variants.not_graceful`.",
+    "Triangular cactus ('connected graph all of whose blocks are triangles') is encoded, since Mathlib has no blocks, by the equivalent characterization: G.Connected ∧ every edge lies in a triangle (∀ u v, Adj u v → ∃ w, Adj u w ∧ Adj v w) ∧ every cycle (Mathlib `Walk.IsCycle`) has length 3. Equivalence: no bridges since each edge is in a triangle; in a 2-connected block any two edges lie on a common cycle, hence a common triangle, which forces the block to be a single triangle; conversely each cycle lies inside one block. Under this definition every edge lies in exactly one triangle, so m = 3t and all degrees are even.",
+    "The one-vertex graph K1 satisfies IsTriangularCactus (0 triangles, vacuous conditions); some block conventions would exclude it. It is trivially graceful, so this does not change the truth of any stated theorem. The empty graph is excluded because `SimpleGraph.Connected` requires a nonempty vertex type.",
+    "Graceful labelings are defined via a bound parameter N (`IsGracefulLabelingWithBound G N f`): f injective, f v ≤ N, edge labels |f u - f v| (computed with `Nat.dist` through `Sym2.lift`) lie in Icc 1 N and are injective on G.edgeSet. Graceful is N = m, near-graceful is N = m+1 with m = G.edgeFinset.card. The range conjunct is redundant given the other three but is kept to transcribe Wikipedia's wording literally; distinctness of m edge labels in {1..m} is equivalent to the classical 'edge labels are exactly 1..m'.",
+    "Finiteness is imposed through [Fintype V] (and [DecidableRel G.Adj] for edgeFinset / cliqueFinset), following FormalConjectures/Wikipedia/GracefulLabeling.lean; [DecidableEq V] is only assumed for the variants that count triangles with cliqueFinset."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "The inlined `Sym2.lift ⟨fun u v => Int.natAbs ((f u : ℤ) - f v), _⟩` in FormalConjectures/Wikipedia/GracefulLabeling.lean (not a reusable declaration); Mathlib's `SimpleGraph.EdgeLabeling` is just a function type G.edgeSet → K with no induced-difference notion.",
+     "name": "RosasConjecture.edgeLabel",
+     "why_needed": "The edge label |f u - f v| induced on an unordered edge by a vertex labeling; needed as a function on Sym2 V to talk about injectivity on the edge set."
+    },
+    {
+     "closest_existing_considered": "No graceful-labeling predicate exists in Mathlib or FormalConjecturesForMathlib; GracefulLabeling.lean inlines the condition inside its theorem statement.",
+     "name": "RosasConjecture.IsGracefulLabelingWithBound",
+     "why_needed": "Common form of graceful (N = m) and near-graceful (N = m+1) labelings: injective vertex labels in {0..N}, edge labels in {1..N}, pairwise distinct on edges."
+    },
+    {
+     "closest_existing_considered": "Inlined statement in FormalConjectures/Wikipedia/GracefulLabeling.lean; nothing in Mathlib.",
+     "name": "RosasConjecture.IsGraceful",
+     "why_needed": "A graph is graceful: it admits a graceful labeling with bound m = number of edges."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or the repo.",
+     "name": "RosasConjecture.IsNearGraceful",
+     "why_needed": "A graph is nearly graceful: it admits a graceful labeling with bound m + 1 (Wikipedia's definition)."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.IsAcyclic / IsTree (cycle-freeness only), SimpleGraph.IsBridge, SimpleGraph.cliqueFinset 3, SimpleGraph.girth — none captures the block structure.",
+     "name": "RosasConjecture.IsTriangularCactus",
+     "why_needed": "Connected graph all of whose blocks are triangles; Mathlib has no blocks/biconnected components or cactus graphs, so it is encoded as connected ∧ every edge in a triangle ∧ every cycle has length 3."
+    }
+   ],
+   "per_slot": {
+    "rosas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated literally as: for every finite simple graph G that is a triangular cactus, G is graceful or G is nearly graceful. Needed bespoke definitions for graceful / near-graceful labelings (Wikipedia's definitions) and for triangular cacti (Mathlib has no notion of blocks or cacti), all declared in the problem file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "rosas_conjecture": "/-- **Rosa's conjecture** (Rosa, 1988): every triangular cactus is graceful or nearly graceful.\n\nHere a *triangular cactus* is a connected graph all of whose blocks are triangles. A graph with\n$m$ edges is *graceful* if its vertices can be labeled with distinct integers from\n$\\{0, \\dots, m\\}$ such that the induced edge labels $|f(u) - f(v)|$ are pairwise distinct and\nlie in $\\{1, \\dots, m\\}$; it is *nearly graceful* if its vertices can be labeled with distinct\nintegers from $\\{0, \\dots, m + 1\\}$ such that the induced edge labels are pairwise distinct and\nlie in $\\{1, \\dots, m + 1\\}$.\n\nSince every graceful graph is nearly graceful (`IsGraceful.isNearGraceful`), the disjunction is\nequivalent to the claim that every triangular cactus is nearly graceful. -/\n@[category research open, AMS 5]\ntheorem rosas_conjecture (hG : IsTriangularCactus G) : IsGraceful G ∨ IsNearGraceful G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rosa's conjecture\n\n*Reference:* [Wikipedia, Graceful labeling](https://en.wikipedia.org/wiki/Graceful_labeling)\n\nRosa's conjecture concerns graceful and near-graceful labelings of triangular cacti.\n-/\n\nnamespace RosasConjecture\n\nopen SimpleGraph\n\n/-- The absolute difference of the labels at the endpoints of an undirected edge. -/\ndef edgeDifference {V : Type*} (f : V → ℕ) (e : Sym2 V) : ℕ :=\n  e.lift ⟨fun u v ↦ Int.natAbs ((f u : ℤ) - (f v : ℤ)), fun u v ↦ by\n    show ((f u : ℤ) - f v).natAbs = ((f v : ℤ) - f u).natAbs\n    rw [← Int.natAbs_neg, neg_sub]⟩\n\n/--\nA finite graph is graceful if, writing $m$ for its number of edges, it has an injective vertex\nlabeling by numbers in $\\{0,\\ldots,m\\}$ whose edge differences are exactly\n$\\{1,\\ldots,m\\}$.\n-/\ndef IsGraceful {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] : Prop :=\n  let m := G.edgeFinset.card\n  ∃ f : V → ℕ,\n    Function.Injective f ∧\n    (∀ v, f v ≤ m) ∧\n    G.edgeFinset.image (edgeDifference f) = Finset.Icc 1 m\n\n/--\nA finite graph is near-graceful if, writing $m$ for its number of edges, it has an injective\nvertex labeling by numbers in $\\{0,\\ldots,m+1\\}$ whose edge differences are pairwise distinct\nand belong to $\\{1,\\ldots,m+1\\}$.\n-/\ndef IsNearGraceful {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] : Prop :=\n  let m := G.edgeFinset.card\n  ∃ f : V → ℕ,\n    Function.Injective f ∧\n    (∀ v, f v ≤ m + 1) ∧\n    Set.InjOn (edgeDifference f) G.edgeFinset ∧\n    ∀ e ∈ G.edgeFinset, edgeDifference f e ∈ Finset.Icc 1 (m + 1)\n\n/--\nA triangular cactus is a connected graph with an edge in which every edge lies in exactly one\ntriangle and every simple cycle is a triangle. This is the standard characterization of a\nconnected graph whose every block is a copy of $K_3$; edge nonemptiness rules out the singleton\nwhose sole block is not $K_3$.\n-/\ndef IsTriangularCactus {V : Type*} (G : SimpleGraph V) : Prop :=\n  G.Connected ∧ G.edgeSet.Nonempty ∧ G.LocallyLinear ∧\n    ∀ (v : V) (c : G.Walk v v), c.IsCycle → c.length = 3\n\n/--\n**Rosa's conjecture.** Every finite triangular cactus admits either a graceful labeling or a\nnear-graceful labeling.\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] (hG : IsTriangularCactus G) :\n    IsGraceful G ∨ IsNearGraceful G := by\n  sorry\n\nend RosasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Encoded the literal Wikipedia formulation as `IsGraceful G ∨ IsNearGraceful G`, rather than collapsing it to near-gracefulness or replacing it with Rosa's sharper congruence-dependent 1988 formulation.",
+    "Used the background article's definition of near-gracefulness: injective vertex labels in `{0, ..., m+1}` and pairwise distinct edge differences in `{1, ..., m+1}`; no particular omitted difference is prescribed.",
+    "Modeled finite undirected graphs as Mathlib `SimpleGraph`s over a `Fintype`. Modeled a triangular cactus by the standard block-equivalent characterization: it is connected and nontrivial, every edge lies in exactly one triangle (`LocallyLinear`), and every simple cycle has length three.",
+    "Included edge nonemptiness in `IsTriangularCactus` because a connected singleton's sole block is not `K₃`; no lower bound on the number of triangles was imposed, so the one-triangle cactus is included."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "The same `Sym2.lift` expression is repeated inline in `FormalConjectures/Wikipedia/GracefulLabeling.lean`, but no reusable named definition exists.",
+     "name": "RosasConjecture.edgeDifference",
+     "why_needed": "Packages the absolute endpoint-label difference as a well-defined function on Mathlib's unordered edges `Sym2 V`."
+    },
+    {
+     "closest_existing_considered": "`GracefulLabeling.graceful_tree_conjecture` contains an equivalent labeling condition inline, but it is a theorem restricted to trees rather than a predicate.",
+     "name": "RosasConjecture.IsGraceful",
+     "why_needed": "No existing reusable predicate states graceful labeling for an arbitrary finite simple graph."
+    },
+    {
+     "closest_existing_considered": "`GracefulLabeling.graceful_tree_conjecture` provides only the graceful condition and has no near-graceful analogue.",
+     "name": "RosasConjecture.IsNearGraceful",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no near-graceful-labeling predicate."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `SimpleGraph.LocallyLinear`, `SimpleGraph.Connected`, and `Walk.IsCycle` provide the constituent notions but not their triangular-cactus combination.",
+     "name": "RosasConjecture.IsTriangularCactus",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no cactus or graph-block decomposition predicate."
+    }
+   ],
+   "per_slot": {
+    "rosas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "rosas_conjecture": "/--\n**Rosa's conjecture.** Every finite triangular cactus admits either a graceful labeling or a\nnear-graceful labeling.\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] (hG : IsTriangularCactus G) :\n    IsGraceful G ∨ IsNearGraceful G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rosa's conjecture\n\n*References:*\n- [Wikipedia, Graceful labeling](https://en.wikipedia.org/wiki/Graceful_labeling)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace RosasConjecture\n\nopen SimpleGraph\n\n/--\nA triangular cactus is a connected graph in which every block is a triangle. Equivalently,\nevery edge lies on a cycle and every simple cycle has length three.\n-/\ndef IsTriangularCactus {V : Type*} (G : SimpleGraph V) : Prop :=\n  G.Connected ∧\n    (∀ ⦃e⦄, e ∈ G.edgeSet → ∃ (v : V) (c : G.Walk v v), c.IsCycle ∧ e ∈ c.edges) ∧\n    ∀ (v : V) (c : G.Walk v v), c.IsCycle → c.length = 3\n\n/--\nA graph with `m` edges is graceful if its vertices have distinct labels in\n$\\{0,\\ldots,m\\}$ and its edge differences are exactly $\\{1,\\ldots,m\\}$.\n-/\ndef IsGraceful {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] : Prop :=\n  let m := G.edgeFinset.card\n  ∃ f : V → ℕ,\n    Function.Injective f ∧\n      (∀ v, f v ≤ m) ∧\n      G.edgeFinset.image (fun e =>\n        e.lift ⟨fun u v => Int.natAbs ((f u : ℤ) - (f v : ℤ)),\n          fun u v => by\n            show ((f u : ℤ) - f v).natAbs = ((f v : ℤ) - f u).natAbs\n            rw [← Int.natAbs_neg, neg_sub]⟩) = Finset.Icc 1 m\n\n/--\nA graph with `m` edges is near-graceful if its vertices have distinct labels in\n$\\{0,\\ldots,m+1\\}$ and its edge differences are distinct members of\n$\\{1,\\ldots,m+1\\}$.\n-/\ndef IsNearlyGraceful {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] : Prop :=\n  let m := G.edgeFinset.card\n  ∃ f : V → ℕ,\n    Function.Injective f ∧\n      (∀ v, f v ≤ m + 1) ∧\n      let differences := G.edgeFinset.image (fun e =>\n        e.lift ⟨fun u v => Int.natAbs ((f u : ℤ) - (f v : ℤ)),\n          fun u v => by\n            show ((f u : ℤ) - f v).natAbs = ((f v : ℤ) - f u).natAbs\n            rw [← Int.natAbs_neg, neg_sub]⟩)\n      differences ⊆ Finset.Icc 1 (m + 1) ∧ differences.card = m\n\n/--\nRosa's conjecture: every finite triangular cactus—that is, every connected graph whose blocks\nare all triangles—admits either a graceful labeling or a near-graceful labeling.\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] (hG : IsTriangularCactus G) :\n    IsGraceful G ∨ IsNearlyGraceful G := by\n  sorry\n\nend RosasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Formalized the cited Wikipedia list entry literally as a disjunction: every finite triangular cactus is graceful or near-graceful. I did not replace it with Rosa's sharper congruence-class formulation from the 1988 paper.",
+    "Characterized a triangular cactus as a connected graph in which every edge lies on a simple cycle and every simple cycle has length three. This is the intrinsic cycle characterization of a connected graph whose every block is K3; it rules out bridges and configurations of triangles that create a longer cycle without imposing an artificial minimum number of triangles.",
+    "Encoded near-graceful edge-label distinctness by requiring the image of the m-edge finset under the difference map to have cardinality m, together with containment in {1,...,m+1}.",
+    "Allowed boundary cases solely according to the connectedness and triangular-block characterization: in particular, a single triangle is included, and no extra lower bound on the number of triangles was imposed."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's SimpleGraph connectivity, Walk.IsCycle, EdgeDisjointTriangles, and LocallyLinear predicates. EdgeDisjointTriangles alone is too weak because a ring of triangles can create a longer cycle.",
+     "name": "RosasConjecture.IsTriangularCactus",
+     "why_needed": "The conjecture quantifies over triangular cacti, but neither Mathlib nor FormalConjecturesForMathlib provides a cactus or graph-block predicate."
+    },
+    {
+     "closest_existing_considered": "FormalConjectures/Wikipedia/GracefulLabeling.lean, whose inline formulation was followed.",
+     "name": "RosasConjecture.IsGraceful",
+     "why_needed": "A reusable predicate for graceful graphs is absent; the nearby GracefulLabeling conjecture spells the labeling condition inline."
+    },
+    {
+     "closest_existing_considered": "The inline graceful-labeling formulation in FormalConjectures/Wikipedia/GracefulLabeling.lean, adapted to labels 0 through m+1 and m pairwise-distinct edge differences in 1 through m+1.",
+     "name": "RosasConjecture.IsNearlyGraceful",
+     "why_needed": "No near-graceful labeling predicate exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "rosas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "rosas_conjecture": "/--\nRosa's conjecture: every finite triangular cactus—that is, every connected graph whose blocks\nare all triangles—admits either a graceful labeling or a near-graceful labeling.\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] (hG : IsTriangularCactus G) :\n    IsGraceful G ∨ IsNearlyGraceful G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rosa's conjecture\n\n*Reference:* [Wikipedia, Graceful labeling](https://en.wikipedia.org/wiki/Graceful_labeling)\n-/\n\nnamespace RosasConjecture\n\nopen SimpleGraph\n\n/-- The absolute difference of the labels at the endpoints of an unordered pair. -/\ndef edgeDifference {V : Type*} (f : V → ℕ) (e : Sym2 V) : ℕ :=\n  e.lift ⟨fun u v ↦ Int.natAbs ((f u : ℤ) - (f v : ℤ)), fun u v ↦ by\n    show ((f u : ℤ) - f v).natAbs = ((f v : ℤ) - f u).natAbs\n    rw [← Int.natAbs_neg, neg_sub]⟩\n\n/--\nA graph with $m$ edges is graceful if its vertices have distinct labels in\n$\\{0,\\ldots,m\\}$ and its edge differences are exactly $\\{1,\\ldots,m\\}$.\n-/\ndef IsGraceful {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] : Prop :=\n  let m := G.edgeFinset.card\n  ∃ f : V → ℕ, Function.Injective f ∧ (∀ v, f v ≤ m) ∧\n    G.edgeFinset.image (edgeDifference f) = Finset.Icc 1 m\n\n/--\nA graph with $m$ edges is near-graceful if its vertices have distinct labels in\n$\\{0,\\ldots,m+1\\}$ and its edge differences are distinct members of\n$\\{1,\\ldots,m+1\\}$.\n-/\ndef IsNearGraceful {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] : Prop :=\n  let m := G.edgeFinset.card\n  ∃ f : V → ℕ, Function.Injective f ∧ (∀ v, f v ≤ m + 1) ∧\n    Set.InjOn (edgeDifference f) G.edgeSet ∧\n    ∀ e ∈ G.edgeSet, edgeDifference f e ∈ Finset.Icc 1 (m + 1)\n\n/--\nA nonseparable vertex set induces a connected graph and remains preconnected after any\none of its vertices is deleted.\n-/\ndef IsNonseparableVertexSet {V : Type*} (G : SimpleGraph V) (B : Set V) : Prop :=\n  (G.induce B).Connected ∧\n    ∀ v : B, ((G.induce B).induce ({v}ᶜ : Set B)).Preconnected\n\n/-- A block is a maximal nonseparable induced vertex set. -/\ndef IsBlock {V : Type*} (G : SimpleGraph V) (B : Set V) : Prop :=\n  IsNonseparableVertexSet G B ∧\n    ∀ C : Set V, B ⊆ C → IsNonseparableVertexSet G C → C = B\n\n/-- A triangular cactus is a connected graph every block of which is a triangle. -/\ndef IsTriangularCactus {V : Type*} (G : SimpleGraph V) : Prop :=\n  G.Connected ∧ ∀ B : Set V, IsBlock G B → G.IsClique B ∧ B.ncard = 3\n\n/--\n**Rosa's conjecture.** Every finite triangular cactus—that is, every connected graph whose\nblocks are triangles—admits either a graceful labeling or a near-graceful labeling.\nFor a graph with $m$ edges, graceful labels lie in $\\{0,\\ldots,m\\}$ and have edge\ndifferences exactly $\\{1,\\ldots,m\\}$; near-graceful labels lie in\n$\\{0,\\ldots,m+1\\}$ and have distinct edge differences in $\\{1,\\ldots,m+1\\}$.\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] (hG : IsTriangularCactus G) :\n    IsGraceful G ∨ IsNearGraceful G := by\n  sorry\n\nend RosasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Encoded the Wikipedia/list-entry formulation literally as `IsGraceful G ∨ IsNearGraceful G`, even though under the supplied definitions graceful implies near-graceful; did not replace it by the sharper congruence-dependent version attributed to Rosa's 1988 paper.",
+    "Modeled graphs as finite Mathlib simple graphs. A triangular cactus is connected and every block is a 3-vertex clique.",
+    "Modeled a block as a maximal vertex set whose induced graph is connected and remains preconnected after deletion of any one vertex. This is the standard maximal-nonseparable characterization and treats maximal isolated vertices and bridges as blocks, so empty or otherwise degenerate graphs are handled by connectedness and the block condition rather than extra cardinality hypotheses.",
+    "Encoded graceful labeling by injective natural-number vertex labels bounded by the edge count and equality of the image of edge differences with `{1, ..., m}`.",
+    "Encoded near-graceful labeling by injective natural-number vertex labels bounded by `m + 1`, with the edge-difference map injective on the edge set and every difference in `{1, ..., m + 1}`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "The inline `Sym2.lift` edge-difference expressions in `FormalConjectures/Wikipedia/GracefulLabeling.lean`; no reusable named definition was found.",
+     "name": "RosasConjecture.edgeDifference",
+     "why_needed": "Provides the well-defined absolute label difference on an unordered pair, used by both labeling predicates."
+    },
+    {
+     "closest_existing_considered": "`FormalConjectures/Wikipedia/GracefulLabeling.lean` states the graceful tree conjecture with the labeling conditions inline, but defines no predicate.",
+     "name": "RosasConjecture.IsGraceful",
+     "why_needed": "No reusable predicate for graceful graphs exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "The inline graceful-labeling formulation in `FormalConjectures/Wikipedia/GracefulLabeling.lean`; it does not cover the near-graceful range and distinct-difference condition.",
+     "name": "RosasConjecture.IsNearGraceful",
+     "why_needed": "No near-graceful labeling predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.IsKConnected` in FormalConjecturesForMathlib expresses vertex connectivity, but its strict vertex-count convention excludes bridge blocks and does not itself define blocks.",
+     "name": "RosasConjecture.IsNonseparableVertexSet",
+     "why_needed": "A graph block requires the standard no-cut-vertex/nonseparability condition, for which no graph predicate was found."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.IsKConnected` and induced-graph connectivity APIs; Mathlib's unrelated group-action `IsBlock` was also found and rejected.",
+     "name": "RosasConjecture.IsBlock",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides graph blocks/biconnected components."
+    },
+    {
+     "closest_existing_considered": "Existing `SimpleGraph.Connected`, `SimpleGraph.IsClique`, and induced-subgraph APIs suffice for the components of the definition but not the combined block condition.",
+     "name": "RosasConjecture.IsTriangularCactus",
+     "why_needed": "No cactus or triangular-cactus graph predicate exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "rosas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "rosas_conjecture": "/--\n**Rosa's conjecture.** Every finite triangular cactus—that is, every connected graph whose\nblocks are triangles—admits either a graceful labeling or a near-graceful labeling.\nFor a graph with $m$ edges, graceful labels lie in $\\{0,\\ldots,m\\}$ and have edge\ndifferences exactly $\\{1,\\ldots,m\\}$; near-graceful labels lie in\n$\\{0,\\ldots,m+1\\}$ and have distinct edge differences in $\\{1,\\ldots,m+1\\}$.\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture {V : Type*} [Fintype V] [DecidableEq V]\n    (G : SimpleGraph V) [DecidableRel G.Adj] (hG : IsTriangularCactus G) :\n    IsGraceful G ∨ IsNearGraceful G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rosa's conjecture\n\nRosa's conjecture states that all triangular cacti are graceful or nearly graceful.\n\n*References:*\n- [Wikipedia/Graceful_labeling](https://en.wikipedia.org/wiki/Graceful_labeling)\n- [Wikipedia/List_of_unsolved_problems_in_mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- A. Rosa, *Cyclic Steiner Triple Systems and Labelings of Triangular Cacti*,\n  Scientia 1 (1988), 87–95.\n- J. A. Gallian, *A dynamic survey of graph labeling*,\n  [Electron. J. Combin., DS6](https://www.combinatorics.org/ojs/index.php/eljc/article/view/DS6).\n-/\n\nnamespace RosasConjecture\n\nopen SimpleGraph\n\nvariable {V : Type*}\n\n/-- The label `|f u - f v|` induced on the edge `s(u, v)` by a vertex labelling `f : V → ℕ`. -/\ndef edgeLabel (f : V → ℕ) : Sym2 V → ℕ :=\n  Sym2.lift ⟨fun u v => Nat.dist (f u) (f v), fun u v => Nat.dist_comm (f u) (f v)⟩\n\n@[category API, AMS 5]\nlemma edgeLabel_mk (f : V → ℕ) (u v : V) : edgeLabel f s(u, v) = Nat.dist (f u) (f v) :=\n  rfl\n\nvariable [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj]\n\n/-- A graph $G$ with $m$ edges is *graceful* if its vertices can be labelled by pairwise distinct\nintegers in $\\{0, \\dots, m\\}$ such that the induced edge labels $|f(u) - f(v)|$, over the edges\n$\\{u, v\\}$ of $G$, are exactly the integers $1, \\dots, m$. -/\ndef IsGraceful : Prop :=\n  ∃ f : V → ℕ, Function.Injective f ∧ (∀ v, f v ≤ G.edgeFinset.card) ∧\n    G.edgeFinset.image (edgeLabel f) = Finset.Icc 1 G.edgeFinset.card\n\n/-- A graph $G$ with $m$ edges is *nearly graceful* if its vertices can be labelled by pairwise\ndistinct integers in $\\{0, \\dots, m + 1\\}$ such that no two edges receive the same induced label\n$|f(u) - f(v)|$. The edge labels then automatically lie in $\\{1, \\dots, m + 1\\}$. -/\ndef IsNearlyGraceful : Prop :=\n  ∃ f : V → ℕ, Function.Injective f ∧ (∀ v, f v ≤ G.edgeFinset.card + 1) ∧\n    Set.InjOn (edgeLabel f) G.edgeSet\n\n/-- A *triangular cactus* is a connected graph all of whose blocks are triangles.\n\nWe encode this as: `G` is connected, every cycle of `G` has length `3`, and no edge of `G` is a\nbridge. Indeed, if all cycles are triangles then no two cycles share an edge, so every block of\n`G` is a single edge or a triangle, and the bridge condition rules out single-edge blocks. -/\ndef IsTriangularCactus : Prop :=\n  G.Connected ∧ (∀ ⦃v : V⦄ (c : G.Walk v v), c.IsCycle → c.length = 3) ∧\n    ∀ e ∈ G.edgeSet, ¬ G.IsBridge e\n\n/-- Every graceful graph is nearly graceful. -/\n@[category API, AMS 5]\nlemma IsGraceful.isNearlyGraceful (h : IsGraceful G) : IsNearlyGraceful G := by\n  obtain ⟨f, hf, hle, himage⟩ := h\n  refine ⟨f, hf, fun v => (hle v).trans (Nat.le_succ _), ?_⟩\n  rw [← coe_edgeFinset, ← Finset.card_image_iff, himage]\n  simp\n\n/-- The complete graph `K₃` is graceful. -/\n@[category test, AMS 5]\nlemma isGraceful_top_fin_three : IsGraceful (⊤ : SimpleGraph (Fin 3)) := by\n  refine ⟨![0, 1, 3], by decide, by decide, ?_⟩\n  decide\n\n/-- The one-vertex graph is a triangular cactus (with no triangles). -/\n@[category test, AMS 5]\nlemma isTriangularCactus_bot_unit : IsTriangularCactus (⊥ : SimpleGraph Unit) := by\n  refine ⟨⟨fun _ _ => Reachable.refl _⟩, fun v c hc => ?_, by simp⟩\n  cases c with\n  | nil => exact absurd rfl hc.ne_nil\n  | cons h _ => exact h.elim\n\n/-- The butterfly graph: two triangles sharing the vertex `0`. It is the triangular cactus with\ntwo triangles, and it is not graceful. -/\ndef butterfly : SimpleGraph (Fin 5) :=\n  fromEdgeSet {s(0, 1), s(0, 2), s(1, 2), s(0, 3), s(0, 4), s(3, 4)}\n\ninstance : DecidableRel butterfly.Adj := by\n  unfold butterfly\n  infer_instance\n\n/-- The butterfly graph is nearly graceful. -/\n@[category test, AMS 5]\nlemma isNearlyGraceful_butterfly : IsNearlyGraceful butterfly := by\n  refine ⟨![0, 7, 5, 4, 3], by decide, by decide, ?_⟩\n  rw [← coe_edgeFinset, ← Finset.card_image_iff]\n  decide\n\n/--\n**Rosa's conjecture.** Every triangular cactus (a connected graph all of whose blocks are\ntriangles) is graceful or nearly graceful.\n\nHere a graph with $m$ edges is *graceful* if its vertices can be labelled by distinct integers in\n$\\{0, \\dots, m\\}$ so that the edge labels $|f(u) - f(v)|$ are exactly $1, \\dots, m$, and *nearly\ngraceful* if its vertices can be labelled by distinct integers in $\\{0, \\dots, m + 1\\}$ so that the\nedge labels $|f(u) - f(v)|$ are pairwise distinct (they then lie in $\\{1, \\dots, m + 1\\}$).\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture (hG : IsTriangularCactus G) : IsGraceful G ∨ IsNearlyGraceful G := by\n  sorry\n\n/--\nRosa's original formulation of the conjecture (Rosa, 1988) is sharper. Let $G$ be a triangular\ncactus with $t$ triangles. If $t \\equiv 0, 1 \\pmod 4$ then $G$ is graceful, and if\n$t \\equiv 2, 3 \\pmod 4$ then $G$ is nearly graceful (in the sense of `IsNearlyGraceful`).\n\nSuch a $G$ is Eulerian with $m = 3t$ edges, so for $t \\equiv 2, 3 \\pmod 4$ one has\n$m \\equiv 1, 2 \\pmod 4$ and $G$ is not graceful by Rosa's parity theorem.\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture.variants.mod_four [DecidableEq V] (hG : IsTriangularCactus G) :\n    let t := (G.cliqueFinset 3).card\n    (t % 4 = 0 ∨ t % 4 = 1 → IsGraceful G) ∧\n      (t % 4 = 2 ∨ t % 4 = 3 → IsNearlyGraceful G) := by\n  sorry\n\nend RosasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table is correct that the literal disjunction collapses to 'nearly graceful' (since graceful implies nearly graceful); I kept the literal disjunction for the slot as it matches the source text, and encoded the sharper mod-4 form as a variant declaration.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Reading of the slot: the literal Wikipedia list entry ('graceful or nearly graceful' for all triangular cacti) is encoded as the slot theorem `rosas_conjecture`. Rosa's sharper 1988 formulation (t ≡ 0,1 mod 4 ⇒ graceful; t ≡ 2,3 mod 4 ⇒ nearly graceful, with t = number of triangles = (G.cliqueFinset 3).card) is added as a separate variant `rosas_conjecture.variants.mod_four`, using the same definitions.",
+    "Definition of 'nearly graceful' follows the Wikipedia article: injective f : V → {0..m+1} with pairwise distinct edge labels |f u - f v| (Set.InjOn on the edge set). The literature (Rosa 1988 / Gallian's survey) may define 'nearly graceful' more restrictively (edge labels {1..m} or {1..m-1, m+1}); the Wikipedia version is a priori weaker and is what the cited source states. Reviewers should check this if the literature definition is preferred; it would affect the variant most.",
+    "Definition of 'graceful' follows the standard form (and the existing repo file Wikipedia/GracefulLabeling.lean): injective f : V → {0..m} whose induced edge labels are exactly Finset.Icc 1 m. Wikipedia's phrasing (distinct edge labels in [1,m]) is equivalent since there are m edges.",
+    "Edge label |f u - f v| is implemented as `Nat.dist (f u) (f v)` lifted to Sym2 (Nat.dist n m = n - m + (m - n) = |n - m|).",
+    "Triangular cactus ('connected graph all of whose blocks are triangles') is encoded without a notion of blocks as: G.Connected ∧ every cycle walk has length 3 ∧ no edge is a bridge (SimpleGraph.IsBridge; equivalently every edge lies on a cycle). Justification: if all cycles are triangles, two distinct triangles cannot share an edge (they would form a 4-cycle), so each edge is in at most one cycle, hence G is a cactus whose blocks are K2's or cycles; bridgelessness excludes K2 blocks and cycle blocks are triangles. Conversely every cycle of a triangular cactus lies in a block (a triangle) and every edge lies in a block (a triangle), so it is not a bridge.",
+    "Boundary cases: the empty graph is excluded by G.Connected (requires Nonempty V). The one-vertex graph K1 satisfies the encoded IsTriangularCactus vacuously (0 triangles); under some conventions K1 is not a triangular cactus, but K1 is graceful (m = 0, f = 0), so its inclusion does not change the truth of either theorem. No extra ad hoc hypotheses were added, per the decomposition notes.",
+    "Graph is assumed finite via [Fintype V] and edge counting uses G.edgeFinset.card (needs [DecidableRel G.Adj]); [DecidableEq V] is only needed for cliqueFinset in the variant.",
+    "A bespoke test graph `butterfly` (two triangles sharing a vertex, the smallest non-graceful triangular cactus) was added with an explicit DecidableRel instance to test IsNearlyGraceful by `decide`; tests also cover K3 graceful and K1 a triangular cactus, plus the API lemma IsGraceful → IsNearlyGraceful."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Sym2.lift with Int.natAbs as in FormalConjectures/Wikipedia/GracefulLabeling.lean (used inline there, not as a reusable definition); Nat.dist is used here for the symmetric difference.",
+     "name": "RosasConjecture.edgeLabel",
+     "why_needed": "Induced edge label |f u - f v| on an edge (Sym2 V) for a vertex labelling f; Mathlib has no such notion."
+    },
+    {
+     "closest_existing_considered": "The inlined statement in FormalConjectures/Wikipedia/GracefulLabeling.lean (graceful_tree_conjecture); no named definition exists.",
+     "name": "RosasConjecture.IsGraceful",
+     "why_needed": "Graceful graph (injective labelling into {0..m} with edge labels exactly {1..m}); absent from Mathlib and FormalConjecturesForMathlib (GracefulLabeling.lean inlines it in the theorem statement)."
+    },
+    {
+     "closest_existing_considered": "None; searched for 'graceful' in Mathlib and the repository.",
+     "name": "RosasConjecture.IsNearlyGraceful",
+     "why_needed": "Nearly graceful graph per the Wikipedia article (injective labelling into {0..m+1} with pairwise distinct edge labels); absent from Mathlib and the repo."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.IsAcyclic / IsTree (only the cycle-free case), SimpleGraph.IsBridge, SimpleGraph.Walk.IsCycle, SimpleGraph.cliqueFinset; no cactus or block notion exists in Mathlib.",
+     "name": "RosasConjecture.IsTriangularCactus",
+     "why_needed": "Connected graph all of whose blocks are triangles; Mathlib has no blocks/biconnected components or cactus graphs, so it is encoded via cycles (SimpleGraph.Walk.IsCycle) and bridges (SimpleGraph.IsBridge)."
+    },
+    {
+     "closest_existing_considered": "No butterfly/bowtie graph in Mathlib; built with SimpleGraph.fromEdgeSet on Fin 5.",
+     "name": "RosasConjecture.butterfly",
+     "why_needed": "Concrete test graph (two triangles sharing a vertex) used only in a `category test` lemma checking IsNearlyGraceful on the smallest non-graceful triangular cactus."
+    }
+   ],
+   "per_slot": {
+    "rosas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G with IsTriangularCactus G, IsGraceful G ∨ IsNearlyGraceful G. Mathlib has no notion of graceful/nearly graceful labelling, nor of blocks/cacti, so bespoke definitions were added in the problem file (graceful, nearly graceful, triangular cactus, edge label), following the Wikipedia article's definitions. The literal disjunction of the source is kept even though graceful implies nearly graceful (an API lemma records this)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "rosas_conjecture": "/--\n**Rosa's conjecture.** Every triangular cactus (a connected graph all of whose blocks are\ntriangles) is graceful or nearly graceful.\n\nHere a graph with $m$ edges is *graceful* if its vertices can be labelled by distinct integers in\n$\\{0, \\dots, m\\}$ so that the edge labels $|f(u) - f(v)|$ are exactly $1, \\dots, m$, and *nearly\ngraceful* if its vertices can be labelled by distinct integers in $\\{0, \\dots, m + 1\\}$ so that the\nedge labels $|f(u) - f(v)|$ are pairwise distinct (they then lie in $\\{1, \\dots, m + 1\\}$).\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture (hG : IsTriangularCactus G) : IsGraceful G ∨ IsNearlyGraceful G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Rosa's conjecture\n\nRosa's conjecture states that all triangular cacti are graceful or nearly-graceful.\n\nA *triangular cactus* is a connected graph all of whose blocks are triangles. Equivalently,\nit is a connected graph in which every edge lies on a cycle and every cycle has length three.\n\nA *graceful labeling* of a graph with $m$ edges is an injective labeling of the vertices by\nintegers in $\\{0, \\dots, m\\}$ such that the absolute differences of the labels of the endpoints\nof the edges are exactly $\\{1, \\dots, m\\}$. A *near-graceful labeling* of a graph with $m$ edges\nis an injective labeling of the vertices by integers in $\\{0, \\dots, m + 1\\}$ such that the\nabsolute differences of the labels of the endpoints of the edges are pairwise distinct (these\ndifferences then lie in $\\{1, \\dots, m + 1\\}$).\n\nRosa's original form of the conjecture is sharper: a triangular cactus with $t$ triangles is\ngraceful when $t \\equiv 0, 1 \\pmod 4$, and when $t \\equiv 2, 3 \\pmod 4$ (where it cannot be\ngraceful by Rosa's parity theorem for Eulerian graphs) it has a labeling from\n$\\{0, \\dots, m + 1\\}$ with edge labels $\\{1, \\dots, m - 1, m + 1\\}$.\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Graceful labeling](https://en.wikipedia.org/wiki/Graceful_labeling)\n- [Wikipedia, Cactus graph](https://en.wikipedia.org/wiki/Cactus_graph)\n- A. Rosa, *Cyclic Steiner triple systems and labelings of triangular cacti*,\n  Scientia, Ser. A, Math. Sci. 1 (1988), 87–95.\n-/\n\nnamespace RosasConjecture\n\nopen SimpleGraph\n\nvariable {V : Type*}\n\n/-- The label that a vertex labeling `f` induces on an edge `e`: the absolute difference\n$|f(u) - f(v)|$ of the labels of its endpoints. -/\ndef edgeLabel (f : V → ℕ) : Sym2 V → ℕ :=\n  Sym2.lift ⟨fun u v => ((f u : ℤ) - f v).natAbs, fun u v => by\n    show ((f u : ℤ) - f v).natAbs = ((f v : ℤ) - f u).natAbs\n    rw [← Int.natAbs_neg, neg_sub]⟩\n\n@[simp, category API, AMS 5]\nlemma edgeLabel_mk (f : V → ℕ) (u v : V) : edgeLabel f s(u, v) = ((f u : ℤ) - f v).natAbs :=\n  rfl\n\n/-- A *triangular cactus* is a connected graph all of whose blocks are triangles. Equivalently,\nit is a connected graph in which every edge lies on a cycle (i.e. no edge is a bridge) and\nevery cycle has length three. -/\ndef IsTriangularCactus (G : SimpleGraph V) : Prop :=\n  G.Connected ∧ (∀ e ∈ G.edgeSet, ¬ G.IsBridge e) ∧\n    ∀ (v : V) (p : G.Walk v v), p.IsCycle → p.length = 3\n\nvariable [Fintype V] (G : SimpleGraph V) [DecidableRel G.Adj]\n\n/-- A *graceful labeling* of a graph `G` with `m` edges is an injective map\n`f : V → {0, …, m}` whose induced edge labels are exactly `{1, …, m}`. -/\ndef IsGracefulLabeling (f : V → ℕ) : Prop :=\n  Function.Injective f ∧ (∀ v, f v ≤ G.edgeFinset.card) ∧\n    G.edgeFinset.image (edgeLabel f) = Finset.Icc 1 G.edgeFinset.card\n\n/-- A graph is *graceful* if it admits a graceful labeling. -/\ndef IsGraceful : Prop :=\n  ∃ f : V → ℕ, IsGracefulLabeling G f\n\n/-- A *near-graceful labeling* of a graph `G` with `m` edges is an injective map\n`f : V → {0, …, m + 1}` whose induced edge labels are pairwise distinct. Since the vertex\nlabels are distinct and lie in `{0, …, m + 1}`, the edge labels automatically lie in\n`{1, …, m + 1}`. -/\ndef IsNearGracefulLabeling (f : V → ℕ) : Prop :=\n  Function.Injective f ∧ (∀ v, f v ≤ G.edgeFinset.card + 1) ∧\n    Set.InjOn (edgeLabel f) G.edgeSet\n\n/-- A graph is *near-graceful* if it admits a near-graceful labeling. -/\ndef IsNearGraceful : Prop :=\n  ∃ f : V → ℕ, IsNearGracefulLabeling G f\n\nvariable {G}\n\n@[category API, AMS 5]\nlemma IsGracefulLabeling.isNearGracefulLabeling {f : V → ℕ} (hf : IsGracefulLabeling G f) :\n    IsNearGracefulLabeling G f := by\n  obtain ⟨hinj, hle, himage⟩ := hf\n  refine ⟨hinj, fun v => (hle v).trans (Nat.le_succ _), ?_⟩\n  rw [← coe_edgeFinset, ← Finset.card_image_iff, himage]\n  simp\n\n/-- Every graceful graph is near-graceful. -/\n@[category API, AMS 5]\nlemma IsGraceful.isNearGraceful (h : IsGraceful G) : IsNearGraceful G :=\n  h.imp fun _ hf => hf.isNearGracefulLabeling\n\n/-- The one-vertex graph is a (degenerate) triangular cactus with no triangles. -/\n@[category test, AMS 5]\nlemma isTriangularCactus_bot_unit : IsTriangularCactus (⊥ : SimpleGraph Unit) := by\n  refine ⟨connected_bot_iff.mpr ⟨inferInstance, inferInstance⟩, by simp, fun v p hp => ?_⟩\n  cases p with\n  | nil => exact absurd rfl hp.ne_nil\n  | cons h _ => exact absurd h (by simp)\n\n/-- The one-vertex graph is graceful. -/\n@[category test, AMS 5]\nlemma isGraceful_bot_unit : IsGraceful (⊥ : SimpleGraph Unit) :=\n  ⟨fun _ => 0, fun _ _ _ => rfl, fun _ => Nat.zero_le _, by simp⟩\n\n/-- The triangle is a triangular cactus. -/\n@[category test, AMS 5]\nlemma isTriangularCactus_top_fin_three : IsTriangularCactus (⊤ : SimpleGraph (Fin 3)) := by\n  refine ⟨connected_top, fun e _ => ?_, fun v p hp => ?_⟩\n  · induction e using Sym2.ind with | _ u v\n    rw [isBridge_iff_adj_and_forall_cycle_notMem]\n    rintro ⟨huv, hcyc⟩\n    have huv' := huv.ne\n    obtain ⟨w, hwu, hwv⟩ : ∃ w : Fin 3, w ≠ u ∧ w ≠ v := by\n      clear hcyc huv; revert u v; decide\n    refine hcyc (Walk.cons huv (Walk.cons ((top_adj v w).mpr hwv.symm)\n      (Walk.cons ((top_adj w u).mpr hwu) Walk.nil))) ?_ (by simp)\n    rw [Walk.cons_isCycle_iff]\n    constructor\n    · simp [Walk.isPath_def, hwu, hwv.symm, huv'.symm]\n    · simp [huv', huv'.symm, hwu.symm, hwv.symm]\n  · refine le_antisymm ?_ hp.three_le_length\n    have := hp.support_nodup.length_le_card\n    simpa [Walk.length_support] using this\n\n/-- The triangle is graceful, with labels `0`, `1`, `3`. -/\n@[category test, AMS 5]\nlemma isGraceful_top_fin_three : IsGraceful (⊤ : SimpleGraph (Fin 3)) :=\n  ⟨![0, 1, 3], by unfold IsGracefulLabeling; decide⟩\n\n/-- A single edge is not a triangular cactus: the edge is a bridge. -/\n@[category test, AMS 5]\nlemma not_isTriangularCactus_top_fin_two : ¬ IsTriangularCactus (⊤ : SimpleGraph (Fin 2)) := by\n  rintro ⟨-, hb, -⟩\n  refine hb s(0, 1) (by simp) (isBridge_iff_mem_and_forall_cycle_notMem.mpr ⟨by simp, ?_⟩)\n  intro u p hp _\n  have h1 := hp.three_le_length\n  have h2 := hp.support_nodup.length_le_card\n  simp [Walk.length_support] at h2\n  omega\n\n/--\n**Rosa's conjecture.** Every triangular cactus is graceful or near-graceful.\n\nHere a triangular cactus is a finite connected graph all of whose blocks are triangles.\nA graph with $m$ edges is graceful if there is an injective vertex labeling\n$f : V \\to \\{0, \\dots, m\\}$ whose induced edge labels $|f(u) - f(v)|$ are exactly\n$\\{1, \\dots, m\\}$, and near-graceful if there is an injective vertex labeling\n$f : V \\to \\{0, \\dots, m + 1\\}$ whose induced edge labels are pairwise distinct\n(and hence lie in $\\{1, \\dots, m + 1\\}$).\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture (hG : IsTriangularCactus G) : IsGraceful G ∨ IsNearGraceful G := by\n  sorry\n\n/--\nThe sharper form of the conjecture from Rosa's 1988 paper. Let $G$ be a triangular cactus with\n$t$ triangles (its blocks), so that $G$ has $m = 3t$ edges. If $t \\equiv 0, 1 \\pmod 4$ then $G$\nis graceful. If $t \\equiv 2, 3 \\pmod 4$ then $G$ is nearly graceful in the sense of Rosa: there\nis an injective vertex labeling $f : V \\to \\{0, \\dots, m + 1\\}$ whose induced edge labels are\nexactly $\\{1, \\dots, m - 1, m + 1\\}$.\n\nA triangular cactus is Eulerian, so by Rosa's parity theorem it cannot be graceful when\n$t \\equiv 2, 3 \\pmod 4$. Hence this form implies `rosas_conjecture`.\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture.variants.rosa_1988 [DecidableEq V] (hG : IsTriangularCactus G) :\n    let t := (G.cliqueFinset 3).card\n    let m := G.edgeFinset.card\n    (t % 4 = 0 ∨ t % 4 = 1 → IsGraceful G) ∧\n    (t % 4 = 2 ∨ t % 4 = 3 →\n      ∃ f : V → ℕ, Function.Injective f ∧ (∀ v, f v ≤ m + 1) ∧\n        G.edgeFinset.image (edgeLabel f) = Finset.Icc 1 (m + 1) \\ {m}) := by\n  sorry\n\n/-- The butterfly graph: two triangles `{0, 1, 2}` and `{0, 3, 4}` sharing the vertex `0`.\nIt is a triangular cactus with `t = 2` triangles and `m = 6` edges. -/\ndef butterfly : SimpleGraph (Fin 5) :=\n  fromEdgeSet {s(0, 1), s(0, 2), s(1, 2), s(0, 3), s(0, 4), s(3, 4)}\n\ninstance : DecidableRel butterfly.Adj := by\n  unfold butterfly; infer_instance\n\n/-- The butterfly graph is not graceful (it has `t = 2` triangles), but it is nearly graceful in\nthe sense of Rosa: the labels `0, 2, 7, 1, 4` induce the edge labels `{1, 2, 3, 4, 5, 7}`. -/\n@[category test, AMS 5]\nlemma butterfly_nearly_graceful :\n    let m := butterfly.edgeFinset.card\n    ∃ f : Fin 5 → ℕ, Function.Injective f ∧ (∀ v, f v ≤ m + 1) ∧\n      butterfly.edgeFinset.image (edgeLabel f) = Finset.Icc 1 (m + 1) \\ {m} :=\n  ⟨![0, 2, 7, 1, 4], by decide⟩\n\nend RosasConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table correctly notes that Wikipedia's 'graceful or nearly-graceful' (with Wikipedia's weak near-graceful notion) is weaker than Rosa's original mod-4 form; I encoded the literal Wikipedia reading in the slot `rosas_conjecture` and added Rosa's sharper form as a separate variant declaration rather than choosing only one.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Triangular cactus ('connected graph all of whose blocks are triangles') is encoded without a block/2-connectivity notion (absent from Mathlib) as: G.Connected ∧ (no edge of G is a bridge, i.e. every edge lies on a cycle) ∧ (every cycle, as a Mathlib `Walk.IsCycle`, has length 3). This is the Wikipedia 'Cactus graph' characterization ('each cycle has length three and each edge belongs to a cycle') and is equivalent to the block definition (a 2-connected block on ≥ 4 vertices containing a triangle has a cycle of length ≥ 4 by the fan lemma; a 2-connected block on 3 vertices is K3; bridges are excluded). Reviewer should check this equivalence.",
+    "Near-graceful follows the Wikipedia article literally: labels in {0..m+1}, injective, edge differences pairwise distinct (Set.InjOn on the edge set); the range condition 'differences in [1, m+1]' is automatic and hence not repeated. This is weaker than Rosa's own 'nearly graceful' (edge labels exactly {1,…,m−1,m+1}), so the main theorem is the (weaker) Wikipedia reading. The literal disjunction 'graceful or near-graceful' is kept even though graceful ⇒ near-graceful (proved as an API lemma).",
+    "A second declaration `rosas_conjecture.variants.rosa_1988` states the sharper original form: with t = number of triangles (= number of 3-cliques = number of blocks), t ≡ 0,1 (mod 4) ⇒ graceful, and t ≡ 2,3 (mod 4) ⇒ there is an injective labeling into {0..m+1} whose edge labels are exactly Finset.Icc 1 (m+1) \\ {m} = {1,…,m−1,m+1}. The exact form of Rosa's 'nearly graceful' was taken from the literature as recalled (Rosa 1988 / Moulton 1989 / Gallian's survey) and is consistent with Rosa's cyclic-STS(6t+1) motivation and with the Eulerian parity constraint; the paper itself was not available in the sandbox, so a reviewer should confirm this definition.",
+    "The single-vertex graph satisfies IsTriangularCactus (t = 0, no blocks) and is graceful, so no extra nondegeneracy hypothesis was added, as requested by the decomposition notes; the empty graph is excluded by connectedness.",
+    "Vertex type is an arbitrary Fintype (finite graphs), with DecidableRel G.Adj to form edgeFinset; DecidableEq V is only required in the variant for `cliqueFinset`.",
+    "Test/API lemmas: graceful ⇒ near-graceful; K1 and K3 are triangular cacti and graceful; K2 is not a triangular cactus; the butterfly graph (t = 2, m = 6, non-graceful) has a Rosa-nearly-graceful labeling 0,2,7,1,4 with edge labels {1,2,3,4,5,7}, checking the t ≡ 2,3 branch of the variant."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Inlined Sym2.lift expression as in FormalConjectures/Wikipedia/GracefulLabeling.lean (not a reusable definition); Nat.dist.",
+     "name": "RosasConjecture.edgeLabel",
+     "why_needed": "The edge label |f(u) − f(v)| induced by a vertex labeling on a Sym2 edge; Mathlib has no such notion."
+    },
+    {
+     "closest_existing_considered": "The inline statement in FormalConjectures/Wikipedia/GracefulLabeling.lean (same mathematical content).",
+     "name": "RosasConjecture.IsGracefulLabeling / IsGraceful",
+     "why_needed": "Graceful labelings are not defined in Mathlib or FormalConjecturesForMathlib; GracefulLabeling.lean inlines the condition instead of defining it."
+    },
+    {
+     "closest_existing_considered": "None; searched for 'graceful' in Mathlib and the repo.",
+     "name": "RosasConjecture.IsNearGracefulLabeling / IsNearGraceful",
+     "why_needed": "Near-graceful labelings (Wikipedia definition) do not exist in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.IsTree / IsAcyclic (trees only), SimpleGraph.IsBridge, Walk.IsCycle; searched for 'cactus' and 'block' in Mathlib and FormalConjecturesForMathlib.",
+     "name": "RosasConjecture.IsTriangularCactus",
+     "why_needed": "Mathlib has no notion of blocks, cactus graphs, or triangular cacti; encoded via Connected, IsBridge and Walk.IsCycle."
+    },
+    {
+     "closest_existing_considered": "No butterfly/bowtie graph in Mathlib; built with SimpleGraph.fromEdgeSet.",
+     "name": "RosasConjecture.butterfly",
+     "why_needed": "Concrete triangular cactus with t = 2 used only in a test lemma exercising the Rosa-nearly-graceful condition of the variant."
+    }
+   ],
+   "per_slot": {
+    "rosas_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite simple graph G that is a triangular cactus, G is graceful or G is near-graceful, with graceful/near-graceful taken from the Wikipedia 'Graceful labeling' article (graceful: injective f : V → {0..m} with edge differences exactly {1..m}; near-graceful: injective f : V → {0..m+1} with pairwise distinct edge differences). Needed bespoke definitions since Mathlib/FormalConjecturesForMathlib have no graceful labelings, no blocks, and no cactus graphs."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "rosas_conjecture": "/--\n**Rosa's conjecture.** Every triangular cactus is graceful or near-graceful.\n\nHere a triangular cactus is a finite connected graph all of whose blocks are triangles.\nA graph with $m$ edges is graceful if there is an injective vertex labeling\n$f : V \\to \\{0, \\dots, m\\}$ whose induced edge labels $|f(u) - f(v)|$ are exactly\n$\\{1, \\dots, m\\}$, and near-graceful if there is an injective vertex labeling\n$f : V \\to \\{0, \\dots, m + 1\\}$ whose induced edge labels are pairwise distinct\n(and hence lie in $\\{1, \\dots, m + 1\\}$).\n-/\n@[category research open, AMS 5]\ntheorem rosas_conjecture (hG : IsTriangularCactus G) : IsGraceful G ∨ IsNearGraceful G := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "rosas_conjecture": "c08"
+ },
+ "id": "wp-rosas-conjecture",
+ "main_attempt": "c08"
+}

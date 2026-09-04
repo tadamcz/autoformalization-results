@@ -1,0 +1,357 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dittert conjecture\n\nThe Dittert conjecture (or Dittert–Hajek conjecture) concerns the maximum of the function\n$$\n\\phi(A) = \\prod_{i=1}^{n}\\Big(\\sum_{j=1}^{n} a_{ij}\\Big)\n  + \\prod_{j=1}^{n}\\Big(\\sum_{i=1}^{n} a_{ij}\\Big) - \\operatorname{per}(A)\n$$\nover the real $n \\times n$ matrices $A = [a_{ij}]$ with nonnegative entries and\n$\\sum_{i=1}^{n} \\sum_{j=1}^{n} a_{ij} = n$. It asserts that $\\phi$ is (uniquely) maximized at\n$A = (1/n) J_n$, where $J_n$ is the $n \\times n$ matrix with all entries equal to $1$.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Dittert_conjecture)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ch11] Cheon, Gi-Sang, \"Some results towards the Dittert conjecture on permanents\",\n  Linear Algebra and its Applications (2011). doi:10.1016/j.laa.2010.08.041\n-/\n\nopen Finset\n\nnamespace DittertConjecture\n\n/-- The set $K_n$ of real $n \\times n$ matrices with nonnegative entries whose entries sum\nto $n$. -/\ndef K (n : ℕ) : Set (Matrix (Fin n) (Fin n) ℝ) :=\n  {A | (∀ i j, 0 ≤ A i j) ∧ ∑ i, ∑ j, A i j = n}\n\n/-- The Dittert function\n$\\phi(A) = \\prod_{i}\\big(\\sum_{j} a_{ij}\\big) + \\prod_{j}\\big(\\sum_{i} a_{ij}\\big)\n- \\operatorname{per}(A)$\nof a real $n \\times n$ matrix $A = [a_{ij}]$: the product of the row sums, plus the product of\nthe column sums, minus the permanent. -/\nnoncomputable def dittertFun {n : ℕ} (A : Matrix (Fin n) (Fin n) ℝ) : ℝ :=\n  ∏ i, ∑ j, A i j + ∏ j, ∑ i, A i j - A.permanent\n\nlocal notation \"φ\" => dittertFun\n\n/-- The $n \\times n$ matrix $J_n$ with all entries equal to $1$. -/\ndef J (n : ℕ) : Matrix (Fin n) (Fin n) ℝ := Matrix.of fun _ _ => 1\n\n/-- For $n \\geq 1$, the matrix $(1/n) J_n$ belongs to $K_n$. -/\n@[category API, AMS 15]\ntheorem smul_J_mem_K (n : ℕ) (hn : 0 < n) : (1 / n : ℝ) • J n ∈ K n := by\n  refine ⟨fun i j => by simp [J], ?_⟩\n  simp only [Matrix.smul_apply, J, Matrix.of_apply, smul_eq_mul, mul_one, sum_const, card_univ,\n    Fintype.card_fin, nsmul_eq_mul]\n  field_simp\n\n/-- Every doubly stochastic $n \\times n$ matrix belongs to $K_n$. -/\n@[category API, AMS 15]\ntheorem doublyStochastic_subset_K (n : ℕ) : (doublyStochastic ℝ (Fin n) : Set _) ⊆ K n := by\n  intro M hM\n  obtain ⟨h0, h1, -⟩ := mem_doublyStochastic_iff_sum.mp hM\n  exact ⟨h0, by simp [h1]⟩\n\n/-- The value of the Dittert function at $(1/n) J_n$ is $2 - n!/n^n$. -/\n@[category API, AMS 15]\ntheorem dittertFun_smul_J (n : ℕ) : φ ((1 / n : ℝ) • J n) = 2 - n.factorial / n ^ n := by\n  rcases Nat.eq_zero_or_pos n with rfl | hn\n  · simp [dittertFun, Matrix.permanent]\n    norm_num\n  · simp only [dittertFun, Matrix.permanent, Matrix.smul_apply, J, Matrix.of_apply, smul_eq_mul,\n      mul_one, sum_const, card_univ, Fintype.card_fin, nsmul_eq_mul, prod_const,\n      Fintype.card_perm, one_div_pow]\n    rw [mul_one_div_cancel (by positivity)]\n    ring\n\n/--\n**Dittert conjecture.** Let $n \\geq 1$ and let $A = [a_{ij}]$ be a real $n \\times n$ matrix with\nnonnegative entries and $\\sum_{i=1}^{n} \\sum_{j=1}^{n} a_{ij} = n$. Then the function\n$$\n\\phi(A) = \\prod_{i=1}^{n}\\Big(\\sum_{j=1}^{n} a_{ij}\\Big)\n  + \\prod_{j=1}^{n}\\Big(\\sum_{i=1}^{n} a_{ij}\\Big) - \\operatorname{per}(A)\n$$\nis uniquely maximized when $A = (1/n) J_n$, where $J_n$ is the $n \\times n$ matrix with all\nentries equal to $1$. That is, $\\phi(A) \\le \\phi((1/n) J_n) = 2 - n!/n^n$ for every such $A$,\nwith equality only if $A = (1/n) J_n$.\n\nThe hypothesis $n \\geq 1$ matches the source, whose statement involves $1/n$; for $n = 0$ the\nstatement is trivial.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ) (hA : A ∈ K n) :\n    φ A ≤ φ ((1 / n : ℝ) • J n) ∧ (φ A = φ ((1 / n : ℝ) • J n) → A = (1 / n : ℝ) • J n) := by\n  sorry\n\n/--\n**Dittert conjecture (without uniqueness).** Let $n \\geq 1$ and let $A = [a_{ij}]$ be a real\n$n \\times n$ matrix with nonnegative entries and $\\sum_{i=1}^{n} \\sum_{j=1}^{n} a_{ij} = n$. Then\n$$\n\\phi(A) = \\prod_{i=1}^{n}\\Big(\\sum_{j=1}^{n} a_{ij}\\Big)\n  + \\prod_{j=1}^{n}\\Big(\\sum_{i=1}^{n} a_{ij}\\Big) - \\operatorname{per}(A)\n  \\le \\phi((1/n) J_n) = 2 - \\frac{n!}{n^n},\n$$\ni.e. $\\phi$ attains its maximum on $K_n$ at $A = (1/n) J_n$ (not necessarily as the unique\nmaximizer).\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : A ∈ K n) :\n    φ A ≤ φ ((1 / n : ℝ) • J n) := by\n  sorry\n\nend DittertConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The split into the full statement (with uniqueness) and the weaker variant (without uniqueness) matches the article's parenthetical '(uniquely)'. Note that excluding n = 0 is not mathematically necessary (the statement is trivially true for n = 0), but it is harmless and matches the article's implicit assumption via 1/n.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Matrices are indexed by `Fin n` over ℝ, matching the article's 'square matrix of order n with real nonnegative entries'.",
+    "The domain K_n is defined as a bespoke set `K n = {A | (∀ i j, 0 ≤ A i j) ∧ ∑ i, ∑ j, A i j = n}`; the article does not name it, but this is the standard K_n of the literature (Cheon 2011).",
+    "φ is defined as `∏ i, ∑ j, A i j + ∏ j, ∑ i, A i j - A.permanent`; parsing as (∏ row sums) + (∏ column sums) − per(A) was verified by an `rfl` test against the fully parenthesized form. Mathlib's `Matrix.permanent M = ∑ σ, ∏ i, M (σ i) i` equals the article's ∑_σ ∏_i a_{i,σ(i)} (verified via `permanent_transpose`).",
+    "(1/n)J_n is written `(1 / n : ℝ) • J n` with `J n := Matrix.of fun _ _ => 1`.",
+    "'Uniquely maximized' is rendered as the conjunction `φ A ≤ φ((1/n)J_n) ∧ (φ A = φ((1/n)J_n) → A = (1/n)J_n)` quantified over all A ∈ K n, rather than via `IsMaxOn`; these are equivalent.",
+    "The right-hand side is kept as φ((1/n)J_n) (as in the article's text) rather than the explicit value 2 − n!/n^n; the API lemma `dittertFun_smul_J` proves φ((1/n)J_n) = 2 − n!/n^n, so the two readings coincide.",
+    "The hypothesis `0 < n` is included because the article's statement involves 1/n; the docstring notes that the n = 0 case is trivial (K_0 is a singleton), so this restriction does not change the mathematical content.",
+    "AMS tags: `AMS 5 15` for the two conjecture statements (combinatorics per the problem tags; permanents are 15A15); API lemmas use `AMS 15`.",
+    "Three API lemmas are included with proofs: `smul_J_mem_K` ((1/n)J_n ∈ K_n for n ≥ 1), `doublyStochastic_subset_K` (doubly stochastic matrices lie in K_n, showing the hypotheses are not vacuous), and `dittertFun_smul_J` (the value 2 − n!/n^n)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`doublyStochastic ℝ (Fin n)` (Mathlib) — strictly smaller (requires each row and column sum to be 1); the API lemma `doublyStochastic_subset_K` records the inclusion.",
+     "name": "DittertConjecture.K",
+     "why_needed": "The domain K_n of real n×n matrices with nonnegative entries and total entry sum n has no Mathlib counterpart."
+    },
+    {
+     "closest_existing_considered": "`Matrix.permanent` (Mathlib), which is used as the per(A) component.",
+     "name": "DittertConjecture.dittertFun",
+     "why_needed": "The Dittert function φ(A) = ∏ row sums + ∏ column sums − per(A) is specific to this problem and not in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`Matrix.of fun _ _ => 1` inline; wrapped in a named definition for readability, mirroring the article's J_n.",
+     "name": "DittertConjecture.J",
+     "why_needed": "The all-ones n×n matrix J_n; Mathlib has no named all-ones matrix (`1 : Matrix` is the identity)."
+    }
+   ],
+   "per_slot": {
+    "dittert_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for n ≥ 1 and every real n×n matrix A with nonnegative entries and total entry sum n (A ∈ K n), φ A ≤ φ((1/n)•J n) and φ A = φ((1/n)•J n) → A = (1/n)•J n, i.e. (1/n)J_n is the unique maximizer of φ on K_n. φ uses Mathlib's Matrix.permanent (verified to agree with ∑_σ ∏_i a_{i,σ(i)}). Bespoke definitions K, dittertFun, J are needed since Mathlib has no such set/function."
+    },
+    "dittert_conjecture.variants.weaker": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same hypotheses, conclusion φ A ≤ φ((1/n)•J n) only (no uniqueness clause). The API lemma dittertFun_smul_J proves φ((1/n)J_n) = 2 − n!/n^n, so this is equivalent to the explicit bound in the decomposition notes."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dittert_conjecture": "/--\n**Dittert conjecture.** Let $n \\geq 1$ and let $A = [a_{ij}]$ be a real $n \\times n$ matrix with\nnonnegative entries and $\\sum_{i=1}^{n} \\sum_{j=1}^{n} a_{ij} = n$. Then the function\n$$\n\\phi(A) = \\prod_{i=1}^{n}\\Big(\\sum_{j=1}^{n} a_{ij}\\Big)\n  + \\prod_{j=1}^{n}\\Big(\\sum_{i=1}^{n} a_{ij}\\Big) - \\operatorname{per}(A)\n$$\nis uniquely maximized when $A = (1/n) J_n$, where $J_n$ is the $n \\times n$ matrix with all\nentries equal to $1$. That is, $\\phi(A) \\le \\phi((1/n) J_n) = 2 - n!/n^n$ for every such $A$,\nwith equality only if $A = (1/n) J_n$.\n\nThe hypothesis $n \\geq 1$ matches the source, whose statement involves $1/n$; for $n = 0$ the\nstatement is trivial.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ) (hA : A ∈ K n) :\n    φ A ≤ φ ((1 / n : ℝ) • J n) ∧ (φ A = φ ((1 / n : ℝ) • J n) → A = (1 / n : ℝ) • J n) := by\n  sorry",
+    "dittert_conjecture.variants.weaker": "/--\n**Dittert conjecture (without uniqueness).** Let $n \\geq 1$ and let $A = [a_{ij}]$ be a real\n$n \\times n$ matrix with nonnegative entries and $\\sum_{i=1}^{n} \\sum_{j=1}^{n} a_{ij} = n$. Then\n$$\n\\phi(A) = \\prod_{i=1}^{n}\\Big(\\sum_{j=1}^{n} a_{ij}\\Big)\n  + \\prod_{j=1}^{n}\\Big(\\sum_{i=1}^{n} a_{ij}\\Big) - \\operatorname{per}(A)\n  \\le \\phi((1/n) J_n) = 2 - \\frac{n!}{n^n},\n$$\ni.e. $\\phi$ attains its maximum on $K_n$ at $A = (1/n) J_n$ (not necessarily as the unique\nmaximizer).\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : A ∈ K n) :\n    φ A ≤ φ ((1 / n : ℝ) • J n) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dittert conjecture\n\nThe Dittert conjecture concerns a function of nonnegative square matrices whose entries\nhave a fixed total sum. The function is the sum of the products of the row sums and of\nthe column sums, minus the permanent.\n\n*References:*\n- [Wikipedia, Dittert conjecture](https://en.wikipedia.org/wiki/Dittert_conjecture)\n-/\n\nnamespace DittertConjecture\n\n/--\nFor every positive integer $n$ and every nonnegative real $n \\times n$ matrix $A$ whose\nentries sum to $n$, let\n$$\n\\phi(A) = \\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A).\n$$\nThen $\\phi(A) \\le 2 - n!/n^n$, with equality if and only if every entry of $A$ is\n$1/n$. Thus $\\phi$ is uniquely maximized at $(1/n)J_n$.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture :\n    ∀ (n : ℕ), 1 ≤ n → ∀ A : Matrix (Fin n) (Fin n) ℝ,\n      (∀ i j, 0 ≤ A i j) →\n      (∑ i, ∑ j, A i j) = n →\n      let φ := (∏ i, ∑ j, A i j) + (∏ j, ∑ i, A i j) - A.permanent\n      let bound := (2 : ℝ) - (Nat.factorial n : ℝ) / (n : ℝ) ^ n\n      let uniform : Matrix (Fin n) (Fin n) ℝ := fun _ _ => 1 / (n : ℝ)\n      φ ≤ bound ∧ (φ = bound ↔ A = uniform) := by\n  sorry\n\n/--\nFor every positive integer $n$ and every nonnegative real $n \\times n$ matrix $A$ whose\nentries sum to $n$, the quantity\n$$\n\\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A)\n$$\nis at most $2 - n!/n^n$. Equivalently, $(1/n)J_n$ attains the maximum, without the\nclaim that it is the unique maximizer.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture.variants.weaker :\n    ∀ (n : ℕ), 1 ≤ n → ∀ A : Matrix (Fin n) (Fin n) ℝ,\n      (∀ i j, 0 ≤ A i j) →\n      (∑ i, ∑ j, A i j) = n →\n      (∏ i, ∑ j, A i j) + (∏ j, ∑ i, A i j) - A.permanent ≤\n        (2 : ℝ) - (Nat.factorial n : ℝ) / (n : ℝ) ^ n := by\n  sorry\n\nend DittertConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry was expanded using the dedicated Wikipedia article: φ(A) is the product of row sums plus the product of column sums minus `Matrix.permanent A`.",
+    "The matrix order is quantified as `n : ℕ` with `1 ≤ n`, reflecting the article's positive matrix order and excluding the unintended empty-matrix case.",
+    "Membership in Kₙ is represented directly by entrywise nonnegativity and the condition that the double sum of all entries equals `n` in ℝ.",
+    "The matrix `(1/n)Jₙ` is represented extensionally by `fun _ _ => 1 / (n : ℝ)`.",
+    "The full uniqueness claim is represented by the upper bound together with `φ(A) = 2 - n!/n^n ↔ A = (1/n)Jₙ`, encoding both attainment and uniqueness. The weaker variant retains only the upper bound.",
+    "The function φ is inlined (with local `let` bindings in the full statement) because it is specific to this conjecture and all needed operations already exist in Mathlib."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "dittert_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    },
+    "dittert_conjecture.variants.weaker": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dittert_conjecture": "/--\nFor every positive integer $n$ and every nonnegative real $n \\times n$ matrix $A$ whose\nentries sum to $n$, let\n$$\n\\phi(A) = \\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A).\n$$\nThen $\\phi(A) \\le 2 - n!/n^n$, with equality if and only if every entry of $A$ is\n$1/n$. Thus $\\phi$ is uniquely maximized at $(1/n)J_n$.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture :\n    ∀ (n : ℕ), 1 ≤ n → ∀ A : Matrix (Fin n) (Fin n) ℝ,\n      (∀ i j, 0 ≤ A i j) →\n      (∑ i, ∑ j, A i j) = n →\n      let φ := (∏ i, ∑ j, A i j) + (∏ j, ∑ i, A i j) - A.permanent\n      let bound := (2 : ℝ) - (Nat.factorial n : ℝ) / (n : ℝ) ^ n\n      let uniform : Matrix (Fin n) (Fin n) ℝ := fun _ _ => 1 / (n : ℝ)\n      φ ≤ bound ∧ (φ = bound ↔ A = uniform) := by\n  sorry",
+    "dittert_conjecture.variants.weaker": "/--\nFor every positive integer $n$ and every nonnegative real $n \\times n$ matrix $A$ whose\nentries sum to $n$, the quantity\n$$\n\\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A)\n$$\nis at most $2 - n!/n^n$. Equivalently, $(1/n)J_n$ attains the maximum, without the\nclaim that it is the unique maximizer.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture.variants.weaker :\n    ∀ (n : ℕ), 1 ≤ n → ∀ A : Matrix (Fin n) (Fin n) ℝ,\n      (∀ i j, 0 ≤ A i j) →\n      (∑ i, ∑ j, A i j) = n →\n      (∏ i, ∑ j, A i j) + (∏ j, ∑ i, A i j) - A.permanent ≤\n        (2 : ℝ) - (Nat.factorial n : ℝ) / (n : ℝ) ^ n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dittert conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Dittert_conjecture)\n-/\n\nnamespace DittertConjecture\n\n/--\nFor every positive integer $n$ and every $n \\times n$ matrix $A$ with nonnegative real entries\nwhose total sum is $n$, let\n$$\\phi(A) = \\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A).$$\nThe Dittert conjecture states that\n$$\\phi(A) \\leq 2 - \\frac{n!}{n^n},$$\nwith equality if and only if every entry of $A$ is $1/n$. Thus the constant matrix\n$A = (1/n)J_n$ is the unique maximizer.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture\n    (n : ℕ) (hn : 1 ≤ n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : ∀ i j, 0 ≤ A i j) (hsum : ∑ i, ∑ j, A i j = n) :\n    let φ := (∏ i, ∑ j, A i j) + (∏ j, ∑ i, A i j) - A.permanent\n    φ ≤ 2 - (n.factorial : ℝ) / (n : ℝ) ^ n ∧\n      (φ = 2 - (n.factorial : ℝ) / (n : ℝ) ^ n ↔\n        A = fun _ _ => 1 / (n : ℝ)) := by\n  sorry\n\n/--\nThe weaker form of the Dittert conjecture omits uniqueness: for every positive integer $n$ and\nevery $n \\times n$ matrix $A$ with nonnegative real entries and total entry sum $n$,\n$$\\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A)\n  \\leq 2 - \\frac{n!}{n^n}.$$\nEquivalently, the matrix $(1/n)J_n$ attains the maximum, but it is not asserted here to be the\nunique maximizer.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture.variants.weaker\n    (n : ℕ) (hn : 1 ≤ n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : ∀ i j, 0 ≤ A i j) (hsum : ∑ i, ∑ j, A i j = n) :\n    (∏ i, ∑ j, A i j) + (∏ j, ∑ i, A i j) - A.permanent ≤\n      2 - (n.factorial : ℝ) / (n : ℝ) ^ n := by\n  sorry\n\nend DittertConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry was expanded using the linked Wikipedia Dittert conjecture article: φ(A) is the product of row sums plus the product of column sums minus the permanent, on nonnegative real matrices whose total entry sum is n.",
+    "Matrix order n is represented by row and column index type `Fin n`, and the article's implicit positive-order assumption is represented by `1 ≤ n`, excluding the degenerate `n = 0` case.",
+    "The uniform matrix `(1/n)J_n` is represented extensionally as `fun _ _ => 1 / (n : ℝ)`. The sharp value is represented as `2 - (n.factorial : ℝ) / (n : ℝ) ^ n`.",
+    "For the full conjecture, unique maximization is stated as the sharp upper bound together with a biconditional between equality and A being the uniform matrix. This explicitly includes attainment as well as uniqueness.",
+    "The weaker variant retains only the sharp upper bound, as directed by the decomposition table; no uniqueness condition is included."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "dittert_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    },
+    "dittert_conjecture.variants.weaker": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dittert_conjecture": "/--\nFor every positive integer $n$ and every $n \\times n$ matrix $A$ with nonnegative real entries\nwhose total sum is $n$, let\n$$\\phi(A) = \\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A).$$\nThe Dittert conjecture states that\n$$\\phi(A) \\leq 2 - \\frac{n!}{n^n},$$\nwith equality if and only if every entry of $A$ is $1/n$. Thus the constant matrix\n$A = (1/n)J_n$ is the unique maximizer.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture\n    (n : ℕ) (hn : 1 ≤ n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : ∀ i j, 0 ≤ A i j) (hsum : ∑ i, ∑ j, A i j = n) :\n    let φ := (∏ i, ∑ j, A i j) + (∏ j, ∑ i, A i j) - A.permanent\n    φ ≤ 2 - (n.factorial : ℝ) / (n : ℝ) ^ n ∧\n      (φ = 2 - (n.factorial : ℝ) / (n : ℝ) ^ n ↔\n        A = fun _ _ => 1 / (n : ℝ)) := by\n  sorry",
+    "dittert_conjecture.variants.weaker": "/--\nThe weaker form of the Dittert conjecture omits uniqueness: for every positive integer $n$ and\nevery $n \\times n$ matrix $A$ with nonnegative real entries and total entry sum $n$,\n$$\\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A)\n  \\leq 2 - \\frac{n!}{n^n}.$$\nEquivalently, the matrix $(1/n)J_n$ attains the maximum, but it is not asserted here to be the\nunique maximizer.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture.variants.weaker\n    (n : ℕ) (hn : 1 ≤ n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : ∀ i j, 0 ≤ A i j) (hsum : ∑ i, ∑ j, A i j = n) :\n    (∏ i, ∑ j, A i j) + (∏ j, ∑ i, A i j) - A.permanent ≤\n      2 - (n.factorial : ℝ) / (n : ℝ) ^ n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dittert conjecture\n\nThe Dittert conjecture (or Dittert–Hajek conjecture) concerns the maximum of the function\n$$\\phi(A) = \\prod_{i=1}^n \\Big(\\sum_{j=1}^n a_{ij}\\Big) + \\prod_{j=1}^n \\Big(\\sum_{i=1}^n a_{ij}\\Big)\n  - \\operatorname{per}(A)$$\nover the set $K_n$ of $n \\times n$ real matrices $A = [a_{ij}]$ with nonnegative entries and\n$\\sum_{i=1}^n \\sum_{j=1}^n a_{ij} = n$. It asserts that $\\phi$ is uniquely maximized on $K_n$ at\n$A = \\frac{1}{n} J_n$, where $J_n$ is the $n \\times n$ matrix with all entries equal to $1$.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Dittert_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- G.-S. Cheon, *Some results towards the Dittert conjecture on permanents*,\n  Linear Algebra Appl. 436 (2012), 791–801. [doi:10.1016/j.laa.2010.08.041](https://doi.org/10.1016/j.laa.2010.08.041)\n-/\n\nopen Nat\n\nnamespace DittertConjecture\n\n/--\nThe set $K_n$ of $n \\times n$ real matrices $A = [a_{ij}]$ with nonnegative entries and\n$\\sum_{i=1}^n \\sum_{j=1}^n a_{ij} = n$.\n-/\ndef K (n : ℕ) : Set (Matrix (Fin n) (Fin n) ℝ) :=\n  {A | (∀ i j, 0 ≤ A i j) ∧ ∑ i, ∑ j, A i j = n}\n\n/--\nThe Dittert function\n$$\\phi(A) = \\prod_{i=1}^n \\Big(\\sum_{j=1}^n a_{ij}\\Big) + \\prod_{j=1}^n \\Big(\\sum_{i=1}^n a_{ij}\\Big)\n  - \\operatorname{per}(A),$$\ni.e. the product of the row sums, plus the product of the column sums, minus the permanent.\n-/\nnoncomputable def phi {n : ℕ} (A : Matrix (Fin n) (Fin n) ℝ) : ℝ :=\n  (∏ i, ∑ j, A i j) + (∏ j, ∑ i, A i j) - A.permanent\n\n/--\nThe matrix $\\frac{1}{n} J_n$, where $J_n$ is the $n \\times n$ matrix with all entries equal to $1$.\n-/\nnoncomputable def uniform (n : ℕ) : Matrix (Fin n) (Fin n) ℝ :=\n  Matrix.of fun _ _ => (1 / n : ℝ)\n\n/-- For $n \\geq 1$, the matrix $\\frac{1}{n} J_n$ belongs to $K_n$. -/\n@[category API, AMS 15]\ntheorem uniform_mem_K {n : ℕ} (hn : 0 < n) : uniform n ∈ K n := by\n  have : (n : ℝ) ≠ 0 := by positivity\n  refine ⟨fun _ _ => by simp [uniform], ?_⟩\n  simp [uniform]\n  field_simp\n\n/-- The value of $\\phi$ at $\\frac{1}{n} J_n$ is $2 - \\frac{n!}{n^n}$ for $n \\geq 1$. -/\n@[category API, AMS 15]\ntheorem phi_uniform {n : ℕ} (hn : 0 < n) : phi (uniform n) = 2 - n ! / (n : ℝ) ^ n := by\n  have : (n : ℝ) ≠ 0 := by positivity\n  simp [phi, uniform, Matrix.permanent, Fintype.card_perm]\n  field_simp\n  ring\n\n/--\n**Dittert conjecture.** Let $n \\geq 1$ and let $A = [a_{ij}]$ be an $n \\times n$ real matrix with\nnonnegative entries and $\\sum_{i=1}^n \\sum_{j=1}^n a_{ij} = n$. Then the function\n$$\\phi(A) = \\prod_{i=1}^n \\Big(\\sum_{j=1}^n a_{ij}\\Big) + \\prod_{j=1}^n \\Big(\\sum_{i=1}^n a_{ij}\\Big)\n  - \\operatorname{per}(A)$$\nis uniquely maximized when $A = \\frac{1}{n} J_n$, where $J_n$ is the $n \\times n$ matrix with all\nentries equal to $1$. That is, $\\phi(A) \\leq \\phi(\\frac{1}{n} J_n) = 2 - \\frac{n!}{n^n}$, with\nequality only if $A = \\frac{1}{n} J_n$.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ) (hA : A ∈ K n) :\n    phi A ≤ phi (uniform n) ∧ (phi A = phi (uniform n) → A = uniform n) := by\n  sorry\n\n/--\n**Dittert conjecture, without uniqueness.** Let $n \\geq 1$ and let $A = [a_{ij}]$ be an\n$n \\times n$ real matrix with nonnegative entries and $\\sum_{i=1}^n \\sum_{j=1}^n a_{ij} = n$. Then\n$$\\phi(A) = \\prod_{i=1}^n \\Big(\\sum_{j=1}^n a_{ij}\\Big) + \\prod_{j=1}^n \\Big(\\sum_{i=1}^n a_{ij}\\Big)\n  - \\operatorname{per}(A) \\leq 2 - \\frac{n!}{n^n},$$\ni.e. $\\phi$ attains its maximum on $K_n$ at $A = \\frac{1}{n} J_n$.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : A ∈ K n) : phi A ≤ 2 - n ! / (n : ℝ) ^ n := by\n  sorry\n\nend DittertConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The two slots (full conjecture with uniqueness; weaker form without uniqueness) match the article's '(uniquely) maximized' phrasing, and the notes' n ≥ 1 restriction is followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list-page statement is terse; the precise formulation (set K_n, function φ, maximizer (1/n)J_n, uniqueness) was taken from the Wikipedia article on the Dittert conjecture.",
+    "Matrices are indexed by `Fin n` with real entries; n is restricted by `hn : 0 < n` since the article's (1/n)J_n implicitly assumes n ≥ 1 (for n = 0 the statement would be trivially true: all Fin 0 matrices are equal and φ = 1).",
+    "Mathlib's `Matrix.permanent M = ∑ σ, ∏ i, M (σ i) i` differs from the article's `∑ σ ∏ a_{i,σ(i)}` only by the reindexing σ ↦ σ⁻¹ (cf. `Matrix.permanent_transpose`), so the values coincide.",
+    "The main slot is stated as `phi A ≤ phi (uniform n)` plus uniqueness (`phi A = phi (uniform n) → A = uniform n`), the literal 'uniquely maximized at (1/n)J_n' form, rather than with the closed form 2 − n!/n^n; the proved API lemma `phi_uniform` shows both forms are the same. The weaker variant uses the explicit closed form as in the decomposition notes.",
+    "Uniqueness is expressed as 'equality of φ-values implies A = (1/n)J_n' for A ∈ K_n, which is the standard meaning of 'uniquely maximized'.",
+    "AMS tags: 5 (combinatorics, per Wikipedia's tag) and 15 (linear algebra / permanents) on the conjecture statements; the API lemmas carry AMS 15.",
+    "Copyright year set to 2026 to match the most recent files in the repository."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "doublyStochastic ℝ (Fin n) (Mathlib.Analysis.Convex.DoublyStochasticMatrix) — too restrictive; no Mathlib notion of 'total entry sum = n' matrices.",
+     "name": "DittertConjecture.K",
+     "why_needed": "The constraint set K_n of n×n real matrices with nonnegative entries and total entry sum n. Mathlib has `doublyStochastic` (row and column sums all 1), which is a strictly smaller set and would misstate the conjecture."
+    },
+    {
+     "closest_existing_considered": "Matrix.permanent (used as the permanent term); nothing for the full function.",
+     "name": "DittertConjecture.phi",
+     "why_needed": "The Dittert function ∏_i(row sums) + ∏_j(column sums) − per(A); problem-specific, no counterpart in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Matrix.of with a constant function (used in the definition); Mathlib has no named all-ones matrix J_n.",
+     "name": "DittertConjecture.uniform",
+     "why_needed": "The matrix (1/n)J_n (all entries 1/n), needed both as the conjectured maximizer and in the uniqueness clause; defined as `Matrix.of fun _ _ => (1 / n : ℝ)`."
+    }
+   ],
+   "per_slot": {
+    "dittert_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated for every n ≥ 1 and every A ∈ K n (nonnegative real n×n matrix with total entry sum n): phi A ≤ phi (uniform n) ∧ (phi A = phi (uniform n) → A = uniform n), where phi is the Dittert function (product of row sums + product of column sums − Matrix.permanent) and uniform n = (1/n)J_n. This is the literal 'uniquely maximized at (1/n)J_n' reading; an accompanying proved API lemma phi_uniform shows phi (uniform n) = 2 − n!/n^n, so it agrees with the closed-form reading in the decomposition notes."
+    },
+    "dittert_conjecture.variants.weaker": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated for every n ≥ 1 and every A ∈ K n: phi A ≤ 2 − n!/(n:ℝ)^n, i.e. the maximum bound without the uniqueness clause, exactly as in the notes."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dittert_conjecture": "/--\n**Dittert conjecture.** Let $n \\geq 1$ and let $A = [a_{ij}]$ be an $n \\times n$ real matrix with\nnonnegative entries and $\\sum_{i=1}^n \\sum_{j=1}^n a_{ij} = n$. Then the function\n$$\\phi(A) = \\prod_{i=1}^n \\Big(\\sum_{j=1}^n a_{ij}\\Big) + \\prod_{j=1}^n \\Big(\\sum_{i=1}^n a_{ij}\\Big)\n  - \\operatorname{per}(A)$$\nis uniquely maximized when $A = \\frac{1}{n} J_n$, where $J_n$ is the $n \\times n$ matrix with all\nentries equal to $1$. That is, $\\phi(A) \\leq \\phi(\\frac{1}{n} J_n) = 2 - \\frac{n!}{n^n}$, with\nequality only if $A = \\frac{1}{n} J_n$.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ) (hA : A ∈ K n) :\n    phi A ≤ phi (uniform n) ∧ (phi A = phi (uniform n) → A = uniform n) := by\n  sorry",
+    "dittert_conjecture.variants.weaker": "/--\n**Dittert conjecture, without uniqueness.** Let $n \\geq 1$ and let $A = [a_{ij}]$ be an\n$n \\times n$ real matrix with nonnegative entries and $\\sum_{i=1}^n \\sum_{j=1}^n a_{ij} = n$. Then\n$$\\phi(A) = \\prod_{i=1}^n \\Big(\\sum_{j=1}^n a_{ij}\\Big) + \\prod_{j=1}^n \\Big(\\sum_{i=1}^n a_{ij}\\Big)\n  - \\operatorname{per}(A) \\leq 2 - \\frac{n!}{n^n},$$\ni.e. $\\phi$ attains its maximum on $K_n$ at $A = \\frac{1}{n} J_n$.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : A ∈ K n) : phi A ≤ 2 - n ! / (n : ℝ) ^ n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dittert conjecture\n\nThe Dittert conjecture concerns a function of square nonnegative real matrices whose entries\nsum to the order of the matrix. The function is the sum of the products of all row sums and all\ncolumn sums, minus the permanent. It is conjectured to be uniquely maximized by the constant\nmatrix whose entries are the reciprocal of its order.\n\n*References:*\n- [Wikipedia, Dittert conjecture](https://en.wikipedia.org/wiki/Dittert_conjecture)\n-/\n\nnamespace DittertConjecture\n\n/--\n**Dittert conjecture.** Let $n \\ge 1$, and let $A$ be an $n \\times n$ nonnegative real\nmatrix whose entries sum to $n$. Define\n$$\\phi(A) = \\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A).$$\nThen $\\phi$ is uniquely maximized at the matrix $U$ with every entry equal to $1/n$.\nMore precisely, $\\phi(U)=2-n!/n^n$, every such $A$ satisfies $\\phi(A)\\leq\\phi(U)$, and\nequality implies $A=U$.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture (n : ℕ) (hn : 1 ≤ n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : ∀ i j, 0 ≤ A i j) (hsum : (∑ i, ∑ j, A i j) = n) :\n    let U : Matrix (Fin n) (Fin n) ℝ := fun _ _ => 1 / (n : ℝ)\n    let φ : Matrix (Fin n) (Fin n) ℝ → ℝ := fun B =>\n      (∏ i, ∑ j, B i j) + (∏ j, ∑ i, B i j) - B.permanent\n    φ U = 2 - (n.factorial : ℝ) / (n : ℝ) ^ n ∧\n      φ A ≤ φ U ∧ (φ A = φ U → A = U) := by\n  sorry\n\n/--\n**Weaker Dittert conjecture.** Let $n \\ge 1$, and let $A$ be an $n \\times n$ nonnegative real\nmatrix whose entries sum to $n$. For\n$$\\phi(A) = \\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A),$$\nthe constant matrix $U$ with entries $1/n$ attains the maximum: its value is\n$2-n!/n^n$, and every such $A$ satisfies $\\phi(A)\\leq\\phi(U)$. No uniqueness is asserted.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 1 ≤ n)\n    (A : Matrix (Fin n) (Fin n) ℝ) (hA : ∀ i j, 0 ≤ A i j)\n    (hsum : (∑ i, ∑ j, A i j) = n) :\n    let U : Matrix (Fin n) (Fin n) ℝ := fun _ _ => 1 / (n : ℝ)\n    let φ : Matrix (Fin n) (Fin n) ℝ → ℝ := fun B =>\n      (∏ i, ∑ j, B i j) + (∏ j, ∑ i, B i j) - B.permanent\n    φ U = 2 - (n.factorial : ℝ) / (n : ℝ) ^ n ∧ φ A ≤ φ U := by\n  sorry\n\nend DittertConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry was expanded using the supplied Wikipedia Dittert conjecture article: φ(A) is the product of row sums plus the product of column sums minus Matrix.permanent.",
+    "Matrices of order n are represented as Matrix (Fin n) (Fin n) ℝ, and the article's implicit positive-order convention is represented by the hypothesis 1 ≤ n.",
+    "The matrix (1/n)J_n is represented directly by the constant function fun _ _ => 1 / (n : ℝ).",
+    "For the full conjecture, unique maximization is represented by three claims: the uniform matrix has value 2 − n!/n^n, every admissible A has φ(A) ≤ φ(U), and equality forces A = U.",
+    "The weaker variant keeps both the explicit value of the uniform matrix and the assertion that it attains the upper bound, while omitting only the equality-implies-matrix-equality clause."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "dittert_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    },
+    "dittert_conjecture.variants.weaker": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dittert_conjecture": "/--\n**Dittert conjecture.** Let $n \\ge 1$, and let $A$ be an $n \\times n$ nonnegative real\nmatrix whose entries sum to $n$. Define\n$$\\phi(A) = \\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A).$$\nThen $\\phi$ is uniquely maximized at the matrix $U$ with every entry equal to $1/n$.\nMore precisely, $\\phi(U)=2-n!/n^n$, every such $A$ satisfies $\\phi(A)\\leq\\phi(U)$, and\nequality implies $A=U$.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture (n : ℕ) (hn : 1 ≤ n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : ∀ i j, 0 ≤ A i j) (hsum : (∑ i, ∑ j, A i j) = n) :\n    let U : Matrix (Fin n) (Fin n) ℝ := fun _ _ => 1 / (n : ℝ)\n    let φ : Matrix (Fin n) (Fin n) ℝ → ℝ := fun B =>\n      (∏ i, ∑ j, B i j) + (∏ j, ∑ i, B i j) - B.permanent\n    φ U = 2 - (n.factorial : ℝ) / (n : ℝ) ^ n ∧\n      φ A ≤ φ U ∧ (φ A = φ U → A = U) := by\n  sorry",
+    "dittert_conjecture.variants.weaker": "/--\n**Weaker Dittert conjecture.** Let $n \\ge 1$, and let $A$ be an $n \\times n$ nonnegative real\nmatrix whose entries sum to $n$. For\n$$\\phi(A) = \\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A),$$\nthe constant matrix $U$ with entries $1/n$ attains the maximum: its value is\n$2-n!/n^n$, and every such $A$ satisfies $\\phi(A)\\leq\\phi(U)$. No uniqueness is asserted.\n-/\n@[category research open, AMS 5]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 1 ≤ n)\n    (A : Matrix (Fin n) (Fin n) ℝ) (hA : ∀ i j, 0 ≤ A i j)\n    (hsum : (∑ i, ∑ j, A i j) = n) :\n    let U : Matrix (Fin n) (Fin n) ℝ := fun _ _ => 1 / (n : ℝ)\n    let φ : Matrix (Fin n) (Fin n) ℝ → ℝ := fun B =>\n      (∏ i, ∑ j, B i j) + (∏ j, ∑ i, B i j) - B.permanent\n    φ U = 2 - (n.factorial : ℝ) / (n : ℝ) ^ n ∧ φ A ≤ φ U := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dittert conjecture\n\nThe Dittert conjecture (or Dittert–Hajek conjecture) concerns the maximum of a certain function\n$\\phi$ on the set $K_n$ of $n \\times n$ real matrices with nonnegative entries whose entries sum\nto $n$. For $A = [a_{ij}] \\in K_n$,\n$$\n\\phi(A) = \\prod_{i=1}^{n} \\Big(\\sum_{j=1}^{n} a_{ij}\\Big)\n  + \\prod_{j=1}^{n} \\Big(\\sum_{i=1}^{n} a_{ij}\\Big) - \\operatorname{per}(A),\n$$\nwhere $\\operatorname{per}(A) = \\sum_{\\sigma \\in S_n} \\prod_{i=1}^{n} a_{i, \\sigma(i)}$ is the\npermanent of $A$. The conjecture asserts that $\\phi$ is uniquely maximized on $K_n$ at\n$A = \\frac{1}{n} J_n$, where $J_n$ is the $n \\times n$ matrix with all entries equal to $1$.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Dittert_conjecture)\n- [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- G.-S. Cheon, I. M. Wanless, *Some results towards the Dittert conjecture on permanents*,\n  Linear Algebra Appl. 436 (2012), 791–801.\n  [doi:10.1016/j.laa.2010.08.041](https://doi.org/10.1016/j.laa.2010.08.041)\n-/\n\nopen Finset\n\nnamespace DittertConjecture\n\n/-- The set $K_n$ of $n \\times n$ real matrices with nonnegative entries whose entries sum\nto $n$. -/\ndef K (n : ℕ) : Set (Matrix (Fin n) (Fin n) ℝ) :=\n  {A | (∀ i j, 0 ≤ A i j) ∧ ∑ i, ∑ j, A i j = n}\n\n/-- The Dittert function\n$\\phi(A) = \\prod_{i} \\big(\\sum_{j} a_{ij}\\big) + \\prod_{j} \\big(\\sum_{i} a_{ij}\\big)\n  - \\operatorname{per}(A)$\nof an $n \\times n$ real matrix $A$: the product of the row sums, plus the product of the column\nsums, minus the permanent. -/\nnoncomputable def φ {n : ℕ} (A : Matrix (Fin n) (Fin n) ℝ) : ℝ :=\n  ∏ i, (∑ j, A i j) + ∏ j, (∑ i, A i j) - A.permanent\n\n/-- The $n \\times n$ matrix $J_n$ with all entries equal to $1$. -/\ndef J (n : ℕ) : Matrix (Fin n) (Fin n) ℝ := Matrix.of fun _ _ => 1\n\n/-- The matrix $\\frac{1}{n} J_n$ belongs to $K_n$ when $n \\ge 1$. -/\n@[category test, AMS 15]\ntheorem inv_smul_J_mem_K (n : ℕ) (hn : 0 < n) : (n : ℝ)⁻¹ • J n ∈ K n := by\n  have hn' : (n : ℝ) ≠ 0 := by positivity\n  refine ⟨fun i j => by simp [J], ?_⟩\n  simp [J, sum_const, card_univ, Fintype.card_fin]\n  field_simp\n\n/-- The value of $\\phi$ at $\\frac{1}{n} J_n$ is $2 - \\frac{n!}{n^n}$ when $n \\ge 1$. -/\n@[category test, AMS 15]\ntheorem φ_inv_smul_J (n : ℕ) (hn : 0 < n) :\n    φ ((n : ℝ)⁻¹ • J n) = 2 - (n.factorial : ℝ) / (n : ℝ) ^ n := by\n  have hn' : (n : ℝ) ≠ 0 := by positivity\n  simp [φ, J, Matrix.permanent, sum_const, prod_const, card_univ, Fintype.card_fin,\n    Fintype.card_perm, hn', div_eq_mul_inv]\n  ring\n\n/--\n**Dittert conjecture.** Let $n \\ge 1$ and let $K_n$ be the set of $n \\times n$ real matrices\nwith nonnegative entries whose entries sum to $n$. For $A = [a_{ij}] \\in K_n$ let\n$$\n\\phi(A) = \\prod_{i=1}^{n} \\Big(\\sum_{j=1}^{n} a_{ij}\\Big)\n  + \\prod_{j=1}^{n} \\Big(\\sum_{i=1}^{n} a_{ij}\\Big) - \\operatorname{per}(A).\n$$\nThen $\\phi$ is uniquely maximized on $K_n$ at $A = \\frac{1}{n} J_n$, where $J_n$ is the\n$n \\times n$ matrix with all entries equal to $1$. That is, for every $A \\in K_n$,\n$\\phi(A) \\le \\phi\\big(\\frac{1}{n} J_n\\big) = 2 - \\frac{n!}{n^n}$, with equality only if\n$A = \\frac{1}{n} J_n$.\n\nThe case $n = 0$ is excluded because the source only considers matrices of positive order.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : A ∈ K n) :\n    φ A ≤ φ ((n : ℝ)⁻¹ • J n) ∧\n      (φ A = φ ((n : ℝ)⁻¹ • J n) → A = (n : ℝ)⁻¹ • J n) := by\n  sorry\n\n/--\n**Dittert conjecture, weaker form (without uniqueness).** Let $n \\ge 1$ and let $K_n$ be the\nset of $n \\times n$ real matrices with nonnegative entries whose entries sum to $n$. Then\n$\\phi$ attains its maximum on $K_n$ at $A = \\frac{1}{n} J_n$: for every $A \\in K_n$,\n$$\n\\phi(A) \\le \\phi\\Big(\\frac{1}{n} J_n\\Big) = 2 - \\frac{n!}{n^n}.\n$$\nThe maximizer is not required to be unique here.\n\nThe case $n = 0$ is excluded because the source only considers matrices of positive order.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : A ∈ K n) :\n    φ A ≤ φ ((n : ℝ)⁻¹ • J n) := by\n  sorry\n\nend DittertConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "None. The split into the full conjecture (with uniqueness) and the weaker inequality-only variant matches the article's parenthetical '(uniquely)'.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list-page statement is terse; the precise formulation (set K_n, function φ = ∏ row sums + ∏ column sums − per(A), maximizer (1/n)J_n, uniqueness) is taken from the Wikipedia article /workspace/background/article.md.",
+    "The maximum value is written as φ((1/n)J_n) rather than the closed form 2 − n!/n^n, to stay literal to 'maximized when A = (1/n)J_n'. The closed form is proved as a `category test` lemma `φ_inv_smul_J` (φ((n:ℝ)⁻¹ • J n) = 2 − n!/n^n for n ≥ 1), so the docstring's mention of 2 − n!/n^n is verified.",
+    "n = 0 is excluded via the hypothesis (hn : 0 < n), since the article implicitly considers matrices of positive order; the n = 0 case would be trivially true anyway (K 0 is a singleton, φ = 1).",
+    "Uniqueness is expressed as an implication φ A = φ((1/n)J_n) → A = (1/n)J_n conjoined with the inequality, rather than via IsMaxOn / IsGreatest, for readability.",
+    "Mathlib's Matrix.permanent is ∑ σ ∏ i M (σ i) i, which equals the article's ∑ σ ∏ i a_{i,σ(i)} (reindex σ ↦ σ⁻¹); no transpose is needed.",
+    "(1/n)J_n is written as (n:ℝ)⁻¹ • J n; a `category test` lemma `inv_smul_J_mem_K` proves it lies in K n for n ≥ 1.",
+    "AMS tags 5 (combinatorics, matching the problem's tag) and 15 (linear algebra / matrices)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "doublyStochastic ℝ (Fin n) (too restrictive: fixes every row and column sum to 1)",
+     "name": "DittertConjecture.K",
+     "why_needed": "The set K_n of n×n real matrices with nonnegative entries and total entry sum n; Mathlib has doublyStochastic but nothing for this weaker 'total sum = n' condition."
+    },
+    {
+     "closest_existing_considered": "Matrix.permanent (used as a component)",
+     "name": "DittertConjecture.φ",
+     "why_needed": "The Dittert function ∏ row sums + ∏ column sums − per(A); problem-specific, no Mathlib analogue."
+    },
+    {
+     "closest_existing_considered": "Matrix.of fun _ _ => 1 (this is exactly how J is defined; named for readability of the statement)",
+     "name": "DittertConjecture.J",
+     "why_needed": "The all-ones n×n real matrix J_n; Mathlib has no dedicated all-ones matrix definition."
+    }
+   ],
+   "per_slot": {
+    "dittert_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for n ≥ 1 and every A ∈ K n (nonnegative real n×n matrix with total entry sum n), φ A ≤ φ((n:ℝ)⁻¹ • J n) and φ A = φ((n:ℝ)⁻¹ • J n) → A = (n:ℝ)⁻¹ • J n. φ is ∏ row sums + ∏ column sums − Matrix.permanent, exactly the article's function; the uniqueness clause captures '(uniquely) maximized'. Bespoke defs K, φ, J are problem-specific set/function/matrix with no Mathlib counterpart."
+    },
+    "dittert_conjecture.variants.weaker": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same hypotheses, conclusion φ A ≤ φ((n:ℝ)⁻¹ • J n) only (maximum attained at (1/n)J_n, uniqueness dropped)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dittert_conjecture": "/--\n**Dittert conjecture.** Let $n \\ge 1$ and let $K_n$ be the set of $n \\times n$ real matrices\nwith nonnegative entries whose entries sum to $n$. For $A = [a_{ij}] \\in K_n$ let\n$$\n\\phi(A) = \\prod_{i=1}^{n} \\Big(\\sum_{j=1}^{n} a_{ij}\\Big)\n  + \\prod_{j=1}^{n} \\Big(\\sum_{i=1}^{n} a_{ij}\\Big) - \\operatorname{per}(A).\n$$\nThen $\\phi$ is uniquely maximized on $K_n$ at $A = \\frac{1}{n} J_n$, where $J_n$ is the\n$n \\times n$ matrix with all entries equal to $1$. That is, for every $A \\in K_n$,\n$\\phi(A) \\le \\phi\\big(\\frac{1}{n} J_n\\big) = 2 - \\frac{n!}{n^n}$, with equality only if\n$A = \\frac{1}{n} J_n$.\n\nThe case $n = 0$ is excluded because the source only considers matrices of positive order.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : A ∈ K n) :\n    φ A ≤ φ ((n : ℝ)⁻¹ • J n) ∧\n      (φ A = φ ((n : ℝ)⁻¹ • J n) → A = (n : ℝ)⁻¹ • J n) := by\n  sorry",
+    "dittert_conjecture.variants.weaker": "/--\n**Dittert conjecture, weaker form (without uniqueness).** Let $n \\ge 1$ and let $K_n$ be the\nset of $n \\times n$ real matrices with nonnegative entries whose entries sum to $n$. Then\n$\\phi$ attains its maximum on $K_n$ at $A = \\frac{1}{n} J_n$: for every $A \\in K_n$,\n$$\n\\phi(A) \\le \\phi\\Big(\\frac{1}{n} J_n\\Big) = 2 - \\frac{n!}{n^n}.\n$$\nThe maximizer is not required to be unique here.\n\nThe case $n = 0$ is excluded because the source only considers matrices of positive order.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 0 < n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA : A ∈ K n) :\n    φ A ≤ φ ((n : ℝ)⁻¹ • J n) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dittert conjecture\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Dittert_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- G.-S. Cheon, *Some results towards the Dittert conjecture on permanents*,\n  Linear Algebra and its Applications 436 (2012), 791–801,\n  [doi:10.1016/j.laa.2010.08.041](https://doi.org/10.1016/j.laa.2010.08.041)\n-/\n\nopen Finset Nat\n\nnamespace DittertConjecture\n\n/-- The set $K_n$ of $n \\times n$ real matrices $A = [a_{ij}]$ with nonnegative entries and\n$\\sum_{i=1}^n \\sum_{j=1}^n a_{ij} = n$. -/\ndef dittertSet (n : ℕ) : Set (Matrix (Fin n) (Fin n) ℝ) :=\n  {A | (∀ i j, 0 ≤ A i j) ∧ ∑ i, ∑ j, A i j = n}\n\n/-- The Dittert function\n$$\\phi(A) = \\prod_{i=1}^n \\left(\\sum_{j=1}^n a_{ij}\\right)\n  + \\prod_{j=1}^n \\left(\\sum_{i=1}^n a_{ij}\\right) - \\operatorname{per}(A),$$\ni.e. the product of the row sums of $A$, plus the product of the column sums of $A$, minus the\npermanent of $A$. -/\nnoncomputable def phi {n : ℕ} (A : Matrix (Fin n) (Fin n) ℝ) : ℝ :=\n  ∏ i, (∑ j, A i j) + ∏ j, (∑ i, A i j) - A.permanent\n\n/-- The matrix $\\frac{1}{n} J_n$, where $J_n$ is the $n \\times n$ matrix with all entries\nequal to $1$. -/\nnoncomputable def uniformMatrix (n : ℕ) : Matrix (Fin n) (Fin n) ℝ :=\n  Matrix.of fun _ _ => (1 / n : ℝ)\n\n/-- The matrix $\\frac{1}{n} J_n$ belongs to $K_n$. -/\n@[category test, AMS 5 15]\ntheorem uniformMatrix_mem_dittertSet (n : ℕ) : uniformMatrix n ∈ dittertSet n := by\n  refine ⟨fun _ _ => by simp [uniformMatrix], ?_⟩\n  rcases Nat.eq_zero_or_pos n with rfl | hn\n  · simp\n  · simp only [uniformMatrix, Matrix.of_apply, sum_const, Finset.card_univ, Fintype.card_fin,\n      nsmul_eq_mul]\n    field_simp\n\n/-- The value of $\\phi$ at $\\frac{1}{n} J_n$ is $2 - n!/n^n$. -/\n@[category test, AMS 5 15]\ntheorem phi_uniformMatrix (n : ℕ) : phi (uniformMatrix n) = 2 - (n ! : ℝ) / n ^ n := by\n  rcases Nat.eq_zero_or_pos n with rfl | hn\n  · norm_num [phi, uniformMatrix, Matrix.permanent_isEmpty]\n  · simp only [phi, uniformMatrix, Matrix.permanent, Matrix.of_apply, sum_const, Finset.card_univ,\n      Fintype.card_fin, Fintype.card_perm, nsmul_eq_mul, prod_const, one_div, inv_pow]\n    have : (n : ℝ) ^ n ≠ 0 := by positivity\n    field_simp\n    ring\n\n/--\n**Dittert conjecture.** Let $n \\ge 1$ and let $K_n$ be the set of $n \\times n$ real matrices\n$A = [a_{ij}]$ with nonnegative entries and $\\sum_{i=1}^n \\sum_{j=1}^n a_{ij} = n$. Then the\nfunction\n$$\\phi(A) = \\prod_{i=1}^n \\left(\\sum_{j=1}^n a_{ij}\\right)\n  + \\prod_{j=1}^n \\left(\\sum_{i=1}^n a_{ij}\\right) - \\operatorname{per}(A)$$\nis uniquely maximized on $K_n$ at $A = \\frac{1}{n} J_n$, where $J_n$ is the $n \\times n$ matrix\nwith all entries equal to $1$. That is, $\\phi(A) \\le \\phi(\\frac{1}{n} J_n) = 2 - n!/n^n$ for\nevery $A \\in K_n$, with equality only when $A = \\frac{1}{n} J_n$.\n\nThe degenerate case $n = 0$ is excluded, since the source implicitly assumes $n \\ge 1$.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture (n : ℕ) (hn : 0 < n) :\n    (∀ A ∈ dittertSet n, phi A ≤ phi (uniformMatrix n)) ∧\n      (∀ A ∈ dittertSet n, phi A = phi (uniformMatrix n) → A = uniformMatrix n) := by\n  sorry\n\n/--\n**Dittert conjecture**, weaker form without the uniqueness clause. Let $n \\ge 1$ and let $K_n$\nbe the set of $n \\times n$ real matrices $A = [a_{ij}]$ with nonnegative entries and\n$\\sum_{i=1}^n \\sum_{j=1}^n a_{ij} = n$. Then\n$$\\phi(A) = \\prod_{i=1}^n \\left(\\sum_{j=1}^n a_{ij}\\right)\n  + \\prod_{j=1}^n \\left(\\sum_{i=1}^n a_{ij}\\right) - \\operatorname{per}(A)\n  \\le \\phi\\left(\\tfrac{1}{n} J_n\\right) = 2 - \\frac{n!}{n^n}$$\nfor every $A \\in K_n$, i.e. $\\frac{1}{n} J_n$ attains the maximum of $\\phi$ on $K_n$\n(but is not required to be the unique maximizer).\n\nThe degenerate case $n = 0$ is excluded, since the source implicitly assumes $n \\ge 1$.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 0 < n) :\n    ∀ A ∈ dittertSet n, phi A ≤ phi (uniformMatrix n) := by\n  sorry\n\nend DittertConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The table's two slots (full conjecture with uniqueness, and the weaker bound-only form) match the article's '(uniquely) maximized' phrasing and the literature's standard formulation (φ(A) ≤ 2 − n!/n^n with equality iff A = (1/n)J_n).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list-page entry is terse; the precise formulation (K_n, φ, maximizer (1/n)J_n, uniqueness) is taken from the Wikipedia article on the Dittert conjecture, as directed.",
+    "Matrices are indexed by Fin n over ℝ; the summation condition is ∑ i, ∑ j, A i j = (n : ℝ).",
+    "Mathlib's Matrix.permanent uses ∑ σ ∏ i M (σ i) i, whereas the article writes ∑ σ ∏ i a_{i,σ(i)}; these agree by reindexing σ ↦ σ⁻¹, so no adjustment was made.",
+    "'Uniquely maximized at (1/n)J_n' is encoded as the conjunction (∀ A ∈ K_n, φ A ≤ φ((1/n)J_n)) ∧ (∀ A ∈ K_n, φ A = φ((1/n)J_n) → A = (1/n)J_n); membership of (1/n)J_n in K_n is a proved test lemma rather than part of the conjecture statement.",
+    "The maximum value is expressed as φ((1/n)J_n) (literal to the article) rather than the closed form 2 − n!/n^n; the proved test lemma phi_uniformMatrix establishes φ((1/n)J_n) = 2 − n!/n^n, so both slots are equivalent to the closed-form versions given in the decomposition notes.",
+    "The degenerate case n = 0 is excluded with hypothesis 0 < n, since the article's 1/n implicitly assumes n ≥ 1 (the n = 0 case would be trivially true: K_0 is the singleton of the empty matrix and φ = 1 = 2 − 0!/0^0).",
+    "AMS tags 5 (Combinatorics) and 15 (Linear algebra) were chosen; the copyright year 2026 matches the majority of recent repository files."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "doublyStochastic ℝ (Fin n) (Mathlib) — not equivalent, since it constrains each row and column sum rather than the total sum.",
+     "name": "DittertConjecture.dittertSet",
+     "why_needed": "The set K_n of n×n real matrices with nonnegative entries and total entry sum n has no Mathlib counterpart; doublyStochastic is the different (stronger) condition that every row and column sums to 1."
+    },
+    {
+     "closest_existing_considered": "Matrix.permanent (Mathlib), which is used as a component; nothing exists for the full expression.",
+     "name": "DittertConjecture.phi",
+     "why_needed": "The Dittert function φ(A) = ∏ row sums + ∏ column sums − per(A) is specific to this problem and not in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Matrix.of fun _ _ => (1 / n : ℝ) inline; Matrix.of 1 / (n : ℝ)• does not directly give J_n since (1 : Matrix) is the identity.",
+     "name": "DittertConjecture.uniformMatrix",
+     "why_needed": "Names the conjectured maximizer (1/n)J_n (all entries 1/n) so the statements read clearly; it is just Matrix.of fun _ _ => 1/n."
+    }
+   ],
+   "per_slot": {
+    "dittert_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for n ≥ 1, every A in K_n (nonnegative n×n real matrix with entry sum n) satisfies phi A ≤ phi ((1/n) J_n), and phi A = phi ((1/n) J_n) implies A = (1/n) J_n. Uses Mathlib's Matrix.permanent plus three bespoke problem-local definitions (dittertSet, phi, uniformMatrix); test lemmas prove (1/n)J_n ∈ K_n and phi((1/n)J_n) = 2 - n!/n^n."
+    },
+    "dittert_conjecture.variants.weaker": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same hypotheses, only the bound phi A ≤ phi ((1/n) J_n) for all A ∈ K_n, without the uniqueness clause. The proved test lemma phi_uniformMatrix shows the right-hand side equals 2 - n!/n^n, matching the notes' formulation."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dittert_conjecture": "/--\n**Dittert conjecture.** Let $n \\ge 1$ and let $K_n$ be the set of $n \\times n$ real matrices\n$A = [a_{ij}]$ with nonnegative entries and $\\sum_{i=1}^n \\sum_{j=1}^n a_{ij} = n$. Then the\nfunction\n$$\\phi(A) = \\prod_{i=1}^n \\left(\\sum_{j=1}^n a_{ij}\\right)\n  + \\prod_{j=1}^n \\left(\\sum_{i=1}^n a_{ij}\\right) - \\operatorname{per}(A)$$\nis uniquely maximized on $K_n$ at $A = \\frac{1}{n} J_n$, where $J_n$ is the $n \\times n$ matrix\nwith all entries equal to $1$. That is, $\\phi(A) \\le \\phi(\\frac{1}{n} J_n) = 2 - n!/n^n$ for\nevery $A \\in K_n$, with equality only when $A = \\frac{1}{n} J_n$.\n\nThe degenerate case $n = 0$ is excluded, since the source implicitly assumes $n \\ge 1$.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture (n : ℕ) (hn : 0 < n) :\n    (∀ A ∈ dittertSet n, phi A ≤ phi (uniformMatrix n)) ∧\n      (∀ A ∈ dittertSet n, phi A = phi (uniformMatrix n) → A = uniformMatrix n) := by\n  sorry",
+    "dittert_conjecture.variants.weaker": "/--\n**Dittert conjecture**, weaker form without the uniqueness clause. Let $n \\ge 1$ and let $K_n$\nbe the set of $n \\times n$ real matrices $A = [a_{ij}]$ with nonnegative entries and\n$\\sum_{i=1}^n \\sum_{j=1}^n a_{ij} = n$. Then\n$$\\phi(A) = \\prod_{i=1}^n \\left(\\sum_{j=1}^n a_{ij}\\right)\n  + \\prod_{j=1}^n \\left(\\sum_{i=1}^n a_{ij}\\right) - \\operatorname{per}(A)\n  \\le \\phi\\left(\\tfrac{1}{n} J_n\\right) = 2 - \\frac{n!}{n^n}$$\nfor every $A \\in K_n$, i.e. $\\frac{1}{n} J_n$ attains the maximum of $\\phi$ on $K_n$\n(but is not required to be the unique maximizer).\n\nThe degenerate case $n = 0$ is excluded, since the source implicitly assumes $n \\ge 1$.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 0 < n) :\n    ∀ A ∈ dittertSet n, phi A ≤ phi (uniformMatrix n) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Dittert conjecture\n\nThe Dittert conjecture concerns a function of nonnegative square matrices whose entries sum to\nthe order of the matrix. It asserts that this function is uniquely maximized by the matrix all of\nwhose entries are the reciprocal of its order.\n\n*References:*\n- [Wikipedia, Dittert conjecture](https://en.wikipedia.org/wiki/Dittert_conjecture)\n-/\n\nnamespace DittertConjecture\n\n/--\nFor every positive integer $n$ and every nonnegative real $n \\times n$ matrix $A$ whose entries\nsum to $n$, let\n$$\n\\phi(A) = \\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A).\n$$\nThen $\\phi(A) \\leq 2 - n! / n^n$, with equality if and only if every entry of $A$ is $1/n$.\nThus $\\phi$ is uniquely maximized at $(1/n)J_n$.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture (n : ℕ) (hn : 1 ≤ n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA_nonneg : ∀ i j, 0 ≤ A i j) (hA_sum : (∑ i, ∑ j, A i j) = n) :\n    let φ : Matrix (Fin n) (Fin n) ℝ → ℝ := fun B =>\n      (∏ i, ∑ j, B i j) + (∏ j, ∑ i, B i j) - B.permanent\n    φ A ≤ 2 - (Nat.factorial n : ℝ) / (n : ℝ) ^ n ∧\n      (φ A = 2 - (Nat.factorial n : ℝ) / (n : ℝ) ^ n ↔\n        A = fun _ _ => 1 / (n : ℝ)) := by\n  sorry\n\n/--\nFor every positive integer $n$ and every nonnegative real $n \\times n$ matrix $A$ whose entries\nsum to $n$, the quantity\n$$\n\\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A)\n$$\nis at most $2 - n! / n^n$. In particular, $(1/n)J_n$ attains the maximum, without asserting that\nit is the unique maximizer.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 1 ≤ n)\n    (A : Matrix (Fin n) (Fin n) ℝ) (hA_nonneg : ∀ i j, 0 ≤ A i j)\n    (hA_sum : (∑ i, ∑ j, A i j) = n) :\n    let φ : Matrix (Fin n) (Fin n) ℝ → ℝ := fun B =>\n      (∏ i, ∑ j, B i j) + (∏ j, ∑ i, B i j) - B.permanent\n    φ A ≤ 2 - (Nat.factorial n : ℝ) / (n : ℝ) ^ n := by\n  sorry\n\nend DittertConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list-page entry was expanded using the dedicated Wikipedia article: the domain is real n-by-n matrices with entrywise nonnegative entries and total entry sum n, and the objective is the sum of the products of row sums and column sums minus the permanent.",
+    "Matrix order is represented by `n : ℕ` with indices `Fin n`, and `1 ≤ n` excludes the article's implicitly disallowed zero-order case.",
+    "The full uniqueness clause is represented by the sharp inequality together with `φ A = 2 - n! / n^n ↔ A = fun _ _ => 1 / (n : ℝ)`. Matrix function equality precisely says every entry is `1/n`.",
+    "The weaker variant states only the sharp upper bound, separating the article's parenthetical uniqueness clause as requested.",
+    "The objective is introduced with a theorem-local `let` to avoid adding a bespoke declaration. Mathlib's `Matrix.permanent` is used directly; its permutation orientation is equivalent to the article's definition after inversion of permutations."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "dittert_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    },
+    "dittert_conjecture.variants.weaker": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "dittert_conjecture": "/--\nFor every positive integer $n$ and every nonnegative real $n \\times n$ matrix $A$ whose entries\nsum to $n$, let\n$$\n\\phi(A) = \\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A).\n$$\nThen $\\phi(A) \\leq 2 - n! / n^n$, with equality if and only if every entry of $A$ is $1/n$.\nThus $\\phi$ is uniquely maximized at $(1/n)J_n$.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture (n : ℕ) (hn : 1 ≤ n) (A : Matrix (Fin n) (Fin n) ℝ)\n    (hA_nonneg : ∀ i j, 0 ≤ A i j) (hA_sum : (∑ i, ∑ j, A i j) = n) :\n    let φ : Matrix (Fin n) (Fin n) ℝ → ℝ := fun B =>\n      (∏ i, ∑ j, B i j) + (∏ j, ∑ i, B i j) - B.permanent\n    φ A ≤ 2 - (Nat.factorial n : ℝ) / (n : ℝ) ^ n ∧\n      (φ A = 2 - (Nat.factorial n : ℝ) / (n : ℝ) ^ n ↔\n        A = fun _ _ => 1 / (n : ℝ)) := by\n  sorry",
+    "dittert_conjecture.variants.weaker": "/--\nFor every positive integer $n$ and every nonnegative real $n \\times n$ matrix $A$ whose entries\nsum to $n$, the quantity\n$$\n\\prod_i \\left(\\sum_j A_{ij}\\right)\n  + \\prod_j \\left(\\sum_i A_{ij}\\right) - \\operatorname{per}(A)\n$$\nis at most $2 - n! / n^n$. In particular, $(1/n)J_n$ attains the maximum, without asserting that\nit is the unique maximizer.\n-/\n@[category research open, AMS 5 15]\ntheorem dittert_conjecture.variants.weaker (n : ℕ) (hn : 1 ≤ n)\n    (A : Matrix (Fin n) (Fin n) ℝ) (hA_nonneg : ∀ i j, 0 ≤ A i j)\n    (hA_sum : (∑ i, ∑ j, A i j) = n) :\n    let φ : Matrix (Fin n) (Fin n) ℝ → ℝ := fun B =>\n      (∏ i, ∑ j, B i j) + (∏ j, ∑ i, B i j) - B.permanent\n    φ A ≤ 2 - (Nat.factorial n : ℝ) / (n : ℝ) ^ n := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "dittert_conjecture": "c01",
+  "dittert_conjecture.variants.weaker": "c01"
+ },
+ "id": "wp-dittert-conjecture",
+ "main_attempt": "c01"
+}

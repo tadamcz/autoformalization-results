@@ -1,0 +1,262 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Kusner conjecture\n\nA set $S$ of points of a metric space is *equilateral* (its points are *equidistant*) if there is\nsome $\\lambda > 0$ such that any two distinct points of $S$ are at distance exactly $\\lambda$.\nThe *equilateral dimension* of a metric space is the maximum size of an equilateral set in it.\n\nLet $\\ell_1^d$ denote $\\mathbb{R}^d$ with the $L^1$ (Manhattan) norm\n$\\|x\\|_1 = |x_1| + \\cdots + |x_d|$. The $2d$ vertices $\\pm e_i$ of the axis-aligned cross-polytope\nare pairwise at $L^1$-distance $2$, so the equilateral dimension of $\\ell_1^d$ is at least $2d$.\nKusner's conjecture (1983) states that this is sharp: at most $2d$ points of $\\ell_1^d$ can be\nequidistant, i.e. the equilateral dimension of $\\ell_1^d$ is exactly $2d$. The conjecture is known\nfor $d \\le 4$, and the equilateral dimension of $\\ell_1^d$ is $O(d \\log d)$ in general.\n\n*References:*\n- [Wikipedia, Kusner conjecture](https://en.wikipedia.org/wiki/Kusner_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Guy83] Guy, R. K., *An olla-podrida of open problems, often oddly posed*,\n  Amer. Math. Monthly 90 (1983), 196–200.\n- [KLS00] Koolen, J., Laurent, M. and Schrijver, A., *Equilateral dimension of the rectilinear\n  space*, Des. Codes Cryptogr. 21 (2000), 149–164.\n- [AP03] Alon, N. and Pudlák, P., *Equilateral sets in $l_p^n$*, Geom. Funct. Anal. 13 (2003),\n  467–482.\n- [Sw04] Swanepoel, K. J., *A problem of Kusner on equilateral sets*, Arch. Math. 83 (2004),\n  164–170. [arXiv:math/0309317](https://arxiv.org/abs/math/0309317)\n-/\n\nopen WithLp\n\nnamespace KusnerConjecture\n\n/-- The space $\\ell_1^d$: $\\mathbb{R}^d$ equipped with the $L^1$ (Manhattan) norm\n$\\|x\\|_1 = \\sum_{i} |x_i|$. -/\nlocal notation \"ℓ¹[\" d \"]\" => PiLp 1 (fun _ : Fin d => ℝ)\n\n/-- A set `S` in a (pseudo)metric space is *equilateral*, i.e. its points are *equidistant*, if\nthere is a positive real `r` such that any two distinct points of `S` are at distance exactly\n`r`. -/\ndef IsEquilateral {X : Type*} [PseudoMetricSpace X] (S : Set X) : Prop :=\n  ∃ r : ℝ, 0 < r ∧ ∀ x ∈ S, ∀ y ∈ S, x ≠ y → dist x y = r\n\n@[category test, AMS 51]\ntheorem isEquilateral_empty {X : Type*} [PseudoMetricSpace X] : IsEquilateral (∅ : Set X) :=\n  ⟨1, one_pos, by simp⟩\n\n@[category test, AMS 51]\ntheorem isEquilateral_singleton {X : Type*} [PseudoMetricSpace X] (x : X) :\n    IsEquilateral {x} :=\n  ⟨1, one_pos, by simp⟩\n\n@[category test, AMS 51]\ntheorem isEquilateral_pair {X : Type*} [MetricSpace X] {x y : X} (h : x ≠ y) :\n    IsEquilateral {x, y} :=\n  ⟨dist x y, dist_pos.2 h, by aesop (add norm dist_comm)⟩\n\n/-- In $\\ell_1^1 = \\mathbb{R}$, the three points $0, 1, 3$ are not equidistant. -/\n@[category test, AMS 51]\ntheorem not_isEquilateral_example :\n    ¬ IsEquilateral ({toLp 1 ![0], toLp 1 ![1], toLp 1 ![3]} : Set ℓ¹[1]) := by\n  rintro ⟨r, -, hr⟩\n  have h₁ := hr (toLp 1 ![0]) (by simp) (toLp 1 ![1]) (by simp) (by simp)\n  have h₂ := hr (toLp 1 ![0]) (by simp) (toLp 1 ![3]) (by simp) (by simp)\n  simp [PiLp.dist_eq_of_L1] at h₁ h₂\n  linarith\n\n/-- The $L^1$-distance between $a e_i$ and $b e_j$ is $|a| + |b|$ when $i \\ne j$. -/\n@[category API, AMS 51]\ntheorem dist_single_single_of_ne {d : ℕ} {i j : Fin d} (hij : i ≠ j) (a b : ℝ) :\n    dist (toLp 1 (Pi.single i a) : ℓ¹[d]) (toLp 1 (Pi.single j b)) = |a| + |b| := by\n  rw [PiLp.dist_eq_of_L1]\n  have h : ∀ k, dist ((Pi.single i a : Fin d → ℝ) k) ((Pi.single j b : Fin d → ℝ) k) =\n      (Pi.single i |a| : Fin d → ℝ) k + (Pi.single j |b| : Fin d → ℝ) k := by\n    intro k\n    rcases eq_or_ne k i with rfl | hki\n    · simp [hij.symm]\n    · rcases eq_or_ne k j with rfl | hkj\n      · simp [hki]\n      · simp [hki, hkj]\n  simp [h, Finset.sum_add_distrib]\n\n/-- The vertices $\\pm e_i$ of the axis-aligned cross-polytope in $\\ell_1^d$. -/\ndef crossPolytopeVertices (d : ℕ) : Set ℓ¹[d] :=\n  Set.range (fun i : Fin d => toLp 1 (Pi.single i 1)) ∪\n    Set.range (fun i : Fin d => toLp 1 (Pi.single i (-1)))\n\n/-- The vertices of the cross-polytope are pairwise at $L^1$-distance $2$, so they form an\nequilateral set in $\\ell_1^d$. -/\n@[category test, AMS 51 52]\ntheorem isEquilateral_crossPolytopeVertices (d : ℕ) :\n    IsEquilateral (crossPolytopeVertices d) := by\n  refine ⟨2, two_pos, ?_⟩\n  rintro x (⟨i, rfl⟩ | ⟨i, rfl⟩) y (⟨j, rfl⟩ | ⟨j, rfl⟩) hxy <;>\n    rcases eq_or_ne i j with rfl | hij <;>\n    simp_all [dist_single_single_of_ne, Real.dist_eq] <;> norm_num\n\n/-- The cross-polytope in $\\ell_1^d$ has exactly $2d$ vertices. -/\n@[category API, AMS 51 52]\ntheorem encard_crossPolytopeVertices (d : ℕ) : (crossPolytopeVertices d).encard = 2 * d := by\n  have hinj : ∀ a : ℝ, a ≠ 0 →\n      Function.Injective (fun i : Fin d => (toLp 1 (Pi.single i a) : ℓ¹[d])) := by\n    intro a ha i j hij\n    have := congrFun (congrArg ofLp hij) i\n    by_contra h\n    simp [h, ha] at this\n  have hdisj : Disjoint (Set.range (fun i : Fin d => (toLp 1 (Pi.single i 1) : ℓ¹[d])))\n      (Set.range (fun i : Fin d => toLp 1 (Pi.single i (-1)))) := by\n    rw [Set.disjoint_left]\n    rintro x ⟨i, rfl⟩ ⟨j, hj⟩\n    have := congrFun (congrArg ofLp hj) i\n    rcases eq_or_ne i j with rfl | hij\n    · norm_num at this\n    · simp [hij.symm] at this\n  rw [crossPolytopeVertices, Set.encard_union_eq hdisj, ← Set.image_univ,\n    (hinj 1 one_ne_zero).encard_image, ← Set.image_univ, (hinj (-1) (by norm_num)).encard_image]\n  simp [two_mul]\n\n/-- The equilateral dimension of $\\ell_1^d$ is at least $2d$: the $2d$ vertices $\\pm e_i$ of the\ncross-polytope are equidistant. This is the easy half of the equality conjectured by Kusner. -/\n@[category textbook, AMS 46 51 52]\ntheorem exists_isEquilateral_encard_eq (d : ℕ) :\n    ∃ S : Set ℓ¹[d], IsEquilateral S ∧ S.encard = 2 * d :=\n  ⟨crossPolytopeVertices d, isEquilateral_crossPolytopeVertices d, encard_crossPolytopeVertices d⟩\n\n/-- **Kusner's conjecture.** For every $d \\ge 1$, at most $2d$ points can be equidistant in\n$\\ell_1^d$: any set $S \\subseteq \\mathbb{R}^d$ whose distinct points are all at the same\n(positive) $L^1$-distance from each other satisfies $|S| \\le 2d$. Together with\n`exists_isEquilateral_encard_eq`, this says that the equilateral dimension of $\\ell_1^d$ is\nexactly $2d$.\n\nThe restriction $d \\ge 1$ excludes the degenerate case $d = 0$, where $\\ell_1^0$ is a single\npoint and so has a (vacuously) equidistant set of $1 > 2 \\cdot 0$ points. -/\n@[category research open, AMS 46 51 52]\ntheorem kusner_conjecture (d : ℕ) (hd : 0 < d) (S : Set ℓ¹[d]) (hS : IsEquilateral S) :\n    S.encard ≤ 2 * d := by\n  sorry\n\nend KusnerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "None. The single slot (upper bound 2d for equilateral sets in ℓ¹_d, d ≥ 1) is the correct reading of the list entry; the d ≥ 1 restriction in the notes is indeed required for the statement to be true.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The terse list entry 'at most 2d points can be equidistant in L¹ spaces' is read, following the Wikipedia 'Equilateral dimension' article and Swanepoel's definition, as: for every d ≥ 1, every equilateral set in ℓ¹_d = (ℝ^d, ‖·‖₁) has at most 2d points (i.e. the equilateral dimension of ℓ¹_d is ≤ 2d).",
+    "ℓ¹_d is modelled as Mathlib's `PiLp 1 (fun _ : Fin d => ℝ)` (via a local notation ℓ¹[d]); its metric is the Manhattan distance ∑ᵢ |xᵢ − yᵢ| (`PiLp.dist_eq_of_L1`). The test `isEquilateral_crossPolytopeVertices` (±eᵢ pairwise at distance 2) only holds for the ℓ¹ metric, so it validates the choice of space.",
+    "Equilateral set: `IsEquilateral S := ∃ r : ℝ, 0 < r ∧ ∀ x ∈ S, ∀ y ∈ S, x ≠ y → dist x y = r`, matching the literature's 'λ-equilateral for some λ > 0'. In a metric space the positivity of r is automatic when S has ≥ 2 points and irrelevant otherwise, so it does not change the claim.",
+    "Cardinality is expressed with `Set.encard ≤ 2 * d` on arbitrary sets (not Finset), so infinite equidistant sets are also excluded (encard = ⊤); this is equivalent to the Finset version since any infinite equilateral set would contain a (2d+1)-point equilateral subset.",
+    "Hypothesis `0 < d` is included (the decomposition notes say d ≥ 1). It is genuinely needed: for d = 0 the space is a single point, the singleton is vacuously equilateral, and 1 > 2·0, so the unrestricted statement is false. This is explained in the theorem docstring.",
+    "Only the upper bound (the conjectural half) is the research-open slot. The easy lower bound (the 2d vertices ±eᵢ form an equilateral set of encard exactly 2d) is proved as a `category textbook` companion `exists_isEquilateral_encard_eq`, with supporting `API`/`test` lemmas; this is not an extra slot but documents that the conjectured bound would be sharp.",
+    "The related Kusner suggestion for p > 2 (equilateral dimension d+1) is deliberately not formalized, as instructed by the decomposition table.",
+    "AMS tags 46 51 52 (functional analysis / geometry / convex and discrete geometry); the given tags were 'geometry, discrete geometry'."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Affine.Simplex.Equilateral (Mathlib/Analysis/Normed/Affine/Simplex.lean) — only for affinely independent simplices, so it cannot express e.g. the 2d cross-polytope vertices (affinely dependent) in ℝ^d; also EuclideanGeometry.Cospherical (equidistant from a centre, a different notion).",
+     "name": "KusnerConjecture.IsEquilateral",
+     "why_needed": "Mathlib has no notion of an equilateral (equidistant) subset of a metric space; the conjecture is about arbitrary such subsets of ℓ¹_d."
+    },
+    {
+     "closest_existing_considered": "No Mathlib definition of the cross-polytope vertex set; built from Set.range and Pi.single.",
+     "name": "KusnerConjecture.crossPolytopeVertices",
+     "why_needed": "Auxiliary set {±eᵢ} used only in the test/textbook lemmas showing that the bound 2d is attained; not used in the conjecture statement itself."
+    }
+   ],
+   "per_slot": {
+    "kusner_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every d with 0 < d and every set S in PiLp 1 (fun _ : Fin d => ℝ) (Mathlib's ℓ¹ norm on ℝ^d, whose dist is ∑ᵢ |xᵢ - yᵢ| by PiLp.dist_eq_of_L1), if S is equilateral (∃ r > 0, all distinct points of S at distance r) then S.encard ≤ 2 * d. Needed a small bespoke predicate IsEquilateral, since Mathlib has no notion of equilateral/equidistant sets in a metric space."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kusner_conjecture": "/-- **Kusner's conjecture.** For every $d \\ge 1$, at most $2d$ points can be equidistant in\n$\\ell_1^d$: any set $S \\subseteq \\mathbb{R}^d$ whose distinct points are all at the same\n(positive) $L^1$-distance from each other satisfies $|S| \\le 2d$. Together with\n`exists_isEquilateral_encard_eq`, this says that the equilateral dimension of $\\ell_1^d$ is\nexactly $2d$.\n\nThe restriction $d \\ge 1$ excludes the degenerate case $d = 0$, where $\\ell_1^0$ is a single\npoint and so has a (vacuously) equidistant set of $1 > 2 \\cdot 0$ points. -/\n@[category research open, AMS 46 51 52]\ntheorem kusner_conjecture (d : ℕ) (hd : 0 < d) (S : Set ℓ¹[d]) (hS : IsEquilateral S) :\n    S.encard ≤ 2 * d := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Kusner conjecture\n\nA set of points in a metric space is *equilateral* (or *equidistant*) if any two distinct\npoints of the set are at the same distance from each other. Let $\\ell^1_d$ denote $\\mathbb{R}^d$\nwith the Manhattan ($L^1$) norm $\\|x\\|_1 = |x_1| + \\cdots + |x_d|$. The $2d$ vertices\n$\\pm e_1, \\dots, \\pm e_d$ of the cross-polytope form an equilateral set in $\\ell^1_d$.\n\nKusner's conjecture (R. B. Kusner, 1983) states that no larger equilateral set exists:\nat most $2d$ points can be equidistant in $\\ell^1_d$. Equivalently, the equilateral dimension of\n$\\ell^1_d$ is exactly $2d$. This is known for $d \\le 4$, and the equilateral dimension of\n$\\ell^1_d$ is known to be $O(d \\log d)$ in general.\n\n*References:*\n* [Wikipedia, Kusner conjecture](https://en.wikipedia.org/wiki/Kusner_conjecture)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* R. K. Guy, *An olla-podrida of open problems, often oddly posed*,\n  Amer. Math. Monthly **90** (1983), 196–200.\n* J. Koolen, M. Laurent, A. Schrijver, *Equilateral dimension of the rectilinear space*,\n  Des. Codes Cryptogr. **21** (2000), 149–164.\n-/\n\nnamespace KusnerConjecture\n\n/--\n**Kusner's conjecture.** For every $d \\ge 1$, at most $2d$ points can be equidistant in\n$\\ell^1_d$: if $S \\subseteq \\mathbb{R}^d$ is a set such that any two distinct points of $S$ are\nat the same $L^1$-distance $r$ from each other, then $|S| \\le 2d$.\n\nThe restriction $d \\ge 1$ excludes the degenerate space $\\mathbb{R}^0$, which is a single point.\n-/\n@[category research open, AMS 46 52]\ntheorem kusner_conjecture (d : ℕ) (hd : 0 < d) (S : Set (PiLp 1 fun _ : Fin d => ℝ)) (r : ℝ)\n    (hS : S.Pairwise fun x y => dist x y = r) : S.encard ≤ 2 * d := by\n  sorry\n\n/--\nThe bound $2d$ in Kusner's conjecture is attained: the $2d$ vertices $\\pm e_1, \\dots, \\pm e_d$\nof the cross-polytope are pairwise at $L^1$-distance $2$ from each other.\n-/\n@[category textbook, AMS 46 52]\ntheorem exists_equilateral_set_encard_eq (d : ℕ) :\n    ∃ S : Set (PiLp 1 fun _ : Fin d => ℝ),\n      S.encard = 2 * d ∧ S.Pairwise fun x y => dist x y = 2 := by\n  let f : Fin d × Bool → PiLp 1 fun _ : Fin d => ℝ :=\n    fun p => WithLp.toLp 1 (Pi.single p.1 (if p.2 then (1 : ℝ) else -1))\n  have hf : Function.Injective f := by\n    rintro ⟨i, b⟩ ⟨j, c⟩ h\n    have h' := congrArg (fun x : PiLp 1 fun _ : Fin d => ℝ => (x i, x j)) h\n    simp only [f, Pi.single_apply] at h'\n    by_cases hij : i = j\n    · subst hij\n      cases b <;> cases c <;> first | rfl | norm_num at h'\n    · simp only [hij, Ne.symm hij] at h'\n      cases b <;> norm_num at h'\n  refine ⟨Set.range f, ?_, ?_⟩\n  · rw [← Set.image_univ, hf.encard_image, Set.encard_univ, ENat.card_eq_coe_fintype_card]\n    simp [mul_comm]\n  · rintro _ ⟨⟨i, b⟩, rfl⟩ _ ⟨⟨j, c⟩, rfl⟩ hne\n    rw [PiLp.dist_eq_sum (by simp)]\n    simp only [f, ENNReal.toReal_one, Real.rpow_one, div_one, Real.dist_eq]\n    by_cases hij : i = j\n    · subst hij\n      have hbc : b ≠ c := fun h => hne (by rw [h])\n      rw [Finset.sum_eq_single i (fun k _ hk => by simp [hk]) (by simp)]\n      cases b <;> cases c <;> first | exact absurd rfl hbc | norm_num\n    · rw [← Finset.sum_erase_add _ _ (Finset.mem_univ i),\n        ← Finset.sum_erase_add _ _ (Finset.mem_erase.mpr ⟨Ne.symm hij, Finset.mem_univ j⟩)]\n      rw [Finset.sum_eq_zero (fun k hk => by\n        simp only [Finset.mem_erase] at hk\n        simp [hk.1, hk.2.1])]\n      rw [Pi.single_eq_of_ne (Ne.symm hij), Pi.single_eq_of_ne hij]\n      cases b <;> cases c <;> norm_num\n\nend KusnerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single slot matches the list-page statement, and the notes' reading (d ≥ 1, common positive ℓ¹-distance, |S| ≤ 2d, p > 2 case excluded) agrees with the article and with Guy (1983)/Koolen–Laurent–Schrijver (2000).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Ambient space: ℓ¹_d is modelled as `PiLp 1 (fun _ : Fin d => ℝ)`; its `dist` is provably `∑ i, |x i - y i|` (verified in a scratch example via `PiLp.dist_eq_sum`), so the L¹/Manhattan distance is used with no bespoke norm definition.",
+    "Equidistance: `S.Pairwise (fun x y => dist x y = r)` with `r : ℝ` universally quantified. This is equivalent to 'S is λ-equilateral for some λ > 0' from the literature: positivity of r is automatic when S has ≥ 2 points (distinct points have positive distance), and when |S| ≤ 1 the bound |S| ≤ 2d is trivial for d ≥ 1. No `0 < r` hypothesis was added to avoid redundancy.",
+    "Cardinality: `Set.encard` (ℕ∞-valued) rather than `Set.ncard` or a `Finset`, so an infinite equilateral set would have encard ⊤ and violate the bound rather than be silently mapped to 0. (Mathematically no infinite equilateral set exists in finite dimension, so this is only a matter of honesty of the encoding.)",
+    "Dimension restriction `(hd : 0 < d)`: the table's notes say d ≥ 1. For d = 0 the space ℝ^0 is a single point, so the singleton set has 1 > 2·0 points and the unrestricted statement would be false; I verified this refutation in Lean.",
+    "Bound is non-strict `≤ 2 * d`, matching 'at most 2d'. The expression `2 * d` elaborates in ℕ∞ as `2 * (d : ℕ∞)`, which equals `((2 * d : ℕ) : ℕ∞)` (checked by `push_cast`).",
+    "Scope: only the ℓ¹ (p = 1) statement is formalized. The p > 2 'equilateral dimension d + 1' suggestion mentioned in the article is not part of the list-page statement and is excluded, as the decomposition table instructs.",
+    "An additional `@[category textbook]` theorem `exists_equilateral_set_encard_eq` (fully proved, ~29 lines, no sorry) records that the 2d cross-polytope vertices ±e_i form an equilateral set in ℓ¹_d, i.e. the conjectured bound is attained. It is not a slot; it is included because the article states it and it exercises/tests the PiLp 1 modelling. A reviewer may drop it if they prefer a single-declaration file.",
+    "AMS tags `46 52` (functional analysis / normed spaces, and convex & discrete geometry). Category `research open` per the status.",
+    "Copyright year 2026, matching the majority of files in the checkout and the latest commit dates."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "kusner_conjecture": {
+     "outcome": "formalized",
+     "why": "Stated as: for every d with 0 < d, every set S of points of PiLp 1 (fun _ : Fin d => ℝ) (Mathlib's ℓ¹ on ℝ^d) whose distinct points are pairwise at a common distance r satisfies S.encard ≤ 2 * d. Only existing Mathlib primitives are used (PiLp, Set.Pairwise, dist, Set.encard). Checked in a scratch file that dist on this type is ∑ i, |x i - y i| and that the d = 0 instance is refutable (so the 0 < d hypothesis matches the table's 'd ≥ 1')."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kusner_conjecture": "/--\n**Kusner's conjecture.** For every $d \\ge 1$, at most $2d$ points can be equidistant in\n$\\ell^1_d$: if $S \\subseteq \\mathbb{R}^d$ is a set such that any two distinct points of $S$ are\nat the same $L^1$-distance $r$ from each other, then $|S| \\le 2d$.\n\nThe restriction $d \\ge 1$ excludes the degenerate space $\\mathbb{R}^0$, which is a single point.\n-/\n@[category research open, AMS 46 52]\ntheorem kusner_conjecture (d : ℕ) (hd : 0 < d) (S : Set (PiLp 1 fun _ : Fin d => ℝ)) (r : ℝ)\n    (hS : S.Pairwise fun x y => dist x y = r) : S.encard ≤ 2 * d := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Kusner conjecture\n\n*Reference:* [Wikipedia, Kusner conjecture](https://en.wikipedia.org/wiki/Kusner_conjecture)\n-/\n\nnamespace KusnerConjecture\n\n/--\nThe Kusner conjecture: for every $d \\geq 1$, a set of points in $\\mathbb{R}^d$ whose\npairwise $\\ell^1$-distances are all equal to the same positive number has at most $2d$ points.\n-/\n@[category research open, AMS 52]\ntheorem kusner_conjecture :\n    ∀ d : ℕ, 1 ≤ d → ∀ S : Set (Fin d → ℝ),\n      (∃ r : ℝ, 0 < r ∧\n        ∀ x ∈ S, ∀ y ∈ S, x ≠ y → (∑ i : Fin d, |x i - y i|) = r) →\n      S.Finite ∧ S.ncard ≤ 2 * d := by\n  sorry\n\nend KusnerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list-page phrase “L^1 spaces” using the cited background article as finite-dimensional real coordinate spaces ℝ^d with Manhattan (ℓ¹) distance, for every d ≥ 1.",
+    "Represented ℝ^d as `Fin d → ℝ` and wrote the ℓ¹ distance explicitly as `∑ i : Fin d, |x i - y i|`, avoiding the default norm on function spaces, which would not express the intended Manhattan norm.",
+    "Expressed equidistance by the existence of one positive real `r` equal to the ℓ¹ distance of every pair of distinct points in the set.",
+    "Quantified over arbitrary sets and concluded both `S.Finite` and `S.ncard ≤ 2 * d`; the finiteness conjunct is necessary because `Set.ncard` alone defaults to zero on infinite sets and would not faithfully express “at most 2d points”.",
+    "Formalized only the stated upper bound. The cross-polytope lower-bound construction and the related p > 2 conjecture were excluded, as directed by the decomposition."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "kusner_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kusner_conjecture": "/--\nThe Kusner conjecture: for every $d \\geq 1$, a set of points in $\\mathbb{R}^d$ whose\npairwise $\\ell^1$-distances are all equal to the same positive number has at most $2d$ points.\n-/\n@[category research open, AMS 52]\ntheorem kusner_conjecture :\n    ∀ d : ℕ, 1 ≤ d → ∀ S : Set (Fin d → ℝ),\n      (∃ r : ℝ, 0 < r ∧\n        ∀ x ∈ S, ∀ y ∈ S, x ≠ y → (∑ i : Fin d, |x i - y i|) = r) →\n      S.Finite ∧ S.ncard ≤ 2 * d := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Kusner conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Kusner_conjecture)\n-/\n\nnamespace KusnerConjecture\n\n/--\nThe Kusner conjecture: for every $d \\geq 1$, a set of points in $\\mathbb{R}^d$ whose\nManhattan distances between distinct points all equal the same positive number has at most $2d$\npoints.\n-/\n@[category research open, AMS 52]\ntheorem kusner_conjecture :\n    ∀ d : ℕ, 1 ≤ d → ∀ S : Set (Fin d → ℝ),\n      (∃ r : ℝ, 0 < r ∧ S.Pairwise fun x y ↦ ∑ i : Fin d, |x i - y i| = r) →\n        S.encard ≤ 2 * d := by\n  sorry\n\nend KusnerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list-page phrase “L¹ spaces” using the linked background article and fixed decomposition as finite-dimensional ℝ^d with Manhattan distance, represented by Fin d → ℝ and the coordinate sum ∑ i, |x i - y i|.",
+    "Represented an equilateral set by the existence of one positive real r such that Set.Pairwise requires every pair of distinct members to have ℓ¹-distance r.",
+    "Used Set.encard rather than Set.ncard or a finiteness hypothesis, so the conclusion S.encard ≤ 2*d both states the cardinal bound and correctly excludes infinite equilateral sets.",
+    "Restricted to d ≥ 1 as specified. Stated only the conjectural upper bound; the known cross-polytope lower bound and the separate p > 2 suggestion were deliberately excluded."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "kusner_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kusner_conjecture": "/--\nThe Kusner conjecture: for every $d \\geq 1$, a set of points in $\\mathbb{R}^d$ whose\nManhattan distances between distinct points all equal the same positive number has at most $2d$\npoints.\n-/\n@[category research open, AMS 52]\ntheorem kusner_conjecture :\n    ∀ d : ℕ, 1 ≤ d → ∀ S : Set (Fin d → ℝ),\n      (∃ r : ℝ, 0 < r ∧ S.Pairwise fun x y ↦ ∑ i : Fin d, |x i - y i| = r) →\n        S.encard ≤ 2 * d := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Kusner conjecture\n\nLet $\\ell_1^d$ denote $\\mathbb{R}^d$ with the $\\ell^1$ (Manhattan) norm\n$\\|x\\|_1 = |x_1| + \\cdots + |x_d|$. A set $S \\subseteq \\ell_1^d$ is *equilateral*\n(or *equidistant*) if all pairs of distinct points of $S$ are at the same distance.\nThe *equilateral dimension* of $\\ell_1^d$ is the largest size of an equilateral set.\n\nThe $2d$ vertices $\\pm e_i$ of the axis-aligned cross-polytope are pairwise at\n$\\ell^1$-distance $2$, so the equilateral dimension of $\\ell_1^d$ is at least $2d$.\nKusner (1983) conjectured that it is exactly $2d$, i.e. that at most $2d$ points of\n$\\ell_1^d$ can be equidistant. This is known for $d \\le 4$, and an upper bound of\n$O(d \\log d)$ is known in general (Alon–Pudlák).\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Equilateral dimension](https://en.wikipedia.org/wiki/Kusner_conjecture)\n- [R. K. Guy, *An olla-podrida of open problems, often oddly posed*,\n  Amer. Math. Monthly **90** (1983), 196–199](https://doi.org/10.2307/2975549)\n- [H.-J. Bandelt, V. Chepoi, M. Laurent, *Embedding into rectilinear spaces*,\n  Discrete Comput. Geom. **19** (1998), 595–604](https://doi.org/10.1007/PL00009370)\n- [J. Koolen, M. Laurent, A. Schrijver, *Equilateral dimension of the rectilinear space*,\n  Des. Codes Cryptogr. **21** (2000), 149–164](https://doi.org/10.1023/A:1008391712305)\n- [N. Alon, P. Pudlák, *Equilateral sets in $l_p^n$*,\n  Geom. Funct. Anal. **13** (2003), 467–482](https://doi.org/10.1007/s00039-003-0418-7)\n-/\n\nnamespace KusnerConjecture\n\n/-- `ℓ¹[d]` is `ℝ^d` with the `ℓ¹` (Manhattan) norm, so that `dist x y = ∑ i, |x i - y i|`. -/\nlocal notation \"ℓ¹[\" d \"]\" => PiLp 1 (fun _ : Fin d => ℝ)\n\n/--\n**Kusner conjecture**\n\nAt most $2d$ points can be equidistant in $\\ell_1^d$: for every $d \\ge 1$, if $S$ is a\nfinite set of points of $\\mathbb{R}^d$ such that any two distinct points of $S$ are at the\nsame $\\ell^1$-distance $r$ from each other, then $|S| \\le 2d$.\n\nThe restriction $d \\ge 1$ excludes the degenerate case $d = 0$, where a single point is\nan equilateral set of size $1 > 2d$. No positivity assumption on $r$ is needed: if $S$\nhas two distinct points then automatically $r > 0$, and otherwise $|S| \\le 1 \\le 2d$.\n-/\n@[category research open, AMS 46 52]\ntheorem kusner_conjecture (d : ℕ) (hd : 0 < d) (S : Finset ℓ¹[d]) (r : ℝ)\n    (hS : (S : Set ℓ¹[d]).Pairwise fun x y => dist x y = r) :\n    S.card ≤ 2 * d := by\n  sorry\n\n/--\nThe Kusner conjecture holds for $d \\le 4$: the case $d = 3$ is due to\nBandelt, Chepoi and Laurent (1998) and the case $d = 4$ to Koolen, Laurent and\nSchrijver (2000).\n-/\n@[category research solved, AMS 46 52]\ntheorem kusner_conjecture.variants.le_four (d : ℕ) (hd : 0 < d) (hd' : d ≤ 4)\n    (S : Finset ℓ¹[d]) (r : ℝ)\n    (hS : (S : Set ℓ¹[d]).Pairwise fun x y => dist x y = r) :\n    S.card ≤ 2 * d := by\n  sorry\n\n/-- Two distinct signed standard basis vectors `± e_i` of `ℓ¹[d]` are at distance `2`. -/\n@[category API, AMS 46 52]\nprivate lemma dist_toLp_single {d : ℕ} (i j : Fin d) (a b : ℝ) (ha : |a| = 1) (hb : |b| = 1)\n    (h : (i, a) ≠ (j, b)) :\n    dist (WithLp.toLp 1 (Pi.single i a) : ℓ¹[d]) (WithLp.toLp 1 (Pi.single j b)) = 2 := by\n  rw [PiLp.dist_eq_of_L1]\n  simp only [Real.dist_eq]\n  by_cases hij : i = j\n  · subst hij\n    have hab : a ≠ b := fun hab => h (by rw [hab])\n    rw [Finset.sum_eq_single_of_mem i (Finset.mem_univ _)]\n    · simp only [Pi.single_eq_same]\n      rcases (abs_eq zero_le_one).1 ha with rfl | rfl <;>\n        rcases (abs_eq zero_le_one).1 hb with rfl | rfl <;>\n        first | exact absurd rfl hab | norm_num\n    · intro k _ hk\n      simp [Pi.single_eq_of_ne hk]\n  · rw [Finset.sum_eq_add_of_mem i j (Finset.mem_univ _) (Finset.mem_univ _) hij]\n    · simp [Pi.single_eq_of_ne hij, Pi.single_eq_of_ne (Ne.symm hij), ha, hb]\n      norm_num\n    · intro k _ hk\n      simp [Pi.single_eq_of_ne hk.1, Pi.single_eq_of_ne hk.2]\n\n/--\nThe bound $2d$ in the Kusner conjecture is attained: the $2d$ vertices $\\pm e_i$ of the\naxis-aligned cross-polytope form an equilateral set in $\\ell_1^d$, all pairs of distinct\npoints being at $\\ell^1$-distance $2$.\n-/\n@[category textbook, AMS 46 52]\ntheorem kusner_conjecture.variants.cross_polytope (d : ℕ) :\n    ∃ S : Finset ℓ¹[d], S.card = 2 * d ∧\n      (S : Set ℓ¹[d]).Pairwise fun x y => dist x y = 2 := by\n  set f : Fin d ⊕ Fin d → ℓ¹[d] :=\n    Sum.elim (fun i => WithLp.toLp 1 (Pi.single i 1)) (fun i => WithLp.toLp 1 (Pi.single i (-1)))\n    with hf\n  have key : ∀ u v, u ≠ v → dist (f u) (f v) = 2 := by\n    rintro (i | i) (j | j) huv <;> simp only [hf, Sum.elim_inl, Sum.elim_inr] <;>\n      apply dist_toLp_single <;> simp_all <;> norm_num\n  have hinj : Function.Injective f := by\n    intro u v huv\n    by_contra h\n    have := key u v h\n    rw [huv, dist_self] at this\n    norm_num at this\n  refine ⟨Finset.univ.map ⟨f, hinj⟩, ?_, ?_⟩\n  · simp [two_mul]\n  · rintro x hx y hy hxy\n    simp only [Finset.coe_map, Set.mem_image, Finset.coe_univ, Set.mem_univ, true_and] at hx hy\n    obtain ⟨u, rfl⟩ := hx\n    obtain ⟨v, rfl⟩ := hy\n    exact key u v (fun h => hxy (by rw [h]))\n\nend KusnerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "None. The table's single slot and its notes (d ≥ 1, common positive distance, |S| ≤ 2d, exclusion of the p > 2 companion conjecture) match the source and the linked article.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Ambient space: 'L^1 spaces' in the list entry is read, following the linked article and Swanepoel's paper, as the finite-dimensional spaces ℓ¹_d = ℝ^d with the Manhattan norm; formalized as Mathlib's `PiLp 1 (fun _ : Fin d => ℝ)` (local notation `ℓ¹[d]`), whose `dist` is provably ∑ i, |x i - y i| (`PiLp.dist_eq_of_L1`).",
+    "Equidistant set: a `Finset S` with `(S : Set ℓ¹[d]).Pairwise fun x y => dist x y = r`, i.e. all pairs of distinct points at the same distance r. Finite sets suffice: an infinite equidistant set would contain a (2d+1)-point equidistant Finset, so the Finset form is equivalent to bounding arbitrary sets; it also avoids `Set.ncard` returning 0 on infinite sets.",
+    "No hypothesis `0 < r` is imposed: for |S| ≥ 2 positivity of r is automatic in a metric space, and for |S| ≤ 1 the bound holds trivially, so the statement is equivalent to the paper's 'λ-equilateral, λ>0' definition. Documented in the docstring.",
+    "Domain restriction `0 < d` is included because for d = 0 a single point is an equilateral set of size 1 > 2·0, making the literal statement false; the decomposition notes and the sources assume d ≥ 1. Documented in the docstring.",
+    "Bound is non-strict (`≤ 2 * d`) with d universally quantified, matching 'at most 2d'.",
+    "The 'related suggestion for p > 2' (equilateral dimension d+1) is deliberately not formalized, per the decomposition table.",
+    "Two extra variants were added beyond the slot: `kusner_conjecture.variants.le_four` (research solved; the d ≤ 4 cases due to Bandelt–Chepoi–Laurent and Koolen–Laurent–Schrijver, statement identical to the main one with `d ≤ 4`) and `kusner_conjecture.variants.cross_polytope` (textbook, fully proved): for every d the 2d points ±e_i form an equidistant set of ℓ¹-distance 2, showing the bound 2d is attained. The proof uses a `private` helper lemma `dist_toLp_single` tagged `@[category API]`, following the pattern of existing Wikipedia files (e.g. MovingSofa.lean).",
+    "AMS tags 46 (functional analysis / normed spaces) and 52 (convex and discrete geometry), matching the MSC codes (52C10, 52A21, 46B20) of the cited Swanepoel paper."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "kusner_conjecture": {
+     "outcome": "formalized",
+     "why": "Stated as: for every d with 0 < d, every Finset S of PiLp 1 (fun _ : Fin d => ℝ) (Mathlib's ℝ^d with the ℓ¹ norm; checked that dist x y = ∑ i, |x i - y i|) whose distinct points are pairwise at a common distance r satisfies S.card ≤ 2 * d. Only existing Mathlib primitives are used (PiLp, Set.Pairwise, Finset.card)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kusner_conjecture": "/--\n**Kusner conjecture**\n\nAt most $2d$ points can be equidistant in $\\ell_1^d$: for every $d \\ge 1$, if $S$ is a\nfinite set of points of $\\mathbb{R}^d$ such that any two distinct points of $S$ are at the\nsame $\\ell^1$-distance $r$ from each other, then $|S| \\le 2d$.\n\nThe restriction $d \\ge 1$ excludes the degenerate case $d = 0$, where a single point is\nan equilateral set of size $1 > 2d$. No positivity assumption on $r$ is needed: if $S$\nhas two distinct points then automatically $r > 0$, and otherwise $|S| \\le 1 \\le 2d$.\n-/\n@[category research open, AMS 46 52]\ntheorem kusner_conjecture (d : ℕ) (hd : 0 < d) (S : Finset ℓ¹[d]) (r : ℝ)\n    (hS : (S : Set ℓ¹[d]).Pairwise fun x y => dist x y = r) :\n    S.card ≤ 2 * d := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Kusner conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Kusner_conjecture)\n-/\n\nnamespace KusnerConjecture\n\n/--\nThe Kusner conjecture states that, for every $d \\geq 1$, any set of points in\n$\\mathbb{R}^d$ whose distinct points are all at the same positive $L^1$ distance is finite and\nhas at most $2d$ points.\n-/\n@[category research open, AMS 52]\ntheorem kusner_conjecture :\n    ∀ d : ℕ, 1 ≤ d → ∀ S : Set (Fin d → ℝ),\n      (∃ r : ℝ, 0 < r ∧\n        ∀ x ∈ S, ∀ y ∈ S, x ≠ y → (∑ i, |x i - y i|) = r) →\n      S.Finite ∧ S.ncard ≤ 2 * d := by\n  sorry\n\nend KusnerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse phrase “L^1 spaces” using the cited article and fixed decomposition as finite-dimensional real coordinate space ℝ^d with Manhattan distance, represented by `Fin d → ℝ` and the explicit formula `∑ i, |x i - y i|`.",
+    "Quantified over all sets, not only finsets. The conclusion includes `S.Finite` before bounding `S.ncard`, since `Set.ncard` alone does not express a finite cardinality bound for infinite sets.",
+    "Expressed equidistance by the existence of one common radius `r > 0` shared by every pair of distinct points.",
+    "Restricted to `d ≥ 1` as specified in the decomposition and formalized only the upper bound from the list-page statement, excluding the article’s lower-bound construction and its separate p > 2 suggestion."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "kusner_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kusner_conjecture": "/--\nThe Kusner conjecture states that, for every $d \\geq 1$, any set of points in\n$\\mathbb{R}^d$ whose distinct points are all at the same positive $L^1$ distance is finite and\nhas at most $2d$ points.\n-/\n@[category research open, AMS 52]\ntheorem kusner_conjecture :\n    ∀ d : ℕ, 1 ≤ d → ∀ S : Set (Fin d → ℝ),\n      (∃ r : ℝ, 0 < r ∧\n        ∀ x ∈ S, ∀ y ∈ S, x ≠ y → (∑ i, |x i - y i|) = r) →\n      S.Finite ∧ S.ncard ≤ 2 * d := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Kusner conjecture\n\nA set of points in a metric space is *equilateral* (or *equidistant*) if all pairs of distinct\npoints in it are at the same distance from each other. The *equilateral dimension* of the space is\nthe largest size of such a set.\n\nRobert B. Kusner conjectured (1983) that at most $2d$ points of $\\mathbb{R}^d$ can be equidistant\nin the $\\ell^1$ (Manhattan) metric $\\|x - y\\|_1 = \\sum_i |x_i - y_i|$. The $2d$ vertices\n$\\pm e_i$ of the cross-polytope are pairwise at $\\ell^1$-distance $2$, so the conjecture says that\nthe equilateral dimension of $\\ell^1_d$ is exactly $2d$. It is known for $d \\le 4$, and the best\ngeneral upper bound is $O(d \\log d)$ (Alon–Pudlák).\n\n*References:*\n- [Wikipedia, Kusner conjecture](https://en.wikipedia.org/wiki/Kusner_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [R. K. Guy, *An olla-podrida of open problems, often oddly posed*, Amer. Math. Monthly 90 (1983)](https://doi.org/10.2307/2975549)\n- [N. Alon, P. Pudlák, *Equilateral sets in $l_p^n$*, Geom. Funct. Anal. 13 (2003)](https://doi.org/10.1007/s00039-003-0418-7)\n- [J. Koolen, M. Laurent, A. Schrijver, *Equilateral dimension of the rectilinear space*, Des. Codes Cryptogr. 21 (2000)](https://doi.org/10.1023/A:1008391712305)\n-/\n\nnamespace KusnerConjecture\n\n/-- **Kusner's conjecture.** For every $d \\geq 1$, at most $2d$ points of $\\mathbb{R}^d$ can be\npairwise equidistant in the $\\ell^1$ (Manhattan) metric: if $S \\subseteq \\mathbb{R}^d$ and there is\nsome $\\lambda > 0$ with $\\|x - y\\|_1 = \\lambda$ for all distinct $x, y \\in S$, then $|S| \\leq 2d$.\n\nHere `PiLp 1 (fun _ : Fin d => ℝ)` is $\\mathbb{R}^d$ with the $\\ell^1$ distance\n$\\operatorname{dist} x\\, y = \\sum_i |x_i - y_i|$. The hypothesis $d \\geq 1$ excludes\n$\\mathbb{R}^0$, a single point, which is a one-element equilateral set. -/\n@[category research open, AMS 46 52]\ntheorem kusner_conjecture (d : ℕ) (hd : 0 < d) (S : Set (PiLp 1 (fun _ : Fin d => ℝ)))\n    (hS : ∃ r > 0, S.Pairwise (dist · · = r)) :\n    S.encard ≤ 2 * d := by\n  sorry\n\n/-- The bound in Kusner's conjecture is attained: for every $d$, the $2d$ vertices $\\pm e_i$ of\nthe cross-polytope are pairwise at $\\ell^1$-distance $2$. -/\n@[category textbook, AMS 46 52]\ntheorem kusner_conjecture.variants.lower_bound (d : ℕ) :\n    ∃ S : Set (PiLp 1 (fun _ : Fin d => ℝ)),\n      (∃ r > 0, S.Pairwise (dist · · = r)) ∧ S.encard = 2 * d := by\n  sorry\n\n/-- Kusner's conjecture holds for $d \\le 4$: the case $d = 3$ is due to Bandelt, Chepoi and\nLaurent (1998), and the case $d = 4$ to Koolen, Laurent and Schrijver (2000). -/\n@[category research solved, AMS 46 52]\ntheorem kusner_conjecture.variants.le_four (d : ℕ) (hd : 0 < d) (hd' : d ≤ 4)\n    (S : Set (PiLp 1 (fun _ : Fin d => ℝ))) (hS : ∃ r > 0, S.Pairwise (dist · · = r)) :\n    S.encard ≤ 2 * d := by\n  sorry\n\nend KusnerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single slot matches the statement; the notes' reading (upper bound 2d for every d ≥ 1 in ℓ¹_d, p > 2 part excluded) is consistent with the article and was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "L¹ space of dimension d is modelled as `PiLp 1 (fun _ : Fin d => ℝ)` (Mathlib's ℝ^d with the ℓ^1 norm); its `dist` is the Manhattan distance ∑ |x_i - y_i| (checked via `PiLp.dist_eq_sum`). The article's 'L^1 spaces' means the finite-dimensional ℓ^1_d, as its 'Lebesgue spaces' section makes explicit.",
+    "'Equidistant' is rendered as `∃ r > 0, S.Pairwise (dist · · = r)`: all pairs of DISTINCT points are at the same positive distance (Swanepoel's definition of a λ-equilateral set, λ > 0). Positivity of r is automatic when |S| ≥ 2 and harmless when |S| ≤ 1.",
+    "The point set is an arbitrary `Set` and the size bound uses `Set.encard` (ℕ∞), so an infinite equilateral set (encard = ⊤) would violate the conclusion, as intended; `ncard` was avoided because it returns 0 on infinite sets and would make the bound vacuous there.",
+    "The hypothesis `0 < d` is included per the decomposition notes ('for every d ≥ 1'); it is necessary since in ℝ^0 the single point is a one-element equilateral set but 2·0 = 0. This is explained in the docstring.",
+    "The bound is stated as the upper bound |S| ≤ 2d, exactly matching the text span 'at most 2d points can be equidistant'; the article's p > 2 suggestion (equilateral dimension d+1) is excluded as directed.",
+    "Two extra non-slot declarations are included following repository convention for variants: `kusner_conjecture.variants.lower_bound` (textbook: 2d equilateral points exist for every d, the cross-polytope ±e_i) and `kusner_conjecture.variants.le_four` (research solved: the conjecture for d ≤ 4, per Bandelt–Chepoi–Laurent 1998 for d = 3 and Koolen–Laurent–Schrijver 2000 for d = 4, as reported in the article). Both are sorry'd; a reviewer may drop them if a single declaration is preferred.",
+    "AMS tags 46 (functional analysis / normed spaces) and 52 (convex and discrete geometry) were chosen, matching the MSC classification of the Alon–Pudlák paper."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "kusner_conjecture": {
+     "outcome": "formalized",
+     "why": "Stated as: for every d with 0 < d and every S : Set (PiLp 1 (fun _ : Fin d => ℝ)) (i.e. ℝ^d with the ℓ¹/Manhattan distance), if ∃ r > 0 with S.Pairwise (dist · · = r) (all distinct points at the same positive ℓ¹-distance), then S.encard ≤ 2 * d. Only Mathlib primitives are used (PiLp, dist, Set.Pairwise, Set.encard). Verified in a scratch file that PiLp.dist_eq_sum gives dist x y = ∑ i, |x i - y i| for p = 1, that the relation unfolds to ∀ x ∈ S, ∀ y ∈ S, x ≠ y → dist x y = r, and that the statement is false at d = 0 (a singleton in ℝ^0), so the hypothesis 0 < d is exactly the notes' 'd ≥ 1'."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kusner_conjecture": "/-- **Kusner's conjecture.** For every $d \\geq 1$, at most $2d$ points of $\\mathbb{R}^d$ can be\npairwise equidistant in the $\\ell^1$ (Manhattan) metric: if $S \\subseteq \\mathbb{R}^d$ and there is\nsome $\\lambda > 0$ with $\\|x - y\\|_1 = \\lambda$ for all distinct $x, y \\in S$, then $|S| \\leq 2d$.\n\nHere `PiLp 1 (fun _ : Fin d => ℝ)` is $\\mathbb{R}^d$ with the $\\ell^1$ distance\n$\\operatorname{dist} x\\, y = \\sum_i |x_i - y_i|$. The hypothesis $d \\geq 1$ excludes\n$\\mathbb{R}^0$, a single point, which is a one-element equilateral set. -/\n@[category research open, AMS 46 52]\ntheorem kusner_conjecture (d : ℕ) (hd : 0 < d) (S : Set (PiLp 1 (fun _ : Fin d => ℝ)))\n    (hS : ∃ r > 0, S.Pairwise (dist · · = r)) :\n    S.encard ≤ 2 * d := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The Kusner Conjecture\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Kusner_conjecture)\n-/\n\nnamespace KusnerConjecture\n\n/--\nThe Kusner conjecture: for every $d \\geq 1$, a set $S \\subseteq \\mathbb{R}^d$ whose distinct\npoints all have the same positive $\\ell^1$-distance has at most $2d$ elements.\n-/\n@[category research open, AMS 52]\ntheorem kusner_conjecture :\n    ∀ (d : ℕ), 1 ≤ d → ∀ (S : Set (Fin d → ℝ)) (r : ℝ),\n      0 < r →\n      (∀ x ∈ S, ∀ y ∈ S, x ≠ y → ∑ i, |x i - y i| = r) →\n      Cardinal.mk S ≤ 2 * d := by\n  sorry\n\nend KusnerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list entry using the background article as the finite-dimensional Manhattan space ℝ^d, for every natural dimension d ≥ 1.",
+    "Represented ℝ^d as `Fin d → ℝ` and wrote the ℓ¹ distance explicitly as `∑ i, |x i - y i|`, avoiding any ambiguity from a default product norm.",
+    "Quantified one common real distance `r > 0` outside the pairwise condition, so every pair of distinct points has that same positive distance.",
+    "Quantified over arbitrary sets and bounded `Cardinal.mk S`, rather than using `Set.ncard`, so an infinite equilateral set does not satisfy the conclusion merely because `Set.ncard` defaults to zero.",
+    "Formalized only the p = 1 upper-bound conjecture in the decomposition table; the attained lower bound and the related p > 2 suggestion are not included."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "kusner_conjecture": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kusner_conjecture": "/--\nThe Kusner conjecture: for every $d \\geq 1$, a set $S \\subseteq \\mathbb{R}^d$ whose distinct\npoints all have the same positive $\\ell^1$-distance has at most $2d$ elements.\n-/\n@[category research open, AMS 52]\ntheorem kusner_conjecture :\n    ∀ (d : ℕ), 1 ≤ d → ∀ (S : Set (Fin d → ℝ)) (r : ℝ),\n      0 < r →\n      (∀ x ∈ S, ∀ y ∈ S, x ≠ y → ∑ i, |x i - y i| = r) →\n      Cardinal.mk S ≤ 2 * d := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kusner_conjecture": "c07"
+ },
+ "id": "wp-kusner-conjecture",
+ "main_attempt": "c07"
+}

@@ -1,0 +1,561 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Birch and Swinnerton-Dyer conjecture\n\nLet $E$ be an elliptic curve over a number field $K$. The Hasse–Weil $L$-function\n$$L(E, s) = \\prod_{\\mathfrak p} L_{\\mathfrak p}(E, q_{\\mathfrak p}^{-s})^{-1}$$\nis an Euler product over the nonzero prime ideals $\\mathfrak p$ of the ring of integers of $K$,\nwhere $q_{\\mathfrak p} = N(\\mathfrak p)$ is the size of the residue field\n$\\mathbb F_{\\mathfrak p}$. The Euler factor is\n$L_{\\mathfrak p}(E, T) = 1 - a_{\\mathfrak p} T + q_{\\mathfrak p} T^2$ if $E$ has good reduction\nat $\\mathfrak p$ and $L_{\\mathfrak p}(E, T) = 1 - a_{\\mathfrak p} T$ otherwise, where\n$a_{\\mathfrak p} = q_{\\mathfrak p} + 1 - \\#\\tilde E(\\mathbb F_{\\mathfrak p})$ is computed from\nthe reduction $\\tilde E$ modulo $\\mathfrak p$ of a Weierstrass equation for $E$ that is minimal\nat $\\mathfrak p$, counting all $\\mathbb F_{\\mathfrak p}$-points of the reduced cubic $\\tilde E$\n(including the singular point when the reduction is bad, so that\n$a_{\\mathfrak p} \\in \\{0, 1, -1\\}$ for additive, split multiplicative and non-split multiplicative\nreduction). The product converges for $\\operatorname{Re}(s) > 3/2$. Hasse conjectured that\n$L(E, s)$ extends to an entire function; for $K = \\mathbb Q$ this follows from the modularity\ntheorem.\n\nThe **Birch and Swinnerton-Dyer conjecture** states that the rank of the abelian group $E(K)$\nof $K$-points of $E$ equals the order of the zero of $L(E, s)$ at $s = 1$. For $K = \\mathbb Q$\nthis is the official Millennium Prize Problem.\n\nThe strong form of the conjecture, which expresses the leading Taylor coefficient of $L(E, s)$\nat $s = 1$ in terms of the Tate–Shafarevich group, the real period, the regulator, the Tamagawa\nnumbers and the torsion subgroup of $E$, is not stated here: Mathlib has none of these invariants.\n\nBy the Mordell–Weil theorem $E(K)$ is finitely generated, so `Module.finrank ℤ E⟮K⟯` is its rank.\n\n*References:*\n- [Wikipedia, *Birch and Swinnerton-Dyer conjecture*](https://en.wikipedia.org/wiki/Birch_and_Swinnerton-Dyer_conjecture)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [A. Wiles, *The Birch and Swinnerton-Dyer conjecture*, Clay Mathematics Institute](https://www.claymath.org/wp-content/uploads/2022/05/birchswin.pdf)\n- J. H. Silverman, *The Arithmetic of Elliptic Curves*, 2nd ed., GTM 106, Springer, 2009,\n  Appendix C, §16.\n-/\n\nnamespace BirchAndSwinnertonDyerConjecture\n\nopen NumberField IsDedekindDomain WeierstrassCurve\nopen scoped WeierstrassCurve.Affine\n\nvariable {K : Type*} [Field K]\n\n/-- A Weierstrass equation `W` with coefficients in the ring of integers `𝓞 K` is a model of the\nWeierstrass curve `E` over `K` if `E` is obtained from `W` by an admissible change of variables\nover `K`. For elliptic curves this means that `E` and `W` define isomorphic curves over `K`. -/\ndef IsModel (E : WeierstrassCurve K) (W : WeierstrassCurve (𝓞 K)) : Prop :=\n  ∃ C : VariableChange K, C • W.baseChange K = E\n\n/-- Every integral Weierstrass equation is a model of its base change to `K`. -/\n@[category API, AMS 11 14]\ntheorem isModel_baseChange (W : WeierstrassCurve (𝓞 K)) : IsModel (W.baseChange K) W :=\n  ⟨1, one_smul _ _⟩\n\n/-- An integral model `W` of `E` is minimal at the nonzero prime `v` of `𝓞 K` if the valuation\nat `v` of its discriminant is minimal among all integral models of `E`. The inequality\n$v(\\Delta_W) \\le v(\\Delta_{W'})$ is spelled out as\n`∀ n, W.Δ ∈ v.asIdeal ^ n → W'.Δ ∈ v.asIdeal ^ n`. -/\ndef IsMinimalModelAt (E : WeierstrassCurve K) (v : HeightOneSpectrum (𝓞 K))\n    (W : WeierstrassCurve (𝓞 K)) : Prop :=\n  IsModel E W ∧ ∀ W', IsModel E W' → ∀ n : ℕ, W.Δ ∈ v.asIdeal ^ n → W'.Δ ∈ v.asIdeal ^ n\n\n/-- The number of solutions $(x, y) \\in \\mathbb F_v^2$ of the Weierstrass equation `W` reduced\nmodulo the nonzero prime `v` of `𝓞 K`, where $\\mathbb F_v = \\mathcal O_K / v$ is the residue\nfield. Singular solutions are counted. Adding the point at infinity gives the number of\n$\\mathbb F_v$-points of the reduced cubic. -/\nnoncomputable def affinePointCount (W : WeierstrassCurve (𝓞 K)) (v : HeightOneSpectrum (𝓞 K)) :\n    ℕ :=\n  Nat.card {P : (𝓞 K ⧸ v.asIdeal) × (𝓞 K ⧸ v.asIdeal) //\n    (W.baseChange (𝓞 K ⧸ v.asIdeal)).toAffine.Equation P.1 P.2}\n\nvariable [NumberField K]\n\n/-- The trace of Frobenius $a_v = q_v + 1 - \\#\\tilde W(\\mathbb F_v) = q_v - N_v$ of the\nWeierstrass equation `W` at the nonzero prime `v` of `𝓞 K`, where $q_v = N(v)$ is the size of\nthe residue field and $N_v$ is the number of affine solutions of the reduced equation. For a model\nthat is minimal at `v` with bad reduction this gives $a_v = 0$, $1$, $-1$ for additive, split\nmultiplicative and non-split multiplicative reduction respectively. -/\nnoncomputable def frobeniusTrace (W : WeierstrassCurve (𝓞 K)) (v : HeightOneSpectrum (𝓞 K)) :\n    ℤ :=\n  Ideal.absNorm v.asIdeal - affinePointCount W v\n\nopen scoped Classical in\n/-- The Euler factor $L_v(W, T)$ of the Weierstrass equation `W` at the nonzero prime `v` of\n`𝓞 K`: $1 - a_v T + q_v T^2$ if the discriminant of `W` is a unit at `v` (good reduction), and\n$1 - a_v T$ otherwise. -/\nnoncomputable def eulerFactor (W : WeierstrassCurve (𝓞 K)) (v : HeightOneSpectrum (𝓞 K))\n    (T : ℂ) : ℂ :=\n  1 - frobeniusTrace W v * T + if W.Δ ∈ v.asIdeal then 0 else Ideal.absNorm v.asIdeal * T ^ 2\n\n/-- `Λ : ℂ → ℂ` is the Hasse–Weil $L$-function of the Weierstrass curve `E` over `K`: it is an\nentire function, and for $\\operatorname{Re}(s) > 3/2$ it is given by the Euler product\n$$L(E, s) = \\prod_v L_v(E, N(v)^{-s})^{-1}$$\nover the nonzero prime ideals `v` of `𝓞 K`, where the Euler factor at `v` is computed from an\nintegral model of `E` that is minimal at `v`. Such an entire function is unique if it exists, and\nit exists when `K = ℚ` by the modularity theorem. -/\ndef IsHasseWeilLFunction (E : WeierstrassCurve K) (Λ : ℂ → ℂ) : Prop :=\n  AnalyticOnNhd ℂ Λ Set.univ ∧\n    ∃ W : HeightOneSpectrum (𝓞 K) → WeierstrassCurve (𝓞 K), (∀ v, IsMinimalModelAt E v (W v)) ∧\n      ∀ s : ℂ, 3 / 2 < s.re →\n        Λ s = ∏' v, (eulerFactor (W v) v ((Ideal.absNorm v.asIdeal : ℂ) ^ (-s)))⁻¹\n\n/-- The **Birch and Swinnerton-Dyer conjecture**: for every elliptic curve $E$ over a number field\n$K$, the rank of the abelian group $E(K)$ of $K$-points of $E$ equals the order of the zero at\n$s = 1$ of the Hasse–Weil $L$-function $L(E, s)$.\n\nThe value of $L(E, s)$ at $s = 1$ refers to its analytic continuation `Λ`, which is taken as a\nhypothesis (its existence is the Hasse–Weil conjecture, a theorem for $K = \\mathbb Q$). The case\n$K = \\mathbb Q$ is the Millennium Prize Problem. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture [DecidableEq K] (E : WeierstrassCurve K)\n    [E.IsElliptic] (Λ : ℂ → ℂ) (hΛ : IsHasseWeilLFunction E Λ) :\n    analyticOrderAt Λ 1 = Module.finrank ℤ E⟮K⟯ := by\n  sorry\n\n/-- The Euler factor is the polynomial $1 - a_v T + \\varepsilon_v q_v T^2$ in $T$, so it is $1$\nat $T = 0$. -/\n@[category API, AMS 11 14]\ntheorem eulerFactor_zero (W : WeierstrassCurve (𝓞 K)) (v : HeightOneSpectrum (𝓞 K)) :\n    eulerFactor W v 0 = 1 := by\n  simp [eulerFactor]\n\nend BirchAndSwinnertonDyerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None substantive. Note that the slot text spans come from the article lead, which is stated over a general number field K, while the strong-form formula in the article (and the Clay statement) is written for E/ℚ; I followed the lead (general K) for the rank slot, with K = ℚ as a special case. The strong slot is correctly identified as requiring Ш, Ω_E, R_E, c_p, none of which are available.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Base field: the theorem is stated over an arbitrary number field K (as in the Wikipedia lead 'E over a number field K'); K = ℚ, the official Millennium Prize statement, is the special case.",
+    "Analytic continuation: `IsHasseWeilLFunction E Λ` requires Λ entire (`AnalyticOnNhd ℂ Λ Set.univ`) and equal to the Euler product for Re s > 3/2 (the region of absolute convergence). The conjecture is stated as `∀ Λ, IsHasseWeilLFunction E Λ → analyticOrderAt Λ 1 = rank`, i.e. continuation is assumed (Hasse–Weil conjecture), not asserted. Such Λ is unique by the identity theorem and exists for K = ℚ by modularity, so for K = ℚ this is exactly Wiles's Clay statement; for other K it is BSD conditional on continuation (the article's phrase 'order of the zero of L(E,s) at s=1' presupposes it). Reviewers may prefer the ∃-form which additionally asserts continuation.",
+    "L-function definition: Euler product over `HeightOneSpectrum (𝓞 K)` with factor `1 - a_v T + q_v T^2` when the v-minimal model has unit discriminant at v (good reduction) and `1 - a_v T` otherwise, T = N(v)^{-s}. Here a_v := N(v) − #{(x,y) ∈ 𝔽_v² solving the reduced minimal equation} = q_v + 1 − #Ẽ(𝔽_v) counting the singular point; this uniform formula yields a_v = 0, 1, −1 for additive, split and non-split multiplicative reduction, matching the standard bad Euler factors (Silverman App. C §16).",
+    "Minimal models: `IsMinimalModelAt E v W` requires W ∈ WeierstrassCurve (𝓞 K), related to E by a `VariableChange K`, with v(Δ_W) ≤ v(Δ_W') for all such 𝓞 K-models W' (spelled out via membership in v.asIdeal ^ n). Such models exist for every v, and the minimum over 𝓞 K-models equals the local minimal discriminant (scale by u = d⁻¹ with d ∉ v clearing denominators), so the Euler factor is model-independent; `IsHasseWeilLFunction` therefore quantifies `∃ W : v ↦ model minimal at v`. Mathlib's `WeierstrassCurve.IsMinimal`/`reduction` are for a DVR with its fraction field and are not directly usable for 𝓞 K without localization instances, hence the bespoke definition.",
+    "Rank: `Module.finrank ℤ E⟮K⟯` (repo convention from EllipticCurveRank.lean); by Mordell–Weil E(K) is finitely generated so this is the rank. `[DecidableEq K]` is assumed for the group structure on E⟮K⟯, following the repo's `mordell_weil`.",
+    "Order of vanishing: `analyticOrderAt Λ 1 : ℕ∞`; Λ is not identically zero (nonvanishing Euler product on Re s > 3/2), so ⊤ cannot occur and the equation with the ℕ-valued rank is meaningful.",
+    "Counting uses `Nat.card` (residue field and solution set are finite) and `Ideal.absNorm v.asIdeal` for q_v = #(𝓞 K ⧸ v); q_v^{-s} is the complex power `(q_v : ℂ) ^ (-s)` with q_v ≥ 2."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "WeierstrassCurve.IsIntegral (only for a DVR R with fraction field K, and requires equality W = W_int.baseChange K rather than isomorphism).",
+     "name": "BirchAndSwinnertonDyerConjecture.IsModel",
+     "why_needed": "Expresses that an integral Weierstrass equation over 𝓞 K defines a curve isomorphic over K to E (via `WeierstrassCurve.VariableChange`)."
+    },
+    {
+     "closest_existing_considered": "WeierstrassCurve.IsMinimal / WeierstrassCurve.minimal (require a DVR R with [Algebra R K] [IsFractionRing R K]; no such instances for the localization of 𝓞 K at v).",
+     "name": "BirchAndSwinnertonDyerConjecture.IsMinimalModelAt",
+     "why_needed": "v-minimality of an integral model of E at a nonzero prime v of 𝓞 K; needed to compute the correct Euler factors at bad primes."
+    },
+    {
+     "closest_existing_considered": "ModularityConjecture.setOfPointsModN / WeierstrassCurve.ap (file-local to ModularityConjecture.lean, only over ℚ, and reduce a non-minimal model so they are wrong at bad primes); WeierstrassCurve.Affine.Point (excludes the singular point, which would change the bad-prime a_v).",
+     "name": "BirchAndSwinnertonDyerConjecture.affinePointCount",
+     "why_needed": "Number of 𝔽_v-solutions of the reduced Weierstrass equation (singular point included), from which a_v is computed."
+    },
+    {
+     "closest_existing_considered": "WeierstrassCurve.ap in ModularityConjecture.lean (see above).",
+     "name": "BirchAndSwinnertonDyerConjecture.frobeniusTrace",
+     "why_needed": "a_v = q_v − N_v ∈ ℤ, the coefficient in the Euler factor."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (no Hasse–Weil / Euler factors for elliptic curves).",
+     "name": "BirchAndSwinnertonDyerConjecture.eulerFactor",
+     "why_needed": "Local factor 1 − a_v T + ε_v q_v T² with ε_v = 1 iff the (minimal) model has good reduction at v."
+    },
+    {
+     "closest_existing_considered": "LSeries (naive Dirichlet series, no continuation, as noted in Millenium/RiemannHypothesis.lean); riemannZeta / DirichletCharacter L-functions (specific to those cases).",
+     "name": "BirchAndSwinnertonDyerConjecture.IsHasseWeilLFunction",
+     "why_needed": "Characterizes the analytic continuation of L(E, s): entire and equal to the Euler product on Re s > 3/2. Needed because the naive Euler product/tprod (or `LSeries`) returns junk outside the convergence region and s = 1 lies outside it."
+    }
+   ],
+   "per_slot": {
+    "birch_and_swinnerton_dyer_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated for every elliptic curve E over a number field K (article lead; K = ℚ is the Clay case): for every entire Λ agreeing on Re s > 3/2 with the Euler product of E (the analytic continuation, taken as hypothesis since it is conjectural for K ≠ ℚ and a theorem for ℚ), analyticOrderAt Λ 1 = Module.finrank ℤ E⟮K⟯. Mathlib has no Hasse–Weil L-function, so the Euler product is defined in the file from v-minimal integral models."
+    },
+    "birch_and_swinnerton_dyer_conjecture.variants.strong": {
+     "outcome": "missing_primitives",
+     "why": "The right-hand side needs the Tate–Shafarevich group Ш(E) (Galois cohomology H¹(K, E) of the absolute Galois group with continuous cochains and local restriction maps at all places; its finiteness is part of the assertion), the regulator via the Néron–Tate canonical height, the real period Ω_E (integral of the invariant differential over E(ℝ) times the number of real components), the Tamagawa numbers c_p = [E(ℚ_p) : E_0(ℚ_p)] and the conductor N. None of these exist in Mathlib or FormalConjecturesForMathlib, and defining Ш faithfully from scratch (Krull-topology Galois cohomology plus embeddings into all completions) is far beyond a bespoke statement-level definition, so no faithful statement is possible."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "birch_and_swinnerton_dyer_conjecture": "/-- The **Birch and Swinnerton-Dyer conjecture**: for every elliptic curve $E$ over a number field\n$K$, the rank of the abelian group $E(K)$ of $K$-points of $E$ equals the order of the zero at\n$s = 1$ of the Hasse–Weil $L$-function $L(E, s)$.\n\nThe value of $L(E, s)$ at $s = 1$ refers to its analytic continuation `Λ`, which is taken as a\nhypothesis (its existence is the Hasse–Weil conjecture, a theorem for $K = \\mathbb Q$). The case\n$K = \\mathbb Q$ is the Millennium Prize Problem. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture [DecidableEq K] (E : WeierstrassCurve K)\n    [E.IsElliptic] (Λ : ℂ → ℂ) (hΛ : IsHasseWeilLFunction E Λ) :\n    analyticOrderAt Λ 1 = Module.finrank ℤ E⟮K⟯ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Birch and Swinnerton-Dyer conjecture\n\nLet $E$ be an elliptic curve over a number field $K$. By the Mordell–Weil theorem the group\n$E(K)$ of $K$-rational points is finitely generated, so it has a well-defined rank. The\nHasse–Weil $L$-function of $E$ is the Euler product\n$$L(E, s) = \\prod_v L_v(E, s)^{-1},$$\nover the finite places $v$ of $K$, where $L_v(E, s) = 1 - a_v q_v^{-s} + q_v^{1 - 2s}$ if $E$ has\ngood reduction at $v$ and $L_v(E, s) = 1 - a_v q_v^{-s}$ otherwise. Here $q_v$ is the size of the\nresidue field $\\mathbb{F}_v$ at $v$, $a_v = q_v + 1 - \\#\\tilde{E}_v(\\mathbb{F}_v)$ at a place of\ngood reduction and $a_v = 1, -1, 0$ at a place of split multiplicative, non-split multiplicative\nor additive reduction respectively. The product converges for $\\Re(s) > 3/2$, and $L(E, s)$ is\nconjectured (and, for $K = \\mathbb{Q}$, known by the modularity theorem) to extend to an entire\nfunction.\n\nThe **Birch and Swinnerton-Dyer conjecture** asserts that the rank of $E(K)$ equals the order of\nvanishing of $L(E, s)$ at $s = 1$.\n\nThe strong form of the conjecture, which also predicts the leading Taylor coefficient of\n$L(E, s)$ at $s = 1$ in terms of the Tate–Shafarevich group, the real period, the regulator, the\nTamagawa numbers and the torsion subgroup of $E$, is not stated here: Mathlib has neither the\nTate–Shafarevich group nor the Tamagawa numbers of an elliptic curve.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Birch_and_Swinnerton-Dyer_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Clay Mathematics Institute](https://www.claymath.org/millennium/birch-and-swinnerton-dyer-conjecture/)\n- A. Wiles, *The Birch and Swinnerton-Dyer conjecture*, official problem description,\n  https://www.claymath.org/wp-content/uploads/2022/05/birchswin.pdf\n- [J. H. Silverman, *The Arithmetic of Elliptic Curves*, Conjecture C.16.5][silverman2009]\n-/\n\nnamespace BirchAndSwinnertonDyerConjecture\n\nopen IsDedekindDomain NumberField WeierstrassCurve\nopen scoped WeierstrassCurve.Affine\n\nvariable {K : Type*} [Field K] [NumberField K]\n\n/-- The reduction $\\tilde{E}_v$ of a Weierstrass curve `E` over `K` at a finite place `v` of `K`.\nIt is the (possibly singular) Weierstrass curve over the residue field $\\mathbb{F}_v$ obtained by\nreducing a `v`-minimal Weierstrass equation for `E`. Here the local ring at `v` is the valuation\nring `(v.valuation K).integer` of `K`, whose residue field is $\\mathcal{O}_K / v$. -/\nnoncomputable def reductionAt (E : WeierstrassCurve K) (v : HeightOneSpectrum (𝓞 K)) :\n    WeierstrassCurve (IsLocalRing.ResidueField (v.valuation K).integer) :=\n  (E.minimal (v.valuation K).integer).reduction (v.valuation K).integer\n\n/-- `E` has good reduction at the finite place `v` if its reduction at `v` is an elliptic curve,\ni.e. has nonzero discriminant. -/\ndef HasGoodReduction (E : WeierstrassCurve K) (v : HeightOneSpectrum (𝓞 K)) : Prop :=\n  (reductionAt E v).IsElliptic\n\n/-- The number $\\#\\tilde{E}_v^{\\mathrm{ns}}(\\mathbb{F}_v)$ of nonsingular points on the reduction of\n`E` at `v`, including the point at infinity. If `E` has good reduction at `v`, this is\n$\\#\\tilde{E}_v(\\mathbb{F}_v)$. If `E` has bad reduction at `v`, this is $q_v - 1$, $q_v + 1$ or\n$q_v$ according as the reduction is split multiplicative, non-split multiplicative or additive. -/\nnoncomputable def cardReductionAt (E : WeierstrassCurve K) (v : HeightOneSpectrum (𝓞 K)) : ℕ :=\n  Nat.card (reductionAt E v).toAffine.Point\n\nopen scoped Classical in\n/-- The coefficient $a_v(E)$ of the local Euler factor of `E` at the finite place `v`, where\n$q_v = N(v)$ is the size of the residue field at `v`.\n* If `E` has good reduction at `v`, then $a_v = q_v + 1 - \\#\\tilde{E}_v(\\mathbb{F}_v)$ is the trace\n  of Frobenius.\n* If `E` has bad reduction at `v`, then $a_v = q_v - \\#\\tilde{E}_v^{\\mathrm{ns}}(\\mathbb{F}_v)$,\n  which is $1$, $-1$ or $0$ according as the reduction is split multiplicative, non-split\n  multiplicative or additive. -/\nnoncomputable def traceOfFrobenius (E : WeierstrassCurve K) (v : HeightOneSpectrum (𝓞 K)) :\n    ℤ :=\n  if HasGoodReduction E v then Ideal.absNorm v.asIdeal + 1 - cardReductionAt E v\n  else Ideal.absNorm v.asIdeal - cardReductionAt E v\n\nopen scoped Classical in\n/-- The local Euler factor $L_v(E, s)$ of `E` at the finite place `v`, with $q_v = N(v)$:\n$L_v(E, s) = 1 - a_v q_v^{-s} + q_v^{1 - 2s}$ if `E` has good reduction at `v`, and\n$L_v(E, s) = 1 - a_v q_v^{-s}$ otherwise. -/\nnoncomputable def eulerFactor (E : WeierstrassCurve K) (v : HeightOneSpectrum (𝓞 K)) (s : ℂ) :\n    ℂ :=\n  1 - traceOfFrobenius E v * (Ideal.absNorm v.asIdeal : ℂ) ^ (-s) +\n    if HasGoodReduction E v then (Ideal.absNorm v.asIdeal : ℂ) ^ (1 - 2 * s) else 0\n\n/-- The Euler product $\\prod_v L_v(E, s)^{-1}$ over the finite places `v` of `K`, which\nconverges absolutely for $\\Re(s) > 3/2$ and defines the Hasse–Weil $L$-function $L(E, s)$\nthere. -/\nnoncomputable def eulerProduct (E : WeierstrassCurve K) (s : ℂ) : ℂ :=\n  ∏' v : HeightOneSpectrum (𝓞 K), (eulerFactor E v s)⁻¹\n\n/-- `L` is the Hasse–Weil $L$-function $L(E, s)$ of `E`: an entire function agreeing with the\nEuler product $\\prod_v L_v(E, s)^{-1}$ on the half-plane $\\Re(s) > 3/2$. By the identity theorem\nsuch a function is unique if it exists. It exists for $K = \\mathbb{Q}$ by the modularity theorem\nand is conjectured to exist for every number field `K` (Hasse–Weil conjecture). -/\nstructure IsHasseWeilLFunction (E : WeierstrassCurve K) (L : ℂ → ℂ) : Prop where\n  differentiable : Differentiable ℂ L\n  eq_eulerProduct : ∀ s : ℂ, 3 / 2 < s.re → L s = eulerProduct E s\n\n@[category API, AMS 11 14]\nlemma eulerFactor_of_hasGoodReduction {E : WeierstrassCurve K} {v : HeightOneSpectrum (𝓞 K)}\n    (h : HasGoodReduction E v) (s : ℂ) :\n    eulerFactor E v s = 1 - traceOfFrobenius E v * (Ideal.absNorm v.asIdeal : ℂ) ^ (-s) +\n      (Ideal.absNorm v.asIdeal : ℂ) ^ (1 - 2 * s) := by\n  simp [eulerFactor, h]\n\n@[category API, AMS 11 14]\nlemma eulerFactor_of_not_hasGoodReduction {E : WeierstrassCurve K} {v : HeightOneSpectrum (𝓞 K)}\n    (h : ¬ HasGoodReduction E v) (s : ℂ) :\n    eulerFactor E v s = 1 - traceOfFrobenius E v * (Ideal.absNorm v.asIdeal : ℂ) ^ (-s) := by\n  simp [eulerFactor, h]\n\n/-- **Birch and Swinnerton-Dyer conjecture.** Let $E$ be an elliptic curve over a number field\n$K$, and let $L(E, s)$ be its Hasse–Weil $L$-function, assumed to be continued analytically to\nthe whole complex plane (this is known for $K = \\mathbb{Q}$). Then the rank of the finitely\ngenerated abelian group $E(K)$ of $K$-rational points of $E$ equals the order of the zero of\n$L(E, s)$ at $s = 1$:\n$$\\operatorname{rank} E(K) = \\operatorname{ord}_{s = 1} L(E, s).$$ -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture [DecidableEq K] (E : WeierstrassCurve K)\n    [E.IsElliptic] (L : ℂ → ℂ) (hL : IsHasseWeilLFunction E L) :\n    analyticOrderAt L 1 = Module.finrank ℤ E⟮K⟯ := by\n  sorry\n\n/-- **Birch and Swinnerton-Dyer conjecture over $\\mathbb{Q}$**, the official Millennium Prize\nproblem. Let $E$ be an elliptic curve over $\\mathbb{Q}$. Its Hasse–Weil $L$-function $L(E, s)$\nextends to an entire function (this is a theorem, by modularity), and the rank of the abelian\ngroup $E(\\mathbb{Q})$ of rational points of $E$ equals the order of the zero of $L(E, s)$ at\n$s = 1$. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture.variants.rat (E : WeierstrassCurve ℚ)\n    [E.IsElliptic] :\n    ∃ L : ℂ → ℂ, IsHasseWeilLFunction E L ∧\n      analyticOrderAt L 1 = Module.finrank ℤ E⟮ℚ⟯ := by\n  sorry\n\nend BirchAndSwinnertonDyerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None of substance. Two remarks: (1) the table's note that the strong form 'implicitly asserts finiteness of Ш' is correct, and this is exactly what makes the slot unformalizable at present: Ш has no definition in Mathlib or the repository and requires Galois cohomology of E over K and all completions K_v (or torsors), which is a large theory rather than a definition. (2) The conductor N mentioned in the strong-form notes is not actually needed for the formula (c_p = 1 at good primes), so its absence from Mathlib is not by itself a blocker; Ш and the Tamagawa numbers are.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Field of definition: the main theorem is over an arbitrary number field K (Wikipedia lead), not just ℚ (Clay). The ℚ case is also given separately as `birch_and_swinnerton_dyer_conjecture.variants.rat` in the Clay form, asserting that the entire continuation exists (a theorem by modularity) and that its order at 1 is the rank.",
+    "Analytic continuation: over general K the continuation is conjectural (Hasse–Weil), so the main statement takes it as a hypothesis: `IsHasseWeilLFunction E L` = `Differentiable ℂ L` (entire) ∧ `L s = eulerProduct E s` for `3/2 < s.re`. Any two such L agree by the identity theorem, so the order at 1 is intrinsic. This follows Silverman AEC Conj. C.16.5 (entire continuation), rather than the weaker 'continuation to a connected neighbourhood of 1'; for K = ℚ both readings coincide.",
+    "L-function normalisation: L(E,s) = ∏_v L_v(E,s)^{-1} over all finite places v = nonzero primes of 𝓞_K (`HeightOneSpectrum (𝓞 K)`), with L_v = 1 - a_v q_v^{-s} + q_v^{1-2s} at good v and 1 - a_v q_v^{-s} at bad v (a_v = 1, -1, 0 for split multiplicative, non-split multiplicative, additive). No Gamma factors or conductor normalisation (these belong to Λ(E,s), not L(E,s)).",
+    "q_v is taken as `Ideal.absNorm v.asIdeal` (= #(𝓞_K/v)); the point count is over `IsLocalRing.ResidueField (v.valuation K).integer`, the residue field of the valuation ring at v, which is the same finite field 𝓞_K/v. `Nat.card` is used; the type is finite, so no junk value arises.",
+    "Reduction at v uses Mathlib's `WeierstrassCurve.minimal`/`reduction` over the DVR `(v.valuation K).integer` (instances from Mathlib.NumberTheory.NumberField.FinitePlaces). Minimal models are unique up to integral isomorphism, so the reduction type and point counts are well defined.",
+    "Bad-place coefficient: a_v is computed uniformly as q_v - #Ẽ_ns(𝔽_v), where Ẽ_ns(𝔽_v) = Mathlib's `Affine.Point` of the (singular) reduced curve, i.e. nonsingular affine points plus O; this group has order q_v-1, q_v+1, q_v in the split multiplicative, non-split multiplicative, additive cases, giving a_v = 1, -1, 0 as required. In the good case a_v = q_v + 1 - #Ẽ(𝔽_v); subtraction is in ℤ (checked with #print).",
+    "Euler product uses Mathlib's unconditional `∏'`; for Re s > 3/2 the product converges absolutely with nonzero factors, so `tprod` is the genuine value and no junk `1` is reached.",
+    "Rank: `Module.finrank ℤ E⟮K⟯` as in the repository's EllipticCurveRank.lean; Mordell–Weil guarantees finite generation so `finrank` is the true rank. `[DecidableEq K]` is required by Mathlib's group instance on `E⟮K⟯` and does not affect the statement.",
+    "Order of vanishing: `analyticOrderAt L 1 : ℕ∞` compared with the rank cast to ℕ∞; this also encodes that L is not identically zero near 1 (true, since L is nonzero on the half-plane).",
+    "Two proved `category API` lemmas unfold the Euler factor in the good/bad cases as basic tests of the definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "WeierstrassCurve.reduction / WeierstrassCurve.minimal (Mathlib.AlgebraicGeometry.EllipticCurve.Reduction), instantiated at R = (v.valuation K).integer.",
+     "name": "BirchAndSwinnertonDyerConjecture.reductionAt",
+     "why_needed": "The reduction Ẽ_v of E at a finite place v of a number field K (as a Weierstrass curve over the residue field), obtained from a v-minimal model; needed for the local Euler factors. Mathlib only has reduction over an abstract DVR, not indexed by places of a number field."
+    },
+    {
+     "closest_existing_considered": "WeierstrassCurve.IsGoodReduction (needs an IsMinimal instance and a DVR argument; equivalent by isGoodReduction_iff_isElliptic_reduction) and WeierstrassCurve.IsElliptic of the reduction.",
+     "name": "BirchAndSwinnertonDyerConjecture.HasGoodReduction",
+     "why_needed": "Good reduction of E at v as a Prop on the number-field level, used to select the shape of the Euler factor."
+    },
+    {
+     "closest_existing_considered": "Nat.card of WeierstrassCurve.Affine.Point; ModularityConjecture.setOfPointsModN (only for ℚ, affine points mod n without minimal model, unusable at bad primes).",
+     "name": "BirchAndSwinnertonDyerConjecture.cardReductionAt",
+     "why_needed": "#Ẽ_v^{ns}(𝔽_v), the number of nonsingular points (including O) of the reduction; the input to a_v."
+    },
+    {
+     "closest_existing_considered": "ModularityConjecture.WeierstrassCurve.ap (only over ℚ, wrong at bad primes by its own docstring); nothing in Mathlib.",
+     "name": "BirchAndSwinnertonDyerConjecture.traceOfFrobenius",
+     "why_needed": "The coefficient a_v(E) of the local Euler factor, including the bad-reduction conventions 1, -1, 0."
+    },
+    {
+     "closest_existing_considered": "LSeries / DirichletCharacter.LFunction / riemannZeta in Mathlib — none attached to elliptic curves.",
+     "name": "BirchAndSwinnertonDyerConjecture.eulerFactor",
+     "why_needed": "The local Euler factor L_v(E,s)."
+    },
+    {
+     "closest_existing_considered": "Mathlib's LSeries (Dirichlet series over ℕ; would need K = ℚ and expanding the Euler product into coefficients); no Hasse–Weil L-function exists in Mathlib or the repo.",
+     "name": "BirchAndSwinnertonDyerConjecture.eulerProduct",
+     "why_needed": "The Euler product ∏_v L_v(E,s)^{-1} defining L(E,s) for Re s > 3/2."
+    },
+    {
+     "closest_existing_considered": "Differentiable ℂ / AnalyticOnNhd together with the Euler product; no existing notion of the continued L-function of an elliptic curve.",
+     "name": "BirchAndSwinnertonDyerConjecture.IsHasseWeilLFunction",
+     "why_needed": "Predicate 'L is the analytic continuation of the Hasse–Weil L-function of E' (entire, agrees with the Euler product on Re s > 3/2), used to formulate the order of vanishing at s = 1 without a junk-valued choice of continuation."
+    }
+   ],
+   "per_slot": {
+    "birch_and_swinnerton_dyer_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated for every elliptic curve E over every number field K: if L : ℂ → ℂ is an entire function agreeing with the Hasse–Weil Euler product ∏_v L_v(E,s)^{-1} on Re s > 3/2 (the analytic continuation, assumed as a hypothesis since it is only known for K = ℚ), then analyticOrderAt L 1 = finrank ℤ E(K). Mathlib has no Hasse–Weil L-function, so the Euler factors are defined in the file from Mathlib's minimal models and reduction of Weierstrass curves over DVRs. A K = ℚ variant (the official Clay formulation, where the continuation is a theorem) asserting existence of the continuation is included as birch_and_swinnerton_dyer_conjecture.variants.rat."
+    },
+    "birch_and_swinnerton_dyer_conjecture.variants.strong": {
+     "outcome": "missing_primitives",
+     "why": "The right-hand side #Ш(E)·Ω_E·R_E·∏_p c_p/(#E_tor)^2 needs the Tate–Shafarevich group Ш(E) (kernel of H^1(K,E) → ∏_v H^1(K_v,E): requires continuous Galois cohomology of E(K̄) together with the local restriction maps at all places, or equivalently the classification of locally trivial E-torsors) and the Tamagawa numbers c_p = [E(ℚ_p):E_0(ℚ_p)] (component groups of the Néron model / Tate's algorithm). Neither Mathlib nor FormalConjecturesForMathlib has any of these (no Galois cohomology of elliptic curves, no Néron models, no conductor), and building them bespoke would be a large, unverifiable construction rather than a definition. The real period Ω_E and the regulator R_E (canonical heights) would also have to be built from scratch. Since Ш alone blocks a faithful statement, the slot is omitted."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "birch_and_swinnerton_dyer_conjecture": "/-- **Birch and Swinnerton-Dyer conjecture.** Let $E$ be an elliptic curve over a number field\n$K$, and let $L(E, s)$ be its Hasse–Weil $L$-function, assumed to be continued analytically to\nthe whole complex plane (this is known for $K = \\mathbb{Q}$). Then the rank of the finitely\ngenerated abelian group $E(K)$ of $K$-rational points of $E$ equals the order of the zero of\n$L(E, s)$ at $s = 1$:\n$$\\operatorname{rank} E(K) = \\operatorname{ord}_{s = 1} L(E, s).$$ -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture [DecidableEq K] (E : WeierstrassCurve K)\n    [E.IsElliptic] (L : ℂ → ℂ) (hL : IsHasseWeilLFunction E L) :\n    analyticOrderAt L 1 = Module.finrank ℤ E⟮K⟯ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Birch and Swinnerton-Dyer conjecture\n\nLet $E$ be an elliptic curve over a number field $K$. The Mordell–Weil theorem says that the\nabelian group $E(K)$ of $K$-points is finitely generated; its rank is $\\operatorname{rank} E(K)$.\nThe Hasse–Weil $L$-function of $E$ is the Euler product\n$$L(E, s) = \\prod_{\\mathfrak p} L_{\\mathfrak p}(E, N\\mathfrak p^{-s})^{-1},$$\nover the nonzero prime ideals $\\mathfrak p$ of the ring of integers of $K$, where\n$N\\mathfrak p$ is the cardinality of the residue field $\\mathbb F_{\\mathfrak p}$ and the local\nfactor is\n$$L_{\\mathfrak p}(E, T) =\n  \\begin{cases}\n    1 - a_{\\mathfrak p} T + N\\mathfrak p \\, T^2 & \\text{if } E \\text{ has good reduction at }\n      \\mathfrak p, \\\\\n    1 - a_{\\mathfrak p} T & \\text{otherwise},\n  \\end{cases}$$\nwith $a_{\\mathfrak p} = N\\mathfrak p + 1 - \\#\\tilde E(\\mathbb F_{\\mathfrak p})$, where $\\tilde E$\nis the reduction modulo $\\mathfrak p$ of a minimal Weierstrass equation for $E$ at $\\mathfrak p$\n(so $a_{\\mathfrak p} = 0, 1, -1$ for additive, split multiplicative and nonsplit multiplicative\nreduction respectively). The Euler product converges absolutely for $\\operatorname{Re}(s) > 3/2$.\nIt is conjectured (and known for $K = \\mathbb Q$ by the modularity theorem) that $L(E, s)$ has an\nanalytic continuation to the whole complex plane.\n\nThe **Birch and Swinnerton-Dyer conjecture** states that the rank of $E(K)$ is the order of\nvanishing of $L(E, s)$ at $s = 1$. For $K = \\mathbb Q$ this is one of the seven Millennium Prize\nProblems of the Clay Mathematics Institute.\n\nThe strong form of the conjecture, which also predicts the leading Taylor coefficient of\n$L(E, s)$ at $s = 1$ in terms of the Tate–Shafarevich group, the real period, the regulator, the\nTamagawa numbers and the torsion subgroup, is not stated here: the Tate–Shafarevich group, the\ncanonical height and the Tamagawa numbers are not available in Mathlib.\n\n*References:*\n- [Wikipedia: Birch and Swinnerton-Dyer conjecture](https://en.wikipedia.org/wiki/Birch_and_Swinnerton-Dyer_conjecture)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [A. Wiles, *The Birch and Swinnerton-Dyer conjecture*, Clay Mathematics Institute official problem description](https://www.claymath.org/wp-content/uploads/2022/05/birchswin.pdf)\n- J. H. Silverman, *The Arithmetic of Elliptic Curves*, 2nd ed., GTM 106, Springer, 2009,\n  Appendix C, §16.\n-/\n\nnamespace BirchAndSwinnertonDyerConjecture\n\nopen WeierstrassCurve IsDedekindDomain\nopen scoped WeierstrassCurve.Affine NumberField\n\nvariable {K : Type*} [Field K] [NumberField K]\n\n/-- The number of points of a Weierstrass curve `W` over a (finite) field `F`, counted on its\nprojective closure: the solutions `(x, y)` of the Weierstrass equation, together with the single\npoint at infinity. Singular points are included in the count. -/\nnoncomputable def numPoints {F : Type*} [Field F] (W : WeierstrassCurve F) : ℕ :=\n  Nat.card {P : F × F // W.toAffine.Equation P.1 P.2} + 1\n\n/-- The curve `y² + y = x³ + x` over `𝔽₂`. -/\ndef testCurve : WeierstrassCurve (ZMod 2) := ⟨0, 0, 1, 1, 0⟩\n\n/-- The curve `y² + y = x³ + x` over `𝔽₂` has four affine points and one point at infinity. -/\n@[category test, AMS 11 14]\ntheorem numPoints_testCurve : numPoints testCurve = 5 := by\n  simp only [numPoints, Affine.equation_iff, Nat.card_eq_fintype_card]\n  decide\n\n/-- The valuation ring `𝒪_𝔭 ⊆ K` of a nonzero prime ideal `𝔭` of the ring of integers of `K`.\nIt is a discrete valuation ring with fraction field `K`, and its residue field is `𝓞 K ⧸ 𝔭`. -/\nabbrev localRing (𝔭 : HeightOneSpectrum (𝓞 K)) : Subring K :=\n  (𝔭.valuation K).integer\n\n/-- The residue field `𝔽_𝔭 = 𝓞 K ⧸ 𝔭` of `K` at a nonzero prime ideal `𝔭`, realised as the\nresidue field of the valuation ring `𝒪_𝔭`. -/\nabbrev residueField (𝔭 : HeightOneSpectrum (𝓞 K)) : Type _ :=\n  IsLocalRing.ResidueField (localRing 𝔭)\n\n/-- The reduction `Ẽ` of a Weierstrass curve `E` over `K` modulo `𝔭`: the reduction to `𝔽_𝔭` of a\nminimal Weierstrass equation for `E` at `𝔭`. -/\nnoncomputable def reductionAt (E : WeierstrassCurve K) (𝔭 : HeightOneSpectrum (𝓞 K)) :\n    WeierstrassCurve (residueField 𝔭) :=\n  (E.minimal (localRing 𝔭)).reduction (localRing 𝔭)\n\n/-- The coefficient `a_𝔭 = N𝔭 + 1 - #Ẽ(𝔽_𝔭)` of a Weierstrass curve `E` over `K` at `𝔭`, where\n`N𝔭 = #𝔽_𝔭` and `Ẽ` is the reduction of a minimal Weierstrass equation for `E` at `𝔭`. For good\nreduction this is the trace of Frobenius; for additive, split multiplicative and nonsplit\nmultiplicative reduction it is `0`, `1` and `-1` respectively. -/\nnoncomputable def ap (E : WeierstrassCurve K) (𝔭 : HeightOneSpectrum (𝓞 K)) : ℤ :=\n  Nat.card (residueField 𝔭) + 1 - numPoints (reductionAt E 𝔭)\n\nopen scoped Classical in\n/-- The local Euler factor `L_𝔭(E, N𝔭^{-s})⁻¹` of the Hasse–Weil `L`-function of a Weierstrass\ncurve `E` over `K` at `𝔭`, where `L_𝔭(E, T) = 1 - a_𝔭 T + N𝔭 T²` if `E` has good reduction at\n`𝔭` and `L_𝔭(E, T) = 1 - a_𝔭 T` otherwise. -/\nnoncomputable def eulerFactor (E : WeierstrassCurve K) (𝔭 : HeightOneSpectrum (𝓞 K)) (s : ℂ) :\n    ℂ :=\n  if IsGoodReduction (localRing 𝔭) (E.minimal (localRing 𝔭)) then\n    (1 - ap E 𝔭 * (Nat.card (residueField 𝔭) : ℂ) ^ (-s) +\n      (Nat.card (residueField 𝔭) : ℂ) ^ (1 - 2 * s))⁻¹\n  else\n    (1 - ap E 𝔭 * (Nat.card (residueField 𝔭) : ℂ) ^ (-s))⁻¹\n\n@[category API, AMS 11 14]\ntheorem eulerFactor_of_isGoodReduction (E : WeierstrassCurve K) (𝔭 : HeightOneSpectrum (𝓞 K))\n    [IsGoodReduction (localRing 𝔭) (E.minimal (localRing 𝔭))] (s : ℂ) :\n    eulerFactor E 𝔭 s = (1 - ap E 𝔭 * (Nat.card (residueField 𝔭) : ℂ) ^ (-s) +\n      (Nat.card (residueField 𝔭) : ℂ) ^ (1 - 2 * s))⁻¹ := by\n  rw [eulerFactor, if_pos ‹_›]\n\n@[category API, AMS 11 14]\ntheorem eulerFactor_of_not_isGoodReduction (E : WeierstrassCurve K)\n    (𝔭 : HeightOneSpectrum (𝓞 K)) (h : ¬ IsGoodReduction (localRing 𝔭) (E.minimal (localRing 𝔭)))\n    (s : ℂ) :\n    eulerFactor E 𝔭 s = (1 - ap E 𝔭 * (Nat.card (residueField 𝔭) : ℂ) ^ (-s))⁻¹ := by\n  rw [eulerFactor, if_neg h]\n\n/-- The Hasse–Weil `L`-function `L(E, s) = ∏_𝔭 L_𝔭(E, N𝔭^{-s})⁻¹` of a Weierstrass curve `E`\nover `K`, defined by its Euler product over the nonzero prime ideals `𝔭` of `𝓞 K`. The product\nconverges absolutely for `Re s > 3 / 2`; elsewhere this definition takes a junk value, so the\nconjecture below is stated for an analytic continuation `L` of this function. -/\nnoncomputable def LFunction (E : WeierstrassCurve K) (s : ℂ) : ℂ :=\n  ∏' 𝔭 : HeightOneSpectrum (𝓞 K), eulerFactor E 𝔭 s\n\n/-- **Birch and Swinnerton-Dyer conjecture.** Let $E$ be an elliptic curve over a number field\n$K$. Then the rank of the abelian group $E(K)$ of $K$-points of $E$ is the order of the zero of\nthe Hasse–Weil $L$-function $L(E, s)$ at $s = 1$:\n$$\\operatorname{rank}_{\\mathbb Z} E(K) = \\operatorname{ord}_{s = 1} L(E, s).$$\n\nHere `L` is the analytic continuation of `LFunction E` to the whole complex plane: an entire\nfunction agreeing with the Euler product on its half-plane of absolute convergence\n$\\operatorname{Re}(s) > 3/2$. Such a continuation is unique when it exists; it exists for every\nelliptic curve over $\\mathbb Q$ by the modularity theorem, and it is conjectured to exist over\nevery number field. The case $K = \\mathbb Q$ is the official Millennium Prize Problem. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture [DecidableEq K] (E : WeierstrassCurve K)\n    [E.IsElliptic] (L : ℂ → ℂ) (hL : Differentiable ℂ L)\n    (hLE : ∀ s : ℂ, 3 / 2 < s.re → L s = LFunction E s) :\n    analyticOrderAt L 1 = Module.finrank ℤ E⟮K⟯ := by\n  sorry\n\nend BirchAndSwinnertonDyerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None of substance. Minor remark: the notes for the rank slot say the conjecture is 'for every elliptic curve E over a number field K (Clay: K = ℚ)'; the file follows the Wikipedia lead and states it for all number fields, with the analytic continuation as a hypothesis (so for K = ℚ it coincides with the Clay statement). For the strong slot the notes correctly observe the formula is written for E/ℚ; independent of that, the right-hand side cannot be stated with current Mathlib/repo primitives (Ш, canonical height/regulator, real period, Tamagawa numbers), so the slot had to be omitted.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Base field: an arbitrary number field K (Wikipedia lead: 'E over a number field K'), which includes the Clay/Millennium case K = ℚ as a special case. No separate K = ℚ declaration is added.",
+    "Analytic continuation: over K ≠ ℚ the continuation of L(E,s) to s = 1 is itself conjectural (Hasse–Weil). Following Silverman (AEC, Conj. C.16.4 vs C.16.5) the continuation is taken as a hypothesis, not asserted: the theorem quantifies over any entire `L : ℂ → ℂ` with `L s = LFunction E s` for `3/2 < s.re`. Such an L is unique by the identity theorem, exists for every E/ℚ by modularity, so for K = ℚ the statement is exactly the Clay statement; for other K it is BSD conditional on Hasse–Weil (vacuous only for a curve whose L-function has no entire continuation, which is not expected to happen). The alternative 'assert existence' form (∃ L entire, ... ∧ ord = rank) would bundle the Hasse–Weil conjecture into BSD.",
+    "Entire (`Differentiable ℂ L`) is required rather than merely analytic near s = 1 on some connected domain; this matches the standard formulation (Wiles' Clay description, Silverman) and loses nothing for K = ℚ.",
+    "Order of vanishing is `analyticOrderAt L 1 : ℕ∞`, compared with the rank cast to ℕ∞; the rank is `Module.finrank ℤ E⟮K⟯` as in the repo's EllipticCurveRank.lean (correct by the Mordell–Weil theorem, which guarantees finite generation).",
+    "L-function: defined as `∏' 𝔭 : HeightOneSpectrum (𝓞 K), eulerFactor E 𝔭 s` (Mathlib `tprod`, unconditional convergence). This agrees with L(E,s) exactly on Re s > 3/2 (absolute convergence); elsewhere it is junk, which is why the conjecture is phrased via the continuation L. The Euler product is the classical (arithmetic) normalisation centred at s = 1, as in Wikipedia.",
+    "Local data at 𝔭 use the DVR `(𝔭.valuation K).integer` (the valuation ring 𝒪_𝔭 ⊆ K, a DVR with fraction field K by Mathlib instances) and Mathlib's `WeierstrassCurve.minimal`/`reduction`/`IsGoodReduction`. N𝔭 is taken as `Nat.card` of the residue field of this DVR, which is (isomorphic to) 𝓞 K ⧸ 𝔭 and finite; this identification is a mathematical fact not checked in Lean.",
+    "Point count of the reduced curve: `numPoints` counts affine solutions of the Weierstrass equation (`Affine.Equation`) plus one point at infinity, including a singular point if present; this is the convention under which a_𝔭 = N𝔭 + 1 − #Ẽ(𝔽_𝔭) gives 0, 1, −1 for additive, split and nonsplit multiplicative reduction, so a single formula for a_𝔭 serves both good and bad primes. `ap` is ℤ-valued (Lean inserts casts before subtraction; verified with `#print`).",
+    "Bad-prime Euler factor is (1 − a_𝔭 N𝔭^{-s})⁻¹ and good-prime factor (1 − a_𝔭 N𝔭^{-s} + N𝔭^{1−2s})⁻¹; the case split uses Mathlib's `IsGoodReduction` of the minimal model (equivalent to the reduction being nonsingular).",
+    "`[DecidableEq K]` is assumed, as in the repo's `mordell_weil`, because the group law on `E⟮K⟯` in Mathlib requires it.",
+    "A `@[category test]` point count over 𝔽₂ and two `@[category API]` unfolding lemmas for `eulerFactor` are included as basic API tests for the bespoke definitions, per CONTRIBUTING.md."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "WeierstrassCurve.Affine.Point (nonsingular points only; wrong at bad reduction), ModularityConjecture.setOfPointsModN in the repo (ℚ-only, uses ZMod n with no minimal model, no point at infinity).",
+     "name": "BirchAndSwinnertonDyerConjecture.numPoints",
+     "why_needed": "Number of points of a (possibly singular) Weierstrass cubic over a finite field on its projective closure (affine solutions + point at infinity), needed for a_𝔭. Mathlib's `WeierstrassCurve.Affine.Point`/`Projective.Point` only contain nonsingular points, so they cannot be used at bad primes."
+    },
+    {
+     "closest_existing_considered": "Localization.AtPrime 𝔭.asIdeal (no `Algebra _ K`/`IsFractionRing _ K` instance for a general number field K, only for `FractionRing`), 𝔭.adicCompletionIntegers K (would require base changing E to the completion).",
+     "name": "BirchAndSwinnertonDyerConjecture.localRing",
+     "why_needed": "The local ring 𝒪_𝔭 ⊆ K at a prime 𝔭 of 𝓞 K, given as `(𝔭.valuation K).integer`; Mathlib provides the DVR / fraction-field instances for it, which are required by `WeierstrassCurve.minimal` and `reduction`."
+    },
+    {
+     "closest_existing_considered": "𝓞 K ⧸ 𝔭.asIdeal (not the field the Mathlib `reduction` API produces), Ideal.absNorm 𝔭.asIdeal for N𝔭 (would mix two descriptions of the same number).",
+     "name": "BirchAndSwinnertonDyerConjecture.residueField",
+     "why_needed": "Abbreviation for the residue field 𝔽_𝔭 of 𝒪_𝔭 (≅ 𝓞 K ⧸ 𝔭), the field over which the reduction lives and whose cardinality is N𝔭."
+    },
+    {
+     "closest_existing_considered": "WeierstrassCurve.reduction (used directly, but needs the minimal model and DVR spelled out each time).",
+     "name": "BirchAndSwinnertonDyerConjecture.reductionAt",
+     "why_needed": "The reduction modulo 𝔭 of a minimal Weierstrass equation for E at 𝔭, packaging Mathlib's `WeierstrassCurve.minimal` and `WeierstrassCurve.reduction`."
+    },
+    {
+     "closest_existing_considered": "ModularityConjecture.WeierstrassCurve.ap in the repo (ℚ-only, not via a minimal model, and incorrect at bad primes by its own docstring).",
+     "name": "BirchAndSwinnertonDyerConjecture.ap",
+     "why_needed": "The coefficient a_𝔭 = N𝔭 + 1 − #Ẽ(𝔽_𝔭) ∈ ℤ at every prime (trace of Frobenius at good primes; 0, ±1 at bad primes)."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Euler product files (Mathlib/NumberTheory/EulerProduct) only treat completely multiplicative Dirichlet series, not degree-2 local factors.",
+     "name": "BirchAndSwinnertonDyerConjecture.eulerFactor",
+     "why_needed": "The local Euler factor L_𝔭(E, N𝔭^{-s})⁻¹, with the case split between good and bad reduction."
+    },
+    {
+     "closest_existing_considered": "LSeries (Dirichlet series with explicit coefficients; would need the multiplicative expansion of the Euler product, less direct), DirichletCharacter.LFunction (wrong object).",
+     "name": "BirchAndSwinnertonDyerConjecture.LFunction",
+     "why_needed": "The Hasse–Weil L-function of E/K as the Euler product over all nonzero primes of 𝓞 K; Mathlib has no Hasse–Weil L-function."
+    },
+    {
+     "closest_existing_considered": "none needed",
+     "name": "BirchAndSwinnertonDyerConjecture.testCurve",
+     "why_needed": "A concrete curve y² + y = x³ + x over 𝔽₂ used only for the `numPoints` unit test (5 points)."
+    }
+   ],
+   "per_slot": {
+    "birch_and_swinnerton_dyer_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated for an elliptic curve E (a `WeierstrassCurve K` with `[E.IsElliptic]`) over an arbitrary number field K: for any entire function L agreeing with the Hasse–Weil Euler product L(E,s) on its half-plane of absolute convergence Re s > 3/2, `analyticOrderAt L 1 = Module.finrank ℤ E⟮K⟯`. Mathlib has no Hasse–Weil L-function, so it is defined in the file as the Euler product over `HeightOneSpectrum (𝓞 K)` of the standard local factors built from Mathlib's minimal Weierstrass model / reduction API (`WeierstrassCurve.minimal`, `reduction`, `IsGoodReduction`)."
+    },
+    "birch_and_swinnerton_dyer_conjecture.variants.strong": {
+     "outcome": "missing_primitives",
+     "why": "The right-hand side #Ш(E)·Ω_E·R_E·∏c_p/(#E_tor)² needs (i) the Tate–Shafarevich group Ш(E/K), which requires continuous Galois cohomology H¹(K,E) and H¹(K_v,E) for all places v (Mathlib has neither Galois cohomology of the absolute Galois group nor the Weil–Châtelet group), (ii) the Néron–Tate canonical height pairing and regulator on E(K) (no heights on elliptic curves in Mathlib or the repo), (iii) the real period ∫_{E(ℝ)}|ω| and (iv) the Tamagawa numbers [E(K_v):E_0(K_v)]. Only #E(K)_tors and the left side L^{(r)}(E,1)/r! could be expressed with existing primitives, so no faithful statement is possible; the slot is omitted (and the omission is explained in the module docstring)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "birch_and_swinnerton_dyer_conjecture": "/-- **Birch and Swinnerton-Dyer conjecture.** Let $E$ be an elliptic curve over a number field\n$K$. Then the rank of the abelian group $E(K)$ of $K$-points of $E$ is the order of the zero of\nthe Hasse–Weil $L$-function $L(E, s)$ at $s = 1$:\n$$\\operatorname{rank}_{\\mathbb Z} E(K) = \\operatorname{ord}_{s = 1} L(E, s).$$\n\nHere `L` is the analytic continuation of `LFunction E` to the whole complex plane: an entire\nfunction agreeing with the Euler product on its half-plane of absolute convergence\n$\\operatorname{Re}(s) > 3/2$. Such a continuation is unique when it exists; it exists for every\nelliptic curve over $\\mathbb Q$ by the modularity theorem, and it is conjectured to exist over\nevery number field. The case $K = \\mathbb Q$ is the official Millennium Prize Problem. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture [DecidableEq K] (E : WeierstrassCurve K)\n    [E.IsElliptic] (L : ℂ → ℂ) (hL : Differentiable ℂ L)\n    (hLE : ∀ s : ℂ, 3 / 2 < s.re → L s = LFunction E s) :\n    analyticOrderAt L 1 = Module.finrank ℤ E⟮K⟯ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Birch and Swinnerton-Dyer conjecture\n\nLet $E$ be an elliptic curve over a number field $K$. For a finite place $v$ of $K$ with residue\nfield $\\mathbb{F}_v$ of cardinality $q_v$, let $\\tilde{E}$ be the reduction modulo $v$ of a\nWeierstrass equation for $E$ that is minimal at $v$, and put\n$a_v = q_v + 1 - \\#\\tilde{E}(\\mathbb{F}_v)$. The Hasse–Weil $L$-function of $E$ is the Euler product\n$$L(E, s) = \\prod_{v \\text{ good}} (1 - a_v q_v^{-s} + q_v^{1 - 2s})^{-1}\n  \\prod_{v \\text{ bad}} (1 - a_v q_v^{-s})^{-1},$$\nwhich converges for $\\operatorname{Re}(s) > 3/2$. Hasse conjectured that $L(E, s)$ extends to an\nentire function; for $K = \\mathbb{Q}$ this is a consequence of the modularity theorem, but for a\ngeneral number field it is still open.\n\nThe **Birch and Swinnerton-Dyer conjecture** states that the rank of the finitely generated abelian\ngroup $E(K)$ equals the order of vanishing of $L(E, s)$ at $s = 1$. The case $K = \\mathbb{Q}$ is one\nof the seven Millennium Prize Problems of the Clay Mathematics Institute.\n\nThe strong form of the conjecture, which predicts the leading Taylor coefficient of $L(E, s)$ at\n$s = 1$ in terms of the Tate–Shafarevich group, the real period, the regulator, the Tamagawa\nnumbers and the torsion subgroup of $E$, is not stated here.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Birch_and_Swinnerton-Dyer_conjecture)\n- [The Clay Institute](https://www.claymath.org/wp-content/uploads/2022/05/birchswin.pdf)\n- [J. H. Silverman, *The Arithmetic of Elliptic Curves*, Appendix C §16][silverman2009]\n-/\n\nnamespace BirchAndSwinnertonDyerConjecture\n\nopen IsDedekindDomain NumberField WeierstrassCurve\nopen Module (finrank)\nopen scoped WeierstrassCurve.Affine\n\nvariable {K : Type*} [Field K] [NumberField K] (E : WeierstrassCurve K)\n  (v : HeightOneSpectrum (𝓞 K))\n\n/-- A Weierstrass equation for `E` that is minimal at the finite place `v` of `K`: its coefficients\nlie in the valuation ring `𝓞_{K,v} = {x ∈ K | v(x) ≥ 0}` of `v`, and the `v`-adic valuation of\nits discriminant is minimal among all such Weierstrass equations for `E`. -/\nnoncomputable abbrev minimalModelAt : WeierstrassCurve K :=\n  E.minimal (v.valuation K).integer\n\n/-- The reduction `Ẽ` modulo `v` of a Weierstrass equation for `E` that is minimal at `v`.\nThis is a (possibly singular) Weierstrass curve over the residue field `𝔽_v` of `v`. -/\nnoncomputable abbrev reductionAt :\n    WeierstrassCurve (IsLocalRing.ResidueField (v.valuation K).integer) :=\n  (minimalModelAt E v).reduction (v.valuation K).integer\n\n/-- The cardinality `q_v` of the residue field `𝔽_v` of the finite place `v`. -/\nnoncomputable def residueCard : ℕ :=\n  Nat.card (IsLocalRing.ResidueField (v.valuation K).integer)\n\n/-- The number `a_v = q_v + 1 - #Ẽ(𝔽_v)`, where `#Ẽ(𝔽_v)` counts all the `𝔽_v`-points of the\nreduced curve `Ẽ`: the affine solutions of the reduced Weierstrass equation together with the\npoint at infinity, including the singular point if there is one.\n\nFor a place of good reduction this is the trace of Frobenius. For a place of bad reduction it\nequals `1`, `-1` or `0` according as the reduction is split multiplicative, nonsplit multiplicative\nor additive. -/\nnoncomputable def av : ℤ :=\n  residueCard v - Nat.card {P : IsLocalRing.ResidueField (v.valuation K).integer ×\n    IsLocalRing.ResidueField (v.valuation K).integer // (reductionAt E v).toAffine.Equation P.1 P.2}\n\nopen scoped Classical in\n/-- The local Euler factor `L_v(E, s)` of the Hasse–Weil `L`-function of `E` at the finite place\n`v`: it is `(1 - a_v q_v^{-s} + q_v^{1 - 2s})⁻¹` if `E` has good reduction at `v`, and\n`(1 - a_v q_v^{-s})⁻¹` if `E` has bad reduction at `v`. -/\nnoncomputable def eulerFactor (s : ℂ) : ℂ :=\n  if IsGoodReduction (v.valuation K).integer (minimalModelAt E v) then\n    (1 - av E v * (residueCard v : ℂ) ^ (-s) + (residueCard v : ℂ) ^ (1 - 2 * s))⁻¹\n  else\n    (1 - av E v * (residueCard v : ℂ) ^ (-s))⁻¹\n\n/-- The Euler factor at a place of good reduction. -/\n@[category API, AMS 11 14]\ntheorem eulerFactor_of_isGoodReduction\n    (h : IsGoodReduction (v.valuation K).integer (minimalModelAt E v)) (s : ℂ) :\n    eulerFactor E v s =\n      (1 - av E v * (residueCard v : ℂ) ^ (-s) + (residueCard v : ℂ) ^ (1 - 2 * s))⁻¹ := by\n  rw [eulerFactor, if_pos h]\n\n/-- The Euler factor at a place of bad reduction. -/\n@[category API, AMS 11 14]\ntheorem eulerFactor_of_not_isGoodReduction\n    (h : ¬ IsGoodReduction (v.valuation K).integer (minimalModelAt E v)) (s : ℂ) :\n    eulerFactor E v s = (1 - av E v * (residueCard v : ℂ) ^ (-s))⁻¹ := by\n  rw [eulerFactor, if_neg h]\n\n/-- `L : ℂ → ℂ` is the Hasse–Weil `L`-function of `E`: it is an entire function which agrees with\nthe Euler product `L(E, s) = ∏_v L_v(E, s)` over the finite places `v` of `K` on the half plane\n`Re s > 3/2`, where the product converges.\n\nBy the identity theorem such a function is unique if it exists. Its existence is Hasse's\nconjecture; over `ℚ` it follows from the modularity theorem. -/\ndef IsHasseWeilLFunction (L : ℂ → ℂ) : Prop :=\n  Differentiable ℂ L ∧\n    ∀ s : ℂ, 3 / 2 < s.re → L s = ∏' v : HeightOneSpectrum (𝓞 K), eulerFactor E v s\n\n/-- The Hasse–Weil `L`-function of `E` is unique. -/\n@[category API, AMS 11 14]\ntheorem IsHasseWeilLFunction.unique {E : WeierstrassCurve K} {L L' : ℂ → ℂ}\n    (hL : IsHasseWeilLFunction E L) (hL' : IsHasseWeilLFunction E L') : L = L' := by\n  refine AnalyticOnNhd.eq_of_eventuallyEq (Complex.analyticOnNhd_univ_iff_differentiable.2 hL.1)\n    (Complex.analyticOnNhd_univ_iff_differentiable.2 hL'.1) (z₀ := 2) ?_\n  have hopen : IsOpen {s : ℂ | 3 / 2 < s.re} := isOpen_lt continuous_const Complex.continuous_re\n  filter_upwards [hopen.mem_nhds (by norm_num)] with s hs\n  rw [hL.2 s hs, hL'.2 s hs]\n\n/-- Hasse's conjecture for elliptic curves over `ℚ`, a consequence of the modularity theorem:\nthe Hasse–Weil `L`-function of an elliptic curve over `ℚ` extends to an entire function. -/\n@[category research solved, AMS 11 14]\ntheorem exists_isHasseWeilLFunction (E : WeierstrassCurve ℚ) [E.IsElliptic] :\n    ∃ L, IsHasseWeilLFunction E L := by\n  sorry\n\n/-- **The Birch and Swinnerton-Dyer conjecture.** Let $E$ be an elliptic curve over $\\mathbb{Q}$\nand let $L(E, s)$ be its Hasse–Weil $L$-function. Then the rank of the abelian group\n$E(\\mathbb{Q})$ of rational points of $E$ is the order of the zero of $L(E, s)$ at $s = 1$:\n$$\\operatorname{rank}_{\\mathbb{Z}} E(\\mathbb{Q}) = \\operatorname{ord}_{s = 1} L(E, s).$$\n\nThis is the official Millennium Prize Problem as posed by the\n[Clay Mathematics Institute](https://www.claymath.org/wp-content/uploads/2022/05/birchswin.pdf).\nHere `L` is any entire function agreeing with the Euler product defining $L(E, s)$ on the half\nplane $\\operatorname{Re}(s) > 3/2$; such a function exists by the modularity theorem and is\nunique by the identity theorem. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture (E : WeierstrassCurve ℚ) [E.IsElliptic]\n    (L : ℂ → ℂ) (hL : IsHasseWeilLFunction E L) :\n    analyticOrderAt L 1 = finrank ℤ E⟮ℚ⟯ := by\n  sorry\n\n/-- **The Birch and Swinnerton-Dyer conjecture over a number field.** Let $E$ be an elliptic\ncurve over a number field $K$. Then the Hasse–Weil $L$-function $L(E, s)$ extends to an entire\nfunction (Hasse's conjecture), and the rank of the abelian group $E(K)$ of $K$-points of $E$ is\nthe order of the zero of $L(E, s)$ at $s = 1$:\n$$\\operatorname{rank}_{\\mathbb{Z}} E(K) = \\operatorname{ord}_{s = 1} L(E, s).$$\n\nSince the analytic continuation of $L(E, s)$ is not known for a general number field $K$, this\nstatement includes it as part of the conjecture. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture.variants.number_field [DecidableEq K]\n    [E.IsElliptic] :\n    ∃ L, IsHasseWeilLFunction E L ∧ analyticOrderAt L 1 = finrank ℤ E⟮K⟯ := by\n  sorry\n\nend BirchAndSwinnertonDyerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None substantive. The table's text span for the rank slot speaks of a general number field K while the notes allow the Clay form K = ℚ; I stated the slot over ℚ (non-vacuous thanks to the modularity theorem) and added the general-K version as an extra variant that asserts the analytic continuation as part of the conjecture.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Base field: the slot declaration is stated over K = ℚ (the official Clay Millennium Prize statement), as the notes allow; the Wikipedia lead speaks of a general number field K, so an extra variant `birch_and_swinnerton_dyer_conjecture.variants.number_field` over an arbitrary number field is included (∃ L, IsHasseWeilLFunction E L ∧ ord = rank, i.e. it asserts Hasse's continuation conjecture as part of the statement since it is open for K ≠ ℚ).",
+    "The L-function is represented relationally: `IsHasseWeilLFunction E L` := L is entire (Differentiable ℂ L) and L s = ∏' v eulerFactor E v s for all s with 3/2 < Re s. The main theorem quantifies over all such L (hypothesis form). Existence over ℚ is a theorem (modularity; recorded as `exists_isHasseWeilLFunction`, category research solved, sorry) and uniqueness is proved in the file (`IsHasseWeilLFunction.unique`), so the hypothesis form is equivalent to BSD and not vacuous.",
+    "Order of the zero at s = 1 is `analyticOrderAt L 1 : ℕ∞` compared with the ℕ-valued rank cast to ℕ∞. For an entire L this is the order of vanishing; the value ⊤ would require L ≡ 0, impossible since the Euler product is nonzero for Re s > 3/2.",
+    "Rank is `Module.finrank ℤ E⟮ℚ⟯` (as in FormalConjectures/Wikipedia/EllipticCurveRank.lean); by Mordell–Weil the group is finitely generated so this is the free rank.",
+    "Local data at a finite place v: minimal model via Mathlib's `WeierstrassCurve.minimal R` with R = (v.valuation K).integer, the valuation ring 𝓞_{K,v} ⊆ K (a DVR with fraction field K; minimality over it is equivalent to minimality over the completion K_v). `minimal` picks a model by choice, but a_v and good reduction do not depend on the choice (any two minimal models differ by a change of variables with unit u and integral r, s, t, giving isomorphic reductions).",
+    "a_v := q_v + 1 − #Ẽ(𝔽_v), where #Ẽ(𝔽_v) counts all affine solutions of the reduced Weierstrass equation (including a singular point) plus the point at infinity; Lean form `residueCard v - Nat.card {affine solutions}` in ℤ. This uniform formula gives the trace of Frobenius at good places and 1 / −1 / 0 at split multiplicative / nonsplit multiplicative / additive places (checked by hand against y² = x³ + a x² and y² = x³).",
+    "Euler factor: (1 − a_v q_v^{-s} + q_v^{1−2s})⁻¹ if `IsGoodReduction` (v(Δ_min) = 0, i.e. v ∤ N), else (1 − a_v q_v^{-s})⁻¹; q_v := Nat.card of the residue field of 𝓞_{K,v} (a finite field, so no junk value). Powers are `Complex.cpow` of a positive real, i.e. the principal branch. Decidability of `IsGoodReduction` is handled with `open scoped Classical in`.",
+    "The infinite product uses Mathlib's `∏'` over `HeightOneSpectrum (𝓞 K)` (all finite places). For Re s > 3/2 the factors are 1 + O(q_v^{1/2−Re s}) with summable norms, so the product is `Multipliable` in Mathlib's sense (`Complex.multipliable_one_add_of_summable`) and `∏'` is the genuine Euler product, not the junk value 1.",
+    "`[DecidableEq K]` is required in the number-field variant only to obtain the group structure on E⟮K⟯ (as in the repo's `mordell_weil`); for ℚ it is automatic.",
+    "The historical precursor ∏_{p≤x} N_p/p ≈ C (log x)^r is not stated, following the notes."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "WeierstrassCurve.minimal (used directly; abbrev only fixes the DVR (v.valuation K).integer)",
+     "name": "BirchAndSwinnertonDyerConjecture.minimalModelAt",
+     "why_needed": "Abbreviation for a Weierstrass equation of E minimal at the finite place v (Mathlib's `WeierstrassCurve.minimal` applied to the valuation ring of v); used to define the reduction, a_v and good reduction."
+    },
+    {
+     "closest_existing_considered": "WeierstrassCurve.reduction (used directly)",
+     "name": "BirchAndSwinnertonDyerConjecture.reductionAt",
+     "why_needed": "Reduction modulo v of the minimal model, a Weierstrass curve over the residue field 𝔽_v, needed to count points."
+    },
+    {
+     "closest_existing_considered": "Ideal.absNorm v.asIdeal (equal mathematically, but Nat.card of the residue field of the same DVR is more transparent and matches the reduction)",
+     "name": "BirchAndSwinnertonDyerConjecture.residueCard",
+     "why_needed": "q_v = #𝔽_v, needed for the Euler factor and a_v."
+    },
+    {
+     "closest_existing_considered": "ModularityConjecture.WeierstrassCurve.ap (not minimal-model based, wrong at bad primes, ℚ only)",
+     "name": "BirchAndSwinnertonDyerConjecture.av",
+     "why_needed": "a_v = q_v + 1 − #Ẽ(𝔽_v); Mathlib has no point count / trace of Frobenius for Weierstrass curves. The repo's ModularityConjecture.WeierstrassCurve.ap is only correct at good primes of a non-minimal model over ℚ and is local to that file."
+    },
+    {
+     "closest_existing_considered": "EulerProduct / LSeries machinery in Mathlib (only for completely multiplicative Dirichlet coefficients, no elliptic-curve local factors)",
+     "name": "BirchAndSwinnertonDyerConjecture.eulerFactor",
+     "why_needed": "Local Euler factor L_v(E, s) of the Hasse–Weil L-function; no such notion in Mathlib."
+    },
+    {
+     "closest_existing_considered": "LSeries / ZMod.LFunction / riemannZeta (Dirichlet-character L-functions only)",
+     "name": "BirchAndSwinnertonDyerConjecture.IsHasseWeilLFunction",
+     "why_needed": "Mathlib has no Hasse–Weil L-function of an elliptic curve nor its analytic continuation; the predicate characterises L(E, s) as the entire function extending the Euler product on Re s > 3/2 (unique by the identity theorem, proved in-file)."
+    }
+   ],
+   "per_slot": {
+    "birch_and_swinnerton_dyer_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated for elliptic curves E over ℚ (the Clay/Millennium form, as permitted by the notes): for every entire L : ℂ → ℂ agreeing with the Euler product of E on Re s > 3/2 (this L exists by the modularity theorem and is unique by the identity theorem, both recorded in the file), analyticOrderAt L 1 = finrank ℤ E⟮ℚ⟯. Mathlib has no Hasse–Weil L-function, so its Euler product was defined from Mathlib's minimal models / reductions (`WeierstrassCurve.minimal`, `reduction`, `IsGoodReduction`). A number-field variant (`birch_and_swinnerton_dyer_conjecture.variants.number_field`, asserting the analytic continuation as part of the conjecture) is included as an extra declaration."
+    },
+    "birch_and_swinnerton_dyer_conjecture.variants.strong": {
+     "outcome": "missing_primitives",
+     "why": "The right-hand side #Ш(E)·Ω_E·R_E·∏c_p/(#E_tor)² needs the Tate–Shafarevich group (requires continuous Galois cohomology H¹(Gal(K̄/K), E(K̄)) with local restriction maps, or torsors/Weil–Châtelet groups — none in Mathlib or FormalConjecturesForMathlib; Mathlib's `groupCohomology` is for abstract groups and would give the wrong (non-continuous) group), the Néron–Tate canonical height/regulator, the real period (integral of the invariant differential over E(ℝ)) and Tamagawa numbers [E(ℚ_p):E_0(ℚ_p)]. None of these exist in Mathlib, and defining Ш faithfully is far beyond a bespoke definition, so the slot was omitted rather than stated approximately."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "birch_and_swinnerton_dyer_conjecture": "/-- **The Birch and Swinnerton-Dyer conjecture.** Let $E$ be an elliptic curve over $\\mathbb{Q}$\nand let $L(E, s)$ be its Hasse–Weil $L$-function. Then the rank of the abelian group\n$E(\\mathbb{Q})$ of rational points of $E$ is the order of the zero of $L(E, s)$ at $s = 1$:\n$$\\operatorname{rank}_{\\mathbb{Z}} E(\\mathbb{Q}) = \\operatorname{ord}_{s = 1} L(E, s).$$\n\nThis is the official Millennium Prize Problem as posed by the\n[Clay Mathematics Institute](https://www.claymath.org/wp-content/uploads/2022/05/birchswin.pdf).\nHere `L` is any entire function agreeing with the Euler product defining $L(E, s)$ on the half\nplane $\\operatorname{Re}(s) > 3/2$; such a function exists by the modularity theorem and is\nunique by the identity theorem. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture (E : WeierstrassCurve ℚ) [E.IsElliptic]\n    (L : ℂ → ℂ) (hL : IsHasseWeilLFunction E L) :\n    analyticOrderAt L 1 = finrank ℤ E⟮ℚ⟯ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Birch and Swinnerton-Dyer conjecture\n\nThe rank form of the Birch and Swinnerton-Dyer conjecture is stated for elliptic curves over\n`ℚ`. The Hasse–Weil L-function is characterized as the entire continuation of its Euler-product\nDirichlet series.\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/Birch_and_Swinnerton-Dyer_conjecture)\n-/\n\nnamespace BirchAndSwinnertonDyerConjecture\n\nopen scoped WeierstrassCurve.Affine\nopen Module (finrank)\n\n/-- An elliptic curve over `ℚ`, presented by a globally minimal integral Weierstrass model. -/\nstructure EllipticCurve where\n  model : WeierstrassCurve ℤ\n  discr_ne_zero : model.Δ ≠ 0\n  isMinimal : ∀ (C : WeierstrassCurve.VariableChange ℚ) (W : WeierstrassCurve ℤ),\n    C • model.map (Int.castRingHom ℚ) = W.map (Int.castRingHom ℚ) →\n      model.Δ.natAbs ≤ W.Δ.natAbs\n\nnamespace EllipticCurve\n\n/-- The rational Weierstrass curve associated to an integral model. -/\nabbrev rationalModel (E : EllipticCurve) : WeierstrassCurve ℚ :=\n  E.model.map (Int.castRingHom ℚ)\n\ninstance (E : EllipticCurve) : E.rationalModel.IsElliptic where\n  isUnit := isUnit_iff_ne_zero.mpr <| by\n    rw [rationalModel, WeierstrassCurve.map_Δ]\n    exact Int.cast_ne_zero.mpr E.discr_ne_zero\n\n/-- The Mordell–Weil rank of an elliptic curve over `ℚ`. -/\nnoncomputable abbrev rank (E : EllipticCurve) : ℕ :=\n  finrank ℤ E.rationalModel⟮ℚ⟯\n\n/-- The affine points on the reduction modulo `p` of the chosen minimal integral model. -/\ndef pointsMod (E : EllipticCurve) (p : ℕ) : Set (ZMod p × ZMod p) :=\n  {P | (E.model.map (Int.castRingHom (ZMod p))).toAffine.Equation P.1 P.2}\n\n/-- The local trace `a_p = p + 1 - #E(𝔽_p)`, with the point at infinity removed from the count. -/\nnoncomputable def localTrace (E : EllipticCurve) (p : ℕ) : ℤ :=\n  p - (E.pointsMod p).ncard\n\n/-- The coefficient of `p^k` in the Hasse–Weil Dirichlet series. At good primes this is the\nrecurrence associated to `(1 - a_p T + p T²)⁻¹`; at bad primes it is associated to\n`(1 - a_p T)⁻¹`. -/\nnoncomputable def localCoefficient (E : EllipticCurve) (p : ℕ) : ℕ → ℤ\n  | 0 => 1\n  | 1 => E.localTrace p\n  | k + 2 =>\n      if p ∣ E.model.Δ.natAbs then\n        E.localTrace p * E.localCoefficient p (k + 1)\n      else\n        E.localTrace p * E.localCoefficient p (k + 1) - p * E.localCoefficient p k\n\n/-- The multiplicative coefficients of the Hasse–Weil Dirichlet series. -/\nnoncomputable def coefficient (E : EllipticCurve) (n : ℕ) : ℤ :=\n  if n = 0 then 0 else n.factorization.prod fun p k ↦ E.localCoefficient p k\n\n/-- A function is the Hasse–Weil L-function of `E` if it is entire and agrees, in the half-plane\nof absolute convergence, with the Dirichlet series determined by the local reductions of `E`. -/\ndef IsHasseWeilLFunction (E : EllipticCurve) (L : ℂ → ℂ) : Prop :=\n  Differentiable ℂ L ∧\n    ∀ s : ℂ, 3 / 2 < s.re → L s = LSeries (fun n ↦ E.coefficient n) s\n\nend EllipticCurve\n\n/-- The rank form of the Birch and Swinnerton-Dyer conjecture over `ℚ`: for every elliptic curve\n`E`, its Hasse–Weil L-function has a zero at `s = 1` whose order equals the rank of the abelian\ngroup `E(ℚ)` of rational points. The existential quantifier also asserts the entire continuation\nof the defining Dirichlet series. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture :\n    ∀ E : EllipticCurve, ∃ L : ℂ → ℂ,\n      E.IsHasseWeilLFunction L ∧ analyticOrderAt L 1 = E.rank := by\n  sorry\n\nend BirchAndSwinnertonDyerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used the official Millennium Prize specialization to elliptic curves over ℚ rather than general number fields K; this avoids folding the independently conjectural analytic continuation over arbitrary K into the rank statement.",
+    "Represented an elliptic curve over ℚ by a globally minimal integral generalized Weierstrass model. Global minimality is expressed by minimal absolute discriminant among integral models related by a rational Weierstrass variable change.",
+    "Defined a_p as p minus the number of affine solutions of the reduced minimal equation. This equals p + 1 minus the projective point count because the Weierstrass model has one point at infinity, and it also gives the standard bad-reduction local trace.",
+    "Defined prime-power coefficients by the inverse Euler-factor recurrences: 1 - a_p T + p T² at good primes and 1 - a_p T at bad primes, then assembled the multiplicative Dirichlet coefficients using prime factorization.",
+    "Characterized the Hasse–Weil L-function as an entire function agreeing with the intrinsic Dirichlet series on Re(s) > 3/2. The theorem existentially asserts this continuation and equates its analytic order at 1 with the Mordell–Weil rank. This avoids Mathlib LSeries's junk value outside its convergence region.",
+    "Omitted the strong variant rather than introducing unconstrained placeholders for its refined arithmetic invariants."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's WeierstrassCurve ℚ and the repository's EllipticCurveRank.RatEllipticCurve; neither packages a globally minimal generalized integral model, and the short reduced model is not sufficient for uniform minimal reduction at 2 and 3.",
+     "name": "BirchAndSwinnertonDyerConjecture.EllipticCurve",
+     "why_needed": "Packages a globally minimal integral Weierstrass model of an elliptic curve over ℚ, needed so the bad-prime Euler factors are intrinsic."
+    },
+    {
+     "closest_existing_considered": "WeierstrassCurve.map/baseChange; this abbreviation specializes that existing operation.",
+     "name": "BirchAndSwinnertonDyerConjecture.EllipticCurve.rationalModel",
+     "why_needed": "Base-changes the integral model to ℚ for rational points and Mordell–Weil rank."
+    },
+    {
+     "closest_existing_considered": "Module.finrank and EllipticCurveRank.RatEllipticCurve.rank; the latter applies to a different curve package.",
+     "name": "BirchAndSwinnertonDyerConjecture.EllipticCurve.rank",
+     "why_needed": "Names the ℤ-finrank of the rational point group used in BSD."
+    },
+    {
+     "closest_existing_considered": "ModularityConjecture.setOfPointsModN, which is tied to rational coefficients and explicitly does not handle the conductor/minimal-model issue intrinsically.",
+     "name": "BirchAndSwinnertonDyerConjecture.EllipticCurve.pointsMod",
+     "why_needed": "Defines affine solutions of the minimal equation modulo p for the local trace."
+    },
+    {
+     "closest_existing_considered": "ModularityConjecture.WeierstrassCurve.ap; that definition reduces arbitrary rational coefficients and is only used away from the conductor.",
+     "name": "BirchAndSwinnertonDyerConjecture.EllipticCurve.localTrace",
+     "why_needed": "Defines the standard local coefficient a_p from the reduced point count."
+    },
+    {
+     "closest_existing_considered": "No elliptic Hasse–Weil Euler-factor coefficient definition was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "BirchAndSwinnertonDyerConjecture.EllipticCurve.localCoefficient",
+     "why_needed": "Defines coefficients at prime powers from the good and bad local Euler factors."
+    },
+    {
+     "closest_existing_considered": "Mathlib LSeries accepts a coefficient sequence but does not construct elliptic-curve coefficients.",
+     "name": "BirchAndSwinnertonDyerConjecture.EllipticCurve.coefficient",
+     "why_needed": "Assembles the multiplicative Hasse–Weil Dirichlet coefficients from local prime-power coefficients."
+    },
+    {
+     "closest_existing_considered": "Mathlib LSeries is only the raw series and returns zero when nonsummable; ZMod.LFunction provides continuation only for Dirichlet characters.",
+     "name": "BirchAndSwinnertonDyerConjecture.EllipticCurve.IsHasseWeilLFunction",
+     "why_needed": "Expresses an entire continuation agreeing with the Hasse–Weil Dirichlet series on its convergence half-plane; Mathlib has no Hasse–Weil L-function."
+    }
+   ],
+   "per_slot": {
+    "birch_and_swinnerton_dyer_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "birch_and_swinnerton_dyer_conjecture.variants.strong": {
+     "outcome": "missing_primitives",
+     "why": "A faithful full BSD formula over ℚ requires intrinsic definitions of the elliptic-curve Tate–Shafarevich group (including its conjectural finiteness/order), the Néron real period with the real-component factor, the canonical-height Mordell–Weil regulator, the conductor, and local Tamagawa numbers. These are absent from Mathlib and FormalConjecturesForMathlib. Replacing them by unconstrained fields or parameters would state an arbitrary-data equality rather than the strong Birch–Swinnerton-Dyer conjecture."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "birch_and_swinnerton_dyer_conjecture": "/-- The rank form of the Birch and Swinnerton-Dyer conjecture over `ℚ`: for every elliptic curve\n`E`, its Hasse–Weil L-function has a zero at `s = 1` whose order equals the rank of the abelian\ngroup `E(ℚ)` of rational points. The existential quantifier also asserts the entire continuation\nof the defining Dirichlet series. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture :\n    ∀ E : EllipticCurve, ∃ L : ℂ → ℂ,\n      E.IsHasseWeilLFunction L ∧ analyticOrderAt L 1 = E.rank := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjectures.Wikipedia.EllipticCurveRank\nimport Mathlib.AlgebraicGeometry.EllipticCurve.Reduction\nimport Mathlib.NumberTheory.Padics.PadicIntegers\n\n/-!\n# Birch and Swinnerton-Dyer conjecture\n\nWe state the rank conjecture for elliptic curves over $\\mathbb{Q}$. This is the version in the\nofficial Millennium Prize problem. The Hasse--Weil $L$-function is characterized as the entire\ncontinuation of its Euler product.\n\n*References:*\n- [Wikipedia, *Birch and Swinnerton-Dyer conjecture*](https://en.wikipedia.org/wiki/Birch_and_Swinnerton-Dyer_conjecture)\n-/\n\nnamespace BirchAndSwinnertonDyerConjecture\n\nopen EllipticCurveRank\nopen EllipticCurveRank.RatEllipticCurve\n\n/-- The trace $a_p=p-\\#\\widetilde E(\\mathbb{F}_p)$, where the cardinality counts all affine\nsolutions of a minimal Weierstrass equation reduced modulo `p`. -/\nnoncomputable def localTrace (E : RatEllipticCurve) (p : {p : ℕ // p.Prime}) : ℤ := by\n  letI : Fact p.1.Prime := ⟨p.2⟩\n  let W : WeierstrassCurve ℚ_[p.1] := E.toWeierstrass.map (algebraMap ℚ ℚ_[p.1])\n  let M := W.minimal ℤ_[p.1]\n  let R := M.reduction ℤ_[p.1]\n  exact (p.1 : ℤ) - Nat.card {P : IsLocalRing.ResidueField ℤ_[p.1] ×\n    IsLocalRing.ResidueField ℤ_[p.1] // R.toAffine.Equation P.1 P.2}\n\n/-- Whether the minimal Weierstrass equation of `E` has good reduction at `p`. -/\nnoncomputable def HasGoodReduction (E : RatEllipticCurve) (p : {p : ℕ // p.Prime}) : Prop := by\n  letI : Fact p.1.Prime := ⟨p.2⟩\n  let W : WeierstrassCurve ℚ_[p.1] := E.toWeierstrass.map (algebraMap ℚ ℚ_[p.1])\n  exact ((W.minimal ℤ_[p.1]).reduction ℤ_[p.1]).IsElliptic\n\n/-- The local Euler factor of the Hasse--Weil $L$-function of `E` at the prime `p`,\nevaluated at `s`. At a prime of good reduction it is\n$(1-a_p p^{-s}+p^{1-2s})^{-1}$; at a prime of bad reduction it is\n$(1-a_p p^{-s})^{-1}$. -/\nnoncomputable def localEulerFactor (E : RatEllipticCurve) (p : {p : ℕ // p.Prime})\n    (s : ℂ) : ℂ := by\n  classical\n  exact if HasGoodReduction E p then\n    (1 - localTrace E p * (p.1 : ℂ) ^ (-s) + (p.1 : ℂ) ^ (1 - 2 * s))⁻¹\n  else\n    (1 - localTrace E p * (p.1 : ℂ) ^ (-s))⁻¹\n\n/-- `L` is the Hasse--Weil $L$-function of the elliptic curve `E` over $\\mathbb{Q}$ if it is\nentire and agrees, in the half-plane $\\operatorname{Re}(s)>3/2$, with the Euler product of its\nstandard local factors. -/\ndef IsHasseWeilLFunction (E : RatEllipticCurve) (L : ℂ → ℂ) : Prop :=\n  Differentiable ℂ L ∧\n    ∀ s : ℂ, 3 / 2 < s.re → L s = ∏' p : {p : ℕ // p.Prime}, localEulerFactor E p s\n\n/-- **Birch and Swinnerton-Dyer rank conjecture.** For every elliptic curve $E$ over\n$\\mathbb{Q}$, its Hasse--Weil Euler product has an entire continuation, and the rank of the\nabelian group $E(\\mathbb{Q})$ equals the order of vanishing of that continuation at $s=1$.\n(The existence of the continuation over $\\mathbb{Q}$ is already known by modularity.) -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture (E : RatEllipticCurve) :\n    ∃ L : ℂ → ℂ, IsHasseWeilLFunction E L ∧ analyticOrderAt L 1 = E.rank := by\n  sorry\n\nend BirchAndSwinnertonDyerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Specialized the rank conjecture to elliptic curves over ℚ, the official Clay Millennium formulation explicitly permitted by the decomposition notes. Curves are represented by the repository's reduced integral short Weierstrass representatives `RatEllipticCurve`.",
+    "Characterized the Hasse–Weil L-function relationally as an entire function agreeing for Re(s) > 3/2 with its Euler product. The theorem existentially asserts such a continuation, avoiding a vacuous implication from an uninhabited interface.",
+    "Defined each local factor using Mathlib's minimal model over ℤ_p after base change to ℚ_p. The trace counts all affine solutions of the reduced minimal equation, which gives the standard a_p at both good and bad reduction; ellipticity of the minimal reduction selects the good or bad Euler factor.",
+    "Used Mathlib's `analyticOrderAt`; the explicit entire-function condition prevents its documented non-analytic junk value, and equality to the natural-number rank also excludes infinite vanishing order.",
+    "Omitted the strong formula rather than introducing arbitrary stand-ins for its unavailable named arithmetic invariants."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`ModularityConjecture.WeierstrassCurve.ap`, which counts a displayed rational model and is explicitly documented as differing from the literature at bad reduction; Mathlib's `WeierstrassCurve.minimal` and `reduction` were instead used to obtain the correct model.",
+     "name": "localTrace",
+     "why_needed": "Defines the standard local coefficient a_p from the point count of a minimal reduction; no elliptic-curve Hasse–Weil local coefficient exists in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `WeierstrassCurve.IsGoodReduction`; the bespoke wrapper specializes it operationally to a rational curve at a prime via base change to ℚ_p and minimal reduction over ℤ_p.",
+     "name": "HasGoodReduction",
+     "why_needed": "Selects the quadratic good-reduction Euler factor versus the linear bad-reduction factor."
+    },
+    {
+     "closest_existing_considered": "Mathlib's generic `LSeries` and Dirichlet-character L-functions, neither of which supplies elliptic-curve Euler factors or their analytic continuation.",
+     "name": "localEulerFactor",
+     "why_needed": "Supplies the standard local factors whose product defines the elliptic-curve Hasse–Weil L-function, absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's generic `LSeries`, `StrongFEPair`, and modular-form APIs; there is no cusp-form/elliptic-curve L-function continuation connecting these APIs.",
+     "name": "IsHasseWeilLFunction",
+     "why_needed": "Faithfully identifies an entire continuation of the elliptic-curve Euler product without using an opaque constant or arbitrary choice."
+    }
+   ],
+   "per_slot": {
+    "birch_and_swinnerton_dyer_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "birch_and_swinnerton_dyer_conjecture.variants.strong": {
+     "outcome": "missing_primitives",
+     "why": "Mathlib and FormalConjecturesForMathlib do not define the Tate–Shafarevich group, its finiteness/cardinality, the canonical-height regulator, the normalized real period, or Tamagawa numbers/conductor for elliptic curves. Modeling these as unconstrained numeric fields would not faithfully state the strong BSD formula."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "birch_and_swinnerton_dyer_conjecture": "/-- **Birch and Swinnerton-Dyer rank conjecture.** For every elliptic curve $E$ over\n$\\mathbb{Q}$, its Hasse--Weil Euler product has an entire continuation, and the rank of the\nabelian group $E(\\mathbb{Q})$ equals the order of vanishing of that continuation at $s=1$.\n(The existence of the continuation over $\\mathbb{Q}$ is already known by modularity.) -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture (E : RatEllipticCurve) :\n    ∃ L : ℂ → ℂ, IsHasseWeilLFunction E L ∧ analyticOrderAt L 1 = E.rank := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Birch and Swinnerton-Dyer conjecture\n\nThe conjecture relates the Mordell–Weil rank of an elliptic curve over $\\mathbb Q$ to the\norder of vanishing of its Hasse–Weil $L$-function at $s = 1$.\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Birch_and_Swinnerton-Dyer_conjecture)\n-/\n\nnamespace BirchAndSwinnertonDyerConjecture\n\nopen Module (finrank)\nopen WeierstrassCurve\nopen scoped WeierstrassCurve.Projective\n\n/-- An integral Weierstrass equation is globally minimal if its discriminant divides the\ndiscriminant of every integral Weierstrass equation isomorphic to it over $\\mathbb Q$. -/\ndef IsGlobalMinimal (W : WeierstrassCurve ℤ) : Prop :=\n  ∀ (W' : WeierstrassCurve ℤ) (C : VariableChange ℚ),\n    C • W.baseChange ℚ = W'.baseChange ℚ → W.Δ ∣ W'.Δ\n\n/-- The number of projective points on the reduction of an integral Weierstrass equation\nmodulo a prime $p$. -/\nnoncomputable def reductionPointCount (W : WeierstrassCurve ℤ) (p : Nat.Primes) : ℕ :=\n  Nat.card\n    (WeierstrassCurve.Projective.Point\n      (W.map (Int.castRingHom (ZMod p.1))).toProjective)\n\n/-- The coefficient $a_p = p + 1 - \\#\\widetilde E(\\mathbb F_p)$ of the local Euler factor. -/\nnoncomputable def localTrace (W : WeierstrassCurve ℤ) (p : Nat.Primes) : ℤ :=\n  (p.1 : ℤ) + 1 - reductionPointCount W p\n\n/-- The coefficient of $p^{1-2s}$ in the local Euler factor: one at primes of good\nreduction and zero at primes of bad reduction. -/\ndef goodReductionCoefficient (W : WeierstrassCurve ℤ) (p : Nat.Primes) : ℤ :=\n  if (W.map (Int.castRingHom (ZMod p.1))).Δ = 0 then 0 else 1\n\n/-- The Hasse–Weil Euler product of a globally minimal integral Weierstrass equation.\nFor $\\operatorname{Re}(s)>3/2$ it is\n$$\\prod_p(1-a_p p^{-s}+\\varepsilon_p p^{1-2s})^{-1}.$$\nAt a bad prime, the point-count definition of $a_p$ gives respectively $1$, $-1$, or $0$\nfor split multiplicative, nonsplit multiplicative, or additive reduction. -/\nnoncomputable def hasseWeilEulerProduct (W : WeierstrassCurve ℤ) (s : ℂ) : ℂ :=\n  ∏' p : Nat.Primes,\n    (1 - (localTrace W p : ℂ) * (p.1 : ℂ) ^ (-s) +\n      (goodReductionCoefficient W p : ℂ) * (p.1 : ℂ) ^ (1 - 2 * s))⁻¹\n\n/-- A function is the Hasse–Weil $L$-function of `W` if it is entire and agrees with the\nHasse–Weil Euler product in its half-plane of absolute convergence. -/\ndef IsHasseWeilLFunction (W : WeierstrassCurve ℤ) (L : ℂ → ℂ) : Prop :=\n  Differentiable ℂ L ∧\n    ∀ s : ℂ, 3 / 2 < s.re → L s = hasseWeilEulerProduct W s\n\n/--\nThe (weak) Birch and Swinnerton-Dyer conjecture over $\\mathbb Q$: for every elliptic curve\n$E/\\mathbb Q$, the rank of the abelian group $E(\\mathbb Q)$ equals the order of the zero of\nits Hasse–Weil $L$-function at $s=1$. The existential clause also records the analytic\ncontinuation of the Euler product.\n-/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture :\n    ∀ (W : WeierstrassCurve ℤ) [(W.baseChange ℚ).IsElliptic], IsGlobalMinimal W →\n      ∃ L : ℂ → ℂ, IsHasseWeilLFunction W L ∧\n        meromorphicOrderAt L 1 =\n          ((finrank ℤ (WeierstrassCurve.Projective.Point (W.baseChange ℚ).toProjective) : ℤ) :\n            WithTop ℤ) := by\n  sorry\n\nend BirchAndSwinnertonDyerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Restricted the weak conjecture to elliptic curves over ℚ, matching the official Millennium Prize formulation noted in the decomposition table; this also makes the asserted entire analytic continuation appropriate by modularity.",
+    "Represented elliptic curves over ℚ by globally minimal integral Weierstrass equations. Global minimality is expressed by divisibility of discriminants among all integral equations related by a rational Weierstrass variable change.",
+    "Defined the local coefficient a_p as p + 1 minus the number of projective points on the reduced minimal equation. Together with a good-reduction indicator, this uniformly gives the standard Euler factor at good, multiplicative, and additive primes.",
+    "Characterized the Hasse–Weil L-function as an entire function agreeing with its Euler product on Re(s) > 3/2, and existentially asserted that continuation in the theorem rather than making the rank claim conditional and potentially vacuous.",
+    "Used `meromorphicOrderAt` for the order of vanishing and `Module.finrank ℤ` of the projective point group for the Mordell–Weil rank."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`WeierstrassCurve.IsMinimal` in Mathlib is formulated over a single discrete valuation ring; no global minimal integral model predicate for curves over ℚ was found.",
+     "name": "IsGlobalMinimal",
+     "why_needed": "A minimal integral model is needed so reduction point counts give the correct bad-prime local Euler factors."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `WeierstrassCurve.map`, projective point types, and local `WeierstrassCurve.reduction`, but no elliptic-curve reduction point-count function.",
+     "name": "reductionPointCount",
+     "why_needed": "Defines the finite-field point count entering each Hasse–Weil local factor."
+    },
+    {
+     "closest_existing_considered": "No elliptic-curve Frobenius trace or Hasse–Weil coefficient definition was found.",
+     "name": "localTrace",
+     "why_needed": "Defines the standard coefficient a_p = p + 1 - #Ẽ(F_p)."
+    },
+    {
+     "closest_existing_considered": "Mathlib has a local `WeierstrassCurve.IsGoodReduction` class, but no global prime-indexed coefficient for an integral model.",
+     "name": "goodReductionCoefficient",
+     "why_needed": "Distinguishes the quadratic good-prime Euler factor from the linear bad-prime factor using smoothness of the reduction."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Euler-product and L-series APIs cover general products and Dirichlet L-functions, not elliptic-curve Hasse–Weil local factors.",
+     "name": "hasseWeilEulerProduct",
+     "why_needed": "Mathlib currently has no Hasse–Weil L-function or Euler product attached to an elliptic curve."
+    },
+    {
+     "closest_existing_considered": "Mathlib has analytic and meromorphic function APIs but no predicate characterizing the analytic continuation of an elliptic-curve Hasse–Weil L-function.",
+     "name": "IsHasseWeilLFunction",
+     "why_needed": "Records both entire analytic continuation and agreement with the defining Euler product in its convergence half-plane."
+    }
+   ],
+   "per_slot": {
+    "birch_and_swinnerton_dyer_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "birch_and_swinnerton_dyer_conjecture.variants.strong": {
+     "outcome": "missing_primitives",
+     "why": "Mathlib and FormalConjecturesForMathlib do not provide the Tate–Shafarevich group, its finiteness/cardinality, the Néron–Tate canonical-height regulator, the real period with the required component factor, or Tamagawa numbers for elliptic curves. Replacing these invariants by unconstrained numerical fields would not faithfully state the strong BSD formula."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "birch_and_swinnerton_dyer_conjecture": "/--\nThe (weak) Birch and Swinnerton-Dyer conjecture over $\\mathbb Q$: for every elliptic curve\n$E/\\mathbb Q$, the rank of the abelian group $E(\\mathbb Q)$ equals the order of the zero of\nits Hasse–Weil $L$-function at $s=1$. The existential clause also records the analytic\ncontinuation of the Euler product.\n-/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture :\n    ∀ (W : WeierstrassCurve ℤ) [(W.baseChange ℚ).IsElliptic], IsGlobalMinimal W →\n      ∃ L : ℂ → ℂ, IsHasseWeilLFunction W L ∧\n        meromorphicOrderAt L 1 =\n          ((finrank ℤ (WeierstrassCurve.Projective.Point (W.baseChange ℚ).toProjective) : ℤ) :\n            WithTop ℤ) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Birch and Swinnerton-Dyer conjecture\n\nThe rank form is stated over $\\mathbb Q$. We use the incomplete Hasse--Weil $L$-function with\nits Euler factors at $2$ and $3$ removed. These factors are nonzero at $s=1$, so their removal\ndoes not change the order of vanishing there.\n\n*References:*\n- [Wikipedia, *Birch and Swinnerton-Dyer conjecture*](https://en.wikipedia.org/wiki/Birch_and_Swinnerton-Dyer_conjecture)\n-/\n\nnamespace BirchAndSwinnertonDyerConjecture\n\nopen Module (finrank)\nopen scoped WeierstrassCurve.Affine\n\n/-- An integral short Weierstrass model $y^2=x^3+Ax+B$ which is minimal at every prime\n$p\\geq 5$. Such models suffice to represent elliptic curves over $\\mathbb Q$; the primes $2$ and\n$3$ are omitted from the incomplete $L$-function below. -/\nstructure IntegralShortModel where\n  A : ℤ\n  B : ℤ\n  reduced (p : ℕ) : p.Prime → 5 ≤ p → ¬ ((p ^ 4 : ℤ) ∣ A ∧ (p ^ 6 : ℤ) ∣ B)\n  nonsingular : 4 * A ^ 3 + 27 * B ^ 2 ≠ 0\n\nnamespace IntegralShortModel\n\n/-- The rational Weierstrass curve associated to an integral short model. -/\ndef curve (E : IntegralShortModel) : WeierstrassCurve ℚ where\n  a₁ := 0\n  a₂ := 0\n  a₃ := 0\n  a₄ := E.A\n  a₆ := E.B\n\nopen WeierstrassCurve in\ninstance (E : IntegralShortModel) : E.curve.IsElliptic where\n  isUnit := isUnit_iff_ne_zero.mpr <| by\n    convert mul_ne_zero (show (-16 : ℚ) ≠ 0 by norm_num) (Int.cast_ne_zero.mpr E.nonsingular)\n    simp_rw [curve, Δ, b₂, b₄, b₆, Int.cast_add, Int.cast_mul, Int.cast_pow]\n    ring\n\n/-- The affine points on the reduction of an integral short Weierstrass model modulo $p$.\nThe projective curve has one additional point at infinity. -/\ndef affinePoints (E : IntegralShortModel) (p : ℕ) : Set (ZMod p × ZMod p) :=\n  {P | P.2 ^ 2 = P.1 ^ 3 + E.A * P.1 + E.B}\n\n/-- The Frobenius trace $a_p=p+1-\\#\\widetilde E(\\mathbb F_p)$, computed from the affine\npoint count as $p-\\#\\widetilde E_{\\mathrm{aff}}(\\mathbb F_p)$. -/\nnoncomputable def frobeniusTrace (E : IntegralShortModel) (p : ℕ) : ℤ :=\n  p - (E.affinePoints p).ncard\n\n/-- The local Euler factor of an integral short model at a prime $p\\geq 5$. For good reduction\nit is $(1-a_p p^{-s}+p^{1-2s})^{-1}$; for bad reduction it is $(1-a_p p^{-s})^{-1}$.\nMinimality at such primes is ensured by `IntegralShortModel.reduced`. -/\nnoncomputable def localEulerFactor (E : IntegralShortModel) (p : ℕ) (s : ℂ) : ℂ :=\n  if (4 * E.A ^ 3 + 27 * E.B ^ 2 : ZMod p) ≠ 0 then\n    (1 - E.frobeniusTrace p * (p : ℂ) ^ (-s) + p * (p : ℂ) ^ (-2 * s))⁻¹\n  else\n    (1 - E.frobeniusTrace p * (p : ℂ) ^ (-s))⁻¹\n\n/-- The Euler product for the incomplete Hasse--Weil $L$-function, with the factors at $2$ and\n$3$ omitted. Its natural region of convergence is $\\operatorname{Re}(s)>3/2$. -/\nnoncomputable def hasseWeilEulerProduct (E : IntegralShortModel) (s : ℂ) : ℂ :=\n  ∏' p : {p : ℕ // p.Prime ∧ 5 ≤ p}, E.localEulerFactor p s\n\n/-- `L` is the incomplete Hasse--Weil $L$-function of `E` if it is entire and agrees with the\nEuler product away from $2$ and $3$ on $\\operatorname{Re}(s)>3/2$. -/\ndef IsIncompleteHasseWeilLFunction (E : IntegralShortModel) (L : ℂ → ℂ) : Prop :=\n  (∀ s : ℂ, AnalyticAt ℂ L s) ∧\n    ∀ s : ℂ, 3 / 2 < s.re → L s = E.hasseWeilEulerProduct s\n\nend IntegralShortModel\n\n/-- **Birch--Swinnerton-Dyer conjecture (rank form, over $\\mathbb Q$).** For every elliptic\ncurve $E/\\mathbb Q$, the Mordell--Weil rank of $E(\\mathbb Q)$ equals the order of the zero at\n$s=1$ of its Hasse--Weil $L$-function. Here `L` is the entire continuation of the Euler product\nwith only the factors at $2$ and $3$ omitted; omitting those nonzero factors does not change the\norder at $s=1$. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture (E : IntegralShortModel) (L : ℂ → ℂ)\n    (hL : E.IsIncompleteHasseWeilLFunction L) :\n    finrank ℤ E.curve⟮ℚ⟯ = analyticOrderNatAt L 1 := by\n  sorry\n\nend BirchAndSwinnertonDyerConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.91,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Restricted the rank form to elliptic curves over ℚ, as permitted by the decomposition notes and as in the official Clay formulation; over ℚ the required analytic continuation follows from modularity.",
+    "Represented curves by integral short Weierstrass models that are minimal at every prime p ≥ 5. Every elliptic curve over ℚ admits such a model.",
+    "Defined the incomplete Hasse–Weil Euler product with the factors at 2 and 3 omitted. Those local factors are nonzero at s = 1, so omission preserves the order of vanishing and hence gives an equivalent rank statement.",
+    "At p ≥ 5, defined a_p from the affine point count (p minus the affine cardinality), equivalent to p + 1 minus the projective point count. Used the quadratic local factor for good reduction and the linear local factor for bad reduction.",
+    "Expressed analytic continuation by quantifying over an entire function L required to agree with the Euler product on Re(s) > 3/2. This avoids assigning a junk default value when no continuation exists and uses Mathlib's analyticOrderNatAt for the order of vanishing.",
+    "Did not state the strong variant because the supplied explicit formula is over ℚ and its essential arithmetic invariants are not formalized; the incomplete L-function used for the rank form would also alter its leading coefficient."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "EllipticCurveRank.RatEllipticCurve; that problem-local structure is not reusable API and imposes reduction at all primes, while this statement specifically omits 2 and 3.",
+     "name": "IntegralShortModel",
+     "why_needed": "Packages an integral short Weierstrass equation, nonsingularity, and the minimality criterion at all primes used by the incomplete Euler product."
+    },
+    {
+     "closest_existing_considered": "EllipticCurveRank.RatEllipticCurve.toWeierstrass, which is tied to a separate problem-local structure.",
+     "name": "IntegralShortModel.curve",
+     "why_needed": "Interprets the integral short model as Mathlib's WeierstrassCurve ℚ so that E(ℚ) and its ℤ-finrank are available."
+    },
+    {
+     "closest_existing_considered": "ModularityConjecture.setOfPointsModN; that definition is problem-local, works with arbitrary rational coefficients via inverses, and its own documentation warns about bad-reduction use.",
+     "name": "IntegralShortModel.affinePoints",
+     "why_needed": "Defines the reduction's affine F_p-points directly for the local Frobenius trace."
+    },
+    {
+     "closest_existing_considered": "ModularityConjecture.WeierstrassCurve.ap; it is problem-local and documented there as differing from the literature at bad reduction for its unrestricted rational-model input.",
+     "name": "IntegralShortModel.frobeniusTrace",
+     "why_needed": "Defines a_p = p + 1 - #Ẽ(F_p), using the affine count and the unique point at infinity."
+    },
+    {
+     "closest_existing_considered": "Mathlib's generic Euler-product and L-series APIs; neither contains elliptic-curve local factors.",
+     "name": "IntegralShortModel.localEulerFactor",
+     "why_needed": "Supplies the correct good- and bad-reduction Euler factors, which Mathlib does not provide for elliptic curves."
+    },
+    {
+     "closest_existing_considered": "Mathlib LSeries and EulerProduct; these are generic frameworks and do not define the Hasse–Weil coefficients or product.",
+     "name": "IntegralShortModel.hasseWeilEulerProduct",
+     "why_needed": "Defines the incomplete Hasse–Weil Euler product away from 2 and 3."
+    },
+    {
+     "closest_existing_considered": "Mathlib analytic and L-series continuation predicates; no predicate specializes them to elliptic-curve Hasse–Weil L-functions.",
+     "name": "IntegralShortModel.IsIncompleteHasseWeilLFunction",
+     "why_needed": "Characterizes the entire analytic continuation by agreement with the defining Euler product on Re(s) > 3/2, without introducing an opaque function or junk default."
+    }
+   ],
+   "per_slot": {
+    "birch_and_swinnerton_dyer_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "birch_and_swinnerton_dyer_conjecture.variants.strong": {
+     "outcome": "missing_primitives",
+     "why": "A faithful explicit strong formula requires the Tate–Shafarevich group and its finiteness/cardinality, the Néron–Tate canonical height and Mordell–Weil regulator, the real/Néron period, the conductor, and local Tamagawa numbers. These are absent from Mathlib and FormalConjecturesForMathlib. Replacing them by unconstrained numerical fields would be placeholder modeling rather than a formalization of the arithmetic invariants."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "birch_and_swinnerton_dyer_conjecture": "/-- **Birch--Swinnerton-Dyer conjecture (rank form, over $\\mathbb Q$).** For every elliptic\ncurve $E/\\mathbb Q$, the Mordell--Weil rank of $E(\\mathbb Q)$ equals the order of the zero at\n$s=1$ of its Hasse--Weil $L$-function. Here `L` is the entire continuation of the Euler product\nwith only the factors at $2$ and $3$ omitted; omitting those nonzero factors does not change the\norder at $s=1$. -/\n@[category research open, AMS 11 14]\ntheorem birch_and_swinnerton_dyer_conjecture (E : IntegralShortModel) (L : ℂ → ℂ)\n    (hL : E.IsIncompleteHasseWeilLFunction L) :\n    finrank ℤ E.curve⟮ℚ⟯ = analyticOrderNatAt L 1 := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "birch_and_swinnerton_dyer_conjecture": "c04",
+  "birch_and_swinnerton_dyer_conjecture.variants.strong": null
+ },
+ "id": "wp-birch-and-swinnerton-dyer-conjecture",
+ "main_attempt": "c04"
+}

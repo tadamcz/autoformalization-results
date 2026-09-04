@@ -1,0 +1,464 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Meyniel's conjecture on the cop number\n\n*References:*\n- [Wikipedia, Cop number](https://en.wikipedia.org/wiki/cop_number)\n- [Bonato and Prałat, *Meyniel's conjecture on the cop number: a survey*](https://arxiv.org/abs/1308.3385)\n-/\n\nuniverse u\n\nnamespace CopNumber\n\n/-- A move in the cops-and-robber game is legal if it follows an edge or stays at the current\nvertex. -/\ndef IsLegalMove {V : Type u} (G : SimpleGraph V) (v w : V) : Prop :=\n  v = w ∨ G.Adj v w\n\n/-- A position of the game with `k` cops records every cop's vertex and the robber's vertex. -/\nabbrev Position (V : Type u) (k : ℕ) := (Fin k → V) × V\n\n/-- A cop strategy chooses the cops' next simultaneous move from the finite history of positions.\nIts subtype condition says that every cop either follows an edge or passes. -/\ndef CopsStrategy {V : Type u} (G : SimpleGraph V) (k : ℕ) :=\n  ∀ (t : ℕ) (history : Fin (t + 1) → Position V k),\n    {next : Fin k → V //\n      ∀ i, IsLegalMove G ((history (Fin.last t)).1 i) (next i)}\n\n/-- `CopsWin G k` means that `k` cops have a winning strategy on `G`. The cops choose their\ninitial vertices before the robber chooses his. Thereafter the cops and robber alternate, with the\ncops moving first; either side may pass. The two alternatives in the capture condition detect\ncapture after a robber move (including initial placement) and after a cop move, respectively. -/\ndef CopsWin {V : Type u} (G : SimpleGraph V) (k : ℕ) : Prop :=\n  ∃ (initial : Fin k → V) (strategy : CopsStrategy G k),\n    ∀ (cops : ℕ → Fin k → V) (robber : ℕ → V),\n      cops 0 = initial →\n      (∀ t, cops (t + 1) =\n        (strategy t (fun j => (cops j, robber j))).1) →\n      (∀ t, IsLegalMove G (robber t) (robber (t + 1))) →\n      ∃ t, (∃ i, cops t i = robber t) ∨ (∃ i, cops (t + 1) i = robber t)\n\n/-- The cop number of a finite graph is the least number of cops having a winning strategy. -/\nnoncomputable def copNumber {V : Type u} [Fintype V] (G : SimpleGraph V) : ℕ :=\n  sInf {k : ℕ | CopsWin G k}\n\n/--\n**Meyniel's conjecture.** There is a constant $d>0$, independent of the graph, such that every\nconnected finite simple graph $G$ on $n$ vertices has cop number at most $d\\sqrt n$.\n-/\n@[category research open, AMS 5]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧\n      ∀ {V : Type u} [Fintype V] (G : SimpleGraph V), G.Connected →\n        (copNumber G : ℝ) ≤ d * Real.sqrt (Fintype.card V) := by\n  sorry\n\nend CopNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list entry using the linked Cop number article and Bonato–Prałat survey: one constant d > 0 bounds every connected finite simple graph G by copNumber G ≤ d * sqrt(|V(G)|).",
+    "Represented the standard reflexive-game convention on Mathlib's irreflexive SimpleGraph by declaring a move legal when it follows an edge or leaves the piece at the same vertex.",
+    "Indexed recorded positions immediately after robber placements/moves. Consequently, the winning condition checks capture both at a recorded position and immediately after the next cop move.",
+    "Modeled a deterministic perfect-information cop strategy as a function of the finite position history. Its output is a subtype carrying legality of every cop's simultaneous move, which prevents illegal strategies from winning vacuously.",
+    "Quantified over all infinite legal robber trajectories rather than explicit robber strategies. Against a fixed history-dependent cop strategy these describe exactly all possible robber choices, while finite capture is expressed by an existential time.",
+    "Defined the cop number as the natural-number infimum of the set of k for which the cops have a winning strategy. The conjecture only applies to connected graphs, whose vertex types are nonempty."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.Adj; it handles edge moves but not passing.",
+     "name": "CopNumber.IsLegalMove",
+     "why_needed": "The game allows moving along one edge or passing, while Mathlib SimpleGraph adjacency is irreflexive."
+    },
+    {
+     "closest_existing_considered": "No cops-and-robbers position type was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "CopNumber.Position",
+     "why_needed": "Packages the simultaneous locations of k indexed cops and the single robber for finite histories."
+    },
+    {
+     "closest_existing_considered": "No reusable infinite alternating graph-game or cops-and-robbers strategy primitive was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "CopNumber.CopsStrategy",
+     "why_needed": "Encodes a legal, history-dependent perfect-information strategy for simultaneous cop moves."
+    },
+    {
+     "closest_existing_considered": "No cops-and-robbers winning predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "CopNumber.CopsWin",
+     "why_needed": "Defines when k cops force finite capture under the specified placement order, alternating legal moves, and passing rules."
+    },
+    {
+     "closest_existing_considered": "Natural-number sInf supplies the minimum construction, but no existing graph cop-number invariant was found.",
+     "name": "CopNumber.copNumber",
+     "why_needed": "Defines the minimum number of cops with a winning strategy, the invariant used by Meyniel's conjecture."
+    }
+   ],
+   "per_slot": {
+    "cop_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cop_number": "/--\n**Meyniel's conjecture.** There is a constant $d>0$, independent of the graph, such that every\nconnected finite simple graph $G$ on $n$ vertices has cop number at most $d\\sqrt n$.\n-/\n@[category research open, AMS 5]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧\n      ∀ {V : Type u} [Fintype V] (G : SimpleGraph V), G.Connected →\n        (copNumber G : ℝ) ≤ d * Real.sqrt (Fintype.card V) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cop number: Meyniel's conjecture\n\n*References:*\n- [Wikipedia, *Cop number*](https://en.wikipedia.org/wiki/cop_number)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [W. Baird, A. Bonato, *Meyniel's conjecture on the cop number: a survey*](https://arxiv.org/abs/1308.3385)\n\n*Cops and Robbers* is a perfect-information pursuit-evasion game played on a graph $G$ by a\nplayer controlling $k$ cops and a player controlling a single robber.\n- First the cops are placed on vertices of $G$ (several cops may share a vertex), then the robber\n  is placed on a vertex of $G$.\n- Afterwards the players alternate turns, the cops moving first. On the cops' turn every cop\n  either stays put or moves to an adjacent vertex. On the robber's turn the robber either stays\n  put or moves to an adjacent vertex.\n- The cops win as soon as a cop occupies the same vertex as the robber (a *capture*). The robber\n  wins if this never happens.\n\nThe *cop number* $c(G)$ is the least $k$ such that $k$ cops have a winning strategy on $G$.\n\n**Meyniel's conjecture** (1985) states that $c(G) = O(\\sqrt{n})$ for connected graphs $G$ on $n$\nvertices.\n\nIn this file the game is formalised through strategies of the cops. Because the cops' strategy is\ndeterministic and the robber has full information, quantifying over all *strategies* of the robber\nis the same as quantifying over all legal *walks* of the robber, which is what we do.\n-/\n\nnamespace CopNumber\n\nopen SimpleGraph\n\nvariable {V : Type*} (G : SimpleGraph V)\n\n/-- A token standing on the vertex `u` of `G` can move to `v` in one turn if it either stays put\n(`v = u`) or moves along an edge of `G`. -/\ndef IsMove (u v : V) : Prop := u = v ∨ G.Adj u v\n\n/-- A sequence of vertices `p 0, p 1, p 2, …` is a legal walk on `G` if each step is a legal\nmove, i.e. a token can follow it moving at most one edge per turn. -/\ndef IsLegalWalk (p : ℕ → V) : Prop := ∀ n, IsMove G (p n) (p (n + 1))\n\n/-- A strategy for `k` cops on the vertex set `V`. Since the game has perfect information, the\ncops' positions at time `n` may depend on the whole history of the game, which is determined by\nthe robber's positions at times `0, …, n - 1`. Thus `σ n h` is the vector of cop positions at\ntime `n` when the robber has occupied the vertices `h 0, …, h (n - 1)` so far. In particular\n`σ 0` is the initial placement of the cops, chosen before the robber is placed. -/\ndef CopStrategy (V : Type*) (k : ℕ) := (n : ℕ) → (Fin n → V) → Fin k → V\n\nvariable {k : ℕ}\n\n/-- The positions of the cops at time `n` when they follow the strategy `σ` and the robber\noccupies the vertex `r m` at time `m`. -/\ndef CopStrategy.positions (σ : CopStrategy V k) (r : ℕ → V) (n : ℕ) : Fin k → V :=\n  σ n fun j => r j\n\n/-- The strategy `σ` is legal on `G`: whatever legal walk the robber follows, every cop follows a\nlegal walk of `G`, i.e. at each turn it stays put or moves along an edge. -/\ndef CopStrategy.IsLegal (σ : CopStrategy V k) : Prop :=\n  ∀ r : ℕ → V, IsLegalWalk G r → ∀ i, IsLegalWalk G fun n => σ.positions r n i\n\n/-- The strategy `σ` is winning for the cops on `G`: whatever legal walk the robber follows, at\nsome time some cop occupies the vertex of the robber. Here `r n` is the position of the robber at\ntime `n`; the capture occurs either after the cops' move at time `n + 1`, while the robber is still\nat `r n`, or with the cops at their time-`n` positions (this includes the robber being placed on a\ncop at time `0`, or moving onto a cop). -/\ndef CopStrategy.IsWinning (σ : CopStrategy V k) : Prop :=\n  ∀ r : ℕ → V, IsLegalWalk G r →\n    ∃ n i, σ.positions r n i = r n ∨ σ.positions r (n + 1) i = r n\n\n/-- `k` cops can win the game of Cops and Robbers on `G`: there is a legal winning strategy for\n`k` cops. -/\ndef CopsWin (k : ℕ) : Prop := ∃ σ : CopStrategy V k, σ.IsLegal G ∧ σ.IsWinning G\n\n/-- The cop number $c(G)$ of `G`: the least number `k` of cops that can win the game of Cops and\nRobbers on `G`. On a finite graph one cop per vertex always wins, so this is well defined; the\njunk value `sInf ∅ = 0` only arises for infinite graphs on which no finite number of cops wins. -/\nnoncomputable def copNumber : ℕ := sInf {k | CopsWin G k}\n\n/-- Placing one cop on every vertex wins immediately. -/\n@[category API, AMS 5 91]\ntheorem copsWin_card [Fintype V] : CopsWin G (Fintype.card V) := by\n  refine ⟨fun _ _ => (Fintype.equivFin V).symm, fun r _ i n => Or.inl rfl, fun r _ => ?_⟩\n  exact ⟨0, Fintype.equivFin V (r 0), Or.inl (by simp [CopStrategy.positions])⟩\n\n/-- With no cops at all, the robber can never be captured. -/\n@[category API, AMS 5 91]\ntheorem not_copsWin_zero [Nonempty V] : ¬ CopsWin G 0 := by\n  rintro ⟨σ, -, hσ⟩\n  obtain ⟨_, i, -⟩ := hσ (fun _ => Classical.arbitrary V) fun _ => Or.inl rfl\n  exact i.elim0\n\n/-- The cop number of a finite graph is at most its number of vertices. -/\n@[category API, AMS 5 91]\ntheorem copNumber_le_card [Fintype V] : copNumber G ≤ Fintype.card V :=\n  Nat.sInf_le (copsWin_card G)\n\n/-- The cop number of a nonempty finite graph is positive. -/\n@[category API, AMS 5 91]\ntheorem copNumber_pos [Fintype V] [Nonempty V] : 0 < copNumber G := by\n  have h : copNumber G ∈ {k | CopsWin G k} := Nat.sInf_mem ⟨_, copsWin_card G⟩\n  exact Nat.pos_of_ne_zero fun h0 => not_copsWin_zero G (h0 ▸ h)\n\n/-- On a complete graph a single cop wins in one move. -/\n@[category test, AMS 5 91]\ntheorem copNumber_top [Fintype V] [Nonempty V] : copNumber (⊤ : SimpleGraph V) = 1 := by\n  refine le_antisymm (Nat.sInf_le ?_) (copNumber_pos _)\n  -- The cop starts anywhere and then always moves onto the robber's current vertex.\n  let σ : CopStrategy V 1 := fun n => match n with\n    | 0 => fun _ _ => Classical.arbitrary V\n    | n + 1 => fun h _ => h (Fin.last n)\n  have hpos (r : ℕ → V) (n : ℕ) (i : Fin 1) : σ.positions r (n + 1) i = r n := rfl\n  refine ⟨σ, fun r _ i n => ?_, fun r _ => ⟨0, 0, Or.inr (hpos r 0 0)⟩⟩\n  by_cases h : σ.positions r n i = σ.positions r (n + 1) i\n  · exact Or.inl h\n  · exact Or.inr h\n\n/-- On two isolated vertices a single cop never catches the robber: the robber sits on the vertex\nnot occupied by the cop, and the cop cannot move. -/\n@[category test, AMS 5 91]\ntheorem not_copsWin_bot_one : ¬ CopsWin (⊥ : SimpleGraph (Fin 2)) 1 := by\n  rintro ⟨σ, hleg, hwin⟩\n  let r : ℕ → Fin 2 := fun _ => σ 0 Fin.elim0 0 + 1\n  have hr : IsLegalWalk ⊥ r := fun _ => Or.inl rfl\n  have hc : ∀ n, σ.positions r n 0 = σ 0 Fin.elim0 0 := by\n    intro n\n    induction n with\n    | zero => simp only [CopStrategy.positions]; rw [Subsingleton.elim (fun _ => _) Fin.elim0]\n    | succ n ih =>\n      rcases hleg r hr 0 n with h | h\n      · exact (show σ.positions r n 0 = σ.positions r (n + 1) 0 from h) ▸ ih\n      · exact ((SimpleGraph.bot_adj _ _).mp h).elim\n  obtain ⟨n, i, h | h⟩ := hwin r hr\n  · rw [Fin.fin_one_eq_zero i, hc n] at h\n    exact absurd h (by simp [r])\n  · rw [Fin.fin_one_eq_zero i, hc (n + 1)] at h\n    exact absurd h (by simp [r])\n\n/-- The cop number of the graph with two isolated vertices is `2`. -/\n@[category test, AMS 5 91]\ntheorem copNumber_bot_fin_two : copNumber (⊥ : SimpleGraph (Fin 2)) = 2 := by\n  refine le_antisymm (by simpa using copNumber_le_card (⊥ : SimpleGraph (Fin 2)))\n    (le_csInf ⟨_, copsWin_card _⟩ fun k hk => ?_)\n  by_contra hlt\n  interval_cases k\n  · exact not_copsWin_zero _ hk\n  · exact not_copsWin_bot_one hk\n\n/-- **Meyniel's conjecture** (communicated to Frankl in 1985): the cop number of a connected graph\non $n$ vertices is $O(\\sqrt{n})$. That is, there is a constant $d > 0$ such that every finite\nconnected graph $G$ on $n$ vertices satisfies $c(G) \\le d \\sqrt{n}$. -/\n@[category research open, AMS 5 91]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧ ∀ (V : Type*) [Fintype V] (G : SimpleGraph V), G.Connected →\n      (copNumber G : ℝ) ≤ d * √(Fintype.card V) := by\n  sorry\n\nend CopNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single slot matches the list entry; the soft Meyniel conjecture is not stated, as the table specifies.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Big-O reading: the terse list entry 'cop number is O(√n)' is stated, following the article and the Baird–Bonato survey, as ∃ d > 0 such that every finite connected graph G on n vertices has c(G) ≤ d·√n, with d chosen before the graph. This is equivalent to c(n) = O(√n) for the max function c(n) (finitely many graphs per n, each with finite cop number, so 'for n sufficiently large' can be absorbed into d); an explicit constant was preferred over Asymptotics.IsBigO on a max-over-graphs function for transparency.",
+    "Robber modelled as an arbitrary legal walk r : ℕ → V rather than a history-dependent strategy: since the cops' strategy is deterministic and the robber has perfect information, every robber strategy against σ produces a legal walk and every legal walk is realised by a (history-independent) robber strategy; so 'σ beats every robber strategy' ⟺ 'σ beats every legal walk'. Cop strategies are fully history-dependent (they see the robber's whole history; their own history is determined), so no positional/memoryless restriction or finiteness assumption is needed for faithfulness.",
+    "Capture condition includes both 'cop moves onto robber' (c (n+1) i = r n) and 'robber occupies a cop's vertex' (c n i = r n, covering the robber placing himself on a cop at time 0 or moving onto a cop), matching 'the cops win whenever the robber occupies the same vertex as a cop'.",
+    "Cop legality is required for all times against every legal robber walk (including after a capture); this does not change which k win, since cops can always stay put.",
+    "Connectedness is imposed via Mathlib's `SimpleGraph.Connected` (which includes `Nonempty V`), and finiteness via `[Fintype V]`; the constant `0 < d` is included as in the survey (redundant but harmless). Graphs are quantified over all vertex types `V : Type*` with a `Fintype` instance rather than only `Fin n`.",
+    "copNumber takes the junk value 0 (sInf ∅) only for infinite graphs where no finite number of cops wins; irrelevant to the conjecture, which quantifies over finite graphs where `copNumber_le_card` and `copNumber_pos` are proven.",
+    "Sanity tests included: cop number of a complete graph is 1, one cop per vertex always wins, zero cops never win on a nonempty graph, and the robber wins against one cop on two isolated vertices (cop number 2), checking that neither side of the game is vacuous."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.Adj (not reflexive), Relation.ReflGen G.Adj (equivalent but less readable), SimpleGraph.dist ≤ 1 (needs connectivity).",
+     "name": "CopNumber.IsMove",
+     "why_needed": "One legal move of a token on G: stay put or move along an edge (`u = v ∨ G.Adj u v`). Encodes the 'reflexive graph' convention of the literature on a Mathlib SimpleGraph."
+    },
+    {
+     "closest_existing_considered": "SimpleGraph.Walk (finite, no staying put).",
+     "name": "CopNumber.IsLegalWalk",
+     "why_needed": "A sequence ℕ → V each of whose steps is an IsMove; used both for the robber's play and for each cop's trajectory."
+    },
+    {
+     "closest_existing_considered": "SetTheory.PGame (combinatorial games, not suitable for a reachability game with simultaneous multi-token moves); no game-on-graph primitive exists in Mathlib or the repo.",
+     "name": "CopNumber.CopStrategy",
+     "why_needed": "History-dependent strategy for k cops: `(n : ℕ) → (Fin n → V) → Fin k → V`, giving the cops' positions at time n from the robber's positions at times 0..n-1 (σ 0 is the initial placement, chosen before the robber is placed)."
+    },
+    {
+     "closest_existing_considered": "none",
+     "name": "CopNumber.CopStrategy.positions",
+     "why_needed": "Cop positions at time n when following σ against robber walk r."
+    },
+    {
+     "closest_existing_considered": "none",
+     "name": "CopNumber.CopStrategy.IsLegal",
+     "why_needed": "Against every legal robber walk, every cop's trajectory is a legal walk (stay or move along an edge each turn)."
+    },
+    {
+     "closest_existing_considered": "none",
+     "name": "CopNumber.CopStrategy.IsWinning",
+     "why_needed": "Against every legal robber walk r, some cop occupies the robber's vertex at some time: either c n i = r n (robber placed on / moved onto a cop) or c (n+1) i = r n (cop moved onto the robber)."
+    },
+    {
+     "closest_existing_considered": "none",
+     "name": "CopNumber.CopsWin",
+     "why_needed": "k cops have a legal winning strategy on G."
+    },
+    {
+     "closest_existing_considered": "No cop number in Mathlib or FormalConjecturesForMathlib (searched for cop/robber/pursuit).",
+     "name": "CopNumber.copNumber",
+     "why_needed": "The cop number c(G) = sInf {k | CopsWin G k}; proven ≤ card V and > 0 for finite nonempty graphs, so the sInf is genuine in the range of the conjecture."
+    }
+   ],
+   "per_slot": {
+    "cop_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `CopNumber.cop_number`: ∃ d : ℝ, 0 < d ∧ ∀ finite V, ∀ G : SimpleGraph V, G.Connected → (copNumber G : ℝ) ≤ d * √(card V). Neither Mathlib nor FormalConjecturesForMathlib contains the cops-and-robbers game or the cop number, so they are defined in the file from the game rules (cops placed first, robber placed second, alternating turns with stay-or-move-along-an-edge, cops win on capture)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cop_number": "/-- **Meyniel's conjecture** (communicated to Frankl in 1985): the cop number of a connected graph\non $n$ vertices is $O(\\sqrt{n})$. That is, there is a constant $d > 0$ such that every finite\nconnected graph $G$ on $n$ vertices satisfies $c(G) \\le d \\sqrt{n}$. -/\n@[category research open, AMS 5 91]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧ ∀ (V : Type*) [Fintype V] (G : SimpleGraph V), G.Connected →\n      (copNumber G : ℝ) ≤ d * √(Fintype.card V) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cop number\n\nThe *cop number* $c(G)$ of a graph $G$ is the least number of cops that suffices to capture a\nrobber in the game of Cops and Robbers on $G$. The rules of the game are:\n\n* First the cops are placed on vertices of $G$ (several cops may share a vertex).\n* Then the robber is placed on a vertex of $G$.\n* The players then alternate turns, the cops moving first. On the cops' turn every cop either\n  stays put or moves to an adjacent vertex. On the robber's turn the robber either stays put or\n  moves to an adjacent vertex.\n* The cops win as soon as a cop and the robber occupy the same vertex (a *capture*). The robber\n  wins by evading capture forever.\n\nMeyniel's conjecture (1985) states that every connected graph on $n$ vertices has cop number\n$O(\\sqrt{n})$.\n\n*References:*\n- [Wikipedia, Cop number](https://en.wikipedia.org/wiki/cop_number)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- W. Baird, A. Bonato, *Meyniel's conjecture on the cop number: a survey*,\n  Journal of Combinatorics 3 (2012), 225–238. [arXiv:1308.3385](https://arxiv.org/abs/1308.3385)\n- P. Frankl, *Cops and robbers in graphs with large girth and Cayley graphs*,\n  Discrete Applied Mathematics 17 (1987), 301–305.\n-/\n\nnamespace CopNumber\n\nvariable {V : Type*} (G : SimpleGraph V)\n\n/-- The positions of the game of Cops and Robbers with `k` cops on `G` from which the cops can\nforce a capture in finitely many rounds.\n\n`CopsWin G true c r` means that the cops occupy the vertices `c 0, …, c (k - 1)`, the robber\noccupies `r`, it is the cops' turn to move, and the cops can force a capture.\n`CopsWin G false c r` is the same, but with the robber to move.\n\nIn a turn, each player either stays put or moves to an adjacent vertex, i.e. moves along the\nreflexive closure `Relation.ReflGen G.Adj` of the adjacency relation. On the cops' turn every cop\nmoves independently, so any subset of the cops may move while the others stay put. A capture\nhappens as soon as a cop and the robber share a vertex. -/\ninductive CopsWin {k : ℕ} : Bool → (Fin k → V) → V → Prop\n  | capture (turn : Bool) (c : Fin k → V) (r : V) (h : ∃ i, c i = r) : CopsWin turn c r\n  | copsMove (c : Fin k → V) (r : V) (c' : Fin k → V)\n      (hc : ∀ i, Relation.ReflGen G.Adj (c i) (c' i)) (h : CopsWin false c' r) : CopsWin true c r\n  | robberMove (c : Fin k → V) (r : V)\n      (h : ∀ r', Relation.ReflGen G.Adj r r' → CopsWin true c r') : CopsWin false c r\n\n/-- The cop number of `G`: the least number `k` of cops that have a winning strategy in Cops and\nRobbers on `G`. That is, the least `k` such that `k` cops can be placed on `G` so that, wherever\nthe robber then places himself, the cops (moving first) can force a capture.\n\nFor a finite nonempty graph placing a cop on every vertex wins, so the set is nonempty and\n`copNumber G` is a genuine minimum. -/\nnoncomputable def copNumber : ℕ :=\n  sInf {k : ℕ | ∃ c : Fin k → V, ∀ r : V, CopsWin G true c r}\n\n/-- Without any cops the robber is never captured. -/\n@[category API, AMS 5 91]\ntheorem not_copsWin_zero {turn : Bool} {c : Fin 0 → V} {r : V} : ¬ CopsWin G turn c r := by\n  intro h\n  induction h with\n  | capture _ _ _ h => exact h.choose.elim0\n  | copsMove _ _ _ _ _ ih => exact ih\n  | robberMove _ r _ ih => exact ih r .refl\n\n/-- Placing a cop on every vertex wins immediately. -/\n@[category API, AMS 5 91]\ntheorem copNumber_le_card [Fintype V] : copNumber G ≤ Fintype.card V :=\n  Nat.sInf_le ⟨fun i => (Fintype.equivFin V).symm i, fun r =>\n    .capture _ _ _ ⟨Fintype.equivFin V r, by simp⟩⟩\n\n/-- A nonempty finite graph needs at least one cop. -/\n@[category API, AMS 5 91]\ntheorem copNumber_pos [Fintype V] [Nonempty V] : 0 < copNumber G := by\n  refine Nat.pos_of_ne_zero fun h => ?_\n  have hS : {k : ℕ | ∃ c : Fin k → V, ∀ r : V, CopsWin G true c r}.Nonempty :=\n    ⟨_, fun i => (Fintype.equivFin V).symm i, fun r =>\n      .capture _ _ _ ⟨Fintype.equivFin V r, by simp⟩⟩\n  obtain ⟨c, hc⟩ : 0 ∈ {k : ℕ | ∃ c : Fin k → V, ∀ r : V, CopsWin G true c r} :=\n    h ▸ Nat.sInf_mem hS\n  exact not_copsWin_zero G (hc (Classical.arbitrary V))\n\n/-- The complete graph on a nonempty finite vertex set has cop number one. -/\n@[category test, AMS 5 91]\ntheorem copNumber_top [Fintype V] [Nonempty V] : copNumber (⊤ : SimpleGraph V) = 1 := by\n  refine le_antisymm (Nat.sInf_le ⟨fun _ => Classical.arbitrary V, fun r => ?_⟩)\n    (copNumber_pos _)\n  refine .copsMove _ _ (fun _ => r) (fun _ => ?_) (.capture _ _ _ ⟨0, rfl⟩)\n  by_cases h : Classical.arbitrary V = r\n  · exact h ▸ .refl\n  · exact .single ((SimpleGraph.top_adj _ _).2 h)\n\n/-- **Meyniel's conjecture.** There is a constant $d > 0$ such that every connected graph $G$ on\n$n$ vertices satisfies $c(G) \\le d \\sqrt{n}$. In other words, the cop number of a connected\n$n$-vertex graph is $O(\\sqrt{n})$. -/\n@[category research open, AMS 5 91]\ntheorem cop_number :\n    ∃ d > (0 : ℝ), ∀ (V : Type*) [Fintype V] (G : SimpleGraph V), G.Connected →\n      (copNumber G : ℝ) ≤ d * Real.sqrt (Fintype.card V) := by\n  sorry\n\nend CopNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single slot matches the list entry; the notes' precise formulation (constant d > 0, all connected finite simple graphs, standard game rules, soft conjecture excluded) was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "O(√n) is rendered with an explicit constant: ∃ d > 0 such that every connected finite graph G satisfies c(G) ≤ d·√|V(G)|, exactly as in the survey/notes. This is equivalent to c(n) = O(√n) (with c(n) the max over connected n-vertex graphs) and to the 'for n sufficiently large' phrasing, because c(n) is finite for each n so finitely many small n can be absorbed into d. The `d > 0` condition is included as in the source (it does not change the truth value).",
+    "Graphs are Mathlib `SimpleGraph`s (finite, connected via `G.Connected`, which requires Nonempty). The source uses reflexive graphs only so that players may pass; passing is modelled by moving along the reflexive closure `Relation.ReflGen G.Adj` (stay or move to an adjacent vertex).",
+    "Winning is modelled by the inductive predicate `CopsWin G turn c r` (least fixed point): `capture` when some cop shares the robber's vertex (at either turn), `copsMove` (every cop independently stays or steps, so any subset may move), `robberMove` (robber stays or steps; cops must win against every choice). Membership in this least fixed point is equivalent to the cops having a strategy that forces capture after finitely many rounds, which is the source's notion of a winning strategy; the robber wins iff he can evade forever.",
+    "`copNumber G := sInf {k | ∃ c : Fin k → V, ∀ r, CopsWin G true c r}`: cops (possibly several on one vertex, since `c` is an arbitrary function) place first, the robber places second seeing the cops, then the cops move first. For a nonempty finite graph the set is nonempty (a cop on every vertex), so sInf is a genuine minimum; the degenerate value sInf ∅ = 0 is unreachable under the conjecture's hypotheses.",
+    "The robber placing himself on a cop's vertex counts as an immediate capture (constructor `capture` at turn `true`); this matches 'the cops win whenever the robber occupies the same vertex as a cop' and does not affect the cop number.",
+    "The vertex type is quantified inside the theorem as `∀ (V : Type*) [Fintype V]`, following the idiom of e.g. `ErdosProblems/760.lean`; n is `Fintype.card V`.",
+    "The theorem is named `cop_number` as required by the slot; the definition is `copNumber`. AMS tags 5 (Combinatorics) and 91 (Game theory).",
+    "Short API/test lemmas are included to validate the definitions: no cops never win (`not_copsWin_zero`), `copNumber G ≤ Fintype.card V`, `0 < copNumber G` for nonempty finite V, and `copNumber ⊤ = 1`.",
+    "The article's soft Meyniel conjecture (O(n^c) for some c < 1) is not referenced by the list entry and, per the decomposition notes, is not included."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Searched Mathlib and the repo for cop/robber/pursuit/strategy/winning definitions (none exist); `Relation.ReflGen` is reused for the move relation instead of a bespoke step relation. Erdos872 has a bespoke minimax game but it is problem-specific and not applicable.",
+     "name": "CopNumber.CopsWin",
+     "why_needed": "No formalization of the Cops-and-Robbers pursuit–evasion game exists in Mathlib or FormalConjecturesForMathlib. This inductive predicate defines the positions (turn, cop positions, robber position) from which the cops can force a capture in finitely many rounds, encoding the game's rules (stay-or-step moves via `Relation.ReflGen G.Adj`, capture on a shared vertex)."
+    },
+    {
+     "closest_existing_considered": "No existing graph invariant in Mathlib or FormalConjecturesForMathlib/Combinatorics/SimpleGraph (e.g. dominationNumber, treewidth-like notions) coincides with the cop number; the pattern `sInf {k | ...}` follows `PebblingNumberConjecture.PebblingNumber`.",
+     "name": "CopNumber.copNumber",
+     "why_needed": "The cop number of a graph (least number of cops with a winning strategy) is the quantity in the conjecture and is absent from Mathlib and the repo."
+    }
+   ],
+   "per_slot": {
+    "cop_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `CopNumber.cop_number`: ∃ d > 0, ∀ finite vertex type V, ∀ connected simple graph G on V, (copNumber G : ℝ) ≤ d * √(card V). Neither Mathlib nor FormalConjecturesForMathlib has the Cops-and-Robbers game or the cop number, so the file defines the game (inductive `CopsWin`) and `copNumber` locally in the problem file, following the rules in the Wikipedia article and the Baird–Bonato survey (cops place first, robber places second, cops move first, each player stays or moves to a neighbour, capture = shared vertex, cops must capture in finitely many rounds)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cop_number": "/-- **Meyniel's conjecture.** There is a constant $d > 0$ such that every connected graph $G$ on\n$n$ vertices satisfies $c(G) \\le d \\sqrt{n}$. In other words, the cop number of a connected\n$n$-vertex graph is $O(\\sqrt{n})$. -/\n@[category research open, AMS 5 91]\ntheorem cop_number :\n    ∃ d > (0 : ℝ), ∀ (V : Type*) [Fintype V] (G : SimpleGraph V), G.Connected →\n      (copNumber G : ℝ) ≤ d * Real.sqrt (Fintype.card V) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cop number\n\nMeyniel's conjecture bounds the number of cops needed to capture a robber on any finite,\nconnected, simple graph.\n\n*Reference:* [Wikipedia, Cop number](https://en.wikipedia.org/wiki/cop_number)\n-/\n\nnamespace CopNumber\n\n/-- A player may move along one edge or stay at the current vertex. -/\ndef MayMove {V : Type*} (G : SimpleGraph V) (u v : V) : Prop :=\n  u = v ∨ G.Adj u v\n\n/-- A position of `k` cops is a vertex for each cop. -/\nabbrev CopsPosition (V : Type*) (k : ℕ) := Fin k → V\n\n/-- A game position records the positions of the cops and then the robber. -/\nabbrev GamePosition (V : Type*) (k : ℕ) := CopsPosition V k × V\n\n/-- The robber is captured when at least one cop occupies the robber's vertex. -/\ndef IsCapture {V : Type*} {k : ℕ} (cops : CopsPosition V k) (robber : V) : Prop :=\n  ∃ i, cops i = robber\n\n/--\nA cop strategy chooses the cops' next positions from the finite chronological history of\npositions after robber turns. It is legal if every cop moves along one edge or stays put.\nRequiring legality on every nonempty history prevents an illegal move from counting as a win.\n-/\ndef IsLegalCopStrategy {V : Type*} (G : SimpleGraph V) {k : ℕ}\n    (strategy : List (GamePosition V k) → CopsPosition V k) : Prop :=\n  ∀ (history : List (GamePosition V k)) (cops : CopsPosition V k) (robber : V),\n    history.getLast? = some (cops, robber) →\n      ∀ i, MayMove G (cops i) (strategy history i)\n\n/--\nAn infinite evading play starts after the cops place themselves and the robber then chooses a\nvertex. In every later round the cops move first according to their strategy, and then the\nrobber moves. Both may stay put. The two non-capture conditions check capture immediately after\nthe cops' move and after the robber's move, respectively.\n-/\ndef IsEvadingPlay {V : Type*} (G : SimpleGraph V) {k : ℕ}\n    (initial : CopsPosition V k)\n    (strategy : List (GamePosition V k) → CopsPosition V k)\n    (play : ℕ → GamePosition V k) : Prop :=\n  (play 0).1 = initial ∧\n  (∀ n, ¬ IsCapture (play n).1 (play n).2) ∧\n  ∀ n,\n    let nextCops := strategy ((List.range (n + 1)).map play)\n    (play (n + 1)).1 = nextCops ∧\n    ¬ IsCapture nextCops (play n).2 ∧\n    MayMove G (play n).2 (play (n + 1)).2\n\n/--\n`k` cops can win if they can place themselves first and choose a legal strategy for which no\nrobber can make legal moves and evade capture forever.\n-/\ndef CopsWin {V : Type*} (G : SimpleGraph V) (k : ℕ) : Prop :=\n  ∃ (initial : CopsPosition V k)\n    (strategy : List (GamePosition V k) → CopsPosition V k),\n    IsLegalCopStrategy G strategy ∧\n    ¬ ∃ play : ℕ → GamePosition V k, IsEvadingPlay G initial strategy play\n\n/-- The cop number is the least number of cops that can win the cops-and-robber game. -/\nnoncomputable def copNumber {V : Type*} (G : SimpleGraph V) : ℕ :=\n  sInf {k : ℕ | CopsWin G k}\n\n/--\n**Meyniel's conjecture:** there is a constant $d>0$, independent of the graph, such that every\nconnected finite simple graph $G$ on $n$ vertices has cop number\n$c(G) \\leq d\\sqrt{n}$.\n-/\n@[category research open, AMS 5 91]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧\n      ∀ (V : Type) [Fintype V] (G : SimpleGraph V), G.Connected →\n        (copNumber G : ℝ) ≤ d * Real.sqrt (Fintype.card V) := by\n  sorry\n\nend CopNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Expanded the terse list-page entry using the cited cop-number article and survey: the theorem states that one positive real constant d works for every finite connected simple graph G, with `(copNumber G : ℝ) ≤ d * sqrt |V(G)|`.",
+    "Modeled a round by recording positions immediately after the robber's turn. The cops place first, the robber then chooses a vertex, and in each later round all cops move (or pass) before the robber moves (or passes).",
+    "Modeled a cop strategy as a nonanticipating function of the finite chronological history. Strategy legality is required separately on every nonempty history, preventing illegal prescribed moves from making the absence of an evading play vacuous.",
+    "Checked capture at the initial post-placement position, immediately after every cop move, and after every robber move. Multiple cops may occupy the same vertex because cop positions are arbitrary functions `Fin k → V`.",
+    "Defined winning as the existence of an initial placement and legal cop strategy for which there is no infinite legal uncaptured play. Defined the cop number as the natural-number infimum of winning cop counts.",
+    "Used Mathlib's `SimpleGraph.Connected`, which includes nonemptiness, so the source's connected-graph convention excludes the empty graph. No decidability assumptions are needed for the declarative game model.",
+    "Did not include the distinct soft Meyniel conjecture, in accordance with the source statement and decomposition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.Adj` and `SimpleGraph.Reachable`; adjacency omits passing, while reachability permits paths of arbitrary length.",
+     "name": "MayMove",
+     "why_needed": "Expresses a legal one-turn move along an edge or a pass on an irreflexive `SimpleGraph`."
+    },
+    {
+     "closest_existing_considered": "Functions `Fin k → V`; no cops-and-robbers position type exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "CopsPosition",
+     "why_needed": "Represents the positions of exactly k labeled cops while allowing several cops on one vertex."
+    },
+    {
+     "closest_existing_considered": "Product types; no existing pursuit-game state type was found.",
+     "name": "GamePosition",
+     "why_needed": "Records all cop positions together with the robber position at one game stage."
+    },
+    {
+     "closest_existing_considered": "Finite existential equality over `Fin k`; no existing capture predicate was found.",
+     "name": "IsCapture",
+     "why_needed": "States that a cop and the robber occupy the same vertex."
+    },
+    {
+     "closest_existing_considered": "No graph-game strategy or legality primitive was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsLegalCopStrategy",
+     "why_needed": "Ensures every cop move prescribed from a nonempty history is an edge move or pass, preventing vacuous wins by illegal strategies."
+    },
+    {
+     "closest_existing_considered": "Mathlib graph walks model one token and do not encode alternating perfect-information multi-agent play.",
+     "name": "IsEvadingPlay",
+     "why_needed": "Encodes an infinite legal alternating play with no capture, including the intermediate capture check after a cop move."
+    },
+    {
+     "closest_existing_considered": "No cops-and-robbers winning-strategy primitive was found.",
+     "name": "CopsWin",
+     "why_needed": "Expresses existence of a legal initial placement and cop strategy ruling out every infinite evading play."
+    },
+    {
+     "closest_existing_considered": "Mathlib invariants such as `SimpleGraph.chromaticNumber` and the repository's `PebblingNumber` use an infimum pattern, but no cop number exists.",
+     "name": "copNumber",
+     "why_needed": "Defines the graph invariant as the least number of cops that can win the formalized game."
+    }
+   ],
+   "per_slot": {
+    "cop_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cop_number": "/--\n**Meyniel's conjecture:** there is a constant $d>0$, independent of the graph, such that every\nconnected finite simple graph $G$ on $n$ vertices has cop number\n$c(G) \\leq d\\sqrt{n}$.\n-/\n@[category research open, AMS 5 91]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧\n      ∀ (V : Type) [Fintype V] (G : SimpleGraph V), G.Connected →\n        (copNumber G : ℝ) ≤ d * Real.sqrt (Fintype.card V) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cop number\n\n*Reference:* [Wikipedia, Cop number](https://en.wikipedia.org/wiki/cop_number)\n-/\n\nnamespace CopNumber\n\n/-- A legal move in the cops-and-robber game either stays at the current vertex or traverses an\nedge. -/\ndef IsLegalMove {V : Type*} (G : SimpleGraph V) (v w : V) : Prop :=\n  v = w ∨ G.Adj v w\n\n/-- `CopsWinIn G k t cops robber` says that, from the displayed positions with the cops to move,\n`k` cops can force capture in at most `t` cop turns. On a cop turn all cops move simultaneously;\non the following robber turn the robber makes one move. -/\ndef CopsWinIn {V : Type*} (G : SimpleGraph V) (k : ℕ) :\n    ℕ → (Fin k → V) → V → Prop\n  | 0, cops, robber => ∃ i, cops i = robber\n  | t + 1, cops, robber =>\n      (∃ i, cops i = robber) ∨\n        ∃ cops' : Fin k → V,\n          (∀ i, IsLegalMove G (cops i) (cops' i)) ∧\n          ((∃ i, cops' i = robber) ∨\n            ∀ robber' : V, IsLegalMove G robber robber' →\n              CopsWinIn G k t cops' robber')\n\n/-- `CopsWin G k` says that the cops can choose their initial positions before the robber chooses\none, and can then force capture after finitely many alternating turns. -/\ndef CopsWin {V : Type*} (G : SimpleGraph V) (k : ℕ) : Prop :=\n  ∃ cops : Fin k → V, ∀ robber : V, ∃ t, CopsWinIn G k t cops robber\n\n/-- The cop number of a graph is the minimum number of cops that can win the cops-and-robber game. -/\nnoncomputable def copNumber {V : Type*} (G : SimpleGraph V) : ℕ :=\n  sInf {k : ℕ | CopsWin G k}\n\n/-- **Meyniel's conjecture:** there is a constant $d>0$, independent of the graph, such that every\nfinite connected simple graph $G$ on $n$ vertices has cop number at most $d\\sqrt n$. -/\n@[category research open, AMS 5]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧ ∀ (V : Type*) [Fintype V] (G : SimpleGraph V), G.Connected →\n      (copNumber G : ℝ) ≤ d * Real.sqrt (Fintype.card V) := by\n  sorry\n\nend CopNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list entry using the supplied Cop number article and survey: there is one real constant d > 0, independent of G and n, bounding every finite connected simple graph by d times sqrt(n).",
+    "Modeled k labeled cops as a function Fin k → V. This permits multiple cops at the same vertex, as required.",
+    "Modeled a move as either staying at the current vertex or traversing an edge of the irreflexive Mathlib SimpleGraph.",
+    "Encoded perfect-information alternating play by a finite-horizon recursive winning predicate: all cops move simultaneously first in each round, then the robber moves, with capture checked after initial placement and after each move.",
+    "Defined winning as the existence of an initial cop placement, chosen before the robber's initial vertex, from which capture can be forced within some finite horizon. On the finite graphs quantified by the conjecture, this bounded-horizon attractor formulation is equivalent to eventual forced capture.",
+    "Defined the cop number as the natural-number infimum of the numbers of cops that win. Although Nat.sInf defaults on an empty set, the conjecture only applies it to finite connected (hence nonempty) graphs, where placing one cop on every vertex provides a winning number.",
+    "Stated the bound for all finite connected graphs, rather than only sufficiently large orders; this is the precise formulation requested by the decomposition and is equivalent to the usual asymptotic formulation after enlarging the positive constant to cover finitely many small orders."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.edist_le_one_iff_adj_or_eq gives a related characterization, but there is no cops-and-robbers move predicate and using graph distance would add unnecessary machinery.",
+     "name": "CopNumber.IsLegalMove",
+     "why_needed": "Expresses the game's pass-or-traverse move rule on Mathlib's irreflexive SimpleGraph."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjecturesForMathlib for game, winning-strategy, and cops-and-robbers APIs; no applicable combinatorial game framework was present.",
+     "name": "CopNumber.CopsWinIn",
+     "why_needed": "Encodes finite-horizon perfect-information alternating cops-and-robber play, including simultaneous cop movement and capture timing."
+    },
+    {
+     "closest_existing_considered": "No existing cops-and-robbers winning predicate or suitable general game strategy primitive was found.",
+     "name": "CopNumber.CopsWin",
+     "why_needed": "Encodes initial placement order and the existence of a finite forced-capture horizon."
+    },
+    {
+     "closest_existing_considered": "Mathlib has no cop-number definition; Nat.sInf is the existing primitive used to construct the minimum.",
+     "name": "CopNumber.copNumber",
+     "why_needed": "The conjecture explicitly concerns the minimum number of winning cops."
+    }
+   ],
+   "per_slot": {
+    "cop_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cop_number": "/-- **Meyniel's conjecture:** there is a constant $d>0$, independent of the graph, such that every\nfinite connected simple graph $G$ on $n$ vertices has cop number at most $d\\sqrt n$. -/\n@[category research open, AMS 5]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧ ∀ (V : Type*) [Fintype V] (G : SimpleGraph V), G.Connected →\n      (copNumber G : ℝ) ≤ d * Real.sqrt (Fintype.card V) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cop number\n\nMeyniel's conjecture gives an asymptotically tight upper bound for the number of cops needed to\ncapture a robber on a finite connected graph.\n\n*References:*\n- [Wikipedia, Cop number](https://en.wikipedia.org/wiki/cop_number)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Bonato and Burgess, Meyniel's conjecture on the cop number: a survey](https://arxiv.org/abs/1308.3385)\n-/\n\nnamespace CopNumber\n\nuniverse u\n\n/-- The player whose turn it is after the cops and robber have been placed. -/\ninductive Turn\n  | cops\n  | robber\n\n/--\nA position is winning for the cops if they have already captured the robber, or can force a\ncapture in finitely many subsequent turns. On a cop turn all cops move simultaneously, with each\ncop either following an edge or staying put. On a robber turn the robber likewise follows one\nedge or stays put.\n-/\ninductive CopsWinning {V : Type u} (G : SimpleGraph V) (k : ℕ) :\n    (Fin k → V) → V → Turn → Prop\n  | capture (cops : Fin k → V) (robber : V) (turn : Turn)\n      (h : ∃ i, cops i = robber) : CopsWinning G k cops robber turn\n  | moveCops (cops cops' : Fin k → V) (robber : V)\n      (hmove : ∀ i, cops' i = cops i ∨ G.Adj (cops i) (cops' i))\n      (hwin : CopsWinning G k cops' robber .robber) :\n      CopsWinning G k cops robber .cops\n  | moveRobber (cops : Fin k → V) (robber : V)\n      (hwin : ∀ robber', robber' = robber ∨ G.Adj robber robber' →\n        CopsWinning G k cops robber' .cops) :\n      CopsWinning G k cops robber .robber\n\n/--\n`k` cops can win on `G` if the cops can first choose their initial vertices so that, after the\nrobber chooses any initial vertex, they can force a capture in finitely many alternating turns.\nMultiple cops may occupy the same vertex.\n-/\ndef CanWinWith (G : SimpleGraph V) (k : ℕ) : Prop :=\n  ∃ cops : Fin k → V, ∀ robber, CopsWinning G k cops robber .cops\n\n/-- The cop number of a graph is the least number of cops that can win the cops-and-robber game. -/\nnoncomputable def copNumber (G : SimpleGraph V) : ℕ :=\n  sInf {k | CanWinWith G k}\n\n/--\n**Meyniel's conjecture.** There is a constant $d>0$, independent of the graph, such that every\nfinite connected simple graph $G$ on $n$ vertices has cop number at most $d\\sqrt n$.\n-/\n@[category research open, AMS 5]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧ ∀ {V : Type*} [Fintype V] (G : SimpleGraph V),\n      G.Connected → (copNumber G : ℝ) ≤ d * √(Fintype.card V : ℝ) := by\n  sorry\n\nend CopNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Expanded the terse list-page entry using the cop-number article and survey: the theorem quantifies over every finite connected simple graph and uses one positive real constant independent of the graph.",
+    "Expressed O(sqrt n) as a uniform inequality for all finite connected graphs. This is equivalent to the survey's eventual bound because the constant can be enlarged to cover the finitely many smaller positive vertex counts.",
+    "Modeled a forced finite-time win as the least inductively generated winning region: existential choice at cop turns, universal response at robber turns, and capture as the base case. This directly excludes infinite non-capturing play.",
+    "Represented k labeled cops by Fin k → V. Initial cop positions are chosen before universally quantifying the robber's initial position; repeated positions allow multiple cops on one vertex.",
+    "A legal move for each cop and for the robber is either staying at the current vertex or traversing one graph edge. Capture is recognized at either player's turn whenever a cop and robber share a vertex.",
+    "Defined the cop number as the natural-number infimum of the set of cop counts with which the cops can force a win. Connected graphs are nonempty in Mathlib, and on finite nonempty graphs that set is nonempty by placing a cop at every vertex."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's SetTheory.PGame has left/right turns only for well-founded combinatorial game values and does not model this cyclic reachability game.",
+     "name": "CopNumber.Turn",
+     "why_needed": "The reachability game state must record whether the cops or robber moves next."
+    },
+    {
+     "closest_existing_considered": "No cops-and-robbers, reachability-game, or winning-strategy predicate was found in Mathlib or FormalConjecturesForMathlib; PGame is not suitable for cyclic graph positions.",
+     "name": "CopNumber.CopsWinning",
+     "why_needed": "Encodes finite forced capture with the correct existential cop moves and universal robber moves."
+    },
+    {
+     "closest_existing_considered": "No existing cops-and-robbers game predicate was found.",
+     "name": "CopNumber.CanWinWith",
+     "why_needed": "Encodes the initial placement phase in which cops place first and the robber then chooses a vertex."
+    },
+    {
+     "closest_existing_considered": "Existing graph invariants such as SimpleGraph.dominationNumber and the local PebblingNumber use the same sInf pattern, but no cop-number invariant exists.",
+     "name": "CopNumber.copNumber",
+     "why_needed": "Defines the graph invariant as the least number of cops that can force capture."
+    }
+   ],
+   "per_slot": {
+    "cop_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cop_number": "/--\n**Meyniel's conjecture.** There is a constant $d>0$, independent of the graph, such that every\nfinite connected simple graph $G$ on $n$ vertices has cop number at most $d\\sqrt n$.\n-/\n@[category research open, AMS 5]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧ ∀ {V : Type*} [Fintype V] (G : SimpleGraph V),\n      G.Connected → (copNumber G : ℝ) ≤ d * √(Fintype.card V : ℝ) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cop number: Meyniel's conjecture\n\nThe game of *Cops and Robbers* is played on a graph `G` by a team of `k` cops and one robber.\nOn the first turn the cops are placed on vertices of `G` (several cops may share a vertex).\nThen the robber is placed on a vertex. Afterwards the two sides alternate, the cops moving first:\non their turn the cops move each cop to an adjacent vertex or leave it in place, and on his turn\nthe robber moves to an adjacent vertex or stays put. The cops win when the robber occupies the\nsame vertex as a cop (a *capture*); the robber wins if he evades capture forever.\n\nThe *cop number* $c(G)$ of `G` is the least `k` such that `k` cops have a winning strategy on `G`.\n\n**Meyniel's conjecture** (1985) states that the cop number of a connected graph on $n$ vertices is\n$O(\\sqrt n)$: there is a constant $d > 0$ such that $c(G) \\le d\\sqrt{n}$ for every connected\ngraph $G$ on $n$ vertices.\n\n*References:*\n- [Wikipedia: Cop number](https://en.wikipedia.org/wiki/cop_number)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- W. Baird, A. Bonato, *Meyniel's conjecture on the cop number: a survey*,\n  [arXiv:1308.3385](https://arxiv.org/abs/1308.3385)\n- P. Frankl, *Cops and robbers in graphs with large girth and Cayley graphs*,\n  Discrete Applied Mathematics 17 (1987), 301–305.\n-/\n\nnamespace CopNumber\n\nopen SimpleGraph\n\nvariable {V : Type*} (G : SimpleGraph V) {k : ℕ}\n\n/-- `IsStep G v w` means that a player standing at `v` may end its turn at `w`:\nit either stays put or moves along an edge of `G`. -/\ndef IsStep (v w : V) : Prop := v = w ∨ G.Adj v w\n\n/-- `IsCopsMove G c c'` means that the cops may move from the configuration `c` to the\nconfiguration `c'`: each cop either stays put or moves to an adjacent vertex.\nCops are indexed by `Fin k`, so several cops may occupy the same vertex. -/\ndef IsCopsMove (c c' : Fin k → V) : Prop := ∀ i, IsStep G (c i) (c' i)\n\n/-- `IsCopsWinPosition G c r` means that the cops, standing at `c`, can force the capture of the\nrobber, standing at `r`, when it is the robber's turn to move. This is the least predicate such\nthat\n* the cops win if the robber is already captured, i.e. some cop stands on `r`;\n* the cops win if for every move `r'` of the robber they have a response `f r'` after which they\n  still win. -/\ninductive IsCopsWinPosition : (Fin k → V) → V → Prop\n  | capture {c : Fin k → V} {r : V} (h : ∃ i, c i = r) : IsCopsWinPosition c r\n  | step {c : Fin k → V} {r : V} (f : V → Fin k → V)\n      (hf : ∀ r', IsStep G r r' → IsCopsMove G c (f r'))\n      (h : ∀ r', IsStep G r r' → IsCopsWinPosition (f r') r') :\n      IsCopsWinPosition c r\n\n/-- `CopsWin G k` means that `k` cops have a winning strategy on `G`: the cops can choose their\ninitial configuration `c` so that, wherever the robber then chooses to start, the cops have a\nfirst move `c'` after which they can force a capture. -/\ndef CopsWin (k : ℕ) : Prop :=\n  ∃ c : Fin k → V, ∀ r : V, ∃ c', IsCopsMove G c c' ∧ IsCopsWinPosition G c' r\n\n/-- The cop number of `G`: the least number of cops that have a winning strategy on `G`.\nFor a finite graph this is a well-defined natural number, since placing a cop on every vertex\nwins. (If no finite number of cops wins, which can only happen for infinite graphs, the\nconvention `sInf ∅ = 0` applies.) -/\nnoncomputable def copNumber : ℕ := sInf {k | CopsWin G k}\n\n/-- The robber is never captured when there are no cops. -/\n@[category API, AMS 5 91]\ntheorem not_isCopsWinPosition_zero (c : Fin 0 → V) (r : V) : ¬ IsCopsWinPosition G c r := by\n  intro h\n  induction h with\n  | capture h => exact h.elim fun i _ => i.elim0\n  | step _ _ _ ih => exact ih _ (Or.inl rfl)\n\n/-- Zero cops never win on a nonempty graph. -/\n@[category API, AMS 5 91]\ntheorem not_copsWin_zero [Nonempty V] : ¬ CopsWin G 0 := by\n  rintro ⟨c, hc⟩\n  obtain ⟨c', -, h⟩ := hc (Classical.arbitrary V)\n  exact not_isCopsWinPosition_zero G c' _ h\n\n/-- Placing a cop on every vertex wins. -/\n@[category API, AMS 5 91]\ntheorem copsWin_card [Fintype V] : CopsWin G (Fintype.card V) :=\n  ⟨(Fintype.equivFin V).symm, fun r => ⟨_, fun _ => Or.inl rfl,\n    .capture ⟨Fintype.equivFin V r, (Fintype.equivFin V).symm_apply_apply r⟩⟩⟩\n\n/-- The cop number of a finite graph is at most its number of vertices. -/\n@[category API, AMS 5 91]\ntheorem copNumber_le_card [Fintype V] : copNumber G ≤ Fintype.card V :=\n  Nat.sInf_le (copsWin_card G)\n\n/-- The cop number of a nonempty finite graph is positive. -/\n@[category API, AMS 5 91]\ntheorem copNumber_pos [Fintype V] [Nonempty V] : 0 < copNumber G := by\n  rw [Nat.pos_iff_ne_zero]\n  intro h\n  rw [copNumber, Nat.sInf_eq_zero] at h\n  rcases h with h | h\n  · exact not_copsWin_zero G h\n  · exact h.subset (copsWin_card G)\n\n/-- The cop number of a nonempty complete graph is one: a single cop captures the robber\nin the first round. -/\n@[category test, AMS 5 91]\ntheorem copNumber_top [Nonempty V] : copNumber (⊤ : SimpleGraph V) = 1 := by\n  refine IsLeast.csInf_eq ⟨⟨fun _ => Classical.arbitrary V, fun r => ⟨fun _ => r, fun _ => ?_,\n    .capture ⟨0, rfl⟩⟩⟩, fun k hk => ?_⟩\n  · by_cases h : Classical.arbitrary V = r\n    · exact Or.inl h\n    · exact Or.inr h\n  · exact Nat.pos_of_ne_zero fun h => not_copsWin_zero _ (h ▸ hk)\n\n/-- On the cycle `C₄`, a player may step from `x` to `y` only if `y` is not opposite to `x`. -/\n@[category API, AMS 5 91]\ntheorem isStep_cycleGraph_four {x y : Fin 4} (h : IsStep (cycleGraph 4) x y) : y ≠ x + 2 := by\n  unfold IsStep at h\n  rw [cycleGraph_adj (n := 2)] at h\n  revert x y; decide\n\n/-- On the cycle `C₄`, a player not standing at `x` may step to the vertex opposite to `x`. -/\n@[category API, AMS 5 91]\ntheorem isStep_cycleGraph_four_add_two {x y : Fin 4} (h : x ≠ y) :\n    IsStep (cycleGraph 4) y (x + 2) := by\n  unfold IsStep\n  rw [cycleGraph_adj (n := 2)]\n  revert x y; decide\n\n/-- On the cycle `C₄`, a robber not standing on the single cop can evade capture forever\nby always moving to the vertex opposite to the cop. -/\n@[category API, AMS 5 91]\ntheorem not_isCopsWinPosition_cycleGraph_four {c : Fin 1 → Fin 4} {r : Fin 4} (hcr : c 0 ≠ r) :\n    ¬ IsCopsWinPosition (cycleGraph 4) c r := by\n  intro h\n  induction h with\n  | capture h =>\n    obtain ⟨i, hi⟩ := h\n    exact hcr (Fin.fin_one_eq_zero i ▸ hi)\n  | step _ hf _ ih =>\n    have hstep := isStep_cycleGraph_four_add_two hcr\n    exact ih _ hstep (isStep_cycleGraph_four (hf _ hstep 0))\n\n/-- A single cop does not win on the cycle `C₄`. -/\n@[category API, AMS 5 91]\ntheorem not_copsWin_cycleGraph_four_one : ¬ CopsWin (cycleGraph 4) 1 := by\n  rintro ⟨c, hc⟩\n  obtain ⟨c', hmove, h⟩ := hc (c 0 + 2)\n  exact not_isCopsWinPosition_cycleGraph_four (isStep_cycleGraph_four (hmove 0)) h\n\n/-- Two cops win on the cycle `C₄`: they start on opposite vertices, and one of them\nthen captures the robber in the first round. -/\n@[category API, AMS 5 91]\ntheorem copsWin_cycleGraph_four_two : CopsWin (cycleGraph 4) 2 := by\n  refine ⟨![0, 2], fun r => ⟨![if r = 2 then 0 else r, 2], fun i => ?_, .capture ?_⟩⟩\n  · unfold IsStep\n    rw [cycleGraph_adj (n := 2)]\n    revert i r; decide\n  · by_cases hr : r = 2\n    · exact ⟨1, by simp [hr]⟩\n    · exact ⟨0, by simp [hr]⟩\n\n/-- The cop number of the cycle `C₄` is two. -/\n@[category test, AMS 5 91]\ntheorem copNumber_cycleGraph_four : copNumber (cycleGraph 4) = 2 := by\n  refine IsLeast.csInf_eq ⟨copsWin_cycleGraph_four_two, fun k hk => ?_⟩\n  rcases k with _ | _ | k\n  · exact (not_copsWin_zero _ hk).elim\n  · exact (not_copsWin_cycleGraph_four_one hk).elim\n  · omega\n\n/-- **Meyniel's conjecture.** The cop number of a connected graph on $n$ vertices is $O(\\sqrt n)$:\nthere is a constant $d > 0$ such that every connected graph $G$ on $n$ vertices satisfies\n$c(G) \\le d\\sqrt{n}$. -/\n@[category research open, AMS 5 91]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧ ∀ (n : ℕ) (G : SimpleGraph (Fin n)), G.Connected →\n      (copNumber G : ℝ) ≤ d * √n := by\n  sorry\n\nend CopNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single slot is appropriate: the list entry names exactly one conjecture, and excluding the soft Meyniel conjecture (mentioned only in the article) is correct.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Precise formulation derived from the article/survey: 'there is a constant d > 0 such that every connected graph on n vertices has cop number ≤ d√n'. This is stated for all n (not just sufficiently large n); the two readings are equivalent because c(G) ≤ n for every finite graph, so the constant can be enlarged to cover finitely many small n.",
+    "n-vertex graphs are quantified as `SimpleGraph (Fin n)` (a common idiom in this repository) rather than an arbitrary `Fintype V`; the cop number is an isomorphism invariant, so this loses nothing.",
+    "The hypothesis `0 < d` is included as in the survey ('constant d > 0'); it is harmless (any d works implies any larger d works).",
+    "The game is modeled on the simple graph with passing allowed (`IsStep`), which is the same as the survey's 'reflexive graph' convention.",
+    "Capture is checked at positions where the robber is to move, i.e. immediately after each cops' move. A robber moving onto a cop is also a capture in this model: the cops can respond by passing and then the `capture` constructor applies. A cop landing on the robber is a capture because `capture` applies before the robber gets to move.",
+    "Turn order: cops are placed first (∃ c), robber is placed (∀ r), then cops move first (∃ c' legal from c), then robber/cops alternate inside `IsCopsWinPosition`. This follows the Wikipedia rules literally.",
+    "'Cops win' is the least fixed point (inductive predicate), i.e. cops can force capture after finitely many rounds along every play; this is the standard notion of a winning strategy for the cops and agrees with 'the robber wins if he evades capture indefinitely'.",
+    "`copNumber` is defined for arbitrary (possibly infinite) vertex types; the junk value `sInf ∅ = 0` can only arise for infinite graphs, which the conjecture never reaches (it quantifies over `Fin n`).",
+    "Sanity tests are proved (not sorried): `copNumber ⊤ = 1` for nonempty complete graphs, `copNumber (cycleGraph 4) = 2` (the article's example that cycles of length > 3 have cop number 2, including the robber's evasion strategy against one cop), `copNumber_le_card`, and `copNumber_pos`.",
+    "AMS tags `5 91` (combinatorics/graph theory, game theory) were used, consistent with the problem tags 'graph theory, games on graphs'."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Relation.ReflGen G.Adj` (inductive reflexive closure) and `G.dist v w ≤ 1` (rejected: dist is 0 on unreachable pairs). The explicit disjunction was chosen for transparency.",
+     "name": "CopNumber.IsStep",
+     "why_needed": "A single player's legal turn on a simple graph: stay put or move along an edge (`v = w ∨ G.Adj v w`). Needed because the game is played on the reflexive closure of G (passing is allowed) and Mathlib's SimpleGraph is irreflexive."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib; `Relation.ReflGen` lifted pointwise would be equivalent but less readable.",
+     "name": "CopNumber.IsCopsMove",
+     "why_needed": "A legal move of the whole team of k cops (indexed by `Fin k`, so cops may share a vertex): each cop independently stays put or moves to an adjacent vertex, matching 'a (possibly empty) subset of the cops moves'."
+    },
+    {
+     "closest_existing_considered": "Mathlib has no pursuit-evasion / combinatorial-game-on-graph machinery; `SetTheory.PGame` is unsuitable (not a two-player reachability game on positions). The repo's `CatchUp.value` recursive evaluator is game-specific.",
+     "name": "CopNumber.IsCopsWinPosition",
+     "why_needed": "Inductive (least-fixed-point) predicate: from the position with cops at `c`, robber at `r`, and the robber to move, the cops can force capture in finitely many rounds. Constructors: `capture` (some cop already stands on r) and `step` (for every legal robber move r' the cops have a legal response `f r'` from which they still win). The response is given as an explicit function `f : V → Fin k → V` because Lean's kernel rejects `∃ c', ... ∧ IsCopsWinPosition c' r'` nested under a binder inside a constructor."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "CopNumber.CopsWin",
+     "why_needed": "`k` cops have a winning strategy on G: ∃ initial cop configuration c, ∀ robber start r, ∃ first cops move c' (legal from c) with `IsCopsWinPosition G c' r`. Encodes the rule order: cops place first, robber places, cops move first thereafter."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib; analogous to the repo's `PebblingNumberConjecture.PebblingNumber` (sInf over a winning-condition set).",
+     "name": "CopNumber.copNumber",
+     "why_needed": "The cop number `sInf {k | CopsWin G k}`. For finite graphs this is a genuine minimum (placing a cop on every vertex wins, proved as `copsWin_card`); it is positive for nonempty finite graphs (`copNumber_pos`), matching the survey's 'well-defined positive integer'."
+    }
+   ],
+   "per_slot": {
+    "cop_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `CopNumber.cop_number`: ∃ d : ℝ, 0 < d ∧ ∀ n (G : SimpleGraph (Fin n)), G.Connected → (copNumber G : ℝ) ≤ d * √n. The constant d is quantified outside n and G (independent of the graph), the domain is connected finite simple graphs, and the cop number is built from a bespoke formalization of the cops-and-robbers game (no such primitives exist in Mathlib or FormalConjecturesForMathlib). The soft Meyniel conjecture is not included, per the decomposition notes."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cop_number": "/-- **Meyniel's conjecture.** The cop number of a connected graph on $n$ vertices is $O(\\sqrt n)$:\nthere is a constant $d > 0$ such that every connected graph $G$ on $n$ vertices satisfies\n$c(G) \\le d\\sqrt{n}$. -/\n@[category research open, AMS 5 91]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧ ∀ (n : ℕ) (G : SimpleGraph (Fin n)), G.Connected →\n      (copNumber G : ℝ) ≤ d * √n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cop number\n\nThe game of *Cops and Robbers* is played on a finite graph $G$ by a set of $k$ cops and a\nsingle robber, who occupy vertices of $G$. First the cops are placed on vertices of $G$ (several\ncops may share a vertex), then the robber is placed on a vertex. Afterwards the players alternate\nturns, cops first. On the cops' turn each cop either stays put or moves to an adjacent vertex; on\nthe robber's turn the robber either stays put or moves to an adjacent vertex. The cops win if,\nafter finitely many rounds, some cop occupies the same vertex as the robber; otherwise the\nrobber wins. The *cop number* $c(G)$ is the least $k$ such that $k$ cops have a winning\nstrategy on $G$.\n\n**Meyniel's conjecture** (1985, reported by Frankl) states that the cop number of every\nconnected $n$-vertex graph is $O(\\sqrt n)$.\n\n*References:*\n- [Wikipedia: Cop number](https://en.wikipedia.org/wiki/cop_number)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [BB13] W. Baird, A. Bonato, *Meyniel's conjecture on the cop number: a survey*,\n  Journal of Combinatorics 3 (2012), 225–238. [arXiv:1308.3385](https://arxiv.org/abs/1308.3385)\n- [Fra87] P. Frankl, *Cops and robbers in graphs with large girth and Cayley graphs*,\n  Discrete Applied Mathematics 17 (1987), 301–305.\n-/\n\nnamespace CopNumber\n\nvariable {V : Type*} (G : SimpleGraph V)\n\n/--\n`CopsWin G c r` says that, in the game of Cops and Robbers on `G` with the `k` cops standing on\nthe vertices `c 0, …, c (k - 1)`, the robber standing on `r`, and the cops to move, the cops can\nforce a capture in finitely many rounds.\n\nOn their turn the cops move to positions `c'`, where each cop either stays put or moves to an\nadjacent vertex. If some cop now stands on the robber's vertex, the robber is captured. Otherwise\nthe robber either stays put or moves to an adjacent vertex `r'`, and the cops must be able to\nforce a capture from the position `(c', r')`.\n-/\ninductive CopsWin {k : ℕ} : (Fin k → V) → V → Prop\n  /-- The cops move to `c'` and one of them lands on the robber. -/\n  | capture {c : Fin k → V} {r : V} (c' : Fin k → V)\n      (hc' : ∀ i, c' i = c i ∨ G.Adj (c i) (c' i)) (h : ∃ i, c' i = r) :\n      CopsWin c r\n  /-- The cops move to `c'`, and whatever the robber does next, the cops can still force a\n  capture. -/\n  | step {c : Fin k → V} {r : V} (c' : Fin k → V)\n      (hc' : ∀ i, c' i = c i ∨ G.Adj (c i) (c' i))\n      (h : ∀ r', (r' = r ∨ G.Adj r r') → CopsWin c' r') :\n      CopsWin c r\n\n/--\n`k` cops have a winning strategy on `G`: the cops can be placed on vertices `c 0, …, c (k - 1)`\nof `G` (repetitions allowed) so that, wherever the robber then places himself, the cops can\nforce a capture.\n-/\ndef CopsCanWin (k : ℕ) : Prop :=\n  ∃ c : Fin k → V, ∀ r : V, CopsWin G c r\n\n/--\nThe cop number $c(G)$ of a graph `G`: the least number of cops that have a winning strategy in\nthe game of Cops and Robbers on `G`.\n\nFor a finite graph this is well defined, since placing one cop on every vertex wins at once.\n(For an infinite graph on which no finite number of cops wins, the `sInf` is `0` by convention;\nthis case is not relevant here.)\n-/\nnoncomputable def copNumber : ℕ :=\n  sInf {k | CopsCanWin G k}\n\n/-- Cops standing on the robber's vertex win by passing. -/\n@[category API, AMS 5]\ntheorem CopsWin.of_exists_eq {k : ℕ} {c : Fin k → V} {r : V} (h : ∃ i, c i = r) :\n    CopsWin G c r :=\n  .capture c (fun _ => Or.inl rfl) h\n\n/-- One cop on every vertex wins immediately. -/\n@[category API, AMS 5]\ntheorem copsCanWin_card [Fintype V] : CopsCanWin G (Fintype.card V) :=\n  ⟨(Fintype.equivFin V).symm, fun r => .of_exists_eq G ⟨Fintype.equivFin V r, by simp⟩⟩\n\n@[category API, AMS 5]\ntheorem copNumber_le_card [Fintype V] : copNumber G ≤ Fintype.card V :=\n  Nat.sInf_le (copsCanWin_card G)\n\n/-- Without cops, the robber is never captured. -/\n@[category API, AMS 5]\ntheorem not_copsWin_zero (c : Fin 0 → V) (r : V) : ¬ CopsWin G c r := by\n  intro h\n  induction h with\n  | capture _ _ h => exact h.elim fun i _ => i.elim0\n  | @step _ r _ _ _ ih => exact ih r (Or.inl rfl)\n\n/-- The cop number of a nonempty finite graph is positive. -/\n@[category API, AMS 5]\ntheorem copNumber_pos [Fintype V] [Nonempty V] : 0 < copNumber G := by\n  refine Nat.pos_of_ne_zero fun h0 => ?_\n  have hmem : copNumber G ∈ {k | CopsCanWin G k} := Nat.sInf_mem ⟨_, copsCanWin_card G⟩\n  rw [h0] at hmem\n  obtain ⟨c, hc⟩ := hmem\n  exact not_copsWin_zero G c (Classical.arbitrary V) (hc _)\n\n/-- A complete graph on at least one vertex has cop number `1`. -/\n@[category test, AMS 5]\ntheorem copNumber_top [Fintype V] [Nonempty V] : copNumber (⊤ : SimpleGraph V) = 1 := by\n  refine le_antisymm (Nat.sInf_le ?_) (copNumber_pos _)\n  obtain ⟨v⟩ := ‹Nonempty V›\n  refine ⟨fun _ => v, fun r => .capture (fun _ => r) (fun _ => ?_) ⟨0, rfl⟩⟩\n  by_cases h : r = v\n  · exact Or.inl h\n  · exact Or.inr fun hv => h hv.symm\n\n/-- In the graph without edges, the robber is safe on any vertex not occupied by a cop. -/\n@[category API, AMS 5]\ntheorem not_copsWin_bot {k : ℕ} {c : Fin k → V} {r : V} (hr : r ∉ Set.range c) :\n    ¬ CopsWin (⊥ : SimpleGraph V) c r := by\n  intro h\n  induction h with\n  | @capture c r c' hc' h =>\n    obtain ⟨i, hi⟩ := h\n    exact hr ⟨i, ((hc' i).resolve_right (by simp)).symm.trans hi⟩\n  | @step c r c' hc' _ ih =>\n    exact ih r (Or.inl rfl) (by rwa [funext fun i => (hc' i).resolve_right (by simp)])\n\n/-- The graph without edges on `n` vertices has cop number `n`. -/\n@[category test, AMS 5]\ntheorem copNumber_bot [Fintype V] : copNumber (⊥ : SimpleGraph V) = Fintype.card V := by\n  refine le_antisymm (copNumber_le_card _)\n    (le_csInf ⟨_, copsCanWin_card _⟩ fun k ⟨c, hc⟩ => not_lt.1 fun hlt => ?_)\n  obtain ⟨r, hr⟩ : ∃ r, r ∉ Set.range c := by\n    by_contra hall\n    push_neg at hall\n    exact absurd (Fintype.card_le_of_surjective c hall) (by simpa using hlt)\n  exact not_copsWin_bot hr (hc r)\n\n/--\n**Meyniel's conjecture.** The cop number of a connected graph on $n$ vertices is $O(\\sqrt n)$:\nthere is a constant $d > 0$ such that every finite connected simple graph $G$ on $n$ vertices\nsatisfies $c(G) \\le d \\sqrt n$.\n\nThe constant $d$ is independent of the graph. Since $c(G) \\le n$ always holds, it makes no\ndifference whether the bound is required for all $n$ or only for all sufficiently large $n$.\n-/\n@[category research open, AMS 5 91]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧ ∀ (V : Type) [Fintype V] (G : SimpleGraph V), G.Connected →\n      (copNumber G : ℝ) ≤ d * √(Fintype.card V) := by\n  sorry\n\nend CopNumber\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single slot matches the list entry, and the notes' precise formulation (constant d > 0 independent of G, all finite connected simple graphs, cop number from the standard game) is what the file states.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The terse list entry 'cop number is O(√n)' is expanded, following the Wikipedia article and the Baird–Bonato survey, to: there is a constant d > 0 such that every finite connected simple graph G on n vertices has c(G) ≤ d√n. The constant is existentially quantified before all graphs (independent of G), and the bound is required for all n rather than only for large n; the docstring notes these are equivalent because c(G) ≤ n always.",
+    "The 'O(√n)' is encoded with an explicit constant rather than via `Asymptotics.IsBigO` on c(n) := max over connected n-vertex graphs; the decomposition notes treat the two as equivalent and the explicit form avoids defining the auxiliary function c(n).",
+    "Graphs are quantified as `∀ (V : Type) [Fintype V] (G : SimpleGraph V)` with n = `Fintype.card V`, rather than `SimpleGraph (Fin n)`, so that no isomorphism-invariance argument is needed. Connectedness (`G.Connected`) forces `Nonempty V`, so the empty graph is excluded, matching the sources.",
+    "Game encoding: `CopsWin G c r` is an inductive Prop for positions with cops at `c : Fin k → V` (labelled cops, repetitions allowed), robber at `r`, cops to move. Constructor `capture`: cops make a legal move `c'` (each cop stays or moves along an edge) and some cop lands on `r`. Constructor `step`: cops make a legal move `c'` and for every robber response `r'` (stay or move along an edge) `CopsWin G c' r'` holds. Being a least fixed point, `CopsWin` holds iff the cops can force capture in finitely many rounds against every robber behaviour, i.e. iff the cops have a winning strategy. A robber placing or moving onto a cop is captured because the cops may pass and invoke `capture`.",
+    "`CopsCanWin G k := ∃ c : Fin k → V, ∀ r, CopsWin G c r` encodes: cops place first, robber places second with knowledge of the cop positions, then cops move first. `copNumber G := sInf {k | CopsCanWin G k}`; for finite V the set contains `Fintype.card V` (proved), so the `sInf ∅ = 0` default is unreachable in the conjecture. The definition is left general in V (no `Fintype` hypothesis) with the infinite-graph caveat documented.",
+    "The reflexive-graph convention of the survey (loops allowing passes) is modelled on a `SimpleGraph` by explicitly allowing each player to stay put (`c' i = c i ∨ G.Adj (c i) (c' i)`, `r' = r ∨ G.Adj r r'`).",
+    "The soft Meyniel conjecture (O(n^c), c < 1) is not included, per the decomposition table.",
+    "AMS tags 5 (combinatorics) and 91 (game theory) are used, matching the 'graph theory, games on graphs' tags. Bespoke definitions are kept in the problem file (as in `PebblingNumberConjecture.lean`) since the task allows only one file; a reviewer may prefer to move them to FormalConjecturesForMathlib."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjecturesForMathlib for 'cop', 'robber', 'pursuit', 'copNumber' (no hits). Considered `Relation.ReflGen G.Adj` for the 'stay or move' step and `SimpleGraph.dist ≤ 1`, but inlining `x = y ∨ G.Adj x y` is more transparent. Considered a history-dependent strategy formalization; the least-fixed-point inductive is equivalent and far simpler.",
+     "name": "CopNumber.CopsWin",
+     "why_needed": "Inductive predicate: from the position with cops at `c`, robber at `r`, cops to move, the cops can force a capture in finitely many rounds. Needed to express who wins the cops-and-robbers game; no pursuit-evasion game exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib/repo; no game-winning-strategy primitive exists.",
+     "name": "CopNumber.CopsCanWin",
+     "why_needed": "`k` cops have a winning strategy on `G`: some initial placement of the k cops wins against every initial robber placement."
+    },
+    {
+     "closest_existing_considered": "Mathlib graph invariants such as `SimpleGraph.chromaticNumber`, `cliqueNum`, and the repo's `PebblingNumber` (same `sInf` pattern) were used as models; none is the cop number.",
+     "name": "CopNumber.copNumber",
+     "why_needed": "The cop number c(G) = least k such that k cops can win, defined as `sInf {k | CopsCanWin G k}`."
+    }
+   ],
+   "per_slot": {
+    "cop_number": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `∃ d : ℝ, 0 < d ∧ ∀ (V : Type) [Fintype V] (G : SimpleGraph V), G.Connected → (copNumber G : ℝ) ≤ d * √(Fintype.card V)`, i.e. a graph-independent constant d > 0 bounding the cop number of every finite connected simple graph on n vertices by d·√n. Neither Mathlib nor FormalConjecturesForMathlib has the cops-and-robbers game or the cop number, so these are defined in the file (inductive `CopsWin`, `CopsCanWin`, `copNumber`) following the Wikipedia rules exactly, with API/test theorems checking them (complete graph has cop number 1, edgeless graph on n vertices has cop number n, 0 cops never win, n cops always win)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cop_number": "/--\n**Meyniel's conjecture.** The cop number of a connected graph on $n$ vertices is $O(\\sqrt n)$:\nthere is a constant $d > 0$ such that every finite connected simple graph $G$ on $n$ vertices\nsatisfies $c(G) \\le d \\sqrt n$.\n\nThe constant $d$ is independent of the graph. Since $c(G) \\le n$ always holds, it makes no\ndifference whether the bound is required for all $n$ or only for all sufficiently large $n$.\n-/\n@[category research open, AMS 5 91]\ntheorem cop_number :\n    ∃ d : ℝ, 0 < d ∧ ∀ (V : Type) [Fintype V] (G : SimpleGraph V), G.Connected →\n      (copNumber G : ℝ) ≤ d * √(Fintype.card V) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "cop_number": "c08"
+ },
+ "id": "wp-cop-number",
+ "main_attempt": "c08"
+}

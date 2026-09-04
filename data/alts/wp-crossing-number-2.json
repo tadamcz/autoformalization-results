@@ -1,0 +1,489 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Guy's conjecture on the crossing number of complete graphs\n\nA *drawing* of a graph in the plane maps the vertices to distinct points and every edge to a\ncurve joining the images of its endpoints, so that no vertex lies on an edge that it is not an\nendpoint of, and any two edges meet in finitely many points outside their endpoints. A *crossing*\nis such a common point, counted once for every pair of edges passing through it. The crossing\nnumber $\\mathrm{cr}(G)$ of $G$ is the minimum number of crossings over all drawings of $G$.\n\nGuy (1960) exhibited drawings of the complete graph $K_n$ showing that\n$$\\mathrm{cr}(K_n) \\le Z(n) := \\frac14 \\left\\lfloor \\frac{n}{2} \\right\\rfloor\n\\left\\lfloor \\frac{n-1}{2} \\right\\rfloor \\left\\lfloor \\frac{n-2}{2} \\right\\rfloor\n\\left\\lfloor \\frac{n-3}{2} \\right\\rfloor,$$\nand conjectured that no drawing of any complete graph does better, i.e. $\\mathrm{cr}(K_n) = Z(n)$\nfor all $n$. This is known for $n \\le 12$ (Saaty, Pan–Richter) and open in general.\n\n*References:*\n- [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Gu60] Guy, R. K., *A combinatorial problem*, Nabla (Bull. Malayan Math. Soc.) 7 (1960), 68–72.\n- [PaRi07] Pan, S. and Richter, R. B., *The crossing number of $K_{11}$ is 100*,\n  J. Graph Theory 56 (2007), 128–134.\n-/\n\nopen scoped EuclideanGeometry unitInterval\n\nnamespace CrossingNumber2\n\nvariable {V : Type*} (G : SimpleGraph V)\n\n/-- A (topological) drawing of the simple graph `G` in the plane. Vertices are mapped to distinct\npoints, and every edge is mapped to a simple arc (an injective continuous curve) whose two\nendpoints are the images of the endpoints of the edge. The interior of an arc passes through no\nvertex, and any two distinct arcs have only finitely many common interior points. Edges are\nallowed to be arbitrary curves, not just straight line segments. -/\nstructure Drawing where\n  /-- The position of each vertex in the plane. -/\n  vertex : V → ℝ²\n  vertex_injective : Function.Injective vertex\n  /-- The curve representing each edge, parametrised by the unit interval. -/\n  arc : G.edgeSet → C(I, ℝ²)\n  arc_injective (e : G.edgeSet) : Function.Injective (arc e)\n  arc_endpoints (e : G.edgeSet) : s(arc e 0, arc e 1) = Sym2.map vertex e\n  arc_avoids_vertex (e : G.edgeSet) (t : I) (ht : t ∈ Set.Ioo 0 1) (v : V) : arc e t ≠ vertex v\n  finite_inter (e f : G.edgeSet) (hef : e ≠ f) :\n    (arc e '' Set.Ioo 0 1 ∩ arc f '' Set.Ioo 0 1).Finite\n\nvariable {G}\n\n/-- The number of crossings of a drawing: the number of pairs `(p, {e, f})` where `e ≠ f` are\nedges and `p` is a common point of the arcs of `e` and `f` other than a shared endpoint\n(equivalently, a common interior point of the two arcs). A point through which several edges pass\nis thus counted once for every pair of edges through it. The count is finite whenever `G` has\nfinitely many edges. -/\nnoncomputable def Drawing.crossings (D : Drawing G) : ℕ∞ :=\n  {x : ℝ² × Sym2 G.edgeSet | ∃ e f, e ≠ f ∧ x.2 = s(e, f) ∧\n    x.1 ∈ D.arc e '' Set.Ioo 0 1 ∩ D.arc f '' Set.Ioo 0 1}.encard\n\n/-- Guy's upper bound\n$Z(n) = \\frac14 \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$\non the crossing number of the complete graph $K_n$. The product is always divisible by `4`, so the\nnatural number division is exact. -/\ndef guyBound (n : ℕ) : ℕ :=\n  n / 2 * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2) / 4\n\n/-- Guy's bound takes the values $1, 3, 9, 18, 36, 60, 100, 150, 225, 315$ for $n = 5, \\dots, 14$\n(OEIS A000241). -/\n@[category test, AMS 5]\ntheorem guyBound_values :\n    (List.range 10).map (fun i => guyBound (i + 5)) =\n      [1, 3, 9, 18, 36, 60, 100, 150, 225, 315] := by\n  decide\n\n/-- Guy's bound vanishes for $n \\le 4$, where $K_n$ is planar. -/\n@[category test, AMS 5]\ntheorem guyBound_eq_zero (n : ℕ) (hn : n ≤ 4) : guyBound n = 0 := by\n  interval_cases n <;> rfl\n\n/-- **Guy's conjecture on the crossing number of complete graphs.**\nIs there a drawing of some complete graph $K_n$ with fewer than\n$Z(n) = \\frac14 \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$ crossings, the number given by Guy's upper bound? Guy conjectured that\nthe answer is no, i.e. that $\\mathrm{cr}(K_n) = Z(n)$ for every $n$. -/\n@[category research open, AMS 5]\ntheorem crossing_number_2 :\n    answer(sorry) ↔\n      ∃ n, ∃ D : Drawing (SimpleGraph.completeGraph (Fin n)), D.crossings < guyBound n := by\n  sorry\n\nend CrossingNumber2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's reading (single yes/no question, conjectured answer 'No', topological drawings, Z(n) as stated, existential over n) is the one formalized.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list-page entry is a yes/no question, so the statement is `answer(sorry) ↔ ∃ n, ∃ D : Drawing (K_n), D.crossings < guyBound n` rather than an infimum-based `crossingNumber (K_n) = Z(n)`; per the decomposition notes, answer(False) ≡ ∀ n, every drawing of K_n has ≥ Z(n) crossings ≡ cr(K_n) = Z(n) given Guy's known upper bound. No `crossingNumber` (sInf) definition was introduced, avoiding sInf/empty-set subtleties.",
+    "Transversality ('proper crossings') is NOT required in `Drawing`: every common interior point of two arcs is counted, including touching points. Defining transversality for merely continuous curves is delicate, and the omission does not change the conjecture: a touching can be removed by a local redrawing without adding crossings (standard, e.g. Schaefer, Crossing Numbers of Graphs; Pach–Tóth), so a drawing with < Z(n) counted points exists iff a proper drawing with < Z(n) crossings exists. Reviewers should confirm they accept this.",
+    "Arcs are required to be injective (simple/Jordan arcs), the standard convention; Wikipedia's text says only 'curves', but self-intersections of a single edge are not counted as crossings and can be shortcut without adding crossings, so the minimum is unaffected.",
+    "Crossings between adjacent edges (sharing an endpoint) and multiple crossings of the same edge pair are counted, and a point on k edges counts C(k,2) times — exactly Wikipedia's counting convention ('counted separately for each crossing point, for each pair of edges'); crossing-minimal drawings never have these anyway.",
+    "The condition 'no vertex lies on an edge it is not an endpoint of' is encoded as: the open-interval part of every arc avoids all vertex points. Because arcs are injective with endpoints at the edge's vertices and vertex placement is injective, this is equivalent to the Wikipedia condition.",
+    "Finiteness of pairwise common interior points is a field of `Drawing` (as in Wikipedia's definition); `crossings` is ℕ∞-valued via `Set.encard`, and `D.crossings < guyBound n` compares in ℕ∞ with the automatic ℕ → ℕ∞ coercion.",
+    "Z(n) uses ℕ truncated subtraction and floor division; for n ≤ 3 the truncation gives 0 which agrees with the intended value (K_n planar for n ≤ 4). Verified values 1,3,9,18,36,60,100,150,225,315 for n = 5..14 (OEIS A000241) by `decide`.",
+    "K_n is `SimpleGraph.completeGraph (Fin n)` with n ranging over all ℕ (including n ≤ 4, where Z(n) = 0 makes the existential trivially false, matching the intended meaning).",
+    "AMS tag 5 (Combinatorics; 05C10 planar graphs). The generic `Drawing`/`crossings` definitions were kept in the problem file because the task permits writing only one file; a maintainer may prefer moving them to FormalConjecturesForMathlib."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Path`/`ContinuousMap` (used for the arcs; `Path` alone was unsuitable because edges are unordered), `IsEmbedding` for Jordan curves as in Wikipedia/InscribedSquare.lean, `UnitDistancePlaneGraph` (a geometric graph, not a drawing). Mathlib has no planar-graph or graph-embedding notion (only a TODO mention in SimpleGraph/Coloring.lean).",
+     "name": "CrossingNumber2.Drawing",
+     "why_needed": "No notion of a (topological) plane drawing of a graph exists in Mathlib or the repo. Fields: injective vertex placement `V → ℝ²`; for each edge `e : G.edgeSet` an injective continuous curve `C(I, ℝ²)` (simple arc) whose unordered endpoint pair equals `Sym2.map vertex e`; arc interiors (`Set.Ioo 0 1` in `I`) avoid every vertex point; any two distinct arcs have finitely many common interior points. This matches the Wikipedia definition (curves allowed, not rectilinear)."
+    },
+    {
+     "closest_existing_considered": "Set.ncard / Nat.card (rejected in favour of encard for honesty on infinite graphs); a Finset sum over Sym2 pairs (needs Fintype/Decidable instances, less generic).",
+     "name": "CrossingNumber2.Drawing.crossings",
+     "why_needed": "The number of crossings of a drawing: `Set.encard` of `{(p, {e,f}) | e ≠ f, p a common interior point of arc e and arc f}` in `ℝ² × Sym2 G.edgeSet`. This counts a crossing point once per unordered pair of edges through it, exactly as Wikipedia specifies. Valued in ℕ∞ (finite for finite graphs) to avoid the `ncard`-of-infinite-set-is-0 artefact."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib; the analogous Zarankiewicz bound is also absent from the repo.",
+     "name": "CrossingNumber2.guyBound",
+     "why_needed": "Guy's bound Z(n) = ¼⌊n/2⌋⌊(n-1)/2⌋⌊(n-2)/2⌋⌊(n-3)/2⌋ as a ℕ-valued function using truncated subtraction/division; the product is always divisible by 4 so division is exact (values for n = 5..14 and vanishing for n ≤ 4 are verified by `decide`/`rfl` test theorems)."
+    }
+   ],
+   "per_slot": {
+    "crossing_number_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ n, ∃ D : Drawing (completeGraph (Fin n)), D.crossings < guyBound n`, a direct rendering of the yes/no question; answer(False) is exactly cr(K_n) ≥ Z(n) for all n. No graph-drawing or crossing primitives exist in Mathlib or FormalConjecturesForMathlib, so a bespoke topological `Drawing` structure, its crossing count, and Guy's bound Z(n) were defined in the problem file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number_2": "/-- **Guy's conjecture on the crossing number of complete graphs.**\nIs there a drawing of some complete graph $K_n$ with fewer than\n$Z(n) = \\frac14 \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$ crossings, the number given by Guy's upper bound? Guy conjectured that\nthe answer is no, i.e. that $\\mathrm{cr}(K_n) = Z(n)$ for every $n$. -/\n@[category research open, AMS 5]\ntheorem crossing_number_2 :\n    answer(sorry) ↔\n      ∃ n, ∃ D : Drawing (SimpleGraph.completeGraph (Fin n)), D.crossings < guyBound n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Guy's conjecture on crossing numbers of complete graphs\n\nGuy's conjecture states that the topological crossing number of the complete graph on `n`\nvertices is\n$$\n  \\frac14 \\left\\lfloor\\frac n2\\right\\rfloor\n  \\left\\lfloor\\frac{n-1}2\\right\\rfloor\n  \\left\\lfloor\\frac{n-2}2\\right\\rfloor\n  \\left\\lfloor\\frac{n-3}2\\right\\rfloor.\n$$\nEdges are represented by arbitrary simple continuous arcs, not necessarily by line segments.\n\n*References:*\n- [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [E. de Klerk et al., Improved bounds for the crossing numbers of $K_{m,n}$ and $K_n$](https://arxiv.org/abs/math/0404142)\n-/\n\nopen Topology\n\nnamespace CrossingNumber2\n\n/-- The Euclidean plane used for topological drawings. -/\nabbrev Plane := ℝ × ℝ\n\n/-- An edge of the complete graph on `n` vertices, represented by its unordered pair of\nendpoints. -/\nabbrev Edge (n : ℕ) := {e : Finset (Fin n) // e.card = 2}\n\n/-- Two simple arcs cross properly at `p` if, in local topological coordinates around `p`,\nthey are the two coordinate axes, with their path parameters serving as coordinates along the\naxes. In particular, both arcs pass through the crossing rather than merely touching there. -/\ndef ProperCrossing (c d : C(Set.Icc (0 : ℝ) 1, Plane)) (p : Plane) : Prop :=\n  ∃ t u : Set.Icc (0 : ℝ) 1,\n    t ≠ 0 ∧ t ≠ 1 ∧ u ≠ 0 ∧ u ≠ 1 ∧ c t = p ∧ d u = p ∧\n      ∃ h : OpenPartialHomeomorph Plane Plane,\n        p ∈ h.source ∧ h p = (0, 0) ∧\n          ∃ ε > 0, ∃ δ > 0,\n            (∀ s : Set.Icc (0 : ℝ) 1, |(s : ℝ) - (t : ℝ)| < ε →\n              c s ∈ h.source ∧ h (c s) = ((s : ℝ) - (t : ℝ), 0)) ∧\n            (∀ s : Set.Icc (0 : ℝ) 1, |(s : ℝ) - (u : ℝ)| < δ →\n              d s ∈ h.source ∧ h (d s) = (0, (s : ℝ) - (u : ℝ)))\n\n/-- A topological drawing of the complete graph on `n` vertices. Vertices are distinct points.\nEvery edge is a simple continuous arc joining its endpoints and avoiding all other vertices.\nEvery intersection away from a shared endpoint is one of finitely many proper crossings. -/\nstructure TopologicalDrawing (n : ℕ) where\n  vertex : Fin n ↪ Plane\n  edge : Edge n → C(Set.Icc (0 : ℝ) 1, Plane)\n  edge_isEmbedding : ∀ e, IsEmbedding (edge e)\n  endpoints : ∀ (e : Edge n) (v : Fin n),\n    v ∈ e.1 ↔ vertex v = edge e 0 ∨ vertex v = edge e 1\n  avoids_other_vertices : ∀ (e : Edge n) (v : Fin n), v ∉ e.1 →\n    ∀ t, edge e t ≠ vertex v\n  finite_intersections : ∀ (e f : Edge n), e ≠ f →\n    {p : Plane | p ∈ Set.range (edge e) ∧ p ∈ Set.range (edge f) ∧\n      ¬∃ v : Fin n, v ∈ e.1 ∧ v ∈ f.1 ∧ vertex v = p}.Finite\n  proper_intersections : ∀ (e f : Edge n) (p : Plane), e ≠ f →\n    p ∈ Set.range (edge e) → p ∈ Set.range (edge f) →\n    (¬∃ v : Fin n, v ∈ e.1 ∧ v ∈ f.1 ∧ vertex v = p) →\n    ProperCrossing (edge e) (edge f) p\n\n/-- The set of crossings of a drawing. The order condition counts each unordered pair of edges\nonce; a point at which several edges cross is counted once for each pair. -/\ndef crossings {n : ℕ} (D : TopologicalDrawing n) : Set ((Edge n × Edge n) × Plane) :=\n  {x | x.1.1 < x.1.2 ∧\n    ¬(∃ v : Fin n, v ∈ x.1.1.1 ∧ v ∈ x.1.2.1 ∧ D.vertex v = x.2) ∧\n    ProperCrossing (D.edge x.1.1) (D.edge x.1.2) x.2}\n\n/-- The number of crossings in a topological drawing. -/\nnoncomputable def crossingCount {n : ℕ} (D : TopologicalDrawing n) : ℕ :=\n  (crossings D).ncard\n\n/-- Guy's upper bound for the crossing number of the complete graph on `n` vertices. -/\ndef guyBound (n : ℕ) : ℕ :=\n  (n / 2 * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2)) / 4\n\n/--\n**Guy's conjecture on the crossing number of complete graphs.**\n\nIs there an `n` and a topological drawing of the complete graph $K_n$ with fewer than\n$$\n  Z(n)=\\frac14\\left\\lfloor\\frac n2\\right\\rfloor\n  \\left\\lfloor\\frac{n-1}2\\right\\rfloor\n  \\left\\lfloor\\frac{n-2}2\\right\\rfloor\n  \\left\\lfloor\\frac{n-3}2\\right\\rfloor\n$$\ncrossings? The conjectured answer is no. Equivalently, every topological drawing of every $K_n$\nhas at least $Z(n)$ crossings.\n-/\n@[category research open, AMS 05]\ntheorem crossing_number_2 :\n    answer(sorry) ↔ ∃ n : ℕ, ∃ D : TopologicalDrawing n, crossingCount D < guyBound n := by\n  sorry\n\nend CrossingNumber2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.92,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The source is a yes/no question, so the declaration uses `answer(sorry) ↔ ∃ n, ∃ D, crossingCount D < guyBound n`; the conjectured answer `False` is equivalent to the universal lower bound for every `n` and every drawing.",
+    "A complete graph edge is represented directly as a two-element finset of `Fin n`, avoiding any orientation of edges.",
+    "A topological drawing uses arbitrary simple continuous arcs in `ℝ × ℝ`, not straight segments or differentiable curves. Simplicity follows the primary source's definition of graph drawings as simple arcs.",
+    "A proper crossing is modeled topologically by a local partial homeomorphism taking the two parameterized arcs to the two coordinate axes. This captures crossing rather than tangency without imposing smoothness.",
+    "Crossings are triples consisting of an ordered representative `e < f` of an unordered edge-pair and a plane point. Thus a common crossing point of several edges is counted separately for every pair, while shared endpoints are excluded.",
+    "Guy's bound is evaluated in `ℕ` as the product of the four floor terms divided by four. Truncated natural subtraction gives the intended value zero for `n ≤ 4`.",
+    "Rather than defining crossing number as a minimum, the source's existence question is stated directly as the existence of a drawing whose crossing count is below Guy's known upper bound."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "The product type `ℝ × ℝ` is used directly; this is only a local abbreviation.",
+     "name": "Plane",
+     "why_needed": "Names the Euclidean plane used by the bespoke drawing model."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.completeGraph` and `edgeFinset` exist, but no existing drawing API consumes their edge subtype; the two-element finset representation makes endpoint incidence explicit.",
+     "name": "Edge",
+     "why_needed": "Represents an unordered edge of `K_n` as a two-element subset of its vertices."
+    },
+    {
+     "closest_existing_considered": "Differential transversality would incorrectly restrict the arbitrary curves in the source; `OpenPartialHomeomorph` supplies a faithful local topological model.",
+     "name": "ProperCrossing",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no notion of a proper topological crossing of two curves."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph` models abstract adjacency only, and topology's `Path`/`ContinuousMap` models individual curves but not a graph drawing with endpoint, vertex-avoidance, and proper-intersection conditions.",
+     "name": "TopologicalDrawing",
+     "why_needed": "No graph-drawing or crossing-number structure exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "No crossing-event set exists in Mathlib or the repository.",
+     "name": "crossings",
+     "why_needed": "Records crossing points once per unordered pair of edges, excluding shared endpoints."
+    },
+    {
+     "closest_existing_considered": "`Set.ncard` provides the cardinality operation, but the crossing-event set itself required a bespoke definition.",
+     "name": "crossingCount",
+     "why_needed": "Counts the crossing events of a valid topological drawing."
+    },
+    {
+     "closest_existing_considered": "No existing Guy/Hill bound definition was found.",
+     "name": "guyBound",
+     "why_needed": "Names the explicit integer-valued upper-bound formula appearing in the conjecture."
+    }
+   ],
+   "per_slot": {
+    "crossing_number_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number_2": "/--\n**Guy's conjecture on the crossing number of complete graphs.**\n\nIs there an `n` and a topological drawing of the complete graph $K_n$ with fewer than\n$$\n  Z(n)=\\frac14\\left\\lfloor\\frac n2\\right\\rfloor\n  \\left\\lfloor\\frac{n-1}2\\right\\rfloor\n  \\left\\lfloor\\frac{n-2}2\\right\\rfloor\n  \\left\\lfloor\\frac{n-3}2\\right\\rfloor\n$$\ncrossings? The conjectured answer is no. Equivalently, every topological drawing of every $K_n$\nhas at least $Z(n)$ crossings.\n-/\n@[category research open, AMS 05]\ntheorem crossing_number_2 :\n    answer(sorry) ↔ ∃ n : ℕ, ∃ D : TopologicalDrawing n, crossingCount D < guyBound n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Guy's conjecture on the crossing number of complete graphs\n\nA *drawing* of a graph in the plane maps distinct vertices to distinct points and each edge to\na simple arc joining the points of its two endpoints. No vertex point lies on an edge that is\nnot incident to it, and any two edges meet in finitely many points other than vertex points.\nThe *crossing number* $\\operatorname{cr}(G)$ of a graph $G$ is the minimum, over all drawings of\n$G$, of the number of pairwise intersections of edges at points other than vertex points.\n\nGuy [Gu60] published a drawing of the complete graph $K_n$ with\n$$Z(n) = \\frac{1}{4} \\left\\lfloor \\frac{n}{2} \\right\\rfloor \\left\\lfloor \\frac{n-1}{2} \\right\\rfloor\n\\left\\lfloor \\frac{n-2}{2} \\right\\rfloor \\left\\lfloor \\frac{n-3}{2} \\right\\rfloor$$\ncrossings, so $\\operatorname{cr}(K_n) \\le Z(n)$. Guy's conjecture (also called Hill's or the\nHarary–Hill conjecture) states that no drawing of any $K_n$ has fewer crossings, that is,\n$\\operatorname{cr}(K_n) = Z(n)$ for every $n$. It is known for $n \\le 12$ [Sa64] [PR07].\n\n*References:*\n- [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Gu60] Guy, R. K., *A combinatorial problem*. Nabla (Bull. Malayan Math. Soc.) 7 (1960), 68–72.\n- [Sa64] Saaty, T. L., *The minimum number of intersections in complete graphs*. Proc. Nat. Acad.\n  Sci. U.S.A. 52 (1964), 688–690.\n- [PR07] Pan, S. and Richter, R. B., *The crossing number of $K_{11}$ is $100$*. J. Graph Theory\n  56 (2007), 128–134.\n- [KMPRS06] de Klerk, E., Maharry, J., Pasechnik, D. V., Richter, R. B. and Salazar, G.,\n  *Improved bounds for the crossing numbers of $K_{m,n}$ and $K_n$*. SIAM J. Discrete Math. 20\n  (2006), 189–202. [arXiv:math/0404142](https://arxiv.org/abs/math/0404142)\n-/\n\nnamespace CrossingNumber2\n\nopen SimpleGraph\nopen scoped EuclideanGeometry\n\nvariable {V : Type*}\n\n/--\nA **drawing** of a simple graph `G` in the plane `ℝ²`.\n\nDistinct vertices are drawn as distinct points, and every edge `s(u, v)` is drawn as a simple arc\n(the image of an injective path) from the point of `u` to the point of `v`. No vertex point lies\non the arc of an edge that is not incident to it, and any two distinct edges have only finitely\nmany common points other than vertex points (i.e. other than a shared endpoint).\n-/\nstructure Drawing (G : SimpleGraph V) where\n  /-- The point of the plane representing a vertex. -/\n  vertexPos : V → ℝ²\n  /-- The subset of the plane (a simple arc) representing an edge. -/\n  edgeArc : G.edgeSet → Set ℝ²\n  /-- Distinct vertices are drawn as distinct points. -/\n  vertexPos_injective : Function.Injective vertexPos\n  /-- The edge `s(u, v)` is drawn as a simple arc from `vertexPos u` to `vertexPos v`. -/\n  exists_path : ∀ ⦃u v : V⦄ (h : G.Adj u v), ∃ γ : Path (vertexPos u) (vertexPos v),\n    Function.Injective γ ∧ Set.range γ = edgeArc ⟨s(u, v), h⟩\n  /-- No vertex point lies on an edge that is not incident to it. -/\n  vertexPos_notMem : ∀ (e : G.edgeSet) (v : V), v ∉ (e : Sym2 V) → vertexPos v ∉ edgeArc e\n  /-- Two distinct edges meet in finitely many points other than vertex points. -/\n  finite_inter : ∀ e f : G.edgeSet, e ≠ f →\n    ((edgeArc e ∩ edgeArc f) \\ Set.range vertexPos).Finite\n\n/--\nThe **crossings** of a drawing `D`: the pairs `(x, p)` where `p` is an unordered pair of two\ndistinct edges and `x` is a point of the plane, other than a vertex point, lying on both edges.\nA crossing is counted once for each pair of edges meeting at a point, so a common point of three\nedges contributes three crossings.\n-/\ndef Drawing.crossings {G : SimpleGraph V} (D : Drawing G) : Set (ℝ² × Sym2 G.edgeSet) :=\n  {c | ¬ c.2.IsDiag ∧ (∀ e ∈ c.2, c.1 ∈ D.edgeArc e) ∧ c.1 ∉ Set.range D.vertexPos}\n\n/--\nThe **crossing number** $\\operatorname{cr}(G)$ of a graph `G`: the minimum number of crossings\nover all drawings of `G` in the plane. It is `⊤` if `G` has no drawing, which does not happen for\nfinite graphs.\n-/\nnoncomputable def crossingNumber (G : SimpleGraph V) : ℕ∞ :=\n  ⨅ D : Drawing G, D.crossings.encard\n\n/--\nGuy's upper bound\n$$Z(n) = \\frac{1}{4} \\left\\lfloor \\frac{n}{2} \\right\\rfloor \\left\\lfloor \\frac{n-1}{2} \\right\\rfloor\n\\left\\lfloor \\frac{n-2}{2} \\right\\rfloor \\left\\lfloor \\frac{n-3}{2} \\right\\rfloor$$\non the crossing number of the complete graph $K_n$, which is the conjectured value of\n$\\operatorname{cr}(K_n)$. The product of the four floors is always divisible by `4`, so the\nnatural number division is exact; for `n ≤ 4` (when $K_n$ is planar) the value is `0`.\n-/\ndef guyBound (n : ℕ) : ℕ :=\n  n / 2 * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2) / 4\n\n/--\n**Guy's conjecture** on the crossing number of complete graphs, as a question.\n\nIs there a drawing of some complete graph $K_n$ with fewer crossings than the number\n$Z(n) = \\frac{1}{4} \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$ given by Guy's upper bound? The conjectured answer is no, that is,\n$\\operatorname{cr}(K_n) = Z(n)$ for every $n$.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2 :\n    answer(sorry) ↔ ∃ (n : ℕ) (D : Drawing (completeGraph (Fin n))),\n      D.crossings.encard < guyBound n := by\n  sorry\n\n/--\n**Guy's conjecture**, equality form: the crossing number of the complete graph $K_n$ equals\n$Z(n) = \\frac{1}{4} \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$ for every $n$.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2.variants.eq (n : ℕ) :\n    crossingNumber (completeGraph (Fin n)) = guyBound n := by\n  sorry\n\n/--\n**Guy's upper bound** [Gu60]: the complete graph $K_n$ has a drawing with $Z(n)$ crossings, so\n$\\operatorname{cr}(K_n) \\le Z(n)$ for every $n$.\n-/\n@[category research solved, AMS 5]\ntheorem crossing_number_2.variants.le (n : ℕ) :\n    crossingNumber (completeGraph (Fin n)) ≤ guyBound n := by\n  sorry\n\n/--\nGuy's conjecture holds for $n \\le 12$: Saaty [Sa64] verified $\\operatorname{cr}(K_n) = Z(n)$ for\n$n \\le 10$, and Pan and Richter [PR07] proved it for $n = 11, 12$.\n-/\n@[category research solved, AMS 5]\ntheorem crossing_number_2.variants.le_twelve (n : ℕ) (hn : n ≤ 12) :\n    crossingNumber (completeGraph (Fin n)) = guyBound n := by\n  sorry\n\n/-- The values $Z(5), \\dots, Z(14)$ are $1, 3, 9, 18, 36, 60, 100, 150, 225, 315$. -/\n@[category test, AMS 5]\ntheorem guyBound_values :\n    (List.range 10).map (fun k => guyBound (k + 5)) =\n      [1, 3, 9, 18, 36, 60, 100, 150, 225, 315] := by\n  decide\n\n/-- $Z(n) = 0$ for $n \\le 4$, where $K_n$ is planar. -/\n@[category test, AMS 5]\ntheorem guyBound_eq_zero (n : ℕ) (hn : n ≤ 4) : guyBound n = 0 := by\n  interval_cases n <;> rfl\n\n/-- The product of the four floors in $Z(n)$ is divisible by `4`. -/\n@[category API, AMS 5]\ntheorem four_dvd_guyBound_prod (n : ℕ) :\n    4 ∣ n / 2 * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2) := by\n  obtain ⟨k, rfl | rfl⟩ := Nat.even_or_odd' n\n  · rcases k with _ | k\n    · simp\n    · have h1 : (2 * (k + 1)) / 2 = k + 1 := by omega\n      have h2 : (2 * (k + 1) - 1) / 2 = k := by omega\n      have h3 : (2 * (k + 1) - 2) / 2 = k := by omega\n      have h4 : (2 * (k + 1) - 3) / 2 = k - 1 := by omega\n      have h : (k + 1) * k * k * (k - 1) = (k * (k + 1)) * (k * (k - 1)) := by ring\n      obtain ⟨a, ha⟩ := Nat.even_mul_succ_self k\n      obtain ⟨b, hb⟩ := Nat.even_mul_pred_self k\n      rw [h1, h2, h3, h4, h, ha, hb]\n      exact ⟨a * b, by ring⟩\n  · have h1 : (2 * k + 1) / 2 = k := by omega\n    have h2 : (2 * k + 1 - 1) / 2 = k := by omega\n    have h3 : (2 * k + 1 - 2) / 2 = k - 1 := by omega\n    have h4 : (2 * k + 1 - 3) / 2 = k - 1 := by omega\n    have h : k * k * (k - 1) * (k - 1) = (k * (k - 1)) * (k * (k - 1)) := by ring\n    obtain ⟨b, hb⟩ := Nat.even_mul_pred_self k\n    rw [h1, h2, h3, h4, h, hb]\n    exact ⟨b * b, by ring⟩\n\n/-- For a finite graph, every drawing has finitely many crossings. -/\n@[category API, AMS 5]\ntheorem Drawing.crossings_finite [Finite V] {G : SimpleGraph V} (D : Drawing G) :\n    D.crossings.Finite := by\n  have : D.crossings ⊆ ⋃ (e : G.edgeSet) (f : G.edgeSet) (_ : e ≠ f),\n      ((D.edgeArc e ∩ D.edgeArc f) \\ Set.range D.vertexPos) ×ˢ {s(e, f)} := by\n    rintro ⟨x, p⟩ hc\n    induction p using Sym2.ind with\n    | h e f =>\n      obtain ⟨hdiag, hmem, hx⟩ := hc\n      simp only [Set.mem_iUnion, Set.mem_prod, Set.mem_diff, Set.mem_inter_iff,\n        Set.mem_singleton_iff]\n      exact ⟨e, f, fun hef => hdiag (Sym2.mk_isDiag_iff.mpr hef),\n        ⟨⟨hmem e (Sym2.mem_mk_left e f), hmem f (Sym2.mem_mk_right e f)⟩, hx⟩, rfl⟩\n  refine Set.Finite.subset ?_ this\n  refine Set.finite_iUnion fun e => Set.finite_iUnion fun f => Set.finite_iUnion fun hef => ?_\n  exact (D.finite_inter e f hef).prod (Set.finite_singleton _)\n\n/-- The complete graph on no vertices has a drawing. -/\n@[category test, AMS 5]\ntheorem nonempty_drawing_fin_zero : Nonempty (Drawing (completeGraph (Fin 0))) :=\n  ⟨{ vertexPos := Fin.elim0\n     edgeArc := fun _ => ∅\n     vertexPos_injective := fun a => a.elim0\n     exists_path := fun u => u.elim0\n     vertexPos_notMem := fun _ v => v.elim0\n     finite_inter := fun _ _ _ => by simp }⟩\n\nend CrossingNumber2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot table matches the source entry; the notes (existential over n, topological drawings, Z(n) integer, answer 'No' equals cr(K_n) = Z(n)) are all consistent with the article and were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Any complete graph' is read existentially (∃ n), as in the decomposition notes; the universal reading would be trivially false (Z(n)=0 for n ≤ 4), so the existential reading is the only sensible one.",
+    "A drawing (`Drawing G`) is: an injective vertex map into ℝ² = `EuclideanSpace ℝ (Fin 2)`; for each edge s(u,v) a set `edgeArc` equal to the range of an injective `Path (vertexPos u) (vertexPos v)` (a Jordan arc; arbitrary curves, not rectilinear); no vertex point on a non-incident edge; any two distinct edges have finitely many common points other than vertex points. This follows Wikipedia's definition and the de Klerk–Maharry–Pasechnik–Richter–Salazar paper (arXiv:math/0404142, §1: 'minimum number of pairwise intersections of edges (at a point other than a vertex) in a drawing').",
+    "Crossings are counted as pairs (point, unordered pair of distinct edges) with the point on both edges and not a vertex point; a common point of three edges counts three times, matching Wikipedia's 'counted separately for each crossing point, for each pair of edges'. Excluding all vertex points equals excluding shared endpoints, because of the no-vertex-on-non-incident-edge axiom.",
+    "Transversality ('proper crossing') is NOT required: every common non-vertex point of two edges counts. Touching points cannot be expressed for general topological arcs; this is the standard convention of several sources (e.g. de Klerk et al.) and does not change the minimum or the existence of a drawing with fewer than Z(n) crossings, because a drawing with touchings/degenerate points can be perturbed to a proper (e.g. polygonal) drawing without increasing the per-pair intersection counts. A reviewer should confirm they accept this standard equivalence.",
+    "`crossingNumber` is valued in ℕ∞ (`⨅ D, D.crossings.encard`) to avoid junk values; for finite graphs drawings exist and (proved API lemma `Drawing.crossings_finite`) the crossing set is finite, so the value is a genuine natural number.",
+    "`guyBound n` uses ℕ floor division `n / 2 * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2) / 4`; the product is always divisible by 4 (proved, `four_dvd_guyBound_prod`) so the division is exact, and truncated subtraction for n < 3 gives 0, which agrees with the real formula. Values Z(5..14) checked by `decide` against the article.",
+    "Main slot uses the question form with `answer(sorry)` per CONTRIBUTING; additional variants: equality form `crossing_number_2.variants.eq` (research open), Guy's upper bound `variants.le` (research solved, Guy 1960), and known cases n ≤ 12 `variants.le_twelve` (research solved, Saaty 1964; Pan–Richter 2007).",
+    "The bespoke definitions are kept in the problem file (the task allows a single file); a maintainer may prefer to move `Drawing`/`crossingNumber` to FormalConjecturesForMathlib/Combinatorics/SimpleGraph as reusable material."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Path` (used as a component) and `SimpleGraph.UnitDistanceEmbeddable` / `UnitDistancePlaneGraph` in FormalConjecturesForMathlib (straight-line/metric embeddings, not general curved drawings with crossings).",
+     "name": "CrossingNumber2.Drawing",
+     "why_needed": "No notion of a topological drawing of a graph in the plane exists in Mathlib or FormalConjecturesForMathlib. Structure: injective vertex positions in ℝ², each edge a simple arc (range of an injective `Path`) between its endpoints, no vertex on a non-incident edge, finitely many non-vertex common points for any two distinct edges."
+    },
+    {
+     "closest_existing_considered": "None; `Set.encard`/`Set.ncard` used for counting.",
+     "name": "CrossingNumber2.Drawing.crossings",
+     "why_needed": "Set of crossings of a drawing: pairs (point, unordered pair of distinct edges) with the point on both edges and not a vertex point; its `encard` is the number of crossings counted per pair of edges."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.chromaticNumber` as a stylistic model (ℕ∞-valued infimum); no planarity or crossing notion exists in Mathlib.",
+     "name": "CrossingNumber2.crossingNumber",
+     "why_needed": "cr(G) = infimum over drawings of the number of crossings (ℕ∞-valued); no crossing number exists in Mathlib."
+    },
+    {
+     "closest_existing_considered": "None (Nat floor division and truncated subtraction, with API lemma showing the division is exact).",
+     "name": "CrossingNumber2.guyBound",
+     "why_needed": "Guy's bound Z(n) = ¼⌊n/2⌋⌊(n−1)/2⌋⌊(n−2)/2⌋⌊(n−3)/2⌋, not in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "crossing_number_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ (n : ℕ) (D : Drawing (completeGraph (Fin n))), D.crossings.encard < guyBound n`, i.e. literally 'is there a drawing of some complete graph K_n with fewer crossings than Guy's bound Z(n)'; `answer(False)` is exactly the conjecture cr(K_n) ≥ Z(n) for all n. No crossing-number/drawing primitives exist in Mathlib or FormalConjecturesForMathlib, so bespoke definitions `Drawing`, `Drawing.crossings`, `crossingNumber`, `guyBound` were added in the problem file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number_2": "/--\n**Guy's conjecture** on the crossing number of complete graphs, as a question.\n\nIs there a drawing of some complete graph $K_n$ with fewer crossings than the number\n$Z(n) = \\frac{1}{4} \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$ given by Guy's upper bound? The conjectured answer is no, that is,\n$\\operatorname{cr}(K_n) = Z(n)$ for every $n$.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2 :\n    answer(sorry) ↔ ∃ (n : ℕ) (D : Drawing (completeGraph (Fin n))),\n      D.crossings.encard < guyBound n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\nimport Mathlib.Topology.Path\n\n/-!\n# Guy's conjecture on crossing numbers of complete graphs\n\n*Reference:* [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n-/\n\nnamespace CrossingNumber2\n\nopen unitInterval\n\n/-- An edge of the complete graph on `Fin n`, represented by its two endpoints. -/\nabbrev CompleteEdge (n : ℕ) := {e : Finset (Fin n) // e.card = 2}\n\n/-- The plane in which a graph is drawn. -/\nabbrev Plane := ℝ × ℝ\n\n/-- The interior of a parametrized curve, with the images of its endpoints removed. -/\ndef curveInterior (γ : C(I, Plane)) : Set Plane :=\n  Set.range γ \\ {γ 0, γ 1}\n\n/-- The points common to the interiors of all curves indexed by `s`. -/\ndef commonInterior {n : ℕ} (edge : CompleteEdge n → C(I, Plane))\n    (s : Finset (CompleteEdge n)) : Set Plane :=\n  ⋂ e ∈ (s : Set (CompleteEdge n)), curveInterior (edge e)\n\n/-- A topological drawing of the complete graph on `Fin n`.\n\nVertices are distinct points of the plane. Each edge is a simple continuous arc between its\nendpoints, containing no other vertex. The interior intersections of every pair of edges are\nrequired to be finite. -/\nstructure Drawing (n : ℕ) where\n  vertex : Fin n → Plane\n  vertex_injective : Function.Injective vertex\n  edge : CompleteEdge n → C(I, Plane)\n  edge_injective : ∀ e, Function.Injective (edge e)\n  edge_endpoints : ∀ e, {edge e 0, edge e 1} = vertex '' (e.1 : Set (Fin n))\n  edge_meets_vertex : ∀ e v, vertex v ∈ Set.range (edge e) ↔ v ∈ e.1\n  finite_crossings : ∀ s : Finset (CompleteEdge n), s.card = 2 →\n    (commonInterior edge s).Finite\n\n/-- The number of crossings in a drawing. Each intersection point is counted once for each\nunordered pair of edge interiors containing it. -/\nnoncomputable def crossingCount {n : ℕ} (D : Drawing n) : ℕ :=\n  ∑ s ∈ (Finset.univ : Finset (CompleteEdge n)).powersetCard 2,\n    (commonInterior D.edge s).ncard\n\n/-- Guy's upper bound for the crossing number of the complete graph on `n` vertices. -/\ndef guyBound (n : ℕ) : ℕ :=\n  (n / 2 * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2)) / 4\n\n/-- **Guy's conjecture on the crossing number of complete graphs.**\n\nThe answer is no to the question whether, for some $n$, the complete graph $K_n$ has a\n(topological, not necessarily rectilinear) drawing with fewer than\n$$\n\\frac14\\left\\lfloor\\frac n2\\right\\rfloor\n\\left\\lfloor\\frac{n-1}2\\right\\rfloor\n\\left\\lfloor\\frac{n-2}2\\right\\rfloor\n\\left\\lfloor\\frac{n-3}2\\right\\rfloor\n$$\ncrossings. Equivalently, every such drawing has at least this many crossings. -/\n@[category research open, AMS 5]\ntheorem crossing_number_2 : answer(False) ↔\n    ∃ n : ℕ, ∃ D : Drawing n, crossingCount D < guyBound n := by\n  sorry\n\nend CrossingNumber2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the list-page question using the background article as the conjectured negative answer: there is no natural number n and no topological drawing of K_n with fewer than Guy's bound; this is stated with `answer(False)` on the left of the existence question.",
+    "Modeled K_n on the vertex type `Fin n`, with an undirected edge represented by a two-element finset of vertices.",
+    "Modeled a topological drawing by distinct points in `ℝ × ℝ` and simple continuous arcs parameterized by the unit interval. Each arc has exactly its edge's vertices as endpoints and contains no other graph vertex. This is the ordinary curve-based rather than rectilinear model.",
+    "Required pairwise edge-interior intersections to be finite. The count sums the number of intersection points over unordered pairs of edges, so a point incident to several edge pairs is counted separately for each pair, as specified by the source.",
+    "The drawing model counts any isolated interior contact as an intersection rather than adding a bespoke local transversality predicate. This is a general-position-equivalent formulation of the minimum crossing number: nonproper contacts can be removed or perturbed without increasing the number, while every conventional proper-crossing drawing is included.",
+    "Restricted edges to simple arcs. Self-intersections are irrelevant to the minimum crossing number and can be removed without increasing crossings with other edges.",
+    "Quantified over every `n : ℕ`, including n ≤ 4. Guy's bound uses natural-number floors and division of the full product by 4; it is 0 in those planar boundary cases."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.completeGraph` and `SimpleGraph.edgeSet`; the latter is a set of symmetric edge quotients, but no existing drawing API uses it and the two-element-finset representation gives a finite edge index directly.",
+     "name": "CompleteEdge",
+     "why_needed": "Provides the undirected edge type of the complete graph on `Fin n` for indexing drawn curves."
+    },
+    {
+     "closest_existing_considered": "The underlying existing type `ℝ × ℝ` is used directly by this abbreviation.",
+     "name": "Plane",
+     "why_needed": "Local readable abbreviation for the Euclidean plane used by the drawing."
+    },
+    {
+     "closest_existing_considered": "`Set.range` and set difference supply the operations, but no existing edge-interior definition was found.",
+     "name": "curveInterior",
+     "why_needed": "Removes an edge curve's two endpoint images so shared graph vertices are not counted as crossings."
+    },
+    {
+     "closest_existing_considered": "Mathlib's indexed set intersection is used internally; no graph-edge crossing-set definition exists.",
+     "name": "commonInterior",
+     "why_needed": "Defines the common interior-intersection set of a finite family of drawn edges, used for each unordered pair."
+    },
+    {
+     "closest_existing_considered": "Mathlib `Path`/`ContinuousMap` provide continuous curves and `SimpleGraph` provides abstract graphs, but the searches found no graph drawing, embedding-in-the-plane, or crossing-number abstraction.",
+     "name": "Drawing",
+     "why_needed": "Mathlib and `FormalConjecturesForMathlib` have no topological graph-drawing or crossing-number structure. This structure records vertex positions, continuous simple edge arcs, endpoint/vertex-avoidance conditions, and finiteness of pairwise intersections."
+    },
+    {
+     "closest_existing_considered": "`Set.ncard` and `Finset.powersetCard` provide cardinality and unordered pairs, but no existing crossing count was found.",
+     "name": "crossingCount",
+     "why_needed": "Counts intersection points separately for every unordered pair of edge interiors in a drawing."
+    },
+    {
+     "closest_existing_considered": "No existing definition of Guy's bound or the sequence A000241 was found.",
+     "name": "guyBound",
+     "why_needed": "Names Guy's explicit integer upper-bound formula for complete graphs."
+    }
+   ],
+   "per_slot": {
+    "crossing_number_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number_2": "/-- **Guy's conjecture on the crossing number of complete graphs.**\n\nThe answer is no to the question whether, for some $n$, the complete graph $K_n$ has a\n(topological, not necessarily rectilinear) drawing with fewer than\n$$\n\\frac14\\left\\lfloor\\frac n2\\right\\rfloor\n\\left\\lfloor\\frac{n-1}2\\right\\rfloor\n\\left\\lfloor\\frac{n-2}2\\right\\rfloor\n\\left\\lfloor\\frac{n-3}2\\right\\rfloor\n$$\ncrossings. Equivalently, every such drawing has at least this many crossings. -/\n@[category research open, AMS 5]\ntheorem crossing_number_2 : answer(False) ↔\n    ∃ n : ℕ, ∃ D : Drawing n, crossingCount D < guyBound n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Guy's conjecture on the crossing number of complete graphs\n\nThe *crossing number* $\\mathrm{cr}(G)$ of a graph $G$ is the least number of edge crossings in\na drawing of $G$ in the plane. Here a drawing sends the vertices to distinct points and each edge\nto a simple arc joining its endpoints, such that no edge passes through a vertex other than its\nendpoints and any two edges meet in finitely many points. A crossing is a point that lies in the\ninterior of two distinct edges, counted separately for each such pair of edges.\n\nGuy (1960) showed that the complete graph $K_n$ always has a drawing with\n$$Z(n) = \\frac{1}{4} \\left\\lfloor \\frac{n}{2} \\right\\rfloor \\left\\lfloor \\frac{n-1}{2} \\right\\rfloor\n\\left\\lfloor \\frac{n-2}{2} \\right\\rfloor \\left\\lfloor \\frac{n-3}{2} \\right\\rfloor$$\ncrossings. Guy's conjecture (also due to Hill, and independently to Saaty) is that no drawing does\nbetter, i.e. that $\\mathrm{cr}(K_n) = Z(n)$ for all $n$.\n\n*References:*\n- [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [A000241](https://oeis.org/A000241)\n- E. de Klerk, J. Maharry, D. V. Pasechnik, R. B. Richter, G. Salazar,\n  *Improved bounds for the crossing numbers of $K_{m,n}$ and $K_n$*,\n  [arXiv:math/0404142](https://arxiv.org/abs/math/0404142)\n-/\n\nopen scoped EuclideanGeometry\n\nnamespace CrossingNumber2\n\nvariable {V : Type*}\n\n/--\nA **drawing** of a simple graph `G` in the plane. The vertices are sent to distinct points of\n$\\mathbb{R}^2$, and each edge `s(u, v)` is sent to a simple arc (the image of an injective path)\njoining the images of `u` and `v`. No edge passes through the image of a vertex other than its\ntwo endpoints, and any two distinct edges meet in only finitely many points. Every common\ninterior point of two edges is counted as a crossing (as in de Klerk et al.); the edges are not\nrequired to cross transversally there, which does not affect the crossing number.\n\nThe set `arc e` is only meaningful when `e` is an edge of `G`.\n-/\nstructure PlaneDrawing (G : SimpleGraph V) where\n  /-- The point of the plane representing each vertex. -/\n  vertex : V → ℝ²\n  /-- Distinct vertices are drawn as distinct points. -/\n  vertex_injective : Function.Injective vertex\n  /-- The set of points of the plane representing each edge. -/\n  arc : Sym2 V → Set ℝ²\n  /-- Each edge `s(u, v)` is drawn as a simple arc joining the images of `u` and `v`. -/\n  exists_path : ∀ ⦃u v⦄, G.Adj u v →\n    ∃ γ : Path (vertex u) (vertex v), Function.Injective γ ∧ Set.range γ = arc s(u, v)\n  /-- The only vertex points on the arc of an edge are those of its endpoints. -/\n  mem_of_vertex_mem_arc : ∀ ⦃e⦄, e ∈ G.edgeSet → ∀ w, vertex w ∈ arc e → w ∈ e\n  /-- Two distinct edges meet in finitely many points. -/\n  finite_arc_inter_arc : ∀ ⦃e f⦄, e ∈ G.edgeSet → f ∈ G.edgeSet → e ≠ f →\n    (arc e ∩ arc f).Finite\n\nnamespace PlaneDrawing\n\nvariable {G : SimpleGraph V}\n\n/-- The **interior** of a drawn edge: its arc with the vertex points removed. For an edge, these\nare exactly the two endpoints of the arc. -/\ndef openArc (D : PlaneDrawing G) (e : Sym2 V) : Set ℝ² :=\n  D.arc e \\ Set.range D.vertex\n\n/-- The interior of a drawn edge `s(u, v)` is its arc with the two endpoints removed. -/\n@[category API, AMS 5]\ntheorem openArc_eq_of_adj (D : PlaneDrawing G) {u v : V} (h : G.Adj u v) :\n    D.openArc s(u, v) = D.arc s(u, v) \\ {D.vertex u, D.vertex v} := by\n  ext x\n  simp only [openArc, Set.mem_diff, Set.mem_range, not_exists, Set.mem_insert_iff,\n    Set.mem_singleton_iff, not_or]\n  refine ⟨fun ⟨hx, hw⟩ => ⟨hx, fun h => hw u h.symm, fun h => hw v h.symm⟩,\n    fun ⟨hx, hu, hv⟩ => ⟨hx, fun w hw => ?_⟩⟩\n  have hw' := D.mem_of_vertex_mem_arc (G.mem_edgeSet.mpr h) w (hw ▸ hx)\n  rcases Sym2.mem_iff.mp hw' with rfl | rfl\n  · exact hu hw.symm\n  · exact hv hw.symm\n\n/-- The number of **crossings** of a drawing: the number of points lying in the interiors of two\ndistinct edges, summed over all unordered pairs of distinct edges. A point where several edges\nmeet is counted once for each pair of edges through it. -/\nnoncomputable def crossings [Fintype V] [DecidableEq V] [DecidableRel G.Adj]\n    (D : PlaneDrawing G) : ℕ :=\n  ∑ p ∈ G.edgeFinset.sym2 with ¬ p.IsDiag,\n    Sym2.lift ⟨fun e f => (D.openArc e ∩ D.openArc f).ncard,\n      fun _ _ => by dsimp only; rw [Set.inter_comm]⟩ p\n\nend PlaneDrawing\n\n/-- The **crossing number** of a finite simple graph `G`: the least number of crossings of a\ndrawing of `G` in the plane. Every finite simple graph has a drawing (for instance with the\nvertices on a circle and straight-line edges), so the infimum is over a nonempty type and is\nattained. -/\nnoncomputable def crossingNumber (G : SimpleGraph V) [Fintype V] [DecidableEq V]\n    [DecidableRel G.Adj] : ℕ :=\n  ⨅ D : PlaneDrawing G, D.crossings\n\n/-- **Guy's bound**\n$$Z(n) = \\frac{1}{4} \\left\\lfloor \\frac{n}{2} \\right\\rfloor \\left\\lfloor \\frac{n-1}{2} \\right\\rfloor\n\\left\\lfloor \\frac{n-2}{2} \\right\\rfloor \\left\\lfloor \\frac{n-3}{2} \\right\\rfloor$$\non the crossing number of $K_n$. The product of the four floors is always divisible by $4$, so\nthe natural number division is exact. -/\ndef guyBound (n : ℕ) : ℕ :=\n  n / 2 * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2) / 4\n\n/-- The values of Guy's bound for $n = 5, \\dots, 14$ are $1, 3, 9, 18, 36, 60, 100, 150, 225, 315$\n(and $0$ for $n \\le 4$), matching [A000241](https://oeis.org/A000241). -/\n@[category test, AMS 5]\ntheorem guyBound_values :\n    (List.range 15).map guyBound = [0, 0, 0, 0, 0, 1, 3, 9, 18, 36, 60, 100, 150, 225, 315] := by\n  decide\n\n/-- The product of the four floors in Guy's bound is divisible by $4$. -/\n@[category API, AMS 5]\ntheorem four_dvd_guyBound_num (n : ℕ) :\n    4 ∣ n / 2 * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2) := by\n  obtain ⟨k, rfl | rfl⟩ := Nat.even_or_odd' n\n  · rcases k with _ | _ | k\n    · simp\n    · simp\n    obtain ⟨m, hm⟩ := Nat.even_mul_succ_self k\n    obtain ⟨m', hm'⟩ := Nat.even_mul_succ_self (k + 1)\n    rw [show 2 * (k + 2) / 2 = k + 2 by omega, show (2 * (k + 2) - 1) / 2 = k + 1 by omega,\n      show (2 * (k + 2) - 2) / 2 = k + 1 by omega, show (2 * (k + 2) - 3) / 2 = k by omega]\n    exact ⟨m' * m, by nlinarith⟩\n  · rcases k with _ | k\n    · simp\n    obtain ⟨m, hm⟩ := Nat.even_mul_succ_self k\n    rw [show (2 * (k + 1) + 1) / 2 = k + 1 by omega,\n      show (2 * (k + 1) + 1 - 1) / 2 = k + 1 by omega,\n      show (2 * (k + 1) + 1 - 2) / 2 = k by omega, show (2 * (k + 1) + 1 - 3) / 2 = k by omega]\n    exact ⟨m * m, by nlinarith⟩\n\n/--\n**Guy's upper bound** (1960): the complete graph $K_n$ has a drawing in the plane with at most\n$Z(n)$ crossings, i.e. $\\mathrm{cr}(K_n) \\le Z(n)$.\n-/\n@[category research solved, AMS 5]\ntheorem crossing_number_2.variants.guy_upper_bound (n : ℕ) :\n    ∃ D : PlaneDrawing (SimpleGraph.completeGraph (Fin n)), D.crossings ≤ guyBound n := by\n  sorry\n\n/--\n**Guy's conjecture** on the crossing number of complete graphs.\nGuy's upper bound says that every complete graph $K_n$ has a drawing in the plane with at most\n$Z(n) = \\frac{1}{4} \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$ crossings.\nIs there a drawing of any complete graph with fewer crossings than the number given by his upper\nbound? The conjectured answer is no: for every $n$, every drawing of $K_n$ in the plane has at\nleast $Z(n)$ crossings, so that $\\mathrm{cr}(K_n) = Z(n)$.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2 :\n    answer(sorry) ↔ ∃ (n : ℕ) (D : PlaneDrawing (SimpleGraph.completeGraph (Fin n))),\n      D.crossings < guyBound n := by\n  sorry\n\n/--\n**Guy's conjecture**, in its usual form: the crossing number of the complete graph $K_n$ is\nexactly $Z(n)$ for every $n$. This is known for $n \\le 12$.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2.variants.crossingNumber_eq (n : ℕ) :\n    crossingNumber (SimpleGraph.completeGraph (Fin n)) = guyBound n := by\n  sorry\n\nend CrossingNumber2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The table's reading (single yes/no question, conjectured answer 'No', existential over n, topological drawings with curves, Z(n) integral and 0 for n ≤ 4, no existing primitives) matches what I found in the article and the primary literature.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Drawing model (`PlaneDrawing G`): vertices ↦ distinct points of ℝ² = `EuclideanSpace ℝ (Fin 2)`; each edge s(u,v) ↦ a set `arc s(u,v)` that is the range of an injective `Path (vertex u) (vertex v)` (a simple arc); the only vertex points on an edge's arc are its two endpoints (proved as API lemma `openArc_eq_of_adj` that the interior is arc minus the two endpoints); any two distinct edges meet in finitely many points. This matches Wikipedia's 'Definitions' section and the definition in arXiv:math/0404142 §1.",
+    "Transversality is NOT required at common points of two edges: every common interior point of two distinct edges counts as one crossing (touching points count too). This is the definition used by de Klerk et al. ('pairwise intersections of edges at a point other than a vertex') and it gives the same crossing number as Wikipedia's transverse-crossing definition, since a touching point can be removed by a local redrawing; genuine drawings are a subclass with identical count, so the formal statement is equivalent to the informal one. Reviewer should confirm they accept this standard folklore equivalence.",
+    "Crossings are counted per unordered pair of distinct edges (`G.edgeFinset.sym2` filtered by `¬IsDiag`) as `Set.ncard (openArc e ∩ openArc f)`, where `openArc e = arc e \\ Set.range vertex`. A point where k ≥ 3 edges meet counts once per pair, exactly as Wikipedia states. Each counted set is finite by the structure axiom `finite_arc_inter_arc`, so `ncard`'s junk value 0 on infinite sets is never reached.",
+    "`arc : Sym2 V → Set ℝ²` is total; its values on non-edges are junk and never used (all axioms and the sum are restricted to edges).",
+    "'Any complete graph' read as an existential over n : ℕ; K_n is `SimpleGraph.completeGraph (Fin n)`. For n ≤ 4, `guyBound n = 0`, so the statement claims nothing there (K_n planar), consistent with Z(n) = 0.",
+    "`guyBound` uses ℕ floor division and a final `/ 4`; exactness is proved in the API lemma `four_dvd_guyBound_num`, and the test `guyBound_values` checks the values 1, 3, 9, 18, 36, 60, 100, 150, 225, 315 for n = 5..14 from the article / OEIS A000241.",
+    "Extra declarations beyond the slot: `crossing_number_2.variants.guy_upper_bound` (research solved: ∃ drawing of K_n with ≤ Z(n) crossings, i.e. Guy's known upper bound referenced in the statement) and `crossing_number_2.variants.crossingNumber_eq` (research open: `crossingNumber (completeGraph (Fin n)) = guyBound n`, the usual cr(K_n) = Z(n) form). `crossingNumber` is `⨅ D : PlaneDrawing G, D.crossings` in ℕ, which would be 0 if no drawing existed; every finite graph has a drawing (circle + straight chords), so this junk case is unreachable, but it is not proved in the file.",
+    "The bespoke definitions are generic (any finite simple graph) and could be moved to `FormalConjecturesForMathlib/Combinatorics/SimpleGraph/` if a reviewer prefers; they are kept in the problem file because the task asks for a single file, and are placed inside `namespace CrossingNumber2` (so they are `CrossingNumber2.PlaneDrawing` etc., used as `PlaneDrawing G` rather than `G.PlaneDrawing`)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Path` (used as the building block for edge arcs), `SimpleGraph.Embedding` (graph-to-graph maps, not into the plane), `IsEmbedding` for curves (used in Wikipedia/InscribedSquare.lean), `UnitDistancePlaneGraph` in FormalConjecturesForMathlib (a specific geometric graph, not drawings).",
+     "name": "CrossingNumber2.PlaneDrawing",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no notion of a (topological) drawing of a graph in the plane; the conjecture quantifies over all such drawings."
+    },
+    {
+     "closest_existing_considered": "`Set.range γ` / `Set.diff`; no existing notion of an open arc of a drawn edge.",
+     "name": "CrossingNumber2.PlaneDrawing.openArc",
+     "why_needed": "The interior of a drawn edge (arc minus vertex points), needed so that shared endpoints are not counted as crossings."
+    },
+    {
+     "closest_existing_considered": "`Set.ncard`, `Finset.sym2`, `Sym2.lift` (used as components); nothing in Mathlib counts edge crossings.",
+     "name": "CrossingNumber2.PlaneDrawing.crossings",
+     "why_needed": "The number of crossings of a drawing (common interior points summed over unordered pairs of distinct edges); no such count exists."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and the repo for 'crossing', 'planar', 'drawing': nothing relevant (only martingale upcrossings and monoidal braidings).",
+     "name": "CrossingNumber2.crossingNumber",
+     "why_needed": "cr(G), the minimum number of crossings over drawings; used for the equality-form variant cr(K_n) = Z(n)."
+    },
+    {
+     "closest_existing_considered": "Inline arithmetic; a named definition with a values test and a divisibility lemma is clearer and checkable.",
+     "name": "CrossingNumber2.guyBound",
+     "why_needed": "Guy's bound Z(n) = ¼⌊n/2⌋⌊(n-1)/2⌋⌊(n-2)/2⌋⌊(n-3)/2⌋, the specific number the statement refers to."
+    }
+   ],
+   "per_slot": {
+    "crossing_number_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ (n : ℕ) (D : PlaneDrawing (SimpleGraph.completeGraph (Fin n))), D.crossings < guyBound n`, where `guyBound n = ⌊n/2⌋⌊(n-1)/2⌋⌊(n-2)/2⌋⌊(n-3)/2⌋ / 4` (exact in ℕ, proved). `answer(False)` is Guy's conjecture cr(K_n) = Z(n) for all n. No drawing/crossing-number primitives exist in Mathlib or FormalConjecturesForMathlib, so a bespoke `PlaneDrawing` structure and `crossings` count were added, following Wikipedia's 'Definitions' section and the definition in de Klerk–Maharry–Pasechnik–Richter–Salazar (arXiv:math/0404142, §1)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number_2": "/--\n**Guy's conjecture** on the crossing number of complete graphs.\nGuy's upper bound says that every complete graph $K_n$ has a drawing in the plane with at most\n$Z(n) = \\frac{1}{4} \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$ crossings.\nIs there a drawing of any complete graph with fewer crossings than the number given by his upper\nbound? The conjectured answer is no: for every $n$, every drawing of $K_n$ in the plane has at\nleast $Z(n)$ crossings, so that $\\mathrm{cr}(K_n) = Z(n)$.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2 :\n    answer(sorry) ↔ ∃ (n : ℕ) (D : PlaneDrawing (SimpleGraph.completeGraph (Fin n))),\n      D.crossings < guyBound n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Guy's conjecture on the crossing number of complete graphs\n\nGuy's conjecture states that the known upper bound for the crossing number of a complete graph is\noptimal.\n\n*References:*\n- [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n-/\n\nnamespace CrossingNumber2\n\n/-- The Euclidean plane, represented in Cartesian coordinates. -/\nabbrev Plane := Fin 2 → ℝ\n\n/-- An edge of the complete graph on `Fin n`, with its endpoints in increasing order. -/\nabbrev Edge (n : ℕ) := {e : Fin n × Fin n // e.1 < e.2}\n\n/--\nA smooth topological drawing of the complete graph on `Fin n` in the plane.\n\nEdges are injective continuously differentiable curves, rather than necessarily straight line\nsegments. Their interiors avoid the vertices, distinct edges have finitely many interior\nintersection points, and all such intersections are transverse proper crossings.\n-/\nstructure Drawing (n : ℕ) where\n  vertex : Fin n → Plane\n  vertex_injective : Function.Injective vertex\n  curve : Edge n → ℝ → Plane\n  curve_contDiff : ∀ e, ContDiff ℝ 1 (curve e)\n  curve_start : ∀ e, curve e 0 = vertex e.1.1\n  curve_end : ∀ e, curve e 1 = vertex e.1.2\n  curve_injective : ∀ e, Set.InjOn (curve e) (Set.Icc 0 1)\n  curve_avoids_vertices : ∀ e v t, t ∈ Set.Ioo (0 : ℝ) 1 → curve e t ≠ vertex v\n  intersections_finite : ∀ e f, e ≠ f → Set.Finite {p | ∃ s ∈ Set.Ioo (0 : ℝ) 1,\n    ∃ t ∈ Set.Ioo (0 : ℝ) 1, curve e s = p ∧ curve f t = p}\n  intersections_transverse : ∀ e f, e ≠ f → ∀ s ∈ Set.Ioo (0 : ℝ) 1,\n    ∀ t ∈ Set.Ioo (0 : ℝ) 1, curve e s = curve f t →\n      (fderiv ℝ (curve e) s 1) 0 * (fderiv ℝ (curve f) t 1) 1 ≠\n        (fderiv ℝ (curve e) s 1) 1 * (fderiv ℝ (curve f) t 1) 0\n\n/-- The interior intersection points of two edges in a drawing. -/\ndef crossingPoints {n : ℕ} (D : Drawing n) (e f : Edge n) : Set Plane :=\n  {p | ∃ s ∈ Set.Ioo (0 : ℝ) 1, ∃ t ∈ Set.Ioo (0 : ℝ) 1,\n    D.curve e s = p ∧ D.curve f t = p}\n\n/-- The number of crossings in a drawing, counted once for each unordered pair of edges. -/\nnoncomputable def crossingCount {n : ℕ} (D : Drawing n) : ℕ :=\n  ∑ e : Edge n, ∑ f : Edge n,\n    if e.1.1 < f.1.1 ∨ (e.1.1 = f.1.1 ∧ e.1.2 < f.1.2)\n    then (crossingPoints D e f).ncard else 0\n\n/-- Guy's upper bound for the crossing number of the complete graph on `n` vertices. -/\ndef guyBound (n : ℕ) : ℕ :=\n  (n / 2 * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2)) / 4\n\n/--\n**Guy's conjecture on the crossing number of complete graphs.**\n\nDoes there exist a (topological, not necessarily rectilinear) drawing of a complete graph with\nfewer than\n$$\n  Z(n)=\\frac14\\left\\lfloor\\frac n2\\right\\rfloor\n  \\left\\lfloor\\frac{n-1}2\\right\\rfloor\n  \\left\\lfloor\\frac{n-2}2\\right\\rfloor\n  \\left\\lfloor\\frac{n-3}2\\right\\rfloor\n$$\ncrossings? Guy's conjectured answer is no. Equivalently, every drawing of $K_n$ has at least\n$Z(n)$ crossings; together with Guy's known upper bound, its crossing number is exactly $Z(n)$.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2 : answer(sorry) ↔\n    ∃ (n : ℕ) (D : Drawing n), crossingCount D < guyBound n := by\n  sorry\n\nend CrossingNumber2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The list-page question is formalized with its literal polarity: `answer(sorry)` is equivalent to the existence of some `n` and some drawing of `K_n` having fewer than Guy's bound. Thus the conjectured answer `False` is equivalent to the usual universal lower bound.",
+    "Ordinary topological drawings are represented by globally C¹ parametrized curved edges in the plane, with injective restrictions to `[0,1]`, prescribed endpoints, interiors avoiding vertices, finitely many pairwise interior intersections, and transverse tangent vectors at every intersection. This is the standard smooth/general-position representative model for the topological crossing number and does not impose rectilinearity.",
+    "Edges are unordered vertex pairs represented canonically by increasing endpoint pairs. Crossing points are summed using an explicit lexicographic order so every unordered pair of edges is counted exactly once.",
+    "A point incident with more than two crossing edges is counted separately for every pair of edges crossing there, matching the background article's counting convention.",
+    "Guy's formula is represented in `ℕ` as the product of the four floor terms followed by division by four. Natural-number division realizes the floors, and truncated subtraction gives the intended zero boundary values for small `n`.",
+    "Self-crossings are excluded by requiring each edge curve to be injective. This is an equivalent standard restriction for crossing number because loops in an edge can be removed without increasing crossings."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`EuclideanSpace ℝ (Fin 2)` exists, but `Fin 2 → ℝ` has the same finite-dimensional product topology and gives direct coordinate access without additional coercions.",
+     "name": "Plane",
+     "why_needed": "Provides concise Cartesian-coordinate notation for the Euclidean plane used by drawings and tangent determinants."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.completeGraph` and `Sym2` represent complete-graph edges, but extracting canonically oriented endpoints from `Sym2` is awkward for parametrized curves; the increasing-pair subtype is equivalent for `Fin n`.",
+     "name": "Edge",
+     "why_needed": "Indexes each edge of `K_n` exactly once while retaining direct access to its two endpoints."
+    },
+    {
+     "closest_existing_considered": "Mathlib `SimpleGraph`, `Path`, continuous maps, graph embeddings, and planarity APIs were searched. `SimpleGraph` has no geometric drawing/planarity structure, while `Path` alone does not encode a whole graph drawing or proper transverse crossings.",
+     "name": "Drawing",
+     "why_needed": "No graph-drawing or crossing-number primitives exist in Mathlib or FormalConjecturesForMathlib; this structure records the geometric and regularity conditions of an ordinary topological drawing."
+    },
+    {
+     "closest_existing_considered": "Mathlib set intersection/range operations were considered, but a bespoke predicate is needed to restrict both curve parameters to edge interiors.",
+     "name": "crossingPoints",
+     "why_needed": "Defines the geometric interior intersections of two parametrized edges so distinct crossing points can be counted separately."
+    },
+    {
+     "closest_existing_considered": "No crossing-count or crossing-number definition was found. `Set.ncard` supplies the cardinality operation but not the graph-level aggregation.",
+     "name": "crossingCount",
+     "why_needed": "Counts crossing points once for each unordered pair of edges, which is the quantity in Guy's conjecture."
+    },
+    {
+     "closest_existing_considered": "No existing definition of Guy's bound or the complete-graph crossing-number sequence was found.",
+     "name": "guyBound",
+     "why_needed": "Names Guy's integer-valued upper-bound formula and handles all natural-number boundary cases."
+    }
+   ],
+   "per_slot": {
+    "crossing_number_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number_2": "/--\n**Guy's conjecture on the crossing number of complete graphs.**\n\nDoes there exist a (topological, not necessarily rectilinear) drawing of a complete graph with\nfewer than\n$$\n  Z(n)=\\frac14\\left\\lfloor\\frac n2\\right\\rfloor\n  \\left\\lfloor\\frac{n-1}2\\right\\rfloor\n  \\left\\lfloor\\frac{n-2}2\\right\\rfloor\n  \\left\\lfloor\\frac{n-3}2\\right\\rfloor\n$$\ncrossings? Guy's conjectured answer is no. Equivalently, every drawing of $K_n$ has at least\n$Z(n)$ crossings; together with Guy's known upper bound, its crossing number is exactly $Z(n)$.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2 : answer(sorry) ↔\n    ∃ (n : ℕ) (D : Drawing n), crossingCount D < guyBound n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Guy's conjecture on the crossing number of complete graphs\n\nA *drawing* of a graph in the plane maps the vertices to distinct points and each edge to a\nsimple arc joining the points of its endpoints, such that no arc passes through a vertex point\nother than its endpoints. A *crossing* of a drawing is a point of the plane, other than a vertex\npoint, lying on the arcs of two distinct edges; crossings are counted separately for each such\npoint and for each pair of edges meeting there. The *crossing number* $\\mathrm{cr}(G)$ of a graph\n$G$ is the least number of crossings of a drawing of $G$.\n\nGuy (1960) gave drawings of the complete graph $K_n$ with exactly\n$$Z(n) = \\frac{1}{4} \\left\\lfloor \\frac{n}{2} \\right\\rfloor \\left\\lfloor \\frac{n-1}{2} \\right\\rfloor\n\\left\\lfloor \\frac{n-2}{2} \\right\\rfloor \\left\\lfloor \\frac{n-3}{2} \\right\\rfloor$$\ncrossings, so $\\mathrm{cr}(K_n) \\le Z(n)$. Guy's conjecture (also formulated independently by\nSaaty in 1964) states that no drawing of any $K_n$ has fewer than $Z(n)$ crossings, i.e.\n$\\mathrm{cr}(K_n) = Z(n)$ for all $n$. This is known for $n \\le 12$.\n\n*References:*\n- [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- R. K. Guy, *A combinatorial problem*, Nabla (Bull. Malayan Math. Soc.) 7 (1960), 68–72.\n- [OEIS A000241](https://oeis.org/A000241)\n-/\n\nopen EuclideanGeometry\n\nnamespace CrossingNumber2\n\nvariable {V : Type*}\n\n/--\nA drawing of a simple graph `G` in the plane. The vertices are mapped to distinct points of the\nplane, and each edge `s(u, v)` is drawn as a simple arc (the image of an injective path) from the\npoint of `u` to the point of `v`. No arc passes through the point of a vertex other than its\nendpoints.\n-/\nstructure Drawing (G : SimpleGraph V) where\n  /-- The point of the plane representing a vertex. -/\n  vertex : V → ℝ²\n  /-- Distinct vertices are drawn as distinct points. -/\n  vertex_injective : Function.Injective vertex\n  /-- The subset of the plane representing an edge. -/\n  arc : G.edgeSet → Set ℝ²\n  /-- Each edge `s(u, v)` is drawn as a simple arc from the point of `u` to the point of `v`. -/\n  exists_path_range_eq_arc : ∀ u v (h : G.Adj u v),\n    ∃ γ : Path (vertex u) (vertex v), Function.Injective γ ∧ Set.range γ = arc ⟨s(u, v), h⟩\n  /-- The arc of an edge contains no vertex point other than those of its endpoints. -/\n  mem_of_vertex_mem_arc : ∀ (e : G.edgeSet) (w : V), vertex w ∈ arc e → w ∈ (e : Sym2 V)\n\nvariable {G : SimpleGraph V}\n\n/--\nThe crossings of a drawing: the pairs `(p, {e, f})` of a point `p` of the plane that is not a\nvertex point and of two distinct edges `e ≠ f` whose arcs both pass through `p`. A point where\nseveral pairs of edges meet contributes one crossing for each such pair.\n-/\ndef Drawing.crossingSet (D : Drawing G) : Set (ℝ² × Sym2 G.edgeSet) :=\n  {x | ¬ x.2.IsDiag ∧ x.1 ∉ Set.range D.vertex ∧ ∀ e ∈ x.2, x.1 ∈ D.arc e}\n\n/--\nThe number of crossings of a drawing, counted separately for each crossing point and for each\npair of edges meeting there. It is `⊤` if the drawing has infinitely many crossings.\n-/\nnoncomputable def Drawing.crossings (D : Drawing G) : ℕ∞ :=\n  D.crossingSet.encard\n\n/--\nThe crossing number of a graph `G`: the least number of crossings of a drawing of `G` in the\nplane. It is `⊤` if `G` has no drawing.\n-/\nnoncomputable def crossingNumber (G : SimpleGraph V) : ℕ∞ :=\n  ⨅ D : Drawing G, D.crossings\n\n/-- The drawing of the graph with one vertex and no edges that places the vertex at the origin. -/\ndef singletonDrawing : Drawing (⊥ : SimpleGraph (Fin 1)) where\n  vertex _ := 0\n  vertex_injective := Function.injective_of_subsingleton _\n  arc e := absurd e.2 (by simp)\n  exists_path_range_eq_arc _ _ h := h.elim\n  mem_of_vertex_mem_arc e := absurd e.2 (by simp)\n\n/-- The drawing of the graph with one vertex and no edges has no crossings. -/\n@[category test, AMS 5]\ntheorem singletonDrawing_crossingSet : singletonDrawing.crossingSet = ∅ := by\n  ext ⟨p, e⟩\n  induction e using Sym2.ind with\n  | _ e f => exact absurd e.2 (by simp)\n\n/-- The graph with one vertex and no edges has crossing number `0`. -/\n@[category test, AMS 5]\ntheorem crossingNumber_bot_fin_one : crossingNumber (⊥ : SimpleGraph (Fin 1)) = 0 := by\n  refine le_antisymm (iInf_le_of_le singletonDrawing ?_) (zero_le _)\n  simp [Drawing.crossings, singletonDrawing_crossingSet]\n\n/--\nGuy's upper bound\n$Z(n) = \\frac{1}{4} \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$\non the crossing number of the complete graph $K_n$. The product is always divisible by `4`\n(see `four_dvd_guyBound_num`), so the natural number division is exact.\n-/\ndef guyBound (n : ℕ) : ℕ :=\n  n / 2 * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2) / 4\n\n/--\nThe product $\\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$ is divisible by $4$, so $Z(n)$ is an integer.\n-/\n@[category API, AMS 5]\ntheorem four_dvd_guyBound_num (n : ℕ) :\n    4 ∣ n / 2 * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2) := by\n  obtain ⟨k, rfl | rfl | rfl | rfl⟩ :\n      ∃ k, n = 4 * k ∨ n = 4 * k + 1 ∨ n = 4 * k + 2 ∨ n = 4 * k + 3 := ⟨n / 4, by omega⟩\n  · rw [show 4 * k / 2 = 2 * k by omega, show (4 * k - 1) / 2 = 2 * k - 1 by omega,\n      show (4 * k - 2) / 2 = 2 * k - 1 by omega, show (4 * k - 3) / 2 = 2 * (k - 1) by omega]\n    exact ⟨k * (2 * k - 1) * (2 * k - 1) * (k - 1), by ring⟩\n  · rw [show (4 * k + 1) / 2 = 2 * k by omega, show (4 * k + 1 - 1) / 2 = 2 * k by omega,\n      show (4 * k + 1 - 2) / 2 = 2 * k - 1 by omega, show (4 * k + 1 - 3) / 2 = 2 * k - 1 by omega]\n    exact ⟨k * k * (2 * k - 1) * (2 * k - 1), by ring⟩\n  · rw [show (4 * k + 2) / 2 = 2 * k + 1 by omega, show (4 * k + 2 - 1) / 2 = 2 * k by omega,\n      show (4 * k + 2 - 2) / 2 = 2 * k by omega, show (4 * k + 2 - 3) / 2 = 2 * k - 1 by omega]\n    exact ⟨(2 * k + 1) * k * k * (2 * k - 1), by ring⟩\n  · rw [show (4 * k + 3) / 2 = 2 * k + 1 by omega, show (4 * k + 3 - 1) / 2 = 2 * k + 1 by omega,\n      show (4 * k + 3 - 2) / 2 = 2 * k by omega, show (4 * k + 3 - 3) / 2 = 2 * k by omega]\n    exact ⟨(2 * k + 1) * (2 * k + 1) * k * k, by ring⟩\n\n/--\nThe values of Guy's bound for $n = 5, \\dots, 14$ are $1, 3, 9, 18, 36, 60, 100, 150, 225, 315$\n(OEIS A000241).\n-/\n@[category test, AMS 5]\ntheorem guyBound_values :\n    (List.range 10).map (fun i => guyBound (i + 5)) =\n      [1, 3, 9, 18, 36, 60, 100, 150, 225, 315] := by\n  decide\n\n/-- Guy's bound vanishes for $n \\le 4$, where $K_n$ is planar. -/\n@[category test, AMS 5]\ntheorem guyBound_eq_zero_of_le_four (n : ℕ) (hn : n ≤ 4) : guyBound n = 0 := by\n  interval_cases n <;> rfl\n\n/--\nGuy's conjecture on the crossing number of complete graphs (Wikipedia list entry): *Is there a\ndrawing of any complete graph with fewer crossings than the number given by his upper bound?*\n\nThat is, is there an $n$ and a drawing of the complete graph $K_n$ in the plane with fewer than\n$Z(n) = \\frac{1}{4} \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$ crossings? The conjectured answer is *no*.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2 :\n    answer(sorry) ↔\n      ∃ n, ∃ D : Drawing (SimpleGraph.completeGraph (Fin n)), D.crossings < guyBound n := by\n  sorry\n\n/--\nGuy's upper bound: the complete graph $K_n$ has a drawing with at most\n$Z(n) = \\frac{1}{4} \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$ crossings, so $\\mathrm{cr}(K_n) \\le Z(n)$.\n-/\n@[category research solved, AMS 5]\ntheorem crossing_number_2.variants.upper_bound (n : ℕ) :\n    crossingNumber (SimpleGraph.completeGraph (Fin n)) ≤ guyBound n := by\n  sorry\n\n/--\nGuy's conjecture, stated as an equality: the crossing number of the complete graph $K_n$ is\n$\\mathrm{cr}(K_n) = Z(n) = \\frac{1}{4} \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor\n\\lfloor (n-2)/2 \\rfloor \\lfloor (n-3)/2 \\rfloor$ for every $n$.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2.variants.eq (n : ℕ) :\n    crossingNumber (SimpleGraph.completeGraph (Fin n)) = guyBound n := by\n  sorry\n\nend CrossingNumber2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The table's single slot and its notes (topological drawings, Z(n) formula, existential over n with conjectured answer 'No', Z(n) integral and 0 for n ≤ 4, no existing primitives) all agree with the article and were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Drawings are topological (edges are arbitrary simple arcs = ranges of injective `Path`s in ℝ² = EuclideanSpace ℝ (Fin 2)), not rectilinear, matching the article's statement that the crossing number 'allows drawings in which the edges may be represented by arbitrary curves'.",
+    "Crossings are counted as all non-vertex points common to two distinct edges, one per (point, unordered pair of edges). Wikipedia additionally requires the pairwise intersections to be a finite set of transverse proper crossings. Transversality is not formalizable for arbitrary continuous arcs; instead every common non-vertex point (including tangential touchings) is counted, and infinitely many are recorded as ⊤ via `Set.encard`. Every Wikipedia drawing is a `Drawing` with the same count, and any `Drawing` with finitely many crossings can be locally perturbed to a proper drawing with no more crossings, so the existence question (and cr(K_n)) is unchanged. Reviewers should confirm they accept this standard robustness argument.",
+    "Intersections at shared endpoints are excluded by excluding all vertex points; since arcs may not pass through non-endpoint vertices (`mem_of_vertex_mem_arc`), a vertex point on two arcs is exactly a shared endpoint.",
+    "Edges are indexed by `G.edgeSet` (unordered), with the simple-arc condition quantified over all adjacent ordered pairs `u v`; this is consistent because reversing an injective path preserves injectivity and range.",
+    "`guyBound` uses ℕ floor division and truncated subtraction; for n ≤ 4 some factor is 0 so Z(n)=0 exactly as in the real formula, and `four_dvd_guyBound_num` proves the final /4 is exact.",
+    "'Any complete graph' is read as ∃ n over finite complete graphs `SimpleGraph.completeGraph (Fin n)` (= ⊤), with `answer(sorry) ↔ ∃ n, ∃ D, D.crossings < guyBound n`; the conjectured answer is False, equivalent to ∀ n, cr(K_n) ≥ Z(n).",
+    "Two variants were added: `crossing_number_2.variants.upper_bound` (Guy's known bound cr(K_n) ≤ Z(n), tagged research solved, proof body sorry) and `crossing_number_2.variants.eq` (cr(K_n) = Z(n), research open).",
+    "The generic definitions (Drawing, crossings, crossingNumber) live in the problem file because the task permits writing a single file; in a real PR they would be moved to FormalConjecturesForMathlib/Combinatorics/SimpleGraph/.",
+    "AMS tag 5 (Combinatorics; 05C10 planar graphs / topological graph theory) is used for all declarations."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Path`, `JoinedIn`, `SimpleGraph.Embedding` (only combinatorial), `UnitDistancePlaneGraph` in FormalConjecturesForMathlib (a specific graph, not a drawing notion).",
+     "name": "CrossingNumber2.Drawing",
+     "why_needed": "No notion of a plane drawing of a graph exists in Mathlib or the repo. A `Drawing G` consists of an injective map `vertex : V → ℝ²`, a set `arc e ⊆ ℝ²` for each edge `e ∈ G.edgeSet`, the requirement that for every adjacent `u v` the arc of `s(u,v)` is the range of an injective `Path (vertex u) (vertex v)` (a simple arc), and the requirement that an arc contains no vertex point other than its endpoints."
+    },
+    {
+     "closest_existing_considered": "None (Set.ncard/encard of intersections of ranges would need an unordered-pair indexing anyway).",
+     "name": "CrossingNumber2.Drawing.crossingSet",
+     "why_needed": "The set of crossings of a drawing: pairs `(p, {e,f})` in `ℝ² × Sym2 G.edgeSet` with `e ≠ f`, `p` not a vertex point, and `p` on both arcs. This realises Wikipedia's 'a crossing is counted separately for each crossing point, for each pair of edges that cross'."
+    },
+    {
+     "closest_existing_considered": "Set.ncard (rejected: would return 0 for infinite intersection sets, trivialising the minimum).",
+     "name": "CrossingNumber2.Drawing.crossings",
+     "why_needed": "Number of crossings of a drawing as `crossingSet.encard : ℕ∞` (⊤ for infinitely many crossings, so such drawings never count as having 'fewer' crossings)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib/repo (grep for crossing/planar/drawing found nothing).",
+     "name": "CrossingNumber2.crossingNumber",
+     "why_needed": "cr(G) := ⨅ over drawings of `crossings`, in ℕ∞; used for the variants (Guy's known upper bound, and the equality form of the conjecture)."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "CrossingNumber2.guyBound",
+     "why_needed": "Z(n) = ⌊n/2⌋⌊(n-1)/2⌋⌊(n-2)/2⌋⌊(n-3)/2⌋ / 4 in ℕ. API lemma `four_dvd_guyBound_num` (proved) shows the division is exact; tests check the values 1,3,9,18,36,60,100,150,225,315 for n=5..14 (OEIS A000241) and Z(n)=0 for n ≤ 4."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "CrossingNumber2.singletonDrawing",
+     "why_needed": "A test drawing of the one-vertex edgeless graph, used to prove the sanity check `crossingNumber (⊥ : SimpleGraph (Fin 1)) = 0`, confirming the definitions are inhabited and not vacuous."
+    }
+   ],
+   "per_slot": {
+    "crossing_number_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ n, ∃ D : Drawing (SimpleGraph.completeGraph (Fin n)), D.crossings < guyBound n`, mirroring the yes/no list-entry question ('Is there a drawing of any complete graph with fewer crossings than Guy's upper bound?'); answer(False) is the conjecture. No notion of graph drawing / crossing number exists in Mathlib or FormalConjecturesForMathlib, so bespoke definitions (Drawing, crossingSet, crossings, crossingNumber, guyBound) were added to the file, following the Definitions section of the Wikipedia article."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number_2": "/--\nGuy's conjecture on the crossing number of complete graphs (Wikipedia list entry): *Is there a\ndrawing of any complete graph with fewer crossings than the number given by his upper bound?*\n\nThat is, is there an $n$ and a drawing of the complete graph $K_n$ in the plane with fewer than\n$Z(n) = \\frac{1}{4} \\lfloor n/2 \\rfloor \\lfloor (n-1)/2 \\rfloor \\lfloor (n-2)/2 \\rfloor\n\\lfloor (n-3)/2 \\rfloor$ crossings? The conjectured answer is *no*.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2 :\n    answer(sorry) ↔\n      ∃ n, ∃ D : Drawing (SimpleGraph.completeGraph (Fin n)), D.crossings < guyBound n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Guy's conjecture on the crossing number of complete graphs\n\nGuy's conjecture states that his upper bound for the crossing number of a complete graph is\noptimal.\n\n*References:*\n- [Wikipedia, Crossing number (graph theory)](https://en.wikipedia.org/wiki/crossing_number_%28graph_theory%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace CrossingNumber2\n\n/-- An edge of the complete graph on `Fin n`, represented by its increasingly ordered endpoints. -/\nabbrev Edge (n : ℕ) := {e : Fin n × Fin n // e.1 < e.2}\n\n/-- The first endpoint of an edge. -/\ndef Edge.source {n : ℕ} (e : Edge n) : Fin n := e.1.1\n\n/-- The second endpoint of an edge. -/\ndef Edge.target {n : ℕ} (e : Edge n) : Fin n := e.1.2\n\n/-- The two vertices incident to an edge. -/\ndef Edge.vertices {n : ℕ} (e : Edge n) : Set (Fin n) := {e.source, e.target}\n\n/-- Lexicographic order on the edges, used to count each pair only once. -/\ndef Edge.IsBefore {n : ℕ} (e f : Edge n) : Prop :=\n  e.source < f.source ∨ (e.source = f.source ∧ e.target < f.target)\n\n/--\nA general-position topological drawing of the complete graph on `Fin n` in the plane.\nEdges are arbitrary continuously differentiable curves, rather than necessarily straight line\nsegments. Each edge is simple, its interior avoids every vertex, and distinct edges have only\nfinitely many non-endpoint intersections, all of which are transverse.\n-/\nstructure Drawing (n : ℕ) where\n  vertex : Fin n → ℝ × ℝ\n  vertex_injective : Function.Injective vertex\n  curve : Edge n → ℝ → ℝ × ℝ\n  curve_contDiff : ∀ e, ContDiff ℝ 1 (curve e)\n  curve_source : ∀ e, curve e 0 = vertex e.source\n  curve_target : ∀ e, curve e 1 = vertex e.target\n  curve_injective : ∀ e, Set.InjOn (curve e) (Set.Icc 0 1)\n  curve_avoids_vertices :\n    ∀ e t, t ∈ Set.Ioo (0 : ℝ) 1 → ∀ v, curve e t ≠ vertex v\n  finite_crossings : ∀ e f, e ≠ f →\n    (Set.diff ((curve e '' Set.Icc 0 1) ∩ (curve f '' Set.Icc 0 1))\n      (vertex '' (e.vertices ∩ f.vertices))).Finite\n  crossings_transverse : ∀ e f, e ≠ f → ∀ p ∈\n      Set.diff ((curve e '' Set.Icc 0 1) ∩ (curve f '' Set.Icc 0 1))\n        (vertex '' (e.vertices ∩ f.vertices)),\n    ∀ s ∈ Set.Icc (0 : ℝ) 1, curve e s = p →\n      ∀ t ∈ Set.Icc (0 : ℝ) 1, curve f t = p →\n        let u := fderiv ℝ (curve e) s 1\n        let v := fderiv ℝ (curve f) t 1\n        u.1 * v.2 - u.2 * v.1 ≠ 0\n\n/-- The crossing points of two edges, excluding their common endpoint if they are incident. -/\ndef Drawing.crossingPoints {n : ℕ} (D : Drawing n) (e f : Edge n) : Set (ℝ × ℝ) :=\n  Set.diff ((D.curve e '' Set.Icc 0 1) ∩ (D.curve f '' Set.Icc 0 1))\n    (D.vertex '' (e.vertices ∩ f.vertices))\n\nopen scoped Classical in\n/--\nThe number of crossings in a drawing. A point is counted once for every unordered pair of edges\nthat crosses there.\n-/\nnoncomputable def Drawing.crossingCount {n : ℕ} (D : Drawing n) : ℕ :=\n  ∑ e : Edge n, ∑ f ∈ Finset.univ.filter (e.IsBefore ·), (D.crossingPoints e f).ncard\n\n/-- Guy's upper bound\n$Z(n)=\\frac14\\lfloor n/2\\rfloor\\lfloor(n-1)/2\\rfloor\n\\lfloor(n-2)/2\\rfloor\\lfloor(n-3)/2\\rfloor$.\n-/\ndef guyBound (n : ℕ) : ℕ :=\n  ((n / 2) * ((n - 1) / 2) * ((n - 2) / 2) * ((n - 3) / 2)) / 4\n\n/--\n**Guy's conjecture on the crossing number of complete graphs.**\n\nIs there some complete graph $K_n$ with a topological drawing having fewer than\n$Z(n)=\\frac14\\lfloor n/2\\rfloor\\lfloor(n-1)/2\\rfloor\n\\lfloor(n-2)/2\\rfloor\\lfloor(n-3)/2\\rfloor$ crossings? The conjectured answer is no.\nHere edges may be curved; this is the ordinary crossing number, not the rectilinear crossing\nnumber. For $n \\le 4$, the bound is zero.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2 :\n    answer(sorry) ↔ ∃ (n : ℕ) (D : Drawing n), D.crossingCount < guyBound n := by\n  sorry\n\nend CrossingNumber2\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.91,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the verbatim yes/no question literally: `answer(sorry)` is equivalent to the existence of some natural number `n` and a drawing of `K_n` with fewer than Guy's bound. Thus the conjectured answer `False` is equivalent to the universal lower bound.",
+    "Modeled the ordinary topological crossing number through general-position C¹ plane drawings. Edges are arbitrary curved C¹ maps, not straight segments; they are simple on `[0,1]`, avoid vertices in their interiors, have finitely many non-endpoint intersections, and every such intersection is transverse. Passing to smooth general position does not change the ordinary topological crossing number.",
+    "Represented each edge of `K_n` once by an increasingly ordered pair of vertices in `Fin n`, then used a lexicographic order on edges so each unordered edge pair is counted exactly once.",
+    "Defined crossings as geometric intersection points after removing the shared vertex of incident edges. Summing their cardinalities over edge pairs counts a common geometric point separately for each pair of edges, as required by the source.",
+    "Encoded Guy's formula in `ℕ` as the product of the four floor divisions followed by division by four. Truncated natural subtraction gives the intended value zero for every `n ≤ 4`; the checked values for `n = 5, ..., 14` are `1, 3, 9, 18, 36, 60, 100, 150, 225, 315`.",
+    "Allowed `n = 0, ..., 4` rather than adding a lower bound. These cases cannot witness the strict inequality because Guy's bound is zero, so they do not alter the existential question."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `Sym2`-based `SimpleGraph.edgeSet`; a canonical ordered endpoint subtype is needed here to index endpoint-dependent curves directly.",
+     "name": "Edge",
+     "why_needed": "Provides a finite, duplicate-free edge type for the complete graph on `Fin n`."
+    },
+    {
+     "closest_existing_considered": "The endpoint and edge-set APIs for `SimpleGraph`; no existing API directly supplies the dependent curve indexing and lexicographic pair selection used here.",
+     "name": "Edge.source / Edge.target / Edge.vertices / Edge.IsBefore",
+     "why_needed": "Expose edge endpoints, identify a possible shared endpoint, and select each unordered pair of edges exactly once."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Path` and continuous-map APIs. They provide curves but no graph-drawing validity, finite-crossing, proper-crossing, or crossing-count structure.",
+     "name": "Drawing",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no definition of a topological graph drawing or crossing number. This structure records plane vertices, curved edges, validity conditions, finite intersections, and transversality."
+    },
+    {
+     "closest_existing_considered": "Set intersection and difference primitives are used internally; no graph-crossing notion exists.",
+     "name": "Drawing.crossingPoints",
+     "why_needed": "Defines the non-endpoint geometric intersections of a pair of drawn edges."
+    },
+    {
+     "closest_existing_considered": "`Set.ncard` and `Finset.sum` are used internally; no crossing-count aggregate exists.",
+     "name": "Drawing.crossingCount",
+     "why_needed": "Counts crossing points once per unordered pair of edges, matching the source's crossing convention."
+    },
+    {
+     "closest_existing_considered": "Basic natural-number division and arithmetic; no named Guy-bound definition exists.",
+     "name": "guyBound",
+     "why_needed": "Names the explicit integer-valued upper-bound formula appearing in Guy's conjecture."
+    }
+   ],
+   "per_slot": {
+    "crossing_number_2": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "crossing_number_2": "/--\n**Guy's conjecture on the crossing number of complete graphs.**\n\nIs there some complete graph $K_n$ with a topological drawing having fewer than\n$Z(n)=\\frac14\\lfloor n/2\\rfloor\\lfloor(n-1)/2\\rfloor\n\\lfloor(n-2)/2\\rfloor\\lfloor(n-3)/2\\rfloor$ crossings? The conjectured answer is no.\nHere edges may be curved; this is the ordinary crossing number, not the rectilinear crossing\nnumber. For $n \\le 4$, the bound is zero.\n-/\n@[category research open, AMS 5]\ntheorem crossing_number_2 :\n    answer(sorry) ↔ ∃ (n : ℕ) (D : Drawing n), D.crossingCount < guyBound n := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "crossing_number_2": "c01"
+ },
+ "id": "wp-crossing-number-2",
+ "main_attempt": "c01"
+}

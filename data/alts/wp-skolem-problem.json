@@ -1,0 +1,354 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Skolem problem\n\nThe Skolem problem (also called the Skolem–Pisot problem) asks whether there is an algorithm\nthat decides, given a constant-recursive sequence, whether the sequence contains the number\nzero. A constant-recursive sequence is a sequence $u_0, u_1, u_2, \\dots$ satisfying a linear\nrecurrence relation with constant coefficients\n$$u_{n + k} = c_0 u_n + c_1 u_{n + 1} + \\dots + c_{k - 1} u_{n + k - 1} \\qquad (n \\ge 0),$$\nand it is determined by the coefficients $c_0, \\dots, c_{k - 1}$ together with the initial\nvalues $u_0, \\dots, u_{k - 1}$. We formalise the problem for recurrences over the integers.\nThe version over the rational numbers is equivalent: if $u$ satisfies a recurrence with\nrational coefficients $c_i$ and $D$ is a common denominator of the $c_i$, then\n$v_n = D^n u_n$ satisfies a recurrence with integer coefficients $c_i D^{k - i}$, and clearing\nthe denominators of the initial values of $v$ gives an integer sequence with the same zero set.\n\nThe number of zeros of a constant-recursive sequence can be finite or infinite. By the\nSkolem–Mahler–Lech theorem the set of zeros is the union of a finite set and finitely many\narithmetic progressions, and it is decidable whether the sequence has infinitely many zeros.\nThe Skolem problem is known to be decidable for recurrences of order at most four, and\nNP-hard for integer recurrences. Its decidability in general is open.\n\n*References:*\n- [Skolem problem (Wikipedia)](https://en.wikipedia.org/wiki/Skolem_problem)\n- [List of unsolved problems in mathematics (Wikipedia)](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Open question: effective Skolem–Mahler–Lech theorem](https://terrytao.wordpress.com/2007/05/25/open-question-effective-skolem-mahler-lech-theorem/)\n  (*Terence Tao*, 2007)\n- [The presence of a zero in an integer linear recurrent sequence is NP-hard to decide](https://doi.org/10.1016/S0024-3795(01)00466-9)\n  (*Vincent D. Blondel, Natacha Portier*, 2002)\n-/\n\nnamespace SkolemProblem\n\n/--\nThe finite data specifying a constant-recursive integer sequence: the integer coefficients\n`c₀, …, c_{k-1}` of a linear recurrence\n`u (n + k) = c₀ * u n + c₁ * u (n + 1) + ⋯ + c_{k-1} * u (n + k - 1)` of order\n`k = coeffs.length`, together with the `k` integer initial values `u 0, …, u (k - 1)`.\n-/\nstructure IntRecurrence where\n  /-- The coefficients `c₀, …, c_{k-1}` of the recurrence; the order `k` is the length. -/\n  coeffs : List ℤ\n  /-- The initial values `u 0, …, u (k - 1)` of the sequence. -/\n  init : List ℤ\n  /-- There are as many initial values as coefficients. -/\n  length_eq : coeffs.length = init.length\n\n/-- An `IntRecurrence` is a finite object, so it can be given as input to an algorithm. -/\ninstance : Primcodable IntRecurrence :=\n  @Primcodable.ofEquiv _ _\n    (Primcodable.subtype <| Primrec.eq.comp\n      (Primrec.list_length.comp Primrec.fst) (Primrec.list_length.comp Primrec.snd))\n    { toFun := fun r => ⟨(r.coeffs, r.init), r.length_eq⟩\n      invFun := fun p => ⟨p.1.1, p.1.2, p.2⟩\n      left_inv := fun _ => rfl\n      right_inv := fun _ => rfl }\n\n/-- The recurrence relation `u (n + k) = ∑ i < k, c_i * u (n + i)` specified by `r`. -/\ndef IntRecurrence.toLinearRecurrence (r : IntRecurrence) : LinearRecurrence ℤ :=\n  ⟨r.coeffs.length, r.coeffs.get⟩\n\n/--\nThe constant-recursive integer sequence `u 0, u 1, u 2, …` specified by `r`: the unique\nsolution of the recurrence relation `r.toLinearRecurrence` whose first `k` terms are `r.init`.\n-/\ndef IntRecurrence.seq (r : IntRecurrence) : ℕ → ℤ :=\n  r.toLinearRecurrence.mkSol fun i => r.init.get (Fin.cast r.length_eq i)\n\n/--\n**Skolem problem.** Is there an algorithm which, given a linear recurrence with integer\ncoefficients $c_0, \\dots, c_{k - 1}$ and integer initial values $u_0, \\dots, u_{k - 1}$,\ndecides whether the constant-recursive sequence $(u_n)_{n \\ge 0}$ defined by\n$u_{n + k} = c_0 u_n + \\dots + c_{k - 1} u_{n + k - 1}$ contains a zero, i.e. whether\n$u_n = 0$ for some $n \\ge 0$?\n\nFormally: is the predicate `∃ n, r.seq n = 0` on the primcodable type `IntRecurrence` a\ncomputable predicate?\n-/\n@[category research open, AMS 3 11 68]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun r : IntRecurrence => ∃ n, r.seq n = 0 := by\n  sorry\n\n/-- The Fibonacci recurrence `F (n + 2) = F n + F (n + 1)` with `F 0 = 0` and `F 1 = 1`. -/\ndef fibonacci : IntRecurrence := ⟨[1, 1], [0, 1], rfl⟩\n\n/-- The sequence specified by `fibonacci` is the Fibonacci sequence. -/\n@[category test, AMS 11]\ntheorem fibonacci_seq : fibonacci.seq = fun n => (Nat.fib n : ℤ) := by\n  symm\n  apply LinearRecurrence.eq_mk_of_is_sol_of_eq_init'\n  · intro n\n    simp [IntRecurrence.toLinearRecurrence, fibonacci, Fin.sum_univ_two, Nat.fib_add_two]\n  · intro i\n    fin_cases i <;> simp [IntRecurrence.toLinearRecurrence, fibonacci]\n\n/-- The Fibonacci sequence contains a zero, namely `F 0 = 0`. -/\n@[category test, AMS 11]\ntheorem fibonacci_seq_has_zero : ∃ n, fibonacci.seq n = 0 :=\n  ⟨0, by simp [fibonacci_seq]⟩\n\n/-- The recurrence `u (n + 1) = 2 * u n` with `u 0 = 1`, whose solution is `u n = 2 ^ n`. -/\ndef powersOfTwo : IntRecurrence := ⟨[2], [1], rfl⟩\n\n/-- The sequence specified by `powersOfTwo` is `2 ^ n`. -/\n@[category test, AMS 11]\ntheorem powersOfTwo_seq : powersOfTwo.seq = fun n => (2 : ℤ) ^ n := by\n  symm\n  apply LinearRecurrence.eq_mk_of_is_sol_of_eq_init'\n  · intro n\n    simp [IntRecurrence.toLinearRecurrence, powersOfTwo, pow_succ, mul_comm]\n  · intro i\n    fin_cases i\n    simp [IntRecurrence.toLinearRecurrence, powersOfTwo]\n\n/-- The sequence `2 ^ n` contains no zero. -/\n@[category test, AMS 11]\ntheorem powersOfTwo_seq_no_zero : ¬ ∃ n, powersOfTwo.seq n = 0 := by\n  simp [powersOfTwo_seq]\n\nend SkolemProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition and its suggested shape (`answer(sorry) ↔ ComputablePred (fun r => ∃ n, seq r n = 0)` over a Primcodable encoding of integer coefficients plus initial values, unbounded degree) match the source and were followed exactly.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list-page statement is terse; following the decomposition table and the article, the problem is posed for recurrences over the integers (coefficients and initial values in ℤ). The rational version is equivalent (scale u_n by D^n to make coefficients integral, then clear denominators of initial values); this is recorded in the module docstring. The algebraic-number version is not formalized.",
+    "'An algorithm determines' is formalized as `ComputablePred` (Mathlib's notion: a decidable predicate whose indicator is computable) on a `Primcodable` encoding of the input. The encoding chosen is the subtype of pairs of integer lists of equal length; any reasonable encoding is computably equivalent.",
+    "'Contains a zero' is `∃ n : ℕ, r.seq n = 0`, i.e. some index n ≥ 0 (u_0 counts). Only the existence of a zero is asked — not infinitely many zeros, not the degree ≤ 4 case, not NP-hardness.",
+    "The input structure `IntRecurrence` requires the number of initial values to equal the number of coefficients (field `length_eq`), so every input is well-formed; the order 0 input yields the zero sequence, a legitimate constant-recursive sequence.",
+    "The sequence is defined via Mathlib's `LinearRecurrence.mkSol`, with the convention u (n + k) = ∑ i < k, c_i * u (n + i); test lemmas verify the Fibonacci recurrence ([1,1], [0,1]) gives `Nat.fib` and ([2], [1]) gives 2^n, confirming the orientation of coefficients and initial values.",
+    "AMS tags 3 (logic/computability), 11 (number theory), 68 (computer science) were used; the source tags the problem as number theory, while decidability is a logic/CS notion."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `LinearRecurrence ℤ` together with `Fin E.order → ℤ` (a sigma type), and `List ℤ × List ℤ` (allows mismatched lengths). `IntRecurrence` is converted to `LinearRecurrence ℤ` by `IntRecurrence.toLinearRecurrence`.",
+     "name": "SkolemProblem.IntRecurrence",
+     "why_needed": "A Primcodable input type for the decision problem: a list of integer coefficients together with an equally long list of integer initial values. Mathlib has no `Primcodable` instance for dependent pairs such as `Σ E : LinearRecurrence ℤ, Fin E.order → ℤ`, so a non-dependent representation with a length-equality field is used; its `Primcodable` instance comes from `Primcodable.subtype` and `Primcodable.ofEquiv`."
+    },
+    {
+     "closest_existing_considered": "`LinearRecurrence.mk` applied directly (this definition is just a named wrapper of it).",
+     "name": "SkolemProblem.IntRecurrence.toLinearRecurrence",
+     "why_needed": "Converts the coefficient list into Mathlib's `LinearRecurrence ℤ` (order = list length, coefficients = list entries) so that Mathlib's `mkSol` can be used."
+    },
+    {
+     "closest_existing_considered": "`LinearRecurrence.mkSol` (used directly; this definition only supplies the initial values from the list via `List.get` and `Fin.cast`).",
+     "name": "SkolemProblem.IntRecurrence.seq",
+     "why_needed": "The constant-recursive sequence ℕ → ℤ determined by the data: `mkSol` of the recurrence with the given initial values. Needed to phrase 'the sequence contains a zero'."
+    }
+   ],
+   "per_slot": {
+    "skolem_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun r : IntRecurrence => ∃ n, r.seq n = 0`, where `IntRecurrence` is a finite list of integer coefficients plus an equally long list of integer initial values (order unbounded), made `Primcodable` via `Primcodable.subtype`/`Primcodable.ofEquiv`, and `r.seq` is the unique solution given by Mathlib's `LinearRecurrence.mkSol`. Existing primitives (`ComputablePred`, `LinearRecurrence`, `mkSol`) suffice except for a non-dependent Primcodable input type, which Mathlib lacks (no `Primcodable` instance for sigma types)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "skolem_problem": "/--\n**Skolem problem.** Is there an algorithm which, given a linear recurrence with integer\ncoefficients $c_0, \\dots, c_{k - 1}$ and integer initial values $u_0, \\dots, u_{k - 1}$,\ndecides whether the constant-recursive sequence $(u_n)_{n \\ge 0}$ defined by\n$u_{n + k} = c_0 u_n + \\dots + c_{k - 1} u_{n + k - 1}$ contains a zero, i.e. whether\n$u_n = 0$ for some $n \\ge 0$?\n\nFormally: is the predicate `∃ n, r.seq n = 0` on the primcodable type `IntRecurrence` a\ncomputable predicate?\n-/\n@[category research open, AMS 3 11 68]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun r : IntRecurrence => ∃ n, r.seq n = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Skolem problem\n\nA *constant-recursive sequence* (also called a *linear recurrence sequence*) over a commutative\nring $R$ is a sequence $u_0, u_1, u_2, \\dots$ in $R$ satisfying, for some order $d \\ge 0$ and\nfixed coefficients $a_0, \\dots, a_{d-1} \\in R$, the linear recurrence\n$$u_{n+d} = a_0 u_n + a_1 u_{n+1} + \\dots + a_{d-1} u_{n+d-1} \\qquad (n \\ge 0).$$\nSuch a sequence is completely determined by the order $d$, the coefficients $a_0, \\dots, a_{d-1}$\nand the initial values $u_0, \\dots, u_{d-1}$. For instance, the Fibonacci numbers are given by\n$d = 2$, $a_0 = a_1 = 1$, $u_0 = 0$ and $u_1 = 1$.\n\nThe *Skolem problem* (also called the *Skolem–Pisot problem*) asks whether there is an algorithm\nwhich, given a constant-recursive sequence (presented by the coefficients of its recurrence and\nits initial values), decides whether the sequence contains the number zero, i.e. whether\n$u_n = 0$ for some index $n \\ge 0$. The problem can be posed for recurrences over the integers,\nthe rational numbers or the algebraic numbers; the integer and rational versions are equivalent\n(clear denominators). It is not known whether such an algorithm exists.\n\nBy the Skolem–Mahler–Lech theorem, the set of zeros of a constant-recursive sequence is the union\nof a finite set and finitely many arithmetic progressions. Whether there are infinitely many\nzeros is decidable, and the problem is solved for recurrences of order at most four; the general\nproblem is open. For integer recurrences, the problem is known to be NP-hard.\n\nWe formalise the problem as the question of whether the predicate \"the sequence has a zero\" is a\n`ComputablePred` on the type of constant-recursive sequences, which is encoded (via the\nequivalence with the list of pairs `(coefficient, initial value)`) as a `Primcodable` type.\n\n*References:*\n- [Wikipedia: Skolem problem](https://en.wikipedia.org/wiki/Skolem_problem)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia: Skolem–Mahler–Lech theorem](https://en.wikipedia.org/wiki/Skolem%E2%80%93Mahler%E2%80%93Lech_theorem)\n-/\n\nnamespace SkolemProblem\n\n/--\nA constant-recursive sequence over `R`, presented by the finite data that determines it: the\norder `d` of the recurrence, its `d` coefficients `a 0, …, a (d - 1)` and its `d` initial values\n`u 0, …, u (d - 1)`. The sequence itself is `LinearRecurrenceSequence.seq`.\n-/\nstructure LinearRecurrenceSequence (R : Type*) [CommSemiring R] where\n  /-- The order `d` of the recurrence. -/\n  order : ℕ\n  /-- The coefficients `a i` of the recurrence `u (n + d) = ∑ i, a i * u (n + i)`. -/\n  coeffs : Fin order → R\n  /-- The initial values `u 0, …, u (d - 1)`. -/\n  init : Fin order → R\n\nnamespace LinearRecurrenceSequence\n\nvariable {R : Type*} [CommSemiring R]\n\n/-- The linear recurrence relation `u (n + d) = ∑ i, a i * u (n + i)` satisfied by `s`. -/\ndef toLinearRecurrence (s : LinearRecurrenceSequence R) : LinearRecurrence R :=\n  ⟨s.order, s.coeffs⟩\n\n/-- The sequence `u : ℕ → R` determined by `s`: the unique solution of the recurrence\n`u (n + d) = ∑ i, a i * u (n + i)` with the initial values `u i = s.init i` for `i < d`. -/\ndef seq (s : LinearRecurrenceSequence R) : ℕ → R :=\n  s.toLinearRecurrence.mkSol s.init\n\n/-- A constant-recursive sequence of order `d` is the same data as a list of `d` pairs\n`(coefficient, initial value)`. This is used to encode such sequences as a `Primcodable` type. -/\ndef equivList : LinearRecurrenceSequence R ≃ List (R × R) :=\n  Equiv.trans\n    { toFun := fun s => ⟨s.order, fun i => (s.coeffs i, s.init i)⟩\n      invFun := fun p => ⟨p.1, fun i => (p.2 i).1, fun i => (p.2 i).2⟩\n      left_inv := fun _ => rfl\n      right_inv := fun _ => rfl }\n    List.equivSigmaTuple.symm\n\ninstance [Primcodable R] : Primcodable (LinearRecurrenceSequence R) :=\n  .ofEquiv _ equivList\n\n/-- The sequence `s.seq` satisfies the recurrence relation of `s`. -/\n@[category API, AMS 11]\ntheorem isSolution_seq (s : LinearRecurrenceSequence R) :\n    s.toLinearRecurrence.IsSolution s.seq :=\n  s.toLinearRecurrence.is_sol_mkSol s.init\n\n/-- The first `d` values of `s.seq` are the initial values of `s`. -/\n@[category API, AMS 11]\ntheorem seq_eq_init (s : LinearRecurrenceSequence R) (i : Fin s.order) :\n    s.seq i = s.init i :=\n  s.toLinearRecurrence.mkSol_eq_init s.init i\n\n/-- The sequence determined by a recurrence of order `0` is identically zero. -/\n@[category test, AMS 11]\ntheorem seq_order_zero (a u : Fin 0 → R) (n : ℕ) :\n    (LinearRecurrenceSequence.mk 0 a u).seq n = 0 := by\n  rw [seq, LinearRecurrence.mkSol]\n  simp [toLinearRecurrence]\n\nend LinearRecurrenceSequence\n\nopen LinearRecurrenceSequence\n\n/--\n**Skolem problem.** Is there an algorithm which, given a constant-recursive sequence of integers\n(presented by the order $d$, the integer coefficients $a_0, \\dots, a_{d-1}$ of its recurrence\n$u_{n+d} = a_0 u_n + \\dots + a_{d-1} u_{n+d-1}$, and its integer initial values\n$u_0, \\dots, u_{d-1}$), decides whether the sequence contains a zero, i.e. whether $u_n = 0$\nfor some index $n \\ge 0$?\n\nFormally: is the predicate \"`s.seq n = 0` for some `n`\" on the `Primcodable` type of integer\nconstant-recursive sequences a computable predicate?\n-/\n@[category research open, AMS 3 11 68]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun s : LinearRecurrenceSequence ℤ => ∃ n, s.seq n = 0 := by\n  sorry\n\n/--\n**Skolem problem over the rationals.** Is there an algorithm which, given a constant-recursive\nsequence of rational numbers (presented by the rational coefficients of its recurrence and its\nrational initial values), decides whether the sequence contains a zero, i.e. whether $u_n = 0$\nfor some index $n \\ge 0$?\n\nThis is equivalent to the integer version `skolem_problem`, since denominators can be cleared.\n-/\n@[category research open, AMS 3 11 68]\ntheorem skolem_problem_rat :\n    answer(sorry) ↔ ComputablePred fun s : LinearRecurrenceSequence ℚ => ∃ n, s.seq n = 0 := by\n  sorry\n\n/-- The Fibonacci sequence, as a constant-recursive sequence of integers. -/\ndef fibonacci : LinearRecurrenceSequence ℤ := ⟨2, ![1, 1], ![0, 1]⟩\n\n/-- The Fibonacci sequence agrees with `Nat.fib`. -/\n@[category test, AMS 11]\ntheorem fibonacci_seq_eq (n : ℕ) : fibonacci.seq n = Nat.fib n := by\n  have h : fibonacci.seq = fun n => (Nat.fib n : ℤ) := by\n    refine (fibonacci.toLinearRecurrence.eq_mk_of_is_sol_of_eq_init' ?_ ?_).symm\n    · intro n\n      simp [fibonacci, toLinearRecurrence, Fin.sum_univ_two, Nat.fib_add_two]\n    · intro i\n      fin_cases i <;> simp [fibonacci]\n  rw [h]\n\n/-- The Fibonacci sequence contains a zero, namely `u 0 = 0`. -/\n@[category test, AMS 11]\ntheorem fibonacci_has_zero : ∃ n, fibonacci.seq n = 0 :=\n  ⟨0, by simp [fibonacci_seq_eq]⟩\n\n/-- The constant sequence `1, 1, 1, …`, given by the recurrence `u (n + 1) = u n` with `u 0 = 1`,\ncontains no zero. -/\n@[category test, AMS 11]\ntheorem const_one_not_has_zero :\n    ¬ ∃ n, (LinearRecurrenceSequence.mk 1 ![1] ![1] : LinearRecurrenceSequence ℤ).seq n = 0 := by\n  set s : LinearRecurrenceSequence ℤ := ⟨1, ![1], ![1]⟩\n  have h : s.seq = fun _ => 1 := by\n    refine (s.toLinearRecurrence.eq_mk_of_is_sol_of_eq_init' ?_ ?_).symm\n    · intro n\n      simp [s, toLinearRecurrence]\n    · intro i\n      fin_cases i; simp [s]\n  simp [h]\n\nend SkolemProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition (yes/no decidability question via `ComputablePred` over a Primcodable encoding of an integer linear recurrence with unbounded degree) is appropriate for the list entry.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The list entry does not fix the number system; following the article (integers, rationals or algebraic numbers) and the decomposition notes, the slot `skolem_problem` is stated over ℤ. A variant `skolem_problem_rat` over ℚ (equivalent after clearing denominators) is added as an extra `research open` declaration; the algebraic-number version is not stated (no Primcodable encoding of algebraic numbers is available).",
+    "'An algorithm can determine' is formalized as Mathlib's `ComputablePred` (existence of a decidable instance whose `decide` function is `Computable`) relative to a `Primcodable` encoding of the input. The encoding is the bijection of a sequence of order d with the list of d pairs (coefficient, initial value), composed with Mathlib's standard encoding of `List (ℤ × ℤ)`; computability of a predicate is invariant under such natural encodings.",
+    "The sequence is `LinearRecurrence.mkSol`: `u (n + d) = ∑ i < d, a i * u (n + i)` with `u i = init i` for `i < d`. This is the standard convention where coefficient `a i` multiplies `u (n + i)`; any other indexing convention gives the same class of sequences and the same decision problem.",
+    "'Contains a zero' means `∃ n : ℕ, u n = 0` with indices starting at 0 (all initial values included), as in the article.",
+    "Order 0 is allowed; `mkSol` then gives the identically-zero sequence (documented by the test `seq_order_zero`). This degenerate instance is trivially decidable and does not change the problem.",
+    "AMS tags 3 (logic/computability), 11 (number theory), 68 (computer science)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`LinearRecurrence R` together with `LinearRecurrence.mkSol` (Mathlib.Algebra.LinearRecurrence), used as the underlying definitions; `Σ E : LinearRecurrence ℤ, Fin E.order → ℤ` was considered but lacks a Primcodable instance and is less readable.",
+     "name": "SkolemProblem.LinearRecurrenceSequence",
+     "why_needed": "A Primcodable input type for the decision problem must package the order, coefficients and initial values together (the initial values depend on the order). Mathlib's `LinearRecurrence R` has no initial values and no `Primcodable` instance, and Mathlib has no `Primcodable` instance for `Sigma` types, so a bespoke structure (with `toLinearRecurrence`, `seq`, `equivList`, and the derived `Primcodable` instance) was added; `seq` is defined directly as Mathlib's `LinearRecurrence.mkSol`."
+    },
+    {
+     "closest_existing_considered": "`Nat.fib` (used in the test to validate the definition).",
+     "name": "SkolemProblem.fibonacci",
+     "why_needed": "Concrete example used only in `category test` statements checking that `seq` agrees with `Nat.fib` and that the Fibonacci sequence has a zero."
+    }
+   ],
+   "per_slot": {
+    "skolem_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun s : LinearRecurrenceSequence ℤ => ∃ n, s.seq n = 0`, where `LinearRecurrenceSequence ℤ` is the finite data (order d, d integer coefficients, d integer initial values) of an integer constant-recursive sequence, made `Primcodable` via its bijection with `List (ℤ × ℤ)`, and `s.seq` is Mathlib's `LinearRecurrence.mkSol` (the unique solution of the recurrence with the given initial values). Degree is unbounded and 'contains a zero' is `∃ n : ℕ, u n = 0`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "skolem_problem": "/--\n**Skolem problem.** Is there an algorithm which, given a constant-recursive sequence of integers\n(presented by the order $d$, the integer coefficients $a_0, \\dots, a_{d-1}$ of its recurrence\n$u_{n+d} = a_0 u_n + \\dots + a_{d-1} u_{n+d-1}$, and its integer initial values\n$u_0, \\dots, u_{d-1}$), decides whether the sequence contains a zero, i.e. whether $u_n = 0$\nfor some index $n \\ge 0$?\n\nFormally: is the predicate \"`s.seq n = 0` for some `n`\" on the `Primcodable` type of integer\nconstant-recursive sequences a computable predicate?\n-/\n@[category research open, AMS 3 11 68]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun s : LinearRecurrenceSequence ℤ => ∃ n, s.seq n = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Skolem problem\n\nThe Skolem problem (also called the Skolem–Pisot problem) asks whether there is an\nalgorithm that decides whether a given constant-recursive sequence contains the number\nzero among its values. A constant-recursive sequence is one satisfying a linear\nrecurrence with constant coefficients\n$$u_{n+d} = a_0 u_n + a_1 u_{n+1} + \\cdots + a_{d-1} u_{n+d-1} \\qquad (n \\ge 0),$$\nand is determined by the coefficients $a_0, \\dots, a_{d-1}$ together with the initial\nvalues $u_0, \\dots, u_{d-1}$. The problem can be posed for recurrences over the\nintegers, the rationals or the algebraic numbers; here we use the integer version, which\nis equivalent to the rational one after clearing denominators.\n\nDecidability is known for recurrences of order at most four, and the existence of\ninfinitely many zeros is decidable in general (Skolem–Mahler–Lech), but the general\nproblem is open.\n\n*References:*\n- [Wikipedia, Skolem problem](https://en.wikipedia.org/wiki/Skolem_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Tao, Open question: effective Skolem–Mahler–Lech theorem](https://terrytao.wordpress.com/2007/05/25/open-question-effective-skolem-mahler-lech-theorem/)\n-/\n\nnamespace SkolemProblem\n\n/--\nThe finite data specifying a constant-recursive sequence of integers: the order `d` of\nthe recurrence, its coefficients `a₀, …, a_{d-1}` and the initial values `u₀, …, u_{d-1}`.\n-/\nstructure IntRecurrence where\n  /-- The order `d` of the recurrence. -/\n  order : ℕ\n  /-- The coefficients `a₀, …, a_{d-1}` of the recurrence\n  `u (n + d) = a₀ * u n + ⋯ + a_{d-1} * u (n + d - 1)`. -/\n  coeffs : Fin order → ℤ\n  /-- The initial values `u₀, …, u_{d-1}`. -/\n  init : Fin order → ℤ\n\n/-- The data of an `IntRecurrence` is the same as a finite list of pairs `(aᵢ, uᵢ)`. -/\ndef IntRecurrence.equivList : IntRecurrence ≃ List (ℤ × ℤ) :=\n  ({ toFun r := ⟨r.order, r.coeffs, r.init⟩\n     invFun p := ⟨p.1, p.2.1, p.2.2⟩\n     left_inv _ := rfl\n     right_inv _ := rfl } : IntRecurrence ≃ Σ d, (Fin d → ℤ) × (Fin d → ℤ)).trans <|\n    (Equiv.sigmaCongrRight fun d => (Equiv.arrowProdEquivProdArrow (Fin d) _ _).symm).trans\n      List.equivSigmaTuple.symm\n\n/-- Encoding of an `IntRecurrence` as a natural number, via `List (ℤ × ℤ)`. -/\ninstance : Primcodable IntRecurrence :=\n  .ofEquiv _ IntRecurrence.equivList\n\n/--\nThe constant-recursive sequence `u` determined by the data `r`: it satisfies\n`u (n + d) = ∑ i < d, r.coeffs i * u (n + i)` for all `n`, and `u i = r.init i` for `i < d`.\n-/\ndef IntRecurrence.seq (r : IntRecurrence) : ℕ → ℤ :=\n  (LinearRecurrence.mk r.order r.coeffs).mkSol r.init\n\n/-- `r.seq` satisfies the linear recurrence with coefficients `r.coeffs`. -/\n@[category API, AMS 11]\ntheorem IntRecurrence.isSolution_seq (r : IntRecurrence) :\n    (LinearRecurrence.mk r.order r.coeffs).IsSolution r.seq :=\n  LinearRecurrence.is_sol_mkSol (LinearRecurrence.mk r.order r.coeffs) r.init\n\n/-- `r.seq` starts with the initial values `r.init`. -/\n@[category API, AMS 11]\ntheorem IntRecurrence.seq_init (r : IntRecurrence) (i : Fin r.order) :\n    r.seq i = r.init i :=\n  LinearRecurrence.mkSol_eq_init (LinearRecurrence.mk r.order r.coeffs) r.init i\n\n/-- The Fibonacci numbers form the constant-recursive sequence with data\n`⟨2, ![1, 1], ![0, 1]⟩`. -/\n@[category test, AMS 11]\ntheorem seq_fib : (IntRecurrence.mk 2 ![1, 1] ![0, 1]).seq = fun n => (Nat.fib n : ℤ) := by\n  refine (LinearRecurrence.eq_mk_of_is_sol_of_eq_init' (LinearRecurrence.mk 2 ![1, 1]) ?_ ?_).symm\n  · intro n\n    simp [Fin.sum_univ_two, Nat.fib_add_two]\n  · intro i\n    fin_cases i <;> simp\n\n/-- The Fibonacci sequence contains a zero (namely `F₀ = 0`). -/\n@[category test, AMS 11]\ntheorem exists_seq_fib_eq_zero : ∃ n, (IntRecurrence.mk 2 ![1, 1] ![0, 1]).seq n = 0 :=\n  ⟨0, by simp [seq_fib]⟩\n\n/-- The constant sequence `1, 1, 1, …` (order one, coefficient `1`, initial value `1`)\ncontains no zero. -/\n@[category test, AMS 11]\ntheorem not_exists_seq_one_eq_zero : ¬ ∃ n, (IntRecurrence.mk 1 ![1] ![1]).seq n = 0 := by\n  have h : (IntRecurrence.mk 1 ![1] ![1]).seq = fun _ => 1 :=\n    (LinearRecurrence.eq_mk_of_is_sol_of_eq_init' (LinearRecurrence.mk 1 ![1])\n      (fun n => by simp) (fun i => by fin_cases i; simp)).symm\n  simp [h]\n\n/--\n**Skolem problem.** Is there an algorithm which, given a constant-recursive sequence of\nintegers (specified by the coefficients of its linear recurrence and its initial values),\ndecides whether the sequence contains a zero, i.e. whether $u_n = 0$ for some $n \\ge 0$?\n-/\n@[category research open, AMS 3 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun r : IntRecurrence => ∃ n, r.seq n = 0 := by\n  sorry\n\nend SkolemProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "None. The single-slot decomposition (integer formulation, unbounded degree, 'contains a zero' = some index n ≥ 0 with u n = 0, stated as answer(sorry) ↔ ComputablePred) is what the file implements.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Number system: the list entry does not fix the ring; the article says the problem can be posed over integers, rationals or algebraic numbers. The integer version is formalized (equivalent to the rational one after clearing denominators), as prescribed by the decomposition notes.",
+    "Algorithm input: a 'constant-recursive sequence' is given to the algorithm by finite data: order d, coefficients a₀..a_{d-1} and initial values u₀..u_{d-1}, all integers, with d unbounded. This is the standard problem instance for the Skolem problem.",
+    "Recurrence convention: u (n + d) = ∑_{i<d} aᵢ · u (n + i) for all n ≥ 0, following Mathlib's `LinearRecurrence`; the sequence is `LinearRecurrence.mkSol init`. Order 0 yields the zero sequence, which is a genuine constant-recursive sequence (and contains a zero); this does not affect decidability.",
+    "Encoding for computability: `Primcodable IntRecurrence` is obtained via `Primcodable.ofEquiv` from the equivalence IntRecurrence ≃ Σ d, (Fin d → ℤ) × (Fin d → ℤ) ≃ Σ d, (Fin d → ℤ × ℤ) ≃ List (ℤ × ℤ) (using `List.equivSigmaTuple`); Mathlib's list/int encodings are standard, so `ComputablePred` faithfully captures 'there is an algorithm'.",
+    "'Contains a zero' is read as ∃ n : ℕ, u n = 0 (some index n ≥ 0), i.e. the values of the sequence include 0; the infinitely-many-zeros variant, the degree ≤ 4 case and NP-hardness are not stated since the entry does not ask them.",
+    "Yes/no form: `answer(sorry) ↔ ComputablePred …`, so `answer(True)` asserts an algorithm exists and `answer(False)` asserts undecidability. AMS tags 3 (logic/computability) and 11 (number theory)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "LinearRecurrence ℤ (Mathlib.Algebra.LinearRecurrence); Σ d, (Fin d → ℤ) × (Fin d → ℤ); List ℤ × List ℤ (rejected: would need a default for mismatched lengths).",
+     "name": "SkolemProblem.IntRecurrence",
+     "why_needed": "A Primcodable type of problem instances (order, integer coefficients, integer initial values, order unbounded) is needed as the domain of `ComputablePred`. Mathlib's `LinearRecurrence ℤ` carries no initial values and has no `Primcodable` instance, and Mathlib has no `Primcodable` instance for Sigma types, so a bespoke structure is needed."
+    },
+    {
+     "closest_existing_considered": "List.equivSigmaTuple, Equiv.sigmaCongrRight, Equiv.arrowProdEquivProdArrow (all used to build it).",
+     "name": "SkolemProblem.IntRecurrence.equivList",
+     "why_needed": "Equivalence IntRecurrence ≃ List (ℤ × ℤ) used to transport Mathlib's `Primcodable (List (ℤ × ℤ))` instance to `IntRecurrence` via `Primcodable.ofEquiv`."
+    },
+    {
+     "closest_existing_considered": "Primcodable.ofEquiv, Primcodable.finArrow, Primcodable.prod, Primcodable list instance.",
+     "name": "instance : Primcodable SkolemProblem.IntRecurrence",
+     "why_needed": "Required by `ComputablePred`."
+    },
+    {
+     "closest_existing_considered": "LinearRecurrence.mkSol (used directly).",
+     "name": "SkolemProblem.IntRecurrence.seq",
+     "why_needed": "The constant-recursive sequence determined by the instance; a thin wrapper around Mathlib's `LinearRecurrence.mkSol` so the predicate reads `∃ n, r.seq n = 0`. API lemmas `isSolution_seq`, `seq_init` and tests (`seq_fib`, `exists_seq_fib_eq_zero`, `not_exists_seq_one_eq_zero`) check it."
+    }
+   ],
+   "per_slot": {
+    "skolem_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun r : IntRecurrence => ∃ n, r.seq n = 0`, where `IntRecurrence` bundles the order d, the d integer coefficients and the d integer initial values (Primcodable via an equivalence with `List (ℤ × ℤ)`), and `r.seq` is Mathlib's `LinearRecurrence.mkSol`, i.e. the unique sequence with u (n+d) = ∑ aᵢ u (n+i) and the given initial values. answer(True) = there is an algorithm; n ranges over all ℕ (index ≥ 0)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "skolem_problem": "/--\n**Skolem problem.** Is there an algorithm which, given a constant-recursive sequence of\nintegers (specified by the coefficients of its linear recurrence and its initial values),\ndecides whether the sequence contains a zero, i.e. whether $u_n = 0$ for some $n \\ge 0$?\n-/\n@[category research open, AMS 3 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun r : IntRecurrence => ∃ n, r.seq n = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Skolem problem\n\n*References:*\n- [Skolem problem](https://en.wikipedia.org/wiki/Skolem_problem)\n-/\n\nnamespace SkolemProblem\n\n/--\nFinite input data for a positive-order linear recurrence over the integers.\nEach pair is a coefficient and the corresponding initial value. The head and tail\nrepresentation ensures that the list is nonempty while leaving the order unbounded.\n-/\nstructure Recurrence where\n  first : ℤ × ℤ\n  rest : List (ℤ × ℤ)\n\ninstance : Primcodable Recurrence :=\n  .ofEquiv ((ℤ × ℤ) × List (ℤ × ℤ))\n    { toFun := fun r => (r.first, r.rest)\n      invFun := fun p => ⟨p.1, p.2⟩\n      left_inv := fun _ => rfl\n      right_inv := fun _ => rfl }\n\n/--\nThe sequence represented by `r`. If its coefficient/initial-value pairs are\n$(c_0,u_0),\\ldots,(c_{d-1},u_{d-1})$, then its first $d$ terms are the $u_i$ and\n$$u_{n+d}=\\sum_{i=0}^{d-1}c_i u_{n+i}.$$\n-/\nnoncomputable def Recurrence.sequence (r : Recurrence) : ℕ → ℤ :=\n  let data := r.first :: r.rest\n  let recurrence : LinearRecurrence ℤ :=\n    { order := data.length\n      coeffs := fun i => (data.get i).1 }\n  recurrence.mkSol fun i => (data.get i).2\n\n/--\nThe Skolem problem asks whether there is an algorithm which, given an integer\nconstant-recursive sequence of arbitrary positive order, determines whether some\nterm $u_n$, for $n \\ge 0$, is zero.\n-/\n@[category research open, AMS 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred (fun r : Recurrence => ∃ n : ℕ, r.sequence n = 0) := by\n  sorry\n\nend SkolemProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Formalized the integer version of the Skolem problem. The background and fixed decomposition identify this as the natural target and note its equivalence to the rational formulation by clearing denominators.",
+    "Encoded a positive-order recurrence of unbounded degree as a head coefficient/initial-value pair together with a finite tail list of such pairs. This is equivalent to giving equally sized nonempty finite lists of integer coefficients and initial values, while providing a direct `Primcodable` representation without malformed unequal-length inputs.",
+    "Used Mathlib's convention `u (n + d) = ∑ i : Fin d, c i * u (n + i)` and `LinearRecurrence.mkSol`; the theorem asks whether the predicate that some zero-based term is zero is computable.",
+    "Excluded order zero, since a recurrence sequence conventionally has positive order; the head-plus-tail representation enforces this while still allowing arbitrary finite order."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `LinearRecurrence ℤ` represents coefficients at a dependent finite order but does not bundle initial values or provide the needed unbounded-order `Primcodable` input representation.",
+     "name": "SkolemProblem.Recurrence",
+     "why_needed": "Bundles unbounded positive-order integer coefficients and matching initial values into a finite `Primcodable` input type for the decision problem."
+    },
+    {
+     "closest_existing_considered": "`LinearRecurrence.mkSol`; the new definition is a thin adapter that constructs a Mathlib `LinearRecurrence` and supplies the bundled initial values.",
+     "name": "SkolemProblem.Recurrence.sequence",
+     "why_needed": "Interprets the finite encoded recurrence data as its unique zero-indexed integer sequence."
+    }
+   ],
+   "per_slot": {
+    "skolem_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "skolem_problem": "/--\nThe Skolem problem asks whether there is an algorithm which, given an integer\nconstant-recursive sequence of arbitrary positive order, determines whether some\nterm $u_n$, for $n \\ge 0$, is zero.\n-/\n@[category research open, AMS 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred (fun r : Recurrence => ∃ n : ℕ, r.sequence n = 0) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Skolem problem\n\nThe Skolem problem asks whether it is decidable if an integer linear recurrence sequence of\narbitrary finite order has a zero term.\n\n*References:*\n- [Wikipedia, Skolem problem](https://en.wikipedia.org/wiki/Skolem_problem)\n-/\n\nnamespace SkolemProblem\n\n/--\nA finite encoding of an integer linear recurrence. For a valid encoding, the two lists have the\nsame positive length. The first list contains the coefficients and the second contains the initial\nvalues.\n-/\nstructure IntegerRecurrence where\n  coefficients : List ℤ\n  initialValues : List ℤ\n\ninstance : Primcodable IntegerRecurrence :=\n  .ofEquiv (List ℤ × List ℤ)\n    { toFun := fun r => (r.coefficients, r.initialValues)\n      invFun := fun p => ⟨p.1, p.2⟩\n      left_inv := fun _ => rfl\n      right_inv := fun _ => rfl }\n\n/-- An encoding is valid when it specifies a positive order and one initial value per coefficient. -/\ndef IntegerRecurrence.IsValid (r : IntegerRecurrence) : Prop :=\n  r.coefficients ≠ [] ∧ r.coefficients.length = r.initialValues.length\n\n/--\nThe sequence encoded by `r`. If the common list length is $d$, its convention is\n$u_{n+d} = \\sum_{i=0}^{d-1} c_i u_{n+i}$.\n-/\nnoncomputable def IntegerRecurrence.sequence (r : IntegerRecurrence) : ℕ → ℤ :=\n  let recurrence : LinearRecurrence ℤ :=\n    { order := r.coefficients.length\n      coeffs := fun i => r.coefficients.getD i 0 }\n  recurrence.mkSol (fun i => r.initialValues.getD i 0)\n\n/--\nCan an algorithm determine whether a constant-recursive integer sequence contains zero? More\nprecisely, is the predicate that takes a finite valid encoding of a constant-coefficient linear\nrecurrence of arbitrary positive order and asks whether some term $u_n$, for $n \\geq 0$, is zero\ncomputable? Invalid encodings are rejected.\n-/\n@[category research open, AMS 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun r : IntegerRecurrence =>\n      r.IsValid ∧ ∃ n : ℕ, r.sequence n = 0 := by\n  sorry\n\nend SkolemProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used integer recurrences. The source article permits integer, rational, or algebraic-number formulations; the fixed decomposition identifies the integer version as the natural target because the integer and rational zero problems are equivalent after clearing/scaling denominators.",
+    "Encoded arbitrary finite-order inputs by two integer lists: coefficients and initial values. This gives a `Primcodable` input type whose order is not bounded in advance.",
+    "Required valid encodings to have equal, nonzero list lengths. Positive order is the standard domain of a linear recurrence; malformed codes are assigned `False` by conjunction in the decision predicate, so the theorem is an ordinary computable-predicate question rather than a promise problem.",
+    "Used Mathlib's `LinearRecurrence` convention `u (n + d) = ∑ i : Fin d, c i * u (n + i)` and its `mkSol` constructor to interpret the lists.",
+    "Interpreted “contains a zero” as `∃ n : ℕ, sequence n = 0`, so indexing begins at zero and includes initial terms."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `LinearRecurrence ℤ`; it stores a runtime-dependent `Fin order → ℤ` and has no suitable `Primcodable` instance for this decision-problem input.",
+     "name": "SkolemProblem.IntegerRecurrence",
+     "why_needed": "Provides an unbounded finite, `Primcodable` encoding consisting of integer coefficients and initial values."
+    },
+    {
+     "closest_existing_considered": "No existing validity predicate was found; Mathlib's `LinearRecurrence` enforces coefficient arity in its dependent field but does not package list-based initial data.",
+     "name": "SkolemProblem.IntegerRecurrence.IsValid",
+     "why_needed": "Identifies list pairs that encode a positive-order recurrence with exactly one initial value per coefficient and permits explicit rejection of malformed codes."
+    },
+    {
+     "closest_existing_considered": "`LinearRecurrence.mkSol`; the new definition is a list-encoding wrapper around this existing constructor.",
+     "name": "SkolemProblem.IntegerRecurrence.sequence",
+     "why_needed": "Interprets the finite list encoding as the unique integer sequence with the encoded initial values satisfying the encoded recurrence."
+    }
+   ],
+   "per_slot": {
+    "skolem_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "skolem_problem": "/--\nCan an algorithm determine whether a constant-recursive integer sequence contains zero? More\nprecisely, is the predicate that takes a finite valid encoding of a constant-coefficient linear\nrecurrence of arbitrary positive order and asks whether some term $u_n$, for $n \\geq 0$, is zero\ncomputable? Invalid encodings are rejected.\n-/\n@[category research open, AMS 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun r : IntegerRecurrence =>\n      r.IsValid ∧ ∃ n : ℕ, r.sequence n = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Skolem Problem\n\nThe Skolem problem asks whether it is decidable if an integer linear recurrence sequence has a\nzero term.\n\n*References:*\n- [Wikipedia, Skolem problem](https://en.wikipedia.org/wiki/Skolem_problem)\n-/\n\nnamespace SkolemProblem\n\n/--\nAn encoding of a positive-order integer linear recurrence. Each pair consists of a coefficient\nand the corresponding initial value. The distinguished first pair ensures that the order is\npositive, while the list allows the order to be arbitrarily large.\n-/\nstructure Encoding where\n  firstCoefficient : ℤ\n  firstInitialValue : ℤ\n  remaining : List (ℤ × ℤ)\n\ninstance : Primcodable Encoding :=\n  .ofEquiv (ℤ × ℤ × List (ℤ × ℤ))\n    { toFun := fun r => (r.firstCoefficient, r.firstInitialValue, r.remaining)\n      invFun := fun p => ⟨p.1, p.2.1, p.2.2⟩\n      left_inv := fun _ => rfl\n      right_inv := fun _ => rfl }\n\n/-- The sequence generated by an encoded integer linear recurrence. -/\nnoncomputable def Encoding.sequence (r : Encoding) : ℕ → ℤ :=\n  let entries := (r.firstCoefficient, r.firstInitialValue) :: r.remaining\n  let recurrence : LinearRecurrence ℤ :=\n    { order := entries.length\n      coeffs := fun i => (entries.get i).1 }\n  recurrence.mkSol fun i => (entries.get i).2\n\n/--\n**Skolem problem.** Can an algorithm determine whether a constant-recursive sequence contains a\nzero? More precisely, is there an algorithm which, given an integer linear recurrence of arbitrary\npositive order with its initial values, decides whether its generated sequence has a term\n$u_n = 0$ for some $n \\geq 0$?\n-/\n@[category research open, AMS 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred (fun r : Encoding => ∃ n : ℕ, r.sequence n = 0) := by\n  sorry\n\nend SkolemProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Formalized “can an algorithm determine” as `answer(sorry) ↔ ComputablePred (...)`, so a positive answer means that zero occurrence is a computable predicate of the encoded recurrence.",
+    "Used integer recurrences. This is the natural formulation identified by the source and decomposition; the rational formulation is equivalent by clearing denominators.",
+    "Encoded a recurrence of arbitrary positive order by one distinguished coefficient/initial-value pair followed by a finite list of further pairs. This is equivalent to two nonempty equal-length finite lists, rules out malformed inputs, is `Primcodable`, and leaves the order unbounded.",
+    "Used Mathlib’s recurrence convention `u (n + d) = ∑ i : Fin d, a i * u (n + i)` and `LinearRecurrence.mkSol` to generate the unique sequence from its initial values.",
+    "Interpreted “contains a zero” as `∃ n : ℕ, sequence n = 0`, including index zero.",
+    "Restricted to positive order, as standard linear recurrence degree/order is positive; the distinguished first pair enforces this without requiring a proof-carrying subtype encoding."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib’s `LinearRecurrence ℤ` represents the recurrence relation but has no `Primcodable` instance and does not bundle initial values.",
+     "name": "SkolemProblem.Encoding",
+     "why_needed": "The decision problem needs a `Primcodable` input that bundles an unbounded-order integer recurrence with exactly the corresponding number of initial values. Mathlib has no such encoded bundled type."
+    },
+    {
+     "closest_existing_considered": "Implemented as a thin wrapper around `LinearRecurrence.mkSol`, after converting the encoded finite data to Mathlib’s `LinearRecurrence ℤ` and its initial vector.",
+     "name": "SkolemProblem.Encoding.sequence",
+     "why_needed": "The predicate must refer canonically to the sequence generated by the encoded coefficients and initial values."
+    }
+   ],
+   "per_slot": {
+    "skolem_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "skolem_problem": "/--\n**Skolem problem.** Can an algorithm determine whether a constant-recursive sequence contains a\nzero? More precisely, is there an algorithm which, given an integer linear recurrence of arbitrary\npositive order with its initial values, decides whether its generated sequence has a term\n$u_n = 0$ for some $n \\geq 0$?\n-/\n@[category research open, AMS 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred (fun r : Encoding => ∃ n : ℕ, r.sequence n = 0) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Skolem problem\n\nThe Skolem problem (also called the Skolem–Pisot problem) asks whether there is an algorithm\nthat, given a constant-recursive sequence, decides whether the values of the sequence include\nthe number zero.\n\nA constant-recursive sequence is specified by finitely many data: the order $d$ and the\ncoefficients $a_0, \\dots, a_{d-1}$ of a linear recurrence relation\n$$u_{n + d} = a_{d-1} u_{n + d - 1} + \\dots + a_1 u_{n + 1} + a_0 u_n \\quad (n \\ge 0),$$\ntogether with the initial values $u_0, \\dots, u_{d-1}$. These data determine the sequence\n$(u_n)_{n \\ge 0}$ uniquely.\n\nThe problem can be formulated for recurrences over the integers, the rational numbers or the\nalgebraic numbers. We state the integer version: the rational version reduces to it by clearing\ndenominators. It is not known whether an algorithm solving the problem exists.\n\n*References:*\n- [Wikipedia, Skolem problem](https://en.wikipedia.org/wiki/Skolem_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace SkolemProblem\n\n/--\nThe data specifying an integer constant-recursive sequence: a linear recurrence relation\n`u (n + d) = ∑ i : Fin d, coeffs i * u (n + i)` with integer coefficients (as a Mathlib\n`LinearRecurrence ℤ`) together with the `d` initial values `u 0, …, u (d - 1)`, where `d` is\nthe order of the recurrence.\n-/\nstructure RecurrenceWithInit where\n  /-- The linear recurrence relation with constant integer coefficients. -/\n  recurrence : LinearRecurrence ℤ\n  /-- The initial values of the sequence. -/\n  init : Fin recurrence.order → ℤ\n\n/--\n`RecurrenceWithInit` is a finitary object: it is equivalent to the type of finite lists of\npairs of integers (the `i`-th pair being the `i`-th coefficient and the `i`-th initial value).\nThis makes it a valid input for an algorithm.\n-/\ninstance : Primcodable RecurrenceWithInit :=\n  .ofEquiv (List (ℤ × ℤ)) <|\n    (({ toFun := fun r => ⟨r.recurrence.order, r.recurrence.coeffs, r.init⟩\n        invFun := fun s => ⟨⟨s.1, s.2.1⟩, s.2.2⟩\n        left_inv := fun ⟨⟨_, _⟩, _⟩ => rfl\n        right_inv := fun ⟨_, _, _⟩ => rfl } :\n      RecurrenceWithInit ≃ Σ n : ℕ, (Fin n → ℤ) × (Fin n → ℤ)).trans\n    (Equiv.sigmaCongrRight fun n => (Equiv.arrowProdEquivProdArrow (Fin n) _ _).symm)).trans\n    List.equivSigmaTuple.symm\n\n/--\nThe constant-recursive sequence `u : ℕ → ℤ` determined by a recurrence relation and initial\nvalues: `u n = init n` for `n < d`, and `u (n + d) = ∑ i : Fin d, coeffs i * u (n + i)` for\nall `n`.\n-/\nnoncomputable def RecurrenceWithInit.seq (r : RecurrenceWithInit) : ℕ → ℤ :=\n  r.recurrence.mkSol r.init\n\n/--\n**Skolem problem.** Is there an algorithm which, given a constant-recursive sequence (specified\nby an integer linear recurrence relation together with its initial values), decides whether the\nsequence contains a zero, i.e. whether $u_n = 0$ for some $n \\ge 0$?\n-/\n@[category research open, AMS 3 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun r : RecurrenceWithInit => ∃ n, r.seq n = 0 := by\n  sorry\n\n/-- The Fibonacci numbers, given by `F (n + 2) = F (n + 1) + F n`, `F 0 = 0` and `F 1 = 1`. -/\ndef fibonacci : RecurrenceWithInit := ⟨⟨2, ![1, 1]⟩, ![0, 1]⟩\n\n/-- The sequence determined by a `RecurrenceWithInit` satisfies the recurrence relation. -/\n@[category API, AMS 11]\ntheorem RecurrenceWithInit.isSolution_seq (r : RecurrenceWithInit) :\n    r.recurrence.IsSolution r.seq :=\n  r.recurrence.is_sol_mkSol r.init\n\n/-- The sequence determined by a `RecurrenceWithInit` starts with the given initial values. -/\n@[category API, AMS 11]\ntheorem RecurrenceWithInit.seq_eq_init (r : RecurrenceWithInit) (n : Fin r.recurrence.order) :\n    r.seq n = r.init n :=\n  r.recurrence.mkSol_eq_init r.init n\n\n/-- The sequence determined by a `RecurrenceWithInit` is the unique solution of the recurrence\nwith the given initial values. -/\n@[category API, AMS 11]\ntheorem RecurrenceWithInit.eq_seq (r : RecurrenceWithInit) {u : ℕ → ℤ}\n    (hu : r.recurrence.IsSolution u) (hinit : ∀ n : Fin r.recurrence.order, u n = r.init n) :\n    u = r.seq :=\n  funext (r.recurrence.eq_mk_of_is_sol_of_eq_init hu hinit)\n\n/-- The Fibonacci sequence contains a zero (namely its first term). -/\n@[category test, AMS 11]\ntheorem fibonacci_seq_zero : fibonacci.seq 0 = 0 :=\n  fibonacci.seq_eq_init (0 : Fin 2)\n\n/-- The Fibonacci sequence satisfies `F (n + 2) = F n + F (n + 1)`. -/\n@[category test, AMS 11]\ntheorem fibonacci_seq_add_two (n : ℕ) :\n    fibonacci.seq (n + 2) = fibonacci.seq n + fibonacci.seq (n + 1) := by\n  simpa [fibonacci, Fin.sum_univ_two] using fibonacci.isSolution_seq n\n\n/-- The Fibonacci sequence satisfies `F 5 = 5`. -/\n@[category test, AMS 11]\ntheorem fibonacci_seq_five : fibonacci.seq 5 = 5 := by\n  have h0 : fibonacci.seq 0 = 0 := fibonacci.seq_eq_init (0 : Fin 2)\n  have h1 : fibonacci.seq 1 = 1 := fibonacci.seq_eq_init (1 : Fin 2)\n  have h2 := fibonacci_seq_add_two 0\n  have h3 := fibonacci_seq_add_two 1\n  have h4 := fibonacci_seq_add_two 2\n  have h5 := fibonacci_seq_add_two 3\n  norm_num at h2 h3 h4 h5\n  omega\n\nend SkolemProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot table matches the source statement; the choice of the integer formulation is a reasonable reading of the article and is recorded as a modeling decision.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Domain: the Wikipedia article says the problem may be posed over integers, rationals or algebraic numbers; following the decomposition notes the integer version is stated (rational reduces to integer by clearing denominators). Recorded in the module docstring.",
+    "'Algorithm' is formalized as Mathlib's `ComputablePred` (a computable Bool-valued decision function) on a `Primcodable` input type. The `Primcodable` instance is obtained by `Primcodable.ofEquiv` from `List (ℤ × ℤ)` (i-th pair = i-th coefficient, i-th initial value), so the input encoding is the standard one for finite lists of integers; degree is unbounded since the list length is arbitrary.",
+    "'Constant-recursive sequence' is modeled as the data (order d, coefficients a_0..a_{d-1}, initial values u_0..u_{d-1}) and the sequence itself is `LinearRecurrence.mkSol`, i.e. u n = init n for n < d and u (n+d) = Σ_i a_i u (n+i). Mathlib's coefficient convention (coeffs i multiplies u (n+i)) is followed and documented.",
+    "'Contains a zero' is `∃ n : ℕ, u n = 0` with n ≥ 0 (indices start at 0), as in the article.",
+    "Boundary case: order 0 gives the identically-zero sequence (empty sum), which trivially contains a zero; this is harmless for the decidability question and matches the informal reading.",
+    "Extra `API`/`test` declarations (solution property, initial values, uniqueness, Fibonacci example) are included as basic API tests for the bespoke definitions, per CONTRIBUTING.md; they are fully proved."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`LinearRecurrence ℤ` alone (lacks initial values, so does not determine a sequence); `Σ E : LinearRecurrence ℤ, Fin E.order → ℤ` (no `Primcodable` instance for sigma types in Mathlib); raw `List (ℤ × ℤ)` (less readable, and the structure is equivalent to it).",
+     "name": "SkolemProblem.RecurrenceWithInit",
+     "why_needed": "A single `Primcodable` input type for the decision problem: an integer linear recurrence (Mathlib `LinearRecurrence ℤ`) together with its `order` initial values. Mathlib has no `Primcodable` instance for `LinearRecurrence` or for dependent sigma types, so a structure with a bespoke instance (via `List.equivSigmaTuple` and `Equiv.arrowProdEquivProdArrow`) was needed."
+    },
+    {
+     "closest_existing_considered": "`LinearRecurrence.mkSol` (used directly in the definition).",
+     "name": "SkolemProblem.RecurrenceWithInit.seq",
+     "why_needed": "The constant-recursive sequence determined by the data, defined as `LinearRecurrence.mkSol`; introduced only as a named abbreviation so the statement reads `r.seq n = 0`."
+    },
+    {
+     "closest_existing_considered": "`Nat.fib` (not an instance of the bespoke structure).",
+     "name": "SkolemProblem.fibonacci",
+     "why_needed": "Example instance used only in `test` declarations checking the bespoke definitions."
+    }
+   ],
+   "per_slot": {
+    "skolem_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun r : RecurrenceWithInit => ∃ n, r.seq n = 0`, where `RecurrenceWithInit` bundles a Mathlib `LinearRecurrence ℤ` (order + integer coefficients) with its initial values, is `Primcodable` via an explicit equivalence with `List (ℤ × ℤ)`, and `r.seq` is the unique solution `LinearRecurrence.mkSol`. `answer(True)` = an algorithm exists, `answer(False)` = none exists."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "skolem_problem": "/--\n**Skolem problem.** Is there an algorithm which, given a constant-recursive sequence (specified\nby an integer linear recurrence relation together with its initial values), decides whether the\nsequence contains a zero, i.e. whether $u_n = 0$ for some $n \\ge 0$?\n-/\n@[category research open, AMS 3 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun r : RecurrenceWithInit => ∃ n, r.seq n = 0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Skolem problem\n\n*Reference:* [Wikipedia, Skolem problem](https://en.wikipedia.org/wiki/Skolem_problem)\n-/\n\nnamespace SkolemProblem\n\n/--\nThe integer sequence encoded by a list of coefficients and a list of initial values.\nFor coefficients $c_0,\\ldots,c_{d-1}$, the recurrence is\n$u_{n+d}=\\sum_{i<d}c_i u_{n+i}$.\n-/\ndef recurrenceSequence (r : List ℤ × List ℤ) : ℕ → ℤ :=\n  let E : LinearRecurrence ℤ := ⟨r.1.length, r.1.get⟩\n  E.mkSol fun i => r.2.getD i 0\n\n/--\nCan an algorithm determine whether a constant-recursive integer sequence contains zero?\nHere an input consists of a nonempty coefficient list and an equally long list of initial\nvalues. The lists may have arbitrary finite length, and an occurrence of zero may be at any\nindex $n \\geq 0$.\n-/\n@[category research open, AMS 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun r : List ℤ × List ℤ =>\n      0 < r.1.length ∧ r.2.length = r.1.length ∧ ∃ n, recurrenceSequence r n = 0 := by\n  sorry\n\nend SkolemProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Formalized the integer version of the Skolem problem. The source permits integer, rational, or algebraic-number formulations, and the fixed decomposition identifies the integer version as the natural target.",
+    "Encoded an input as `List ℤ × List ℤ`: the first list contains constant recurrence coefficients and the second contains initial values. This type already has a `Primcodable` instance through Mathlib's list and product instances.",
+    "Required the coefficient list to have positive length and the initial-value list to have the same length. Thus only standard positive-order recurrences are accepted; malformed pairs are assigned `False`, which gives a total predicate on the ambient computable encoding without changing the decision problem on valid inputs.",
+    "Used Mathlib's coefficient order: for a list of length `d`, `u (n + d) = ∑ i : Fin d, c_i * u (n + i)`.",
+    "Interpreted “contains a zero” as existence of an index `n : ℕ`, including `n = 0`.",
+    "Used `answer(sorry) ↔ ComputablePred ...` so a positive answer says exactly that the zero-existence predicate on encoded recurrences is computable."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `LinearRecurrence` and `LinearRecurrence.mkSol` provide the recurrence semantics and are used by the helper, but `LinearRecurrence ℤ` itself has no suitable unbounded-degree `Primcodable` input instance and its dependent coefficient field does not directly include a coded list of initial values.",
+     "name": "SkolemProblem.recurrenceSequence",
+     "why_needed": "A helper is needed to turn the `Primcodable` pair-of-lists input encoding into the integer sequence whose zero set is queried."
+    }
+   ],
+   "per_slot": {
+    "skolem_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "skolem_problem": "/--\nCan an algorithm determine whether a constant-recursive integer sequence contains zero?\nHere an input consists of a nonempty coefficient list and an equally long list of initial\nvalues. The lists may have arbitrary finite length, and an occurrence of zero may be at any\nindex $n \\geq 0$.\n-/\n@[category research open, AMS 11]\ntheorem skolem_problem :\n    answer(sorry) ↔ ComputablePred fun r : List ℤ × List ℤ =>\n      0 < r.1.length ∧ r.2.length = r.1.length ∧ ∃ n, recurrenceSequence r n = 0 := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "skolem_problem": "c07"
+ },
+ "id": "wp-skolem-problem",
+ "main_attempt": "c07"
+}

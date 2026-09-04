@@ -1,0 +1,478 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vertex coloring game\n\nThe vertex coloring game is played on a finite simple graph with a fixed palette. Alice moves\nfirst, and then Alice and Bob alternate without passing. A move assigns a color to one uncolored\nvertex while keeping the partial coloring proper. Alice wins if every vertex is colored; Bob wins\nif this becomes impossible.\n\n*Reference:* [Wikipedia, Graph coloring game](https://en.wikipedia.org/wiki/graph_coloring_game)\n-/\n\nnamespace VertexColoringGame\n\n/-- A partial vertex coloring is proper when adjacent colored vertices have different colors. -/\ndef IsProperPartialColoring {V : Type*} (G : SimpleGraph V) {k : ℕ}\n    (coloring : V → Option (Fin k)) : Prop :=\n  ∀ ⦃v w : V⦄ ⦃c : Fin k⦄, G.Adj v w → coloring v = some c → coloring w ≠ some c\n\n/-- The partial coloring obtained by coloring `v` with `c`. -/\nnoncomputable def colorVertex {V : Type*} {k : ℕ} (coloring : V → Option (Fin k))\n    (v : V) (c : Fin k) : V → Option (Fin k) := by\n  letI := Classical.decEq V\n  exact Function.update coloring v (some c)\n\n/-- A move colors one previously uncolored vertex and leaves a proper partial coloring. -/\ndef IsLegalMove {V : Type*} (G : SimpleGraph V) {k : ℕ}\n    (coloring : V → Option (Fin k)) (v : V) (c : Fin k) : Prop :=\n  coloring v = none ∧ IsProperPartialColoring G (colorVertex coloring v c)\n\n/-- A partial coloring is complete when every vertex has been assigned a color. -/\ndef IsComplete {V : Type*} {k : ℕ} (coloring : V → Option (Fin k)) : Prop :=\n  ∀ v, ∃ c, coloring v = some c\n\n/-- Backward induction for the assertion that Alice can force a complete coloring within the\nspecified number of moves. The Boolean records whether it is Alice's turn. -/\ndef AliceWinsIn {V : Type*} (G : SimpleGraph V) {k : ℕ} :\n    ℕ → Bool → (V → Option (Fin k)) → Prop\n  | 0, _, coloring => IsComplete coloring\n  | n + 1, aliceToMove, coloring =>\n      IsComplete coloring ∨ if aliceToMove then\n        ∃ v c, IsLegalMove G coloring v c ∧ AliceWinsIn G n false (colorVertex coloring v c)\n      else\n        (∃ v c, IsLegalMove G coloring v c) ∧\n          ∀ v c, IsLegalMove G coloring v c →\n            AliceWinsIn G n true (colorVertex coloring v c)\n\n/-- Alice has a winning strategy in the standard vertex coloring game with exactly `k` colors. -/\ndef AliceWins {V : Type*} [Fintype V] (G : SimpleGraph V) (k : ℕ) : Prop :=\n  AliceWinsIn (k := k) G (Fintype.card V) true (fun _ ↦ (none : Option (Fin k)))\n\n/--\nDoes Alice having a winning strategy for the vertex coloring game on any finite simple graph\nwith exactly $k \\geq 1$ colors imply that she has a winning strategy on the same graph with\nexactly $k+1$ colors? Here Alice moves first, the players alternate without passing, every move\nproperly colors one uncolored vertex, and Alice wins exactly when all vertices are colored.\n-/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game :\n    answer(sorry) ↔ ∀ (V : Type) [Fintype V] (G : SimpleGraph V) (k : ℕ),\n      1 ≤ k → AliceWins G k → AliceWins G (k + 1) := by\n  sorry\n\nend VertexColoringGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite simple graphs are represented by `SimpleGraph V` with `[Fintype V]`; the theorem quantifies over every such graph and every natural number `k ≥ 1`.",
+    "The fixed palette of exactly `k` colors is represented by `Fin k`, and a partial coloring by `V → Option (Fin k)`.",
+    "Winning-strategy semantics are defined by backward induction for exactly `Fintype.card V` possible moves. Alice chooses some legal move, whereas Alice must survive every legal move by Bob; Bob's branch additionally requires that a legal move exists, so inability to move in an incomplete position is a Bob win rather than a vacuous Alice win.",
+    "The game starts with Alice at the completely uncolored position. Every legal move colors one previously uncolored vertex, so passing is impossible and turns alternate after each move.",
+    "The source says Bob wins as soon as some uncolored vertex has no available color. The definition instead characterizes Alice's win as forcing complete coloring. These are equivalent because coloring further vertices can never make a color available again at a blocked vertex.",
+    "The yes/no wording is represented as `answer(sorry) ↔` the universally quantified upward-closure assertion, following repository conventions.",
+    "The article's separate question involving a function `f(k)` is omitted, as required by the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.Coloring` in Mathlib, which is total rather than partial.",
+     "name": "VertexColoringGame.IsProperPartialColoring",
+     "why_needed": "Mathlib's graph coloring structure describes total proper colorings, while game positions require partial proper colorings."
+    },
+    {
+     "closest_existing_considered": "`Function.update`, which is used internally but does not itself specialize the update to partial vertex colorings.",
+     "name": "VertexColoringGame.colorVertex",
+     "why_needed": "Defines the state update made by one coloring-game move."
+    },
+    {
+     "closest_existing_considered": "No coloring-game move predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "VertexColoringGame.IsLegalMove",
+     "why_needed": "Packages the two game-specific move requirements: the vertex is uncolored and the updated partial coloring is proper."
+    },
+    {
+     "closest_existing_considered": "Mathlib has total `SimpleGraph.Coloring`, but the terminal predicate must be stated on a partial coloring position.",
+     "name": "VertexColoringGame.IsComplete",
+     "why_needed": "Expresses the game-specific terminal condition that every vertex has received a palette color."
+    },
+    {
+     "closest_existing_considered": "Mathlib's deprecated `SetTheory.PGame.State` constructs normal-play combinatorial games and does not directly encode this asymmetric completion objective or a player-to-move state.",
+     "name": "VertexColoringGame.AliceWinsIn",
+     "why_needed": "Defines finite alternating winning-strategy semantics with Alice's completion objective, no passing, and a bounded number of remaining moves."
+    },
+    {
+     "closest_existing_considered": "No vertex-coloring-game winning predicate exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "VertexColoringGame.AliceWins",
+     "why_needed": "Specializes the bounded game semantics to the standard initial position, Alice to move, with one possible move per vertex."
+    }
+   ],
+   "per_slot": {
+    "vertex_coloring_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vertex_coloring_game": "/--\nDoes Alice having a winning strategy for the vertex coloring game on any finite simple graph\nwith exactly $k \\geq 1$ colors imply that she has a winning strategy on the same graph with\nexactly $k+1$ colors? Here Alice moves first, the players alternate without passing, every move\nproperly colors one uncolored vertex, and Alice wins exactly when all vertices are colored.\n-/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game :\n    answer(sorry) ↔ ∀ (V : Type) [Fintype V] (G : SimpleGraph V) (k : ℕ),\n      1 ≤ k → AliceWins G k → AliceWins G (k + 1) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vertex coloring game: more colors for Alice\n\nThe vertex coloring game (Brams 1981, Bodlaender 1991) is played by Alice and Bob on a finite\nsimple graph $G$ with a fixed set of $k$ colors. The rules are:\n\n* Alice moves first, and the players alternate turns; passing is not allowed.\n* On each turn, the player chooses an uncolored vertex $v$ and a color that does not appear on\n  any neighbor of $v$, and colors $v$ with it (so the coloring stays proper).\n* If some uncolored vertex has every color on its neighborhood, it can never be colored and Bob\n  wins.\n* If every vertex gets colored, Alice wins.\n\nThe game chromatic number $\\chi_g(G)$ is the least $k$ for which Alice has a winning strategy.\n\nThis file models a position as a partial coloring `V → Option (Fin k)` and defines the predicate\n`AliceWinsFrom G c p`, meaning that Alice can force a win from position `c` with player `p` to\nmove. It is the usual backward-induction characterisation of having a winning strategy in a\nfinite two-player game of perfect information: Alice needs one legal move leading to a winning\nposition, Bob must have a legal move and all of his legal moves must lead to winning positions,\nand a completely colored position is won for Alice. Since colors are never removed, an\nuncolorable vertex stays uncolorable, so this agrees with the rule that Bob wins as soon as such\na vertex appears (see `not_aliceWinsFrom_of_isBlocked`).\n\nThe open problem asks whether having more colors can only help Alice.\n\n*References:*\n- [Wikipedia, Graph coloring game](https://en.wikipedia.org/wiki/graph_coloring_game)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [H. L. Bodlaender, *On the complexity of some coloring games*](https://doi.org/10.1007/3-540-53832-1_29),\n  Graph-Theoretic Concepts in Computer Science (WG 1990), LNCS 484, Springer, 1991.\n-/\n\nnamespace VertexColoringGame\n\n/-- The two players of the vertex coloring game. -/\ninductive Player\n  | alice\n  | bob\n\nvariable {V : Type*} [DecidableEq V] (G : SimpleGraph V) {k : ℕ}\n\n/-- `IsLegalMove G c v i` says that, in the partial coloring `c` of the vertices of `G` with the\ncolors `Fin k`, coloring the vertex `v` with the color `i` is a legal move: `v` is uncolored and\nno neighbor of `v` has color `i`. -/\ndef IsLegalMove (c : V → Option (Fin k)) (v : V) (i : Fin k) : Prop :=\n  c v = none ∧ ∀ w, G.Adj v w → c w ≠ some i\n\n/-- `AliceWinsFrom G c p` says that Alice can force a win in the vertex coloring game on `G`\nfrom the partial coloring `c` when it is player `p`'s turn to move:\n* if every vertex is colored, Alice has won;\n* on Alice's turn, some legal move leads to a position from which Alice can force a win;\n* on Bob's turn, Bob has a legal move and every legal move leads to a position from which Alice\n  can force a win. -/\ninductive AliceWinsFrom : (V → Option (Fin k)) → Player → Prop\n  | complete {c : V → Option (Fin k)} {p : Player} (h : ∀ v, (c v).isSome) : AliceWinsFrom c p\n  | alice {c : V → Option (Fin k)} (v : V) (i : Fin k) (hvi : IsLegalMove G c v i)\n      (h : AliceWinsFrom (Function.update c v (some i)) .bob) : AliceWinsFrom c .alice\n  | bob {c : V → Option (Fin k)} (hne : ∃ v i, IsLegalMove G c v i)\n      (h : ∀ v i, IsLegalMove G c v i → AliceWinsFrom (Function.update c v (some i)) .alice) :\n      AliceWinsFrom c .bob\n\nvariable (k) in\n/-- `AliceHasWinningStrategy G k` says that Alice has a winning strategy for the vertex coloring\ngame on `G` with `k` colors: she can force a win from the empty coloring, moving first. -/\ndef AliceHasWinningStrategy : Prop :=\n  AliceWinsFrom G (fun _ : V => (none : Option (Fin k))) .alice\n\n/-- `IsBlocked G c v` says that the vertex `v` is uncolored in `c` and every color appears on a\nneighbor of `v`, so that `v` can never be colored properly. -/\ndef IsBlocked (c : V → Option (Fin k)) (v : V) : Prop :=\n  c v = none ∧ ∀ i : Fin k, ∃ w, G.Adj v w ∧ c w = some i\n\nvariable {G} in\n/-- A legal move never unblocks a vertex. -/\n@[category API, AMS 5 91]\ntheorem IsBlocked.update {c : V → Option (Fin k)} {u : V} {j : Fin k} (huj : IsLegalMove G c u j)\n    {v : V} (hv : IsBlocked G c v) : IsBlocked G (Function.update c u (some j)) v := by\n  obtain ⟨hu, hadj⟩ := huj\n  obtain ⟨hv, hb⟩ := hv\n  refine ⟨?_, fun i => ?_⟩\n  · have huv : u ≠ v := by\n      rintro rfl\n      obtain ⟨w, hw, hcw⟩ := hb j\n      exact hadj w hw hcw\n    rw [Function.update_of_ne huv.symm, hv]\n  · obtain ⟨w, hw, hcw⟩ := hb i\n    have hwu : w ≠ u := by\n      rintro rfl\n      rw [hu] at hcw\n      exact Option.some_ne_none i hcw.symm\n    exact ⟨w, hw, by rw [Function.update_of_ne hwu, hcw]⟩\n\nvariable {G} in\n/-- If some vertex is blocked, then Alice cannot win from `c`, whoever is to move. This is the\nrule that Bob wins as soon as a vertex becomes uncolorable. -/\n@[category API, AMS 5 91]\ntheorem not_aliceWinsFrom_of_isBlocked {c : V → Option (Fin k)} {v : V} (hv : IsBlocked G c v)\n    (p : Player) : ¬ AliceWinsFrom G c p := by\n  intro h\n  induction h with\n  | complete h => simpa [hv.1] using h v\n  | alice u j huj _ ih => exact ih (hv.update huj)\n  | bob hne _ ih =>\n    obtain ⟨u, j, huj⟩ := hne\n    exact ih u j huj (hv.update huj)\n\n/-- On a graph with no vertices, Alice wins with any number of colors. -/\n@[category test, AMS 5 91]\ntheorem aliceHasWinningStrategy_of_isEmpty [IsEmpty V] (k : ℕ) : AliceHasWinningStrategy G k :=\n  .complete fun v => isEmptyElim v\n\n/-- On a graph with at least one vertex, Alice does not win with `0` colors. -/\n@[category test, AMS 5 91]\ntheorem not_aliceHasWinningStrategy_zero [Nonempty V] : ¬ AliceHasWinningStrategy G 0 := by\n  rintro (h | ⟨v, i, -, -⟩)\n  · obtain ⟨v⟩ := ‹Nonempty V›\n    simpa using h v\n  · exact i.elim0\n\n/-- Alice wins on a single vertex with one color. -/\n@[category test, AMS 5 91]\ntheorem aliceHasWinningStrategy_bot_unit : AliceHasWinningStrategy (⊥ : SimpleGraph Unit) 1 :=\n  .alice () 0 ⟨rfl, fun _ h => h.elim⟩ (.complete fun v => by simp)\n\n/-- Alice does not win on a single edge with one color: after her first move the other vertex\nhas no legal color, so Bob wins. -/\n@[category test, AMS 5 91]\ntheorem not_aliceHasWinningStrategy_top_fin_two :\n    ¬ AliceHasWinningStrategy (⊤ : SimpleGraph (Fin 2)) 1 := by\n  rintro (h | ⟨v, i, -, (h | - | ⟨⟨w, j, hw, hwj⟩, -⟩)⟩)\n  · simpa using h 0\n  · have := h (v + 1)\n    simp at this\n  · simp only [Function.update_apply, ne_eq] at hw hwj\n    have hwv : w ≠ v := by rintro rfl; simp at hw\n    have := hwj v (by simpa [SimpleGraph.top_adj] using hwv)\n    simp [Fin.eq_zero i, Fin.eq_zero j] at this\n\n/-- **More colors for Alice.** Suppose Alice has a winning strategy for the vertex coloring game\non a graph $G$ with $k$ colors. Does she have one for $k+1$ colors?\n\nHere $G$ ranges over all finite simple graphs and $k$ over all natural numbers. -/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ),\n      AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1) := by\n  sorry\n\nend VertexColoringGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The table's single slot and its stated conventions (Alice first, alternation, no passing, fixed set of exactly k colors, Alice wins iff every vertex is colored, finite simple graphs, exclusion of the f(k) relaxation) match the article and the primary literature. The only deviation is quantifying over all k : ℕ instead of k ≥ 1, which is provably equivalent (the k = 0 case is trivially true).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Alice has a winning strategy' is modeled by the least-fixed-point/backward-induction predicate `AliceWinsFrom` (Alice can force a win) rather than by explicit strategy functions; for a finite two-player perfect-information game these are equivalent, and this follows the repo's minimax treatment in ErdosProblems/872.lean.",
+    "Standard conventions fixed (from the Wikipedia article and the cited papers arXiv:2008.13275, arXiv:1410.5223): Alice moves first, players alternate, no passing, each move colors an uncolored vertex with a color from the fixed set `Fin k` that does not appear on its neighborhood, Alice wins iff every vertex gets colored.",
+    "Bob's win condition: Wikipedia says Bob wins as soon as some uncolored vertex has every color on its neighborhood. The model instead lets play continue and Alice wins only if the coloring is completed; the two are equivalent because an uncolorable vertex stays uncolorable, which is proved in the file as the API lemma `not_aliceWinsFrom_of_isBlocked`. Also, when Bob has no legal move but the coloring is incomplete, Bob wins (the `bob` constructor requires a legal move to exist).",
+    "G ranges over all finite simple graphs (`[Fintype V]`, `SimpleGraph V`), matching 'graph' in this literature; on infinite V Alice could never win, so the hypothesis would be unsatisfiable there anyway.",
+    "k ranges over all natural numbers, including k = 0, rather than only k ≥ 1 as in the decomposition note. This is equivalent: with 0 colors Alice wins only on the graph with no vertices, where she also wins with 1 color (see the test lemmas `aliceHasWinningStrategy_of_isEmpty` and `not_aliceHasWinningStrategy_zero`).",
+    "A `[DecidableEq V]` instance is quantified in the statement because positions are updated with `Function.update`; the predicate is a Prop, so the choice of instance is immaterial.",
+    "The separate relaxation via a function f(k) listed in the article is a different problem and is not included, per the decomposition table.",
+    "`answer(sorry)` elaborates to `True` under the repository's default `answer` setting; `answer(True)` reads as the positive answer ('yes, k+1 colors also suffice for every finite graph and every k')."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Bool` (used in ErdosProblems/872.lean) — a named enumeration is clearer; `CatchUp.Player` in Paper/CatchUpConjecture.lean is file-local to another problem.",
+     "name": "VertexColoringGame.Player",
+     "why_needed": "Two-element type recording whose turn it is (Alice or Bob) in the game position."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Coloring` / `SimpleGraph.Colorable` in Mathlib are total colorings only; no partial-coloring or coloring-extension primitive exists.",
+     "name": "VertexColoringGame.IsLegalMove",
+     "why_needed": "Legal move of the vertex coloring game: vertex uncolored and color absent from its neighborhood (proper partial coloring extension)."
+    },
+    {
+     "closest_existing_considered": "`SetTheory.PGame` (combinatorial games, normal play, not suited to a coloring game with a completion win condition); minimax value `Erdos872.gameValueAux` is problem-specific.",
+     "name": "VertexColoringGame.AliceWinsFrom",
+     "why_needed": "Inductive predicate: Alice can force a win from a partial coloring with a given player to move; this is the backward-induction meaning of 'has a winning strategy'."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or the repo (searched for 'coloring game', 'game chromatic', 'winning strategy').",
+     "name": "VertexColoringGame.AliceHasWinningStrategy",
+     "why_needed": "Alice has a winning strategy for the vertex coloring game on G with k colors: `AliceWinsFrom` at the empty coloring with Alice to move."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "VertexColoringGame.IsBlocked",
+     "why_needed": "Auxiliary notion (uncolored vertex with every color on its neighborhood) used only for the API lemma `not_aliceWinsFrom_of_isBlocked`, which checks that the model agrees with Wikipedia's rule that Bob wins as soon as a vertex becomes uncolorable."
+    }
+   ],
+   "per_slot": {
+    "vertex_coloring_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ), AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1)`. No coloring-game or winning-strategy primitives exist in Mathlib or FormalConjecturesForMathlib, so the game is defined in the file: positions are partial colorings `V → Option (Fin k)`, `IsLegalMove` encodes proper coloring of an uncolored vertex, and the inductive predicate `AliceWinsFrom` is the backward-induction characterisation of Alice having a winning strategy (Alice: some legal move wins; Bob: has a legal move and all legal moves lose for him; complete coloring: Alice wins). `AliceHasWinningStrategy G k` is this predicate at the empty coloring with Alice to move."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vertex_coloring_game": "/-- **More colors for Alice.** Suppose Alice has a winning strategy for the vertex coloring game\non a graph $G$ with $k$ colors. Does she have one for $k+1$ colors?\n\nHere $G$ ranges over all finite simple graphs and $k$ over all natural numbers. -/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ),\n      AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vertex coloring game\n\nIn the standard vertex coloring game, Alice and Bob alternately color one uncolored vertex of a\nfinite simple graph, with Alice moving first. A move must use one of the fixed colors and must not\ngive adjacent vertices the same color. Alice wins if every vertex is colored; Bob wins as soon as\nsome uncolored vertex has no legal color.\n\n*Reference:*\n- [Wikipedia, Graph coloring game](https://en.wikipedia.org/wiki/graph_coloring_game)\n-/\n\nnamespace VertexColoringGame\n\n/-- A color is available at `v` in the partial coloring `p` if no neighbor of `v` has that\ncolor. -/\ndef IsAvailable {V : Type*} (G : SimpleGraph V) {k : ℕ} (p : V → Option (Fin k))\n    (v : V) (c : Fin k) : Prop :=\n  ∀ w, G.Adj v w → p w ≠ some c\n\n/-- A legal move colors exactly one previously uncolored vertex with an available color. -/\ndef IsMove {V : Type*} (G : SimpleGraph V) {k : ℕ} (p q : V → Option (Fin k)) : Prop :=\n  ∃ v c, p v = none ∧ IsAvailable G p v c ∧ q v = some c ∧\n    ∀ w, w ≠ v → q w = p w\n\n/-- A partial coloring is safe if every uncolored vertex has an available color. Thus an unsafe\nposition is an immediate win for Bob under the standard rules. -/\ndef IsSafe {V : Type*} (G : SimpleGraph V) {k : ℕ} (p : V → Option (Fin k)) : Prop :=\n  ∀ v, p v = none → ∃ c, IsAvailable G p v c\n\n/-- `AliceWins G p aliceTurn` says that Alice has a winning strategy from `p`, with the Boolean\nrecording whether it is Alice's turn. The constructors encode Alice's choice, every possible Bob\nmove, and Alice's win when all vertices have been colored. -/\ninductive AliceWins {V : Type*} (G : SimpleGraph V) {k : ℕ} :\n    (V → Option (Fin k)) → Bool → Prop where\n  | complete (p : V → Option (Fin k)) (turn : Bool) (h : ∀ v, p v ≠ none) :\n      AliceWins G p turn\n  | alice (p q : V → Option (Fin k)) (safe : IsSafe G p) (move : IsMove G p q)\n      (win : AliceWins G q false) : AliceWins G p true\n  | bob (p : V → Option (Fin k)) (safe : IsSafe G p)\n      (moves : ∀ q, IsMove G p q → AliceWins G q true) : AliceWins G p false\n\n/-- Suppose Alice has a winning strategy for the standard vertex coloring game on a finite simple\ngraph $G$ with exactly $k \\geq 1$ colors. Does she also have a winning strategy on $G$ with\nexactly $k+1$ colors? Alice moves first, the players alternate without passing, each move properly\ncolors one uncolored vertex, Alice wins when every vertex is colored, and Bob wins as soon as an\nuncolored vertex has no available color. -/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game :\n    answer(sorry) ↔ ∀ {V : Type*} [Fintype V] (G : SimpleGraph V) (k : ℕ), 1 ≤ k →\n      AliceWins G (k := k) (fun _ ↦ none) true →\n        AliceWins G (k := k + 1) (fun _ ↦ none) true := by\n  sorry\n\nend VertexColoringGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list-page question using the linked graph-coloring-game article and the supplied primary-literature description: finite simple graphs; Alice moves first; players alternate without passing; a move colors exactly one previously uncolored vertex from a fixed palette; adjacent colored vertices must differ; Alice wins upon total coloring; Bob wins immediately when any uncolored vertex has no available color.",
+    "Represented the fixed palette of exactly k colors by `Fin k`, and made the decomposition table's implicit restriction k ≥ 1 explicit.",
+    "Represented existence of a winning strategy by the inductively generated finite game tree: Alice selects a legal successor on her turns, while all legal Bob successors must remain winning for Alice. Since the theorem restricts to finite vertex types and every move colors one new vertex, all plays are finite.",
+    "Allowed the empty finite graph; its empty initial coloring is already total, so Alice wins for both palette sizes and the implication has the expected harmless boundary behavior."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `SimpleGraph.Coloring` represents total proper colorings only; its source explicitly lists partial-coloring API as undeveloped.",
+     "name": "VertexColoringGame.IsAvailable",
+     "why_needed": "Expresses whether a color may legally be assigned to a vertex in a partial graph coloring."
+    },
+    {
+     "closest_existing_considered": "No partial-coloring move relation was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "VertexColoringGame.IsMove",
+     "why_needed": "Expresses a no-pass move that colors exactly one uncolored vertex with an available color while leaving every other vertex unchanged."
+    },
+    {
+     "closest_existing_considered": "No graph-coloring-game terminal-position predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "VertexColoringGame.IsSafe",
+     "why_needed": "Captures the standard game's special immediate Bob-win condition that any uncolored vertex lacking every color ends the game, even if another vertex could still be colored."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `PGame`/`Game` APIs concern Conway combinatorial games and do not provide the required finite perfect-information strategy semantics or this game's asymmetric terminal rule; no general `HasWinningStrategy` primitive was found.",
+     "name": "VertexColoringGame.AliceWins",
+     "why_needed": "Expresses Alice's winning-strategy game tree with alternating existential Alice moves, universal Bob moves, and total-coloring terminal wins."
+    }
+   ],
+   "per_slot": {
+    "vertex_coloring_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vertex_coloring_game": "/-- Suppose Alice has a winning strategy for the standard vertex coloring game on a finite simple\ngraph $G$ with exactly $k \\geq 1$ colors. Does she also have a winning strategy on $G$ with\nexactly $k+1$ colors? Alice moves first, the players alternate without passing, each move properly\ncolors one uncolored vertex, Alice wins when every vertex is colored, and Bob wins as soon as an\nuncolored vertex has no available color. -/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game :\n    answer(sorry) ↔ ∀ {V : Type*} [Fintype V] (G : SimpleGraph V) (k : ℕ), 1 ≤ k →\n      AliceWins G (k := k) (fun _ ↦ none) true →\n        AliceWins G (k := k + 1) (fun _ ↦ none) true := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vertex coloring game\n\nThe vertex coloring game is played on a finite simple graph. Alice and Bob alternate assigning\ncolors to previously uncolored vertices, with Alice moving first. Every move must preserve a proper\npartial coloring. Passing is not allowed. Alice wins if every vertex is colored; Bob wins if play\ngets stuck before then.\n\n*Reference:* [Wikipedia, Graph coloring game](https://en.wikipedia.org/wiki/graph_coloring_game)\n-/\n\nnamespace VertexColoringGame\n\n/-- A position in the vertex coloring game is a partial assignment of one of exactly `k` colors to\neach vertex. -/\nabbrev Position (V : Type*) (k : ℕ) := V → Option (Fin k)\n\n/-- A partial coloring is proper if adjacent colored vertices have different colors. -/\ndef IsProper {V : Type*} (G : SimpleGraph V) {k : ℕ} (p : Position V k) : Prop :=\n  ∀ ⦃v w : V⦄ ⦃c : Fin k⦄, G.Adj v w → p v = some c → p w ≠ some c\n\n/-- A position is complete if every vertex has been assigned a color. -/\ndef IsComplete {V : Type*} {k : ℕ} (p : Position V k) : Prop :=\n  ∀ v, ∃ c, p v = some c\n\n/-- A move consists of a vertex and a color. It is legal when the vertex is uncolored and assigning\nthe chosen color leaves a proper partial coloring. -/\ndef IsLegalMove {V : Type*} [DecidableEq V] (G : SimpleGraph V) {k : ℕ}\n    (p : Position V k) (m : V × Fin k) : Prop :=\n  p m.1 = none ∧ IsProper G (Function.update p m.1 (some m.2))\n\n/-- The type of legal moves from a position. -/\ndef LegalMove {V : Type*} [DecidableEq V] (G : SimpleGraph V) {k : ℕ}\n    (p : Position V k) := {m : V × Fin k // IsLegalMove G p m}\n\n/-- Apply a legal move to a position. -/\ndef play {V : Type*} [DecidableEq V] {G : SimpleGraph V} {k : ℕ} {p : Position V k}\n    (m : LegalMove G p) : Position V k :=\n  Function.update p m.1.1 (some m.1.2)\n\n/-- Finite backward induction for the vertex coloring game. On Alice's turn she chooses a legal\nmove; on Bob's turn every legal choice must remain winning for Alice. Requiring a legal move in the\nBob clause ensures that an incomplete position with no legal move is a win for Bob. -/\ndef AliceWinsIn {V : Type*} [DecidableEq V] (G : SimpleGraph V) {k : ℕ} :\n    ℕ → Bool → Position V k → Prop\n  | 0, _turn, p => IsComplete p\n  | fuel + 1, aliceTurn, p =>\n      IsComplete p ∨ if aliceTurn then\n        ∃ m : LegalMove G p, AliceWinsIn G fuel false (play m)\n      else\n        Nonempty (LegalMove G p) ∧ ∀ m : LegalMove G p, AliceWinsIn G fuel true (play m)\n\n/-- Alice has a winning strategy with exactly `k` available colors: starting from the empty\nposition and moving first, she can force every vertex to be colored. The fuel is the number of\nvertices, since every legal move colors one previously uncolored vertex. -/\ndef AliceWins {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ) : Prop :=\n  AliceWinsIn (k := k) G (Fintype.card V) true (fun _ ↦ none)\n\n/--\nSuppose Alice has a winning strategy for the vertex coloring game on a finite simple graph $G$\nusing a fixed palette of exactly $k \\ge 1$ colors. Does she also have a winning strategy when the\nfixed palette has exactly $k+1$ colors? Here Alice moves first, the players alternate without\npassing, every move properly colors one previously uncolored vertex, and Alice wins exactly when\nall vertices are colored.\n-/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ),\n      1 ≤ k → AliceWins G k → AliceWins G (k + 1) := by\n  sorry\n\nend VertexColoringGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the terse list-page question using the linked graph-coloring-game article and the fixed decomposition: finite simple graphs, Alice first, strict alternation, no passing, and one properly colored previously uncolored vertex per move.",
+    "Represented the fixed palette of exactly k colors by `Fin k`, and restricted the universally quantified natural number k by `1 ≤ k`.",
+    "Defined Alice's possession of a winning strategy by finite backward induction from the empty partial coloring: Alice has an existential choice, while all of Bob's legal choices must remain winning for Alice.",
+    "Made a completed coloring immediately winning for Alice. At an incomplete Bob-turn position, required that a legal move exist before universally quantifying over Bob's moves, so an empty legal-move type cannot produce a vacuous Alice win.",
+    "Used `Fintype.card V` as recursion fuel because every legal move colors one previously uncolored vertex. This also faithfully handles the empty graph, which is already completely colored.",
+    "Did not include the article's separate relaxation involving a function f(k)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.Coloring` represents only total proper colorings, not partial game positions.",
+     "name": "VertexColoringGame.Position",
+     "why_needed": "Represents a partial assignment from vertices to a fixed palette for intermediate game states."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Coloring` and its validity condition apply to total colorings.",
+     "name": "VertexColoringGame.IsProper",
+     "why_needed": "States properness for a partial coloring, allowing adjacent vertices to remain uncolored."
+    },
+    {
+     "closest_existing_considered": "A total `SimpleGraph.Coloring` does not itself describe completion of a partial game position.",
+     "name": "VertexColoringGame.IsComplete",
+     "why_needed": "Expresses Alice's terminal winning condition that every vertex has received a color."
+    },
+    {
+     "closest_existing_considered": "No graph-coloring-game move primitive was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "VertexColoringGame.IsLegalMove",
+     "why_needed": "Fixes the standard move rule: choose an uncolored vertex and a color whose assignment preserves properness."
+    },
+    {
+     "closest_existing_considered": "No reusable legal-move type for this game was found.",
+     "name": "VertexColoringGame.LegalMove",
+     "why_needed": "Packages a vertex-color pair together with proof that it is legal, for quantification in the game recursion."
+    },
+    {
+     "closest_existing_considered": "Uses the existing `Function.update`; only the game-specific wrapper is new.",
+     "name": "VertexColoringGame.play",
+     "why_needed": "Applies a legal move by updating the partial coloring at its selected vertex."
+    },
+    {
+     "closest_existing_considered": "No general finite perfect-information winning-strategy API was found; existing repository game formalizations use bespoke minimax recursions.",
+     "name": "VertexColoringGame.AliceWinsIn",
+     "why_needed": "Defines the finite alternating game tree and Alice's winning region with explicit fuel."
+    },
+    {
+     "closest_existing_considered": "No existing vertex-coloring-game winning predicate or game chromatic number definition was found.",
+     "name": "VertexColoringGame.AliceWins",
+     "why_needed": "Specializes the winning-region recursion to the empty position, Alice's first turn, and sufficient fuel."
+    }
+   ],
+   "per_slot": {
+    "vertex_coloring_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vertex_coloring_game": "/--\nSuppose Alice has a winning strategy for the vertex coloring game on a finite simple graph $G$\nusing a fixed palette of exactly $k \\ge 1$ colors. Does she also have a winning strategy when the\nfixed palette has exactly $k+1$ colors? Here Alice moves first, the players alternate without\npassing, every move properly colors one previously uncolored vertex, and Alice wins exactly when\nall vertices are colored.\n-/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ),\n      1 ≤ k → AliceWins G k → AliceWins G (k + 1) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Vertex coloring game\n\n*Reference:* [Wikipedia, Graph coloring game](https://en.wikipedia.org/wiki/graph_coloring_game)\n-/\n\nnamespace VertexColoringGame\n\nuniverse u\n\nvariable {V : Type u}\n\n/-- A position in the vertex coloring game with `k` colors is a partial assignment of a color\nin `Fin k` to each vertex. -/\nabbrev Position (V : Type u) (k : ℕ) := V → Option (Fin k)\n\n/-- A partial coloring is proper if adjacent colored vertices have different colors. -/\ndef IsProper (G : SimpleGraph V) {k : ℕ} (p : Position V k) : Prop :=\n  ∀ ⦃v w : V⦄ ⦃c : Fin k⦄, G.Adj v w → p v = some c → p w ≠ some c\n\n/-- `IsMove G p q` means that `q` is obtained from `p` by properly coloring exactly one\npreviously uncolored vertex. -/\ndef IsMove (G : SimpleGraph V) {k : ℕ} (p q : Position V k) : Prop :=\n  IsProper G q ∧ ∃ v c, p v = none ∧ q v = some c ∧ ∀ w, w ≠ v → q w = p w\n\n/-- A position is complete if every vertex has been colored. -/\ndef IsComplete {k : ℕ} (p : Position V k) : Prop :=\n  ∀ v, ∃ c, p v = some c\n\n/-- A position is blocked if some uncolored vertex sees every available color on a neighbor.\nBy the rules of the vertex coloring game, Bob wins as soon as this occurs. -/\ndef IsBlocked (G : SimpleGraph V) {k : ℕ} (p : Position V k) : Prop :=\n  ∃ v, p v = none ∧ ∀ c, ∃ w, G.Adj v w ∧ p w = some c\n\n/-- `AliceWins G p aliceToMove` says that Alice has a winning strategy from `p`. At a\nnonterminal position Alice chooses one legal move on her turn, while her strategy must win after\nevery legal move on Bob's turn. Neither player may move from a blocked position or pass. -/\ninductive AliceWins (G : SimpleGraph V) {k : ℕ} : Position V k → Bool → Prop\n  | complete (p : Position V k) (aliceToMove : Bool) (proper : IsProper G p)\n      (complete : IsComplete p) : AliceWins G p aliceToMove\n  | aliceMove (p q : Position V k) (proper : IsProper G p) (notComplete : ¬ IsComplete p)\n      (notBlocked : ¬ IsBlocked G p) (move : IsMove G p q) (wins : AliceWins G q false) :\n      AliceWins G p true\n  | bobMoves (p : Position V k) (proper : IsProper G p) (notComplete : ¬ IsComplete p)\n      (notBlocked : ¬ IsBlocked G p) (canMove : ∃ q, IsMove G p q)\n      (wins : ∀ q, IsMove G p q → AliceWins G q true) : AliceWins G p false\n\n/--\nSuppose Alice has a winning strategy for the vertex coloring game on a finite simple graph $G$\nwith $k \\ge 1$ colors. Does she also have a winning strategy with exactly $k+1$ colors?\n\nAlice moves first. The players alternate without passing, and each move properly colors one\nuncolored vertex from the fixed color set. Alice wins exactly when every vertex is colored; Bob\nwins as soon as an uncolored vertex has no available color.\n-/\n@[category research open, AMS 05 91]\ntheorem vertex_coloring_game :\n    answer(sorry) ↔ ∀ (V : Type) [Fintype V] (G : SimpleGraph V) (k : ℕ), 1 ≤ k →\n      AliceWins (k := k) G (fun _ ↦ none) true →\n        AliceWins (k := k + 1) G (fun _ ↦ none) true := by\n  sorry\n\nend VertexColoringGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Graphs are finite simple graphs, represented by `SimpleGraph V` with `[Fintype V]`; the conjecture universally quantifies over these graphs and over natural numbers `k` satisfying `1 ≤ k`.",
+    "The fixed palette of exactly `k` available colors is represented by `Fin k`; a position is a partial coloring `V → Option (Fin k)`. This does not require every available color to be used.",
+    "The standard game conventions from the background article are made explicit: Alice moves first (`true`), players alternate without passing, and a legal move colors exactly one previously uncolored vertex while preserving properness.",
+    "Following both the article and cited literature, Bob wins immediately whenever some uncolored vertex has neighbors carrying every available color. Thus blocked positions cannot satisfy either nonterminal constructor of `AliceWins`, even if a legal move remains at another vertex.",
+    "Winning-strategy existence is represented by an inductive finite game-tree predicate: Alice existentially chooses a legal successor on her turn, while all legal Bob successors must remain winning for Alice on Bob's turn. Bob's constructor also requires an actual legal move to make no-passing and non-vacuity explicit.",
+    "The theorem uses `answer(sorry) ↔ ...` because the source asks a yes/no question. Its positive proposition is upward closure from `k` to `k + 1`; the separate relaxation involving a function `f(k)` is not included."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.Coloring` in Mathlib models only total proper colorings; its source has a TODO noting the lack of a partial-coloring API.",
+     "name": "Position",
+     "why_needed": "The game requires partial vertex colorings, including uncolored vertices."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Coloring.valid` applies to total `SimpleGraph.Coloring` values, not partial maps into `Option (Fin k)`.",
+     "name": "IsProper",
+     "why_needed": "A proposition is needed to say that the colored part of a `Position` is proper."
+    },
+    {
+     "closest_existing_considered": "No vertex-coloring-game legal-move relation was found in Mathlib or `FormalConjecturesForMathlib`.",
+     "name": "IsMove",
+     "why_needed": "The rules require a no-passing move relation that colors exactly one previously uncolored vertex and leaves all other assignments unchanged."
+    },
+    {
+     "closest_existing_considered": "A total `SimpleGraph.Coloring` represents a completed coloring but does not directly predicate completeness of a partial game position.",
+     "name": "IsComplete",
+     "why_needed": "The game's Alice-win terminal condition is that every vertex has been colored."
+    },
+    {
+     "closest_existing_considered": "No blocked partial-coloring predicate was found; ordinary graph colorability does not express this game-state condition.",
+     "name": "IsBlocked",
+     "why_needed": "The standard rules award Bob an immediate win when any uncolored vertex sees every available color among its neighbors."
+    },
+    {
+     "closest_existing_considered": "No reusable winning-strategy or vertex-coloring-game framework was found in Mathlib or `FormalConjecturesForMathlib`; nearby repository games define their own problem-specific finite minimax semantics.",
+     "name": "AliceWins",
+     "why_needed": "The conjecture is about existence of Alice's winning strategy under alternating existential/universal choices and the game's special terminal conditions."
+    }
+   ],
+   "per_slot": {
+    "vertex_coloring_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vertex_coloring_game": "/--\nSuppose Alice has a winning strategy for the vertex coloring game on a finite simple graph $G$\nwith $k \\ge 1$ colors. Does she also have a winning strategy with exactly $k+1$ colors?\n\nAlice moves first. The players alternate without passing, and each move properly colors one\nuncolored vertex from the fixed color set. Alice wins exactly when every vertex is colored; Bob\nwins as soon as an uncolored vertex has no available color.\n-/\n@[category research open, AMS 05 91]\ntheorem vertex_coloring_game :\n    answer(sorry) ↔ ∀ (V : Type) [Fintype V] (G : SimpleGraph V) (k : ℕ), 1 ≤ k →\n      AliceWins (k := k) G (fun _ ↦ none) true →\n        AliceWins (k := k + 1) G (fun _ ↦ none) true := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# More colors for Alice in the vertex coloring game\n\nThe vertex coloring game (Brams 1981, Bodlaender 1991) is played by Alice and Bob on a finite\nsimple graph $G$ with a fixed set of $k$ colors. Alice moves first and the players alternate.\nA move colors an uncolored vertex with a color that no neighbor of that vertex already has.\nIf some uncolored vertex has no such color available, Bob wins; if every vertex gets colored,\nAlice wins. There is no passing.\n\nThis file fixes these standard conventions and asks the open question from the Wikipedia list:\nif Alice has a winning strategy on $G$ with $k$ colors, does she also have one with $k + 1$ colors?\n\nBecause the game is a finite two-player game of perfect information with alternating moves,\nAlice has a winning strategy from a position if and only if she can force a win by backward\ninduction on the game tree. `AliceWins` is that backward-induction predicate.\n\n*References:*\n- [Wikipedia, Graph coloring game](https://en.wikipedia.org/wiki/graph_coloring_game)\n- [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- H. L. Bodlaender, *On the complexity of some coloring games*, in: Graph-Theoretic Concepts in\n  Computer Science (WG 1990), Lecture Notes in Computer Science 484, Springer, 1991,\n  [doi:10.1007/3-540-53832-1_29](https://doi.org/10.1007/3-540-53832-1_29).\n-/\n\nnamespace VertexColoringGame\n\nopen Function\n\n/-- The two players of the vertex coloring game. -/\ninductive Player\n  | alice\n  | bob\n\nvariable {V : Type*} [DecidableEq V] (G : SimpleGraph V) {k : ℕ}\n\n/-- A position of the game with `k` colors is a partial coloring `c : V → Option (Fin k)` of the\nvertices, where `c v = none` means that `v` is still uncolored.\n\n`IsLegalMove G c v a` means that coloring `v` with `a` is a legal move at position `c`: the vertex\n`v` is uncolored and no neighbor of `v` has color `a`. -/\ndef IsLegalMove (c : V → Option (Fin k)) (v : V) (a : Fin k) : Prop :=\n  c v = none ∧ ∀ w, G.Adj v w → c w ≠ some a\n\n/-- Alice can force a win in the vertex coloring game on `G` from position `c` with `turn` to\nmove. This is the backward-induction (minimax) predicate for the game with the standard rules:\n* if some uncolored vertex cannot be colored properly with any color, Bob wins;\n* if every vertex is colored, Alice wins;\n* otherwise, the player to move colors an uncolored vertex with a legal color and the turn passes\n  to the other player. Alice needs one legal move that keeps her winning; every legal move of Bob\n  must keep her winning. -/\ndef AliceWins [Fintype V] : Player → (V → Option (Fin k)) → Prop\n  | .alice, c => (∀ v, c v = none → ∃ a, IsLegalMove G c v a) ∧\n      ((∀ v, c v ≠ none) ∨\n        ∃ (v : V) (a : Fin k) (_ : IsLegalMove G c v a), AliceWins .bob (update c v (some a)))\n  | .bob, c => (∀ v, c v = none → ∃ a, IsLegalMove G c v a) ∧\n      ((∀ v, c v ≠ none) ∨\n        ∀ v a, IsLegalMove G c v a → AliceWins .alice (update c v (some a)))\ntermination_by _ c => (Finset.univ.filter fun v => c v = none).card\ndecreasing_by all_goals\n  refine Finset.card_lt_card ((Finset.ssubset_iff_of_subset ?_).mpr ⟨v, ?_, ?_⟩)\n  · intro w hw\n    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hw ⊢\n    by_cases hwv : w = v\n    · subst hwv; simp at hw\n    · simpa [update_of_ne hwv] using hw\n  · simpa using (‹IsLegalMove _ c v a›).1\n  · simp\n\n/-- Alice has a winning strategy in the vertex coloring game on `G` with `k` colors: Alice moves\nfirst, and the game starts from the coloring in which every vertex is uncolored. -/\ndef AliceHasWinningStrategy [Fintype V] (k : ℕ) : Prop :=\n  AliceWins G .alice fun _ : V => (none : Option (Fin k))\n\n/-- **More colors for Alice.** Suppose Alice has a winning strategy for the vertex coloring game\non a graph $G$ with $k$ colors. Does she have one for $k + 1$ colors?\n\nThe game uses the standard conventions: Alice moves first, the players alternate without passing,\neach move colors an uncolored vertex with one of the $k$ colors that no neighbor already has, and\nAlice wins if and only if every vertex gets colored. Here $G$ ranges over all finite simple\ngraphs and $k$ over all natural numbers. With $k = 0$ colors Alice wins only on the graph with no\nvertices, where she also wins with one color, so including $k = 0$ does not change the question. -/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ),\n      AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1) := by\n  sorry\n\n/-- On a graph with no vertices, Alice wins with any number of colors. -/\n@[category API, AMS 5 91]\ntheorem aliceHasWinningStrategy_of_isEmpty [Fintype V] [IsEmpty V] (k : ℕ) :\n    AliceHasWinningStrategy G k := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  exact ⟨fun v => isEmptyElim v, Or.inl fun v => isEmptyElim v⟩\n\n/-- On a graph with at least one vertex, Alice does not win with zero colors. -/\n@[category API, AMS 5 91]\ntheorem not_aliceHasWinningStrategy_zero [Fintype V] [Nonempty V] :\n    ¬ AliceHasWinningStrategy G 0 := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  rintro ⟨h, -⟩\n  obtain ⟨a, -⟩ := h (Classical.arbitrary V) rfl\n  exact a.elim0\n\n/-- Alice wins on a single vertex with one color. -/\n@[category test, AMS 5 91]\ntheorem aliceHasWinningStrategy_bot_fin_one :\n    AliceHasWinningStrategy (⊥ : SimpleGraph (Fin 1)) 1 := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  refine ⟨fun v _ => ⟨0, rfl, fun w hw => hw.elim⟩,\n    Or.inr ⟨0, 0, ⟨rfl, fun w hw => hw.elim⟩, ?_⟩⟩\n  rw [AliceWins]\n  refine ⟨fun v hv => ?_, Or.inl fun v => ?_⟩\n  · obtain rfl : v = 0 := Subsingleton.elim v 0\n    simp at hv\n  · obtain rfl : v = 0 := Subsingleton.elim v 0\n    simp\n\n/-- Alice does not win on a single edge with one color: after her first move, the other endpoint\ncannot be colored. -/\n@[category test, AMS 5 91]\ntheorem not_aliceHasWinningStrategy_top_fin_two :\n    ¬ AliceHasWinningStrategy (⊤ : SimpleGraph (Fin 2)) 1 := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  rintro ⟨-, h | ⟨v, a, -, h⟩⟩\n  · exact h 0 rfl\n  · rw [AliceWins] at h\n    obtain ⟨b, hb, hb'⟩ := h.1 (v + 1) (by simp)\n    exact hb' v (by simp) (by simp [Subsingleton.elim b a])\n\nend VertexColoringGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single slot matches the statement; the notes' conventions (Alice first, alternation, no passing, exactly k colors, Alice wins iff all colored) are the ones fixed in the file, and the f(k) relaxation is excluded as the notes direct.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "\"Alice has a winning strategy\" is formalized as the backward-induction (minimax) predicate `AliceWins` rather than an explicit ∃ strategy ∀ counter-strategy formulation. The game is a finite two-player perfect-information game with alternating moves and no draws, so by Zermelo's theorem the two are equivalent; the recursive predicate avoids having to specify strategy types and illegal-move conventions. Same approach as the repo's ErdosProblems/872 and Paper/CatchUpConjecture files.",
+    "Standard conventions fixed as in the Wikipedia article and the cited papers (Bodlaender 1991; Dunn et al. arXiv:1410.5223): Alice moves first, players alternate, no passing, each move colors an uncolored vertex with one of exactly k colors that no neighbor already has, Bob wins as soon as some uncolored vertex has no legal color, Alice wins iff every vertex is colored. `AliceWins` encodes the Bob-wins rule literally as the conjunct `∀ v, c v = none → ∃ a, IsLegalMove G c v a` at every position; this also guarantees that at Bob's turn on an incomplete coloring the `∀ legal move` clause is never vacuous.",
+    "Graphs are finite simple graphs (`SimpleGraph V` with `[Fintype V] [DecidableEq V]`), as in the sources (the game is only defined/terminating on finite graphs). `V : Type*` inside the theorem makes the statement universe-polymorphic, following FormalConjectures/Wikipedia/SidorenkoConjecture.lean.",
+    "k ranges over all natural numbers including 0. With 0 colors Alice wins only when the graph has no vertices (proved as API lemmas `aliceHasWinningStrategy_of_isEmpty` and `not_aliceHasWinningStrategy_zero`), where she also wins with 1 color, so the k = 0 instance is trivially true and including it does not change the question; this is recorded in the theorem docstring.",
+    "The article's separate relaxation via a function f(k) is a different list entry and is not included, per the decomposition table.",
+    "Bespoke definitions are kept in the problem file (game-specific) rather than FormalConjecturesForMathlib, since the task restricts writing to the candidate file; a reviewer may prefer to move them.",
+    "Added API/test lemmas with short proofs (empty graph, zero colors, single vertex with one color, single edge with one color) to exercise the definitions, per CONTRIBUTING's request for basic API tests of bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Bool` (used for the turn in ErdosProblems/872); an inductive was chosen for readability.",
+     "name": "VertexColoringGame.Player",
+     "why_needed": "Two-element type `alice | bob` recording whose turn it is in the recursive game predicate."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Coloring` (total colorings only, no notion of partial coloring or of a single legal move).",
+     "name": "VertexColoringGame.IsLegalMove",
+     "why_needed": "`IsLegalMove G c v a`: at partial coloring `c : V → Option (Fin k)`, vertex `v` is uncolored and no `G`-neighbor of `v` has color `a`, i.e. coloring `v` with `a` is a legal (proper) move. No Mathlib notion of a partial proper coloring / legal color exists."
+    },
+    {
+     "closest_existing_considered": "`SetTheory.PGame` (Conway combinatorial games) — uses normal-play win convention and no vertex-coloring structure, so it does not model this game.",
+     "name": "VertexColoringGame.AliceWins",
+     "why_needed": "`AliceWins G turn c`: backward-induction predicate that Alice can force a win from position `c` with `turn` to move, encoding the standard rules (Bob wins if an uncolored vertex has no legal color; Alice wins if all colored; Alice needs one legal move to a winning position, Bob's every legal move must lead to a winning position). Defined by well-founded recursion on the number of uncolored vertices."
+    },
+    {
+     "closest_existing_considered": "No game chromatic number / coloring game notion exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "VertexColoringGame.AliceHasWinningStrategy",
+     "why_needed": "`AliceHasWinningStrategy G k`: Alice has a winning strategy in the vertex coloring game on `G` with `k` colors, i.e. `AliceWins G .alice` from the all-uncolored coloring with colors `Fin k`. This is the predicate the conjecture is about (its threshold in k would be the game chromatic number χ_g(G))."
+    }
+   ],
+   "per_slot": {
+    "vertex_coloring_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ), AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1)`. Mathlib and the repo have no coloring-game or game-chromatic-number primitives (checked `rg` for coloring game / game chromatic / winning strategy; only Conway-style `PGame` exists, which uses normal-play winning and does not match this game), so the game is defined in the file: `IsLegalMove` (uncolored vertex, no neighbor has the color), the backward-induction predicate `AliceWins` (Alice first, alternating turns, no passing, Bob wins if some uncolored vertex has no legal color, Alice wins iff all vertices colored), and `AliceHasWinningStrategy G k` (Alice to move from the all-uncolored position with colors `Fin k`)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vertex_coloring_game": "/-- **More colors for Alice.** Suppose Alice has a winning strategy for the vertex coloring game\non a graph $G$ with $k$ colors. Does she have one for $k + 1$ colors?\n\nThe game uses the standard conventions: Alice moves first, the players alternate without passing,\neach move colors an uncolored vertex with one of the $k$ colors that no neighbor already has, and\nAlice wins if and only if every vertex gets colored. Here $G$ ranges over all finite simple\ngraphs and $k$ over all natural numbers. With $k = 0$ colors Alice wins only on the graph with no\nvertices, where she also wins with one color, so including $k = 0$ does not change the question. -/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ),\n      AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The vertex coloring game: more colors for Alice\n\nThe *vertex coloring game* is played by Alice and Bob on a finite simple graph $G$ with a fixed\nset of $k$ colors. Alice moves first and the players alternate turns. On each turn the player to\nmove chooses an uncolored vertex and gives it a color from the $k$ colors that does not already\nappear on a neighbor of that vertex (so the partial coloring stays proper); passing is not allowed.\nIf every vertex ends up colored, Alice wins. If some uncolored vertex can no longer receive any\ncolor (every color appears on one of its neighbors), Bob wins.\n\nThe open problem asks whether the set of $k$ for which Alice has a winning strategy is closed\nupwards: if Alice has a winning strategy for the vertex coloring game on $G$ with $k$ colors, does\nshe also have one with $k + 1$ colors?\n\nIn this file the game is formalized by backward induction. A *position* is a partial coloring\n`c : V → Option (Fin k)` (`none` means uncolored) together with the player to move, and\n`AliceWins G c p` says that Alice can force a win from that position. Since a vertex that cannot\nbe colored stays uncolorable, Alice wins a play exactly when every vertex is colored when the play\nends, so we only need to record this winning condition.\n\n*References:*\n* [Wikipedia, Graph coloring game](https://en.wikipedia.org/wiki/graph_coloring_game)\n* [Wikipedia, List of unsolved problems in\n  mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* H. L. Bodlaender, *On the complexity of some coloring games*,\n  Internat. J. Found. Comput. Sci. 2 (1991), 133--147.\n-/\n\nopen Finset\n\nnamespace VertexColoringGame\n\n/-- The two players of the vertex coloring game. -/\ninductive Player\n  | alice\n  | bob\n\nvariable {V : Type*} (G : SimpleGraph V) {k : ℕ}\n\n/-- A partial coloring `c` of the vertices of `G` with colors from `Fin k` (where `none` means\n\"uncolored\") is complete if every vertex is colored. -/\ndef IsComplete (c : V → Option (Fin k)) : Prop :=\n  ∀ v, c v ≠ none\n\n/-- Giving the color `a` to the vertex `v` is a legal move in the partial coloring `c` if `v` is\nuncolored and no neighbor of `v` already has color `a`. -/\ndef IsLegalMove (c : V → Option (Fin k)) (v : V) (a : Fin k) : Prop :=\n  c v = none ∧ ∀ w, G.Adj v w → c w ≠ some a\n\nvariable [DecidableEq V]\n\n/-- The set of uncolored vertices of a partial coloring. -/\ndef uncolored [Fintype V] (c : V → Option (Fin k)) : Finset V :=\n  univ.filter fun v => c v = none\n\n/-- Each legal move colors one uncolored vertex, so it strictly decreases the number of uncolored\nvertices. -/\n@[category API, AMS 5 91]\nlemma card_uncolored_update_lt [Fintype V] {c : V → Option (Fin k)} {v : V} {a : Fin k}\n    (h : IsLegalMove G c v a) :\n    (uncolored (Function.update c v (some a))).card < (uncolored c).card := by\n  apply card_lt_card\n  refine ⟨fun w hw => ?_, fun hsub => ?_⟩\n  · simp only [uncolored, mem_filter, mem_univ, true_and] at hw ⊢\n    by_cases hwv : w = v\n    · subst hwv\n      simp at hw\n    · rwa [Function.update_of_ne hwv] at hw\n  · have hv : v ∈ uncolored c := by simpa [uncolored] using h.1\n    have := hsub hv\n    simp [uncolored] at this\n\n/-- `AliceWins G c p` means that Alice has a winning strategy in the vertex coloring game on `G`\nfrom the position where the current partial coloring is `c` and it is player `p`'s turn.\n\n* If every vertex is colored, Alice has won.\n* Otherwise, if it is Alice's turn, she needs some legal move after which she still wins with\n  Bob to move.\n* Otherwise, if it is Bob's turn, Bob must have a legal move (if he has none, some uncolored vertex\n  cannot be colored and Bob wins), and every legal move of Bob must lead to a position from which\n  Alice wins with Alice to move. -/\ndef AliceWins [Fintype V] : (V → Option (Fin k)) → Player → Prop\n  | c, .alice => IsComplete c ∨\n      ∃ v a, ∃ _ : IsLegalMove G c v a, AliceWins (Function.update c v (some a)) .bob\n  | c, .bob => IsComplete c ∨\n      ((∃ v a, IsLegalMove G c v a) ∧\n        ∀ v a, IsLegalMove G c v a → AliceWins (Function.update c v (some a)) .alice)\ntermination_by c _ => (uncolored c).card\ndecreasing_by all_goals exact card_uncolored_update_lt G ‹_›\n\n/-- Alice has a winning strategy for the vertex coloring game on `G` with `k` colors: starting\nfrom the completely uncolored graph, with Alice to move first. -/\ndef AliceHasWinningStrategy [Fintype V] (k : ℕ) : Prop :=\n  AliceWins G (fun _ : V => (none : Option (Fin k))) .alice\n\n/-- Alice wins the game with `k` colors on the graph with no vertices, for every `k`. -/\n@[category test, AMS 5 91]\ntheorem aliceHasWinningStrategy_of_isEmpty [Fintype V] [IsEmpty V] (k : ℕ) :\n    AliceHasWinningStrategy G k := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  exact Or.inl fun v => isEmptyElim v\n\n/-- Alice does not win the game with `0` colors on a graph with at least one vertex. -/\n@[category test, AMS 5 91]\ntheorem not_aliceHasWinningStrategy_zero [Fintype V] [Nonempty V] :\n    ¬ AliceHasWinningStrategy G 0 := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  rintro (h | ⟨v, a, _⟩)\n  · exact h (Classical.arbitrary V) rfl\n  · exact a.elim0\n\n/-- Alice wins the game with `1` color on the graph with one vertex. -/\n@[category test, AMS 5 91]\ntheorem aliceHasWinningStrategy_one_unique [Fintype V] [Unique V] :\n    AliceHasWinningStrategy G 1 := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  refine Or.inr ⟨default, 0, ⟨rfl, fun w hw => ?_⟩, ?_⟩\n  · exact (G.ne_of_adj hw (Subsingleton.elim _ _)).elim\n  · rw [AliceWins]\n    refine Or.inl fun v => ?_\n    rw [Subsingleton.elim v default]\n    simp\n\n/-- Alice does not win the game with `1` color on the graph with two adjacent vertices: after her\nfirst move, the other vertex cannot be colored. -/\n@[category test, AMS 5 91]\ntheorem not_aliceHasWinningStrategy_one_top_fin_two :\n    ¬ AliceHasWinningStrategy (⊤ : SimpleGraph (Fin 2)) 1 := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  rintro (h | ⟨v, a, -, hwin⟩)\n  · exact h 0 rfl\n  · rw [AliceWins] at hwin\n    rcases hwin with h | ⟨⟨w, b, hwv, hb⟩, -⟩\n    · exact h (v + 1) (by simp)\n    · have hwv' : w ≠ v := by\n        rintro rfl\n        simp at hwv\n      exact hb v (by simpa using hwv') (by simp [Subsingleton.elim a b])\n\n/-- **More colors for Alice.** Suppose Alice has a winning strategy for the vertex coloring game on\na finite simple graph $G$ with $k$ colors. Does she then have one for $k + 1$ colors?\n\nHere the game follows the standard conventions: Alice moves first, the players alternate and may\nnot pass, each move properly colors an uncolored vertex with one of the $k$ colors, and Alice wins\nif and only if every vertex gets colored. One expects the answer to be \"yes\", but no proof is\nknown. -/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ),\n      AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1) := by\n  sorry\n\nend VertexColoringGame",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot table with implicit universal quantifiers over finite simple graphs and k, and the exclusion of the f(k) relaxation, matches the source.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Graphs: all finite simple graphs, quantified as `∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V)` inside the statement (repo idiom, cf. SidorenkoConjecture/erdos_904). The `DecidableEq V` instance is only used by `Function.update`; the proposition does not depend on which instance is chosen.",
+    "Winning strategy is modeled by backward induction (`AliceWins G c p`, well-founded recursion on the number of uncolored vertices) rather than by explicit strategy functions on histories; for a finite perfect-information game these are equivalent.",
+    "Bob's win condition ('some uncolored vertex cannot be colored') is not recorded explicitly: the play continues while legal moves exist and Alice wins iff the coloring is completed. This is equivalent because a vertex that has become uncolorable stays uncolorable, so Alice can complete the coloring iff no vertex ever becomes stuck. In the Bob-to-move clause, `(∃ legal move) ∧ (∀ legal moves, Alice wins)` ensures that 'incomplete and no legal move' (a stuck vertex) counts as a Bob win; on Alice's turn the same situation falsifies the ∃-clause.",
+    "Exactly k colors are modeled by `Fin k`. k ranges over all of ℕ, including k = 0: with 0 colors Alice wins only on the empty graph, where she wins for every k, so the k = 0 instance is trivially true and `∀ k` is equivalent to the table's `∀ k ≥ 1`.",
+    "`answer(True)` means 'yes, Alice's winning set of k is upward closed for every finite graph'; `answer(False)` means some graph G and k exist where Alice wins with k colors but not with k+1.",
+    "The relaxation with a function f(k) (a separate list entry) is intentionally not included, per the decomposition notes.",
+    "Test theorems cover the empty graph (Alice wins for every k), 0 colors on a nonempty graph (Alice loses), 1 color on a single vertex (Alice wins), and 1 color on K₂ (Alice loses because Bob's turn has no legal move), exercising both the Alice and Bob clauses."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Bool`; `CatchUp.Player` in FormalConjectures/Paper/CatchUpConjecture.lean (problem-local, not reusable).",
+     "name": "VertexColoringGame.Player",
+     "why_needed": "Two-element type indexing whose turn it is; a Bool would be less readable."
+    },
+    {
+     "closest_existing_considered": "No partial-coloring notion in Mathlib (`SimpleGraph.Coloring` is total); `∀ v, (c v).isSome`.",
+     "name": "VertexColoringGame.IsComplete",
+     "why_needed": "The winning condition for Alice: every vertex of the partial coloring `V → Option (Fin k)` is colored."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Coloring.valid` / `SimpleGraph.Colorable` only handle total colorings.",
+     "name": "VertexColoringGame.IsLegalMove",
+     "why_needed": "A legal move: the vertex is uncolored and the chosen color appears on none of its neighbors (keeps the coloring proper)."
+    },
+    {
+     "closest_existing_considered": "Inline `Finset.univ.filter`; kept as a named def for the termination lemma.",
+     "name": "VertexColoringGame.uncolored",
+     "why_needed": "Finset of uncolored vertices; its cardinality is the termination measure of `AliceWins`."
+    },
+    {
+     "closest_existing_considered": "`SetTheory.PGame` (Mathlib combinatorial games) is for normal-play (last mover wins) games and does not model this winning condition; `Erdos872.gameValueAux` and `CatchUp.valueAux` are problem-specific minimax recursions in the repo.",
+     "name": "VertexColoringGame.AliceWins",
+     "why_needed": "Backward-induction definition of 'Alice can force a win from position (c, player to move)'. This is the core game-theoretic notion, absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "None; this is the predicate whose upward closure in k is the conjecture (its least k is the game chromatic number).",
+     "name": "VertexColoringGame.AliceHasWinningStrategy",
+     "why_needed": "Alice has a winning strategy for the vertex coloring game on G with k colors: `AliceWins` from the all-uncolored position with Alice to move."
+    }
+   ],
+   "per_slot": {
+    "vertex_coloring_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ), AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1)`. The game itself (positions = partial colorings `V → Option (Fin k)` plus player to move; winning positions by backward induction on the number of uncolored vertices) is not in Mathlib or the repo, so bespoke definitions were needed. Conventions fixed per the article and the cited papers (Bradshaw 2021, Dunn et al. 2014): finite simple graph, Alice moves first, players alternate, no passing, each move gives an uncolored vertex one of exactly k colors not present on a neighbor, Alice wins iff every vertex is colored."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vertex_coloring_game": "/-- **More colors for Alice.** Suppose Alice has a winning strategy for the vertex coloring game on\na finite simple graph $G$ with $k$ colors. Does she then have one for $k + 1$ colors?\n\nHere the game follows the standard conventions: Alice moves first, the players alternate and may\nnot pass, each move properly colors an uncolored vertex with one of the $k$ colors, and Alice wins\nif and only if every vertex gets colored. One expects the answer to be \"yes\", but no proof is\nknown. -/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ),\n      AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# More colors for Alice in the vertex coloring game\n\nThe vertex coloring game is played by Alice and Bob on a finite simple graph $G$ with a fixed\nset of $k$ colors. Alice moves first and the players alternate turns. A move colors an\nuncolored vertex with a color that no neighbor of that vertex already has (the coloring stays\nproper). If at any point an uncolored vertex has no available color, Bob wins. Alice wins once\nevery vertex is colored.\n\n**Open problem.** Suppose Alice has a winning strategy for the vertex coloring game on a graph\n$G$ with $k$ colors. Does she have one for $k + 1$ colors?\n\nThe game is a finite two-player game of perfect information, so Alice has a winning strategy\nif and only if the standard backward-induction predicate `VertexColoringGame.AliceWins` holds at\nthe initial (empty) position. This file uses that predicate to express \"Alice has a winning\nstrategy\".\n\n*References:*\n* [Wikipedia, Graph coloring game](https://en.wikipedia.org/wiki/graph_coloring_game)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics#Graph_theory)\n* [Bo91] Bodlaender, H. L. (1991). \"On the complexity of some coloring games.\"\n  *Graph-Theoretic Concepts in Computer Science*, LNCS 484, pp. 30--40.\n* [DLLRT14] Dunn, C., Larsen, V., Lindke, K., Retter, T., Toci, D. (2014).\n  \"The game chromatic number of trees and forests.\"\n  [arXiv:1410.5223](https://arxiv.org/abs/1410.5223)\n-/\n\nnamespace VertexColoringGame\n\n/-- The two players of the vertex coloring game. -/\ninductive Player\n  | alice\n  | bob\n\nvariable {V : Type*} (G : SimpleGraph V) {k : ℕ}\n\n/-- A position of the vertex coloring game on `G` with `k` colors is a partial coloring\n`c : V → Option (Fin k)`, where `c v = none` means that `v` is still uncolored.\n\n`IsLegalMove G c v a` says that coloring `v` with `a` is a legal move in position `c`:\n`v` is uncolored and no neighbor of `v` is colored `a`, so the coloring stays proper. -/\ndef IsLegalMove (c : V → Option (Fin k)) (v : V) (a : Fin k) : Prop :=\n  c v = none ∧ ∀ w, G.Adj v w → c w ≠ some a\n\n/-- `AliceWins G c turn` says that Alice wins the vertex coloring game on `G` from the position\n`c` when it is `turn`'s move, i.e. Alice has a winning strategy from this position.\n\nThe rules of the game are encoded as follows.\n* If every vertex is colored, Alice has won.\n* Otherwise, if some uncolored vertex has no legal color, Bob has won.\n* Otherwise the player to move makes a legal move (one exists) and play continues:\n  Alice wins if she has *some* legal move after which she wins, and Alice wins on Bob's turn if\n  she wins after *every* legal move of Bob.\n\nThe definition is by well-founded recursion on the number of uncolored vertices, since every\nmove colors one more vertex. -/\ndef AliceWins [Fintype V] [DecidableEq V] (c : V → Option (Fin k)) (turn : Player) : Prop :=\n  (∀ v, c v ≠ none) ∨\n    ((∀ v, c v = none → ∃ a, IsLegalMove G c v a) ∧\n      match turn with\n      | .alice => ∃ v a, ∃ _ : IsLegalMove G c v a,\n          AliceWins (Function.update c v (some a)) .bob\n      | .bob => ∀ v a, IsLegalMove G c v a →\n          AliceWins (Function.update c v (some a)) .alice)\ntermination_by (Finset.univ.filter fun v => c v = none).card\ndecreasing_by\n  all_goals\n    apply Finset.card_lt_card\n    rw [Finset.ssubset_iff_of_subset]\n    · exact ⟨v, by simpa using ‹IsLegalMove G c v a›.1, by simp⟩\n    · intro w hw\n      simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hw ⊢\n      by_cases hwv : w = v\n      · subst hwv\n        simp at hw\n      · rwa [Function.update_of_ne hwv] at hw\n\n/-- Alice has a winning strategy for the vertex coloring game on the finite graph `G` with\n`k` colors: Alice moves first, players alternate, and every move properly colors an uncolored\nvertex with one of the `k` colors. Alice wins if and only if every vertex gets colored. -/\ndef AliceHasWinningStrategy [Fintype V] [DecidableEq V] (k : ℕ) : Prop :=\n  AliceWins G (fun _ => (none : Option (Fin k))) .alice\n\n/-- Alice wins the game with `0` colors on a graph without vertices. -/\n@[category test, AMS 5 91]\ntheorem aliceHasWinningStrategy_of_isEmpty [Fintype V] [DecidableEq V] [IsEmpty V] :\n    AliceHasWinningStrategy G 0 := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  exact Or.inl fun v => isEmptyElim v\n\n/-- Alice loses the game with `0` colors on a graph with at least one vertex. -/\n@[category test, AMS 5 91]\ntheorem not_aliceHasWinningStrategy_zero [Fintype V] [DecidableEq V] [Nonempty V] :\n    ¬ AliceHasWinningStrategy G 0 := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  rintro (h | ⟨h, -⟩)\n  · exact h (Classical.arbitrary V) rfl\n  · obtain ⟨a, -⟩ := h (Classical.arbitrary V) rfl\n    exact a.elim0\n\n/-- Alice wins the game with `1` color on the graph with a single vertex. -/\n@[category test, AMS 5 91]\ntheorem aliceHasWinningStrategy_bot_fin_one :\n    AliceHasWinningStrategy (⊥ : SimpleGraph (Fin 1)) 1 := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  refine Or.inr ⟨fun v _ => ⟨0, rfl, fun w hw => hw.elim⟩, 0, 0,\n    ⟨rfl, fun w hw => hw.elim⟩, ?_⟩\n  rw [AliceWins]\n  exact Or.inl fun v => by fin_cases v; simp\n\n/-- Alice loses the game with `1` color on the graph with a single edge. -/\n@[category test, AMS 5 91]\ntheorem not_aliceHasWinningStrategy_top_fin_two :\n    ¬ AliceHasWinningStrategy (⊤ : SimpleGraph (Fin 2)) 1 := by\n  rw [AliceHasWinningStrategy, AliceWins]\n  rintro (h | ⟨-, v, a, -, h⟩)\n  · exact h 0 rfl\n  · have hv : v + 1 ≠ v := by omega\n    rw [AliceWins] at h\n    rcases h with h | ⟨h, -⟩\n    · have := h (v + 1)\n      simp at this\n    · obtain ⟨b, -, hb⟩ := h (v + 1) (by simp)\n      exact hb v (by simp [hv]) (by simp [Subsingleton.elim a b])\n\n/--\n**More colors for Alice.**\n\nSuppose Alice has a winning strategy for the vertex coloring game on a (finite simple) graph $G$\nwith $k$ colors. Does she have one for $k + 1$ colors?\n\nEquivalently: is the set of $k$ for which Alice wins on $G$ upward closed, so that the game\nchromatic number $\\chi_g(G)$ is a true threshold? One expects the answer to be \"yes\", but no proof\nis known.\n\nHere $k$ ranges over all natural numbers. The case $k = 0$ is trivial: Alice wins with $0$ colors\nonly on the graph without vertices, where she wins with any number of colors. -/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ),\n      AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1) := by\n  sorry\n\nend VertexColoringGame\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate; the f(k) relaxation is correctly excluded as a separate problem.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "\"Alice has a winning strategy\" is expressed by the backward-induction predicate `AliceWins` (∃ over Alice's legal moves, ∀ over Bob's legal moves), rather than by explicit strategy functions and plays. For a finite two-player perfect-information game these are equivalent (Zermelo / backward induction; positional strategies suffice). This follows the repo precedent of recursive game values in ErdosProblems/872.lean and Paper/CatchUpConjecture.lean.",
+    "Graphs are finite simple graphs: `SimpleGraph V` with `[Fintype V]` (plus `[DecidableEq V]`, needed for `Function.update`; it does not restrict generality). The Wikipedia statement says only \"graph G\"; finiteness is the standing convention in the game-chromatic-number literature and is needed for the game to terminate.",
+    "Colors are `Fin k`, so the game uses a fixed set of exactly k colors. Legal move = vertex currently uncolored and no neighbor already has that color (proper coloring maintained).",
+    "Bob's win is detected at every position as soon as some uncolored vertex has no legal color (Wikipedia/Dunn et al. wording). This is equivalent to the convention in the decomposition notes (Alice wins iff every vertex eventually gets colored), because an uncolorable vertex stays uncolorable.",
+    "On Bob's turn the ∀ over legal moves is never vacuous: that branch is only reached when not all vertices are colored and every uncolored vertex has a legal color, so a legal move exists.",
+    "k ranges over all naturals (no `0 < k` hypothesis). The decomposition notes say k ≥ 1; k = 0 is a trivially true case (Alice wins with 0 colors only on the vertex-free graph, where she wins with any number of colors), so the truth value is unchanged. Documented in the theorem docstring.",
+    "The theorem quantifies over `V : Type*` inside the iff (universe-polymorphic statement), as in Wikipedia/SidorenkoConjecture.lean.",
+    "Four `@[category test]` lemmas check the definitions on smallest inputs: empty graph with 0 colors (Alice wins), nonempty graph with 0 colors (Alice loses), K_1 with 1 color (Alice wins), K_2 with 1 color (Alice loses).",
+    "The relaxation with a function f(k) mentioned in the article is a separate listed problem and is not included, per the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Bool` (used in ErdosProblems/872.lean); a named inductive is clearer and mirrors `CatchUp.Player`.",
+     "name": "VertexColoringGame.Player",
+     "why_needed": "Two-element type recording whose turn it is (Alice or Bob) in the game position."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Coloring` / `SimpleGraph.Colorable` (total colorings only, no game structure).",
+     "name": "VertexColoringGame.IsLegalMove",
+     "why_needed": "Legal move in a partial coloring `c : V → Option (Fin k)`: vertex `v` uncolored and no neighbor colored `a`. Mathlib has no partial-coloring API (`SimpleGraph.Coloring` is total; its module TODO lists partial colorings)."
+    },
+    {
+     "closest_existing_considered": "`SetTheory.PGame` (normal-play 'last mover wins' convention, unsuitable for an 'all vertices colored' win condition); recursive game values in ErdosProblems/872.lean and Paper/CatchUpConjecture.lean (problem-specific, not reusable).",
+     "name": "VertexColoringGame.AliceWins",
+     "why_needed": "Backward-induction predicate 'Alice wins from position c with `turn` to move', defined by well-founded recursion on the number of uncolored vertices, encoding the rules of the vertex coloring game."
+    },
+    {
+     "closest_existing_considered": "No existing notion of the graph coloring game or game chromatic number in Mathlib or FormalConjecturesForMathlib.",
+     "name": "VertexColoringGame.AliceHasWinningStrategy",
+     "why_needed": "'Alice has a winning strategy for the vertex coloring game on G with k colors': `AliceWins` at the empty coloring with Alice to move."
+    }
+   ],
+   "per_slot": {
+    "vertex_coloring_game": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ), AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1)`. Neither Mathlib nor FormalConjecturesForMathlib has partial colorings, the vertex coloring game, or a notion of winning strategy, so the game is defined in the file by the standard backward-induction predicate (finite perfect-information game), with rules matching Wikipedia and Dunn et al. (arXiv:1410.5223): Alice first, alternation, no passing, each move properly colors an uncolored vertex with one of exactly k colors, Bob wins as soon as an uncolored vertex has no legal color, Alice wins iff every vertex is colored."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "vertex_coloring_game": "/--\n**More colors for Alice.**\n\nSuppose Alice has a winning strategy for the vertex coloring game on a (finite simple) graph $G$\nwith $k$ colors. Does she have one for $k + 1$ colors?\n\nEquivalently: is the set of $k$ for which Alice wins on $G$ upward closed, so that the game\nchromatic number $\\chi_g(G)$ is a true threshold? One expects the answer to be \"yes\", but no proof\nis known.\n\nHere $k$ ranges over all natural numbers. The case $k = 0$ is trivial: Alice wins with $0$ colors\nonly on the graph without vertices, where she wins with any number of colors. -/\n@[category research open, AMS 5 91]\ntheorem vertex_coloring_game : answer(sorry) ↔\n    ∀ {V : Type*} [Fintype V] [DecidableEq V] (G : SimpleGraph V) (k : ℕ),\n      AliceHasWinningStrategy G k → AliceHasWinningStrategy G (k + 1) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "vertex_coloring_game": "c02"
+ },
+ "id": "wp-vertex-coloring-game",
+ "main_attempt": "c02"
+}

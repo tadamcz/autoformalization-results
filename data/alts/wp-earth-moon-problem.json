@@ -1,0 +1,394 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Earth–Moon problem\n\nThe Earth–Moon problem, posed by Gerhard Ringel in 1959, asks for the maximum chromatic number\nof a biplanar graph, i.e. of a finite simple graph whose edges can be partitioned into two\nplanar subgraphs (a graph of thickness at most two). It is known that this maximum is at least\n$9$ (Sulanke, 1974: the join $K_6 + C_5$ needs $9$ colours) and at most $12$ (Ringel, 1959).\nRingel conjectured the answer $8$, which Sulanke's example refuted; Gethner conjectured in 2018\nthat the answer is $11$.\n\n*References:*\n- [Wikipedia, Earth–Moon problem](https://en.wikipedia.org/wiki/Earth%E2%80%93Moon_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Open Problem Garden, Earth-Moon Problem](http://www.openproblemgarden.org/op/earth_moon_problem)\n- [Ge18] Gethner, E., *To the Moon and beyond*, in: Graph Theory: Favorite Conjectures and\n  Open Problems, II, Springer (2018), 115–133.\n-/\n\nopen SimpleGraph\nopen scoped EuclideanGeometry unitInterval\n\nnamespace EarthMoonProblem\n\nvariable {V : Type*}\n\n/-- A **planar drawing** of a simple graph `G`. The vertices are placed at distinct points of the\nEuclidean plane $\\mathbb{R}^2$. Every edge `e` is drawn as a simple arc `arc e`, a continuous\ninjective map from $[0,1]$ into $\\mathbb{R}^2$, whose two end points are the points of the two\nend vertices of `e`. An arc passes through a vertex point only at its end points, and two distinct\narcs meet only in vertex points (hence only in common end vertices). -/\nstructure PlanarDrawing (G : SimpleGraph V) where\n  /-- The point of the plane at which a vertex is drawn. -/\n  vertex : V → ℝ²\n  vertex_injective : Function.Injective vertex\n  /-- The simple arc along which an edge is drawn. -/\n  arc : G.edgeSet → C(I, ℝ²)\n  arc_injective : ∀ e, Function.Injective (arc e)\n  /-- The end points of the arc of `e` are the points of the two end vertices of `e`. -/\n  arc_ends : ∀ e : G.edgeSet, s(arc e 0, arc e 1) = (e : Sym2 V).map vertex\n  /-- An arc meets a vertex point only at its own end points. -/\n  arc_vertex : ∀ (e : G.edgeSet) (t : I), arc e t ∈ Set.range vertex → t = 0 ∨ t = 1\n  /-- Two distinct arcs meet only in vertex points. -/\n  arc_inter : ∀ e e' : G.edgeSet, e ≠ e' →\n    Set.range (arc e) ∩ Set.range (arc e') ⊆ Set.range vertex\n\n/-- A simple graph is **planar** if it has a planar drawing. -/\ndef IsPlanar (G : SimpleGraph V) : Prop :=\n  Nonempty (PlanarDrawing G)\n\n/-- A simple graph is **biplanar** (has thickness at most two) if its edge set can be partitioned\ninto two subsets such that the two corresponding spanning subgraphs are both planar. -/\ndef IsBiplanar (G : SimpleGraph V) : Prop :=\n  ∃ G₁ G₂ : SimpleGraph V,\n    Disjoint G₁ G₂ ∧ G₁ ⊔ G₂ = G ∧ IsPlanar G₁ ∧ IsPlanar G₂\n\n/-- If the vertex type injects into the plane, the empty graph on it is planar: place the\nvertices at the given points and draw no arcs. -/\n@[category API, AMS 5]\ntheorem isPlanar_bot_of_injective (f : V → ℝ²) (hf : Function.Injective f) :\n    IsPlanar (⊥ : SimpleGraph V) :=\n  have : IsEmpty (⊥ : SimpleGraph V).edgeSet := by simp\n  ⟨{ vertex := f\n     vertex_injective := hf\n     arc := isEmptyElim\n     arc_injective := isEmptyElim\n     arc_ends := isEmptyElim\n     arc_vertex := isEmptyElim\n     arc_inter := isEmptyElim }⟩\n\n/-- Every planar graph is biplanar. -/\n@[category API, AMS 5]\ntheorem IsPlanar.isBiplanar {G : SimpleGraph V} (hG : IsPlanar G) : IsBiplanar G :=\n  have ⟨D⟩ := hG\n  ⟨G, ⊥, disjoint_bot_right, sup_bot_eq G, hG,\n    isPlanar_bot_of_injective D.vertex D.vertex_injective⟩\n\n/-- The empty graph on finitely many vertices is planar. -/\n@[category test, AMS 5]\ntheorem isPlanar_bot (n : ℕ) : IsPlanar (⊥ : SimpleGraph (Fin n)) :=\n  isPlanar_bot_of_injective (fun i => !₂[(i : ℝ), 0]) fun i j h =>\n    Fin.ext <| Nat.cast_injective (R := ℝ) <| by simpa [PiLp.ext_iff, Fin.forall_fin_two] using h\n\n/-- **The Earth–Moon problem** (Ringel, 1959): what is the maximum chromatic number of biplanar\ngraphs? That is, determine the greatest value of the chromatic number $\\chi(G)$ over all finite\nsimple biplanar graphs $G$. It is known that this maximum lies between $9$ and $12$, and\nGethner conjectures that it is $11$. -/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    IsGreatest\n      {χ : ℕ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧ G.chromaticNumber = χ}\n      answer(sorry) := by\n  sorry\n\n/-- Every biplanar graph has chromatic number at most $12$ (Ringel, 1959). A biplanar graph on\n$n$ vertices has at most $6n - 12$ edges, so it has a vertex of degree at most $11$; greedily\ncolouring a degeneracy ordering uses at most $12$ colours. -/\n@[category research solved, AMS 5]\ntheorem earth_moon_problem.variants.upper_bound (n : ℕ) (G : SimpleGraph (Fin n))\n    (hG : IsBiplanar G) : G.chromaticNumber ≤ 12 := by\n  sorry\n\n/-- There is a biplanar graph with chromatic number at least $9$ (Sulanke, 1974): the join\n$K_6 + C_5$ of a complete graph on six vertices and a cycle of length five is biplanar and has\nchromatic number $9$. This refuted Ringel's conjecture that $8$ colours always suffice. -/\n@[category research solved, AMS 5]\ntheorem earth_moon_problem.variants.lower_bound :\n    ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧ 9 ≤ G.chromaticNumber := by\n  sorry\n\n/-- **Gethner's conjecture** (2018): the maximum chromatic number of a biplanar graph is $11$. -/\n@[category research open, AMS 5]\ntheorem earth_moon_problem.variants.gethner :\n    IsGreatest\n      {χ : ℕ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧ G.chromaticNumber = χ}\n      11 := by\n  sorry\n\nend EarthMoonProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot table is correct: the list entry is one open-ended question, and the article confirms the precise reading 'maximum chromatic number of biplanar graphs (thickness ≤ 2)'. I followed the note's guidance to define biplanarity myself, but chose the topological (drawing) definition of planarity over a Kuratowski/Wagner criterion, since using a criterion as the definition would make faithfulness depend on a deep theorem.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Planarity is defined topologically (the primary definition), not via a Kuratowski/Wagner criterion: a `PlanarDrawing` of G consists of an injective map vertex : V → ℝ² (EuclideanSpace ℝ (Fin 2)), and for each edge e a continuous injective arc arc e : C(unitInterval, ℝ²) with s(arc e 0, arc e 1) = e.map vertex, such that an arc meets a vertex point only at t = 0 or t = 1, and two distinct arcs meet only in vertex points (hence, combined with the previous condition, only at common end vertices). `IsPlanar G := Nonempty (PlanarDrawing G)`. Reviewers should check these four conditions capture 'edges intersect only at common endpoints'.",
+    "Arcs are required to be injective (simple/Jordan arcs), matching the standard definition of a planar embedding; for finite graphs this is equivalent to allowing arbitrary continuous curves with the same disjointness conditions.",
+    "`IsBiplanar G := ∃ G₁ G₂, Disjoint G₁ G₂ ∧ G₁ ⊔ G₂ = G ∧ IsPlanar G₁ ∧ IsPlanar G₂`, i.e. literally a partition of the edge set into two planar spanning subgraphs (thickness ≤ 2). Planar graphs are therefore biplanar (one part may be empty); this matches the article's 'edges can be partitioned into two subsets such that the corresponding two subgraphs are both planar' and does not affect the maximum chromatic number. Disjointness is included for literal faithfulness; dropping it would be equivalent since subgraphs of planar graphs are planar.",
+    "Finite simple graphs are quantified as `SimpleGraph (Fin n)` for all n : ℕ (repo idiom, cf. ErdosProblems/1104.lean); chromatic number and biplanarity are isomorphism invariants, so this loses no generality. The case n = 0 contributes χ = 0 harmlessly.",
+    "The set of chromatic numbers is taken in ℕ (with `G.chromaticNumber = ↑χ` in ℕ∞), since finite graphs have finite chromatic number; the answer is thus a natural number. `IsGreatest` (rather than `sSup`) is used because the article's 'maximum' exists (9 ≤ max ≤ 12) and IsGreatest also asserts that some biplanar graph attains it, avoiding ℕ's `sSup ∅ = 0` / unbounded-set defaults.",
+    "'Biplanar' is read as thickness ≤ 2 (edge set partitionable into two planar subgraphs) rather than thickness exactly 2; the two readings give the same maximum since every planar graph has χ ≤ 4 < 9.",
+    "Extra declarations beyond the slot: `earth_moon_problem.variants.upper_bound` (χ ≤ 12 for biplanar graphs, Ringel 1959, research solved), `earth_moon_problem.variants.lower_bound` (∃ biplanar G with 9 ≤ χ(G), Sulanke 1974, research solved; stated existentially because Mathlib has no graph-join operation to write K₆ + C₅ directly), `earth_moon_problem.variants.gethner` (Gethner's 2018 conjecture that the maximum is 11, research open), plus two proven API lemmas (`isPlanar_bot_of_injective`, `IsPlanar.isBiplanar`) and one proven test (`isPlanar_bot`) for the bespoke definitions.",
+    "The bespoke definitions live in the problem namespace `EarthMoonProblem` (as `PlanarDrawing G`, `IsPlanar G`, `IsBiplanar G`) rather than in FormalConjecturesForMathlib, since the task restricts output to a single problem file; they are generic enough that a maintainer might prefer moving them to FormalConjecturesForMathlib/Combinatorics/SimpleGraph/."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "SimpleGraph.UnitDistancePlaneGraph / UnitDistanceEmbeddable (FormalConjecturesForMathlib) only place vertices in ℝ^n with unit-length edges, and say nothing about edge crossings; Mathlib's `Path`/`ContinuousMap`/`unitInterval` are used as building blocks. Searched Mathlib and the repo for planar, Kuratowski, Wagner, thickness, minor, subdivision: nothing.",
+     "name": "EarthMoonProblem.PlanarDrawing",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines planar graphs (nor graph minors/subdivisions that a Kuratowski/Wagner criterion would need). A structure packaging a planar embedding: injective vertex placement in ℝ², a simple arc C(unitInterval, ℝ²) per edge joining the images of its endpoints, arcs avoiding vertex points except at their endpoints, and distinct arcs meeting only in vertex points."
+    },
+    {
+     "closest_existing_considered": "No planarity predicate exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "EarthMoonProblem.IsPlanar",
+     "why_needed": "Prop-valued planarity: `Nonempty (PlanarDrawing G)`. Needed to define biplanarity."
+    },
+    {
+     "closest_existing_considered": "No thickness/biplanarity notion exists in Mathlib or the repo; built from the lattice structure on `SimpleGraph V` (`⊔`, `Disjoint`).",
+     "name": "EarthMoonProblem.IsBiplanar",
+     "why_needed": "The statement is about biplanar graphs (thickness ≤ 2): the edge set is partitioned into two planar spanning subgraphs, `∃ G₁ G₂, Disjoint G₁ G₂ ∧ G₁ ⊔ G₂ = G ∧ IsPlanar G₁ ∧ IsPlanar G₂`."
+    }
+   ],
+   "per_slot": {
+    "earth_moon_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `IsGreatest {χ : ℕ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧ G.chromaticNumber = χ} answer(sorry)`, i.e. the maximum of χ(G) over all finite simple biplanar graphs equals the unknown answer, in the repo's answer(sorry) idiom. Neither Mathlib nor FormalConjecturesForMathlib has any notion of planar graph, graph minor, or subdivision, so planarity and biplanarity are defined in the file (topological definition via Jordan-arc drawings in ℝ²)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "earth_moon_problem": "/-- **The Earth–Moon problem** (Ringel, 1959): what is the maximum chromatic number of biplanar\ngraphs? That is, determine the greatest value of the chromatic number $\\chi(G)$ over all finite\nsimple biplanar graphs $G$. It is known that this maximum lies between $9$ and $12$, and\nGethner conjectures that it is $11$. -/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    IsGreatest\n      {χ : ℕ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧ G.chromaticNumber = χ}\n      answer(sorry) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Earth–Moon problem\n\nThe Earth–Moon problem was posed by Gerhard Ringel in 1959 [Ri59]. Each country on the Earth owns\na colony on the Moon, and a country and its colony must receive the same colour. Two countries\nthat share a border, on the Earth or on the Moon, must receive different colours. How many colours\nare needed to colour every such pair of maps?\n\nIn graph-theoretic terms, the graphs that arise are exactly the *biplanar* graphs: the finite\nsimple graphs whose edge set can be partitioned into two planar subgraphs (equivalently, the graphs\nof thickness at most two). The Earth–Moon problem asks for the maximum chromatic number of a\nbiplanar graph. It is known that this maximum is at least $9$ (Sulanke, 1974) and at most $12$\n(Ringel, 1959). Ringel conjectured the answer to be $8$, which Sulanke refuted; Gethner [Ge18]\nconjectured the answer to be $11$.\n\nMathlib has no notion of planar graph, so this file defines planarity directly: a graph is\nplanar if it has a drawing in the Euclidean plane with vertices as distinct points and edges as\nsimple arcs that meet only at common endpoints.\n\n*References:*\n- [Wikipedia, Earth–Moon problem](https://en.wikipedia.org/wiki/Earth%E2%80%93Moon_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Open Problem Garden, Earth–Moon problem](http://www.openproblemgarden.org/op/earth_moon_problem)\n- [Ri59] G. Ringel, *Färbungsprobleme auf Flächen und Graphen*, VEB Deutscher Verlag der\n  Wissenschaften, Berlin, 1959.\n- [Ge18] E. Gethner, *To the Moon and beyond*, in: Graph Theory: Favorite Conjectures and Open\n  Problems, II, Springer, 2018, pp. 115–133.\n  [doi:10.1007/978-3-319-97686-0_11](https://doi.org/10.1007/978-3-319-97686-0_11)\n- [BGS08] D. L. Boutin, E. Gethner, T. Sulanke, *Thickness-two graphs, I: New nine-critical\n  graphs, permuted layer graphs, and Catlin's graphs*, J. Graph Theory 57 (2008), 198–214.\n  [doi:10.1002/jgt.20282](https://doi.org/10.1002/jgt.20282)\n-/\n\nopen SimpleGraph\nopen scoped EuclideanGeometry\n\nnamespace EarthMoonProblem\n\nvariable {V : Type*}\n\n/-- A *plane drawing* (planar embedding) of a simple graph `G`. The vertices are drawn as\ndistinct points of the Euclidean plane $\\mathbb{R}^2$. Each edge is drawn as a simple arc (the\nimage of an injective continuous map from $[0,1]$) joining the points of its two endpoints. An\narc passes through the point of a vertex only if that vertex is an endpoint of the edge, and two\ndistinct arcs meet only at points of common endpoints. -/\nstructure PlaneDrawing (G : SimpleGraph V) where\n  /-- The point of the plane at which a vertex is drawn. -/\n  vertex : V → ℝ²\n  /-- Distinct vertices are drawn at distinct points. -/\n  vertex_injective : Function.Injective vertex\n  /-- The set of points of the plane covered by the drawing of an edge. -/\n  edge : G.edgeSet → Set ℝ²\n  /-- Each edge `e = s(u, v)` is drawn as a simple arc from `vertex u` to `vertex v`. -/\n  edge_isArc : ∀ e : G.edgeSet, ∃ γ : C(unitInterval, ℝ²), Function.Injective γ ∧\n    Set.range γ = edge e ∧\n    ∃ u v, (e : Sym2 V) = s(u, v) ∧ γ 0 = vertex u ∧ γ 1 = vertex v\n  /-- The arc of an edge passes through the point of a vertex `w` only if `w` is an endpoint of\n  that edge. -/\n  vertex_mem_edge : ∀ (e : G.edgeSet) (w : V), vertex w ∈ edge e → w ∈ (e : Sym2 V)\n  /-- The arcs of two distinct edges meet only at points of common endpoints. -/\n  edge_inter_edge : ∀ e₁ e₂ : G.edgeSet, e₁ ≠ e₂ → ∀ p ∈ edge e₁ ∩ edge e₂,\n    ∃ w : V, w ∈ (e₁ : Sym2 V) ∧ w ∈ (e₂ : Sym2 V) ∧ vertex w = p\n\n/-- A simple graph is *planar* if it has a plane drawing. -/\ndef IsPlanar (G : SimpleGraph V) : Prop :=\n  Nonempty (PlaneDrawing G)\n\n/-- A simple graph is *biplanar* (equivalently, has thickness at most two) if its edge set can be\npartitioned into two planar subgraphs: the \"Earth\" edges and the \"Moon\" edges. -/\ndef IsBiplanar (G : SimpleGraph V) : Prop :=\n  ∃ G₁ G₂ : SimpleGraph V,\n    G₁ ⊔ G₂ = G ∧ Disjoint G₁ G₂ ∧ IsPlanar G₁ ∧ IsPlanar G₂\n\n/-- The edgeless graph on a countable vertex type is planar. -/\n@[category API, AMS 5]\nlemma isPlanar_bot [Countable V] : IsPlanar (⊥ : SimpleGraph V) := by\n  obtain ⟨f, hf⟩ := Countable.exists_injective_nat V\n  have : IsEmpty (⊥ : SimpleGraph V).edgeSet := ⟨fun e => by simpa using e.2⟩\n  exact ⟨{ vertex := fun v => EuclideanSpace.single 0 (f v : ℝ)\n           vertex_injective := fun a b h => hf <| by simpa using congrArg (fun x : ℝ² => x 0) h\n           edge := isEmptyElim\n           edge_isArc := isEmptyElim\n           vertex_mem_edge := isEmptyElim\n           edge_inter_edge := isEmptyElim }⟩\n\n/-- A planar graph on a countable vertex type is biplanar. -/\n@[category API, AMS 5]\nlemma IsPlanar.isBiplanar [Countable V] {G : SimpleGraph V} (hG : IsPlanar G) : IsBiplanar G :=\n  ⟨G, ⊥, sup_bot_eq G, disjoint_bot_right, hG, isPlanar_bot⟩\n\n/-- The graph with a single edge is planar: draw the edge as a straight segment. -/\n@[category test, AMS 5]\nlemma isPlanar_top_fin_two : IsPlanar (⊤ : SimpleGraph (Fin 2)) := by\n  have hEq : ∀ e ∈ (⊤ : SimpleGraph (Fin 2)).edgeSet, e = s(0, 1) := by\n    intro e he\n    induction e with | h a b =>\n    simp only [mem_edgeSet, top_adj] at he\n    fin_cases a <;> fin_cases b <;> simp_all [Sym2.eq_swap]\n  let p : Fin 2 → ℝ² := fun i => EuclideanSpace.single 0 (i : ℝ)\n  have hp : p 0 ≠ p 1 := by\n    intro h\n    have := congrArg (fun x : ℝ² => x 0) h\n    simp [p] at this\n  exact ⟨{ vertex := p\n           vertex_injective := fun a b h => by\n             fin_cases a <;> fin_cases b <;> simp_all\n           edge := fun _ => segment ℝ (p 0) (p 1)\n           edge_isArc := fun e => by\n             refine ⟨⟨fun t => AffineMap.lineMap (p 0) (p 1) (t : ℝ), by fun_prop⟩,\n               ?_, ?_, 0, 1, hEq e e.2, by simp, by simp⟩\n             · intro s t hst\n               exact Subtype.ext (AffineMap.lineMap_injective ℝ hp hst)\n             · rw [segment_eq_image_lineMap]\n               ext x\n               simp\n           vertex_mem_edge := fun e w _ => by\n             rw [hEq e e.2]\n             fin_cases w <;> simp\n           edge_inter_edge := fun e₁ e₂ h =>\n             (h (Subtype.ext ((hEq _ e₁.2).trans (hEq _ e₂.2).symm))).elim }⟩\n\n/-- The graph with a single edge is biplanar. -/\n@[category test, AMS 5]\nlemma isBiplanar_top_fin_two : IsBiplanar (⊤ : SimpleGraph (Fin 2)) :=\n  isPlanar_top_fin_two.isBiplanar\n\n/-- **The Earth–Moon problem** (Ringel, 1959): what is the maximum chromatic number of a\nbiplanar graph? That is, determine the largest $n$ such that some finite biplanar graph has\nchromatic number $n$. Every biplanar graph has chromatic number at most $12$, so this maximum\nexists. -/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    IsGreatest {n : ℕ | ∃ (V : Type) (_ : Fintype V) (G : SimpleGraph V),\n      IsBiplanar G ∧ G.chromaticNumber = n} answer(sorry) := by\n  sorry\n\n/-- Every biplanar graph has chromatic number at most $12$ [Ri59]. A biplanar graph on $n$\nvertices has at most $6n - 12$ edges, so it has a vertex of degree at most $11$, and a greedy\ncolouring along a degeneracy ordering uses at most $12$ colours. -/\n@[category research solved, AMS 5]\ntheorem earth_moon_problem.variants.upper_bound (G : SimpleGraph V) [Fintype V]\n    (hG : IsBiplanar G) : G.chromaticNumber ≤ 12 := by\n  sorry\n\n/-- Sulanke's graph: the join of the complete graph $K_6$ and the cycle $C_5$, i.e. the disjoint\nunion of $K_6$ and $C_5$ together with all edges between the two parts. -/\ndef sulankeGraph : SimpleGraph (Fin 6 ⊕ Fin 5) :=\n  ((⊤ : SimpleGraph (Fin 6)) ⊕g cycleGraph 5) ⊔ completeBipartiteGraph (Fin 6) (Fin 5)\n\n/-- Sulanke's graph $K_6 + C_5$ is biplanar and has chromatic number $9$ (Sulanke, 1974; see\n[BGS08]). This refuted Ringel's conjecture that eight colours always suffice. -/\n@[category research solved, AMS 5]\ntheorem earth_moon_problem.variants.sulanke :\n    IsBiplanar sulankeGraph ∧ sulankeGraph.chromaticNumber = 9 := by\n  sorry\n\n/-- Ringel's original conjecture [Ri59] that the answer to the Earth–Moon problem is $8$ is\nfalse, by Sulanke's example. -/\n@[category research solved, AMS 5]\ntheorem earth_moon_problem.variants.ringel :\n    ¬ IsGreatest {n : ℕ | ∃ (V : Type) (_ : Fintype V) (G : SimpleGraph V),\n      IsBiplanar G ∧ G.chromaticNumber = n} 8 := by\n  sorry\n\n/-- Gethner's conjecture [Ge18]: the maximum chromatic number of a biplanar graph is $11$. -/\n@[category research open, AMS 5]\ntheorem earth_moon_problem.variants.gethner :\n    IsGreatest {n : ℕ | ∃ (V : Type) (_ : Fintype V) (G : SimpleGraph V),\n      IsBiplanar G ∧ G.chromaticNumber = n} 11 := by\n  sorry\n\nend EarthMoonProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition matches the terse list entry; the article confirms the intended reading (maximum of χ over finite biplanar graphs, with 9 ≤ answer ≤ 12 known).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Maximum chromatic number' is formalized as `IsGreatest S answer(sorry)` with `S` the set of chromatic numbers (as ℕ, coerced to ℕ∞ in `G.chromaticNumber = n`) of finite biplanar graphs. This asserts the maximum is attained, which is correct since every biplanar graph has χ ≤ 12. A `sSup`/`iSup` formulation would be equivalent.",
+    "Graphs are restricted to finite simple graphs (`∃ (V : Type) (_ : Fintype V) (G : SimpleGraph V)`), following the maps-with-finitely-many-countries setting of the source and the decomposition note. Quantifying over `V : Type` (universe 0) loses nothing since every finite graph is isomorphic to one on `Fin n`.",
+    "Planarity is defined topologically (drawing in ℝ² = `EuclideanSpace ℝ (Fin 2)` with simple arcs) rather than via Wagner/Kuratowski. This is the actual definition of a planar graph; the combinatorial criteria are theorems equivalent to it for finite graphs. A reviewer should check the `PlaneDrawing` fields: `edge_isArc` (arc is the range of an injective continuous map on `unitInterval` with endpoints the images of the edge's two endpoints, in either order via `∃ u v, e = s(u, v)`), `vertex_mem_edge` (no arc passes through a non-endpoint vertex), `edge_inter_edge` (distinct arcs meet only at images of common endpoints).",
+    "`IsBiplanar` uses two spanning subgraphs on the same vertex type with `G₁ ⊔ G₂ = G ∧ Disjoint G₁ G₂` to mirror 'edge set partitioned into two subsets'. Dropping `Disjoint` (thickness ≤ 2 formulation) is equivalent since subgraphs of planar graphs are planar; isolated vertices do not affect planarity of finite graphs.",
+    "The planarity/biplanarity definitions are generic and would normally go in `FormalConjecturesForMathlib/Combinatorics/SimpleGraph/`; they are kept in the problem file only because the task allows writing a single file.",
+    "Supporting variants added beyond the single slot: `earth_moon_problem.variants.upper_bound` (χ ≤ 12, research solved, Ringel), `earth_moon_problem.variants.sulanke` (K₆ + C₅ is biplanar with χ = 9, research solved), `earth_moon_problem.variants.ringel` (Ringel's conjecture c = 8 is false, research solved), `earth_moon_problem.variants.gethner` (Gethner's conjecture c = 11, research open). Plus proved API/test lemmas: `isPlanar_bot` (countable V), `IsPlanar.isBiplanar`, `isPlanar_top_fin_two` (a single edge drawn as a segment), `isBiplanar_top_fin_two`.",
+    "Copyright year set to 2026 (current date of the sandbox / latest repo commits)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Nothing on planarity exists (grep for planar/thickness/minor/subdivision in Mathlib's Combinatorics and the repo). `UnitDistanceEmbeddable`/`HasDimension` in FormalConjecturesForMathlib embed vertices only, not edges. Wagner/Kuratowski criteria were considered but they would also require bespoke minor/subdivision definitions and are theorems rather than the definition.",
+     "name": "EarthMoonProblem.PlaneDrawing",
+     "why_needed": "No definition of a planar graph / planar embedding exists in Mathlib or FormalConjecturesForMathlib. This structure is the textbook definition of a plane drawing: an injective vertex map `V → ℝ²`, and for each edge a simple arc (range of an injective continuous map `[0,1] → ℝ²`) joining the images of its two endpoints, such that an arc contains the image of a vertex only if it is an endpoint of the edge, and two distinct arcs meet only at images of common endpoints."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or FormalConjecturesForMathlib.",
+     "name": "EarthMoonProblem.IsPlanar",
+     "why_needed": "`Nonempty (PlaneDrawing G)`; the predicate `G is planar` used to define biplanarity."
+    },
+    {
+     "closest_existing_considered": "None; no thickness notion in Mathlib or the repo.",
+     "name": "EarthMoonProblem.IsBiplanar",
+     "why_needed": "Biplanar = edge set partitions into two planar subgraphs (thickness ≤ 2): `∃ G₁ G₂, G₁ ⊔ G₂ = G ∧ Disjoint G₁ G₂ ∧ IsPlanar G₁ ∧ IsPlanar G₂`. Not available anywhere."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.sum` (⊕g) and `completeBipartiteGraph` exist and are combined; Mathlib has no join operation.",
+     "name": "EarthMoonProblem.sulankeGraph",
+     "why_needed": "Only for the supporting solved variant (Sulanke's 9-chromatic biplanar graph K₆ + C₅), defined as `(⊤ ⊕g cycleGraph 5) ⊔ completeBipartiteGraph (Fin 6) (Fin 5)` since Mathlib has no graph join."
+    }
+   ],
+   "per_slot": {
+    "earth_moon_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `IsGreatest {n : ℕ | ∃ (V : Type) (_ : Fintype V) (G : SimpleGraph V), IsBiplanar G ∧ G.chromaticNumber = n} answer(sorry)`: the maximum of χ over all finite simple biplanar graphs. Mathlib and FormalConjecturesForMathlib have no planarity/thickness notion, so `PlaneDrawing`/`IsPlanar` (topological embedding in ℝ²) and `IsBiplanar` (edge partition into two planar spanning subgraphs) were defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "earth_moon_problem": "/-- **The Earth–Moon problem** (Ringel, 1959): what is the maximum chromatic number of a\nbiplanar graph? That is, determine the largest $n$ such that some finite biplanar graph has\nchromatic number $n$. Every biplanar graph has chromatic number at most $12$, so this maximum\nexists. -/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    IsGreatest {n : ℕ | ∃ (V : Type) (_ : Fintype V) (G : SimpleGraph V),\n      IsBiplanar G ∧ G.chromaticNumber = n} answer(sorry) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Earth–Moon problem\n\n*Reference:* [Wikipedia, Earth–Moon problem](https://en.wikipedia.org/wiki/Earth%E2%80%93Moon_problem)\n-/\n\nnamespace EarthMoonProblem\n\nopen SimpleGraph\n\n/--\n`H` is a minor of `G` if the vertices of `H` can be represented by nonempty, pairwise disjoint,\nconnected branch sets in `G`, with adjacent vertices represented by branch sets joined by an edge.\n-/\ndef IsMinor {V W : Type*} (H : SimpleGraph W) (G : SimpleGraph V) : Prop :=\n  ∃ branch : W → Set V,\n    (∀ w, (branch w).Nonempty ∧ (G.induce (branch w)).Preconnected) ∧\n    (Pairwise fun u v ↦ Disjoint (branch u) (branch v)) ∧\n    ∀ ⦃u v⦄, H.Adj u v → ∃ x ∈ branch u, ∃ y ∈ branch v, G.Adj x y\n\n/-- A graph is planar if it has neither `K₅` nor `K₃,₃` as a minor, by Wagner's theorem. -/\ndef IsPlanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  ¬ IsMinor (completeGraph (Fin 5)) G ∧\n    ¬ IsMinor (completeBipartiteGraph (Fin 3) (Fin 3)) G\n\n/-- A graph is biplanar if its edges can be partitioned into the edges of two planar graphs. -/\ndef IsBiplanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  ∃ G₁ G₂ : SimpleGraph V, IsPlanar G₁ ∧ IsPlanar G₂ ∧ Disjoint G₁ G₂ ∧ G = G₁ ⊔ G₂\n\n/--\nThe Earth–Moon problem asks for the maximum chromatic number of a finite biplanar graph. Precisely,\nwhat is the supremum of `G.chromaticNumber` over all finite simple graphs `G` whose edge set can be\npartitioned into two planar subgraphs?\n-/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    sSup {c : ℕ∞ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)),\n      IsBiplanar G ∧ G.chromaticNumber = c} = answer(sorry) := by\n  sorry\n\nend EarthMoonProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented all finite simple graphs as `SimpleGraph (Fin n)` while quantifying over `n : ℕ`; every finite simple graph is isomorphic to one of this form, and chromatic number and biplanarity are invariant under relabeling.",
+    "Used Mathlib's `SimpleGraph.chromaticNumber`, whose codomain is `ℕ∞`, and stated that the `sSup` of all values attained by finite biplanar graphs equals `answer(sorry)`, following the requested open-answer idiom.",
+    "Defined planarity through Wagner's forbidden-minor characterization: a finite simple graph is planar exactly when it has neither `K₅` nor `K₃,₃` as a minor.",
+    "Defined a graph minor using the standard branch-set characterization: nonempty pairwise-disjoint connected vertex sets, with an edge between branch sets for every edge of the minor graph.",
+    "Defined biplanarity by an edge-disjoint pair of planar spanning simple graphs whose supremum is the original graph. This directly expresses partitionability of the edge set into two planar subgraphs, equivalently thickness at most two.",
+    "Did not assert Gethner's proposed value 11: the source asks for the unknown maximum, so the value is represented only by `answer(sorry)`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib simple-graph embeddings, induced subgraphs, connectivity, and matroid minors; graph embeddings are too restrictive, while the available minor relation is only for matroids.",
+     "name": "EarthMoonProblem.IsMinor",
+     "why_needed": "Wagner's criterion requires graph minors, but Mathlib and FormalConjecturesForMathlib contain no simple-graph minor primitive."
+    },
+    {
+     "closest_existing_considered": "A geometric embedding into the plane and Kuratowski's subdivision criterion; no suitable plane-drawing or graph-subdivision API exists, so Wagner's finite forbidden-minor criterion is the cleanest faithful characterization.",
+     "name": "EarthMoonProblem.IsPlanar",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib contain no graph planarity predicate."
+    },
+    {
+     "closest_existing_considered": "The complete lattice structure on `SimpleGraph` supplies graph supremum and `Disjoint`, but no existing predicate packages a partition into two planar layers.",
+     "name": "EarthMoonProblem.IsBiplanar",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib contain no graph thickness or biplanarity predicate."
+    }
+   ],
+   "per_slot": {
+    "earth_moon_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "earth_moon_problem": "/--\nThe Earth–Moon problem asks for the maximum chromatic number of a finite biplanar graph. Precisely,\nwhat is the supremum of `G.chromaticNumber` over all finite simple graphs `G` whose edge set can be\npartitioned into two planar subgraphs?\n-/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    sSup {c : ℕ∞ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)),\n      IsBiplanar G ∧ G.chromaticNumber = c} = answer(sorry) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The Earth–Moon problem\n\nThe Earth–Moon problem, posed by Gerhard Ringel in 1959, asks for the maximum chromatic number\nof a *biplanar* graph, i.e. of a finite simple graph whose edge set can be partitioned into two\nsubsets each of which forms a planar graph (equivalently, a graph of thickness at most two).\n\nRingel proved that this maximum is at least $8$ and at most $12$, and conjectured that it is $8$.\nSulanke (1974) showed that the join of $K_6$ and $C_5$ is a biplanar graph with chromatic number\n$9$, refuting Ringel's conjecture. Gethner (2018) conjectured that the answer is $11$.\nThe problem is open: the maximum is known to lie between $9$ and $12$.\n\nMathlib has no notion of planarity, so we define it here. A finite graph is planar exactly when\nit has neither $K_5$ nor $K_{3,3}$ as a minor (Wagner's theorem), and we take this\ncharacterisation as the definition of planarity for finite graphs.\n\n*References:*\n- [Wikipedia, Earth–Moon problem](https://en.wikipedia.org/wiki/Earth%E2%80%93Moon_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Open Problem Garden, Earth-Moon problem](http://www.openproblemgarden.org/op/earth_moon_problem)\n- [Ri59] G. Ringel, *Färbungsprobleme auf Flächen und Graphen*, VEB Deutscher Verlag der\n  Wissenschaften, Berlin (1959).\n- [Ge18] E. Gethner, *To the Moon and beyond*, in: Graph Theory: Favorite Conjectures and Open\n  Problems, II, Springer (2018), 115–133.\n-/\n\nopen Function SimpleGraph\n\nnamespace EarthMoonProblem\n\nvariable {V W : Type*}\n\n/--\nA simple graph `H` is a *minor* of a simple graph `G` if there is a family `B` of pairwise disjoint\nvertex sets of `G` (the *branch sets*), indexed by the vertices of `H`, such that each branch set\ninduces a connected (in particular nonempty) subgraph of `G`, and for every edge `w w'` of `H` some\nvertex of `B w` is adjacent in `G` to some vertex of `B w'`.\n-/\ndef IsMinor (H : SimpleGraph W) (G : SimpleGraph V) : Prop :=\n  ∃ B : W → Set V, Pairwise (Disjoint on B) ∧ (∀ w, (G.induce (B w)).Connected) ∧\n    ∀ w w', H.Adj w w' → ∃ a ∈ B w, ∃ b ∈ B w', G.Adj a b\n\n/--\nA finite simple graph is *planar* if it can be drawn in the plane without edge crossings.\nBy Wagner's theorem, a finite graph is planar if and only if it has neither the complete graph\n$K_5$ nor the complete bipartite graph $K_{3,3}$ as a minor; we take this characterisation as\nthe definition. (It is only intended for finite graphs.)\n-/\ndef IsPlanar (G : SimpleGraph V) : Prop :=\n  ¬ IsMinor (⊤ : SimpleGraph (Fin 5)) G ∧ ¬ IsMinor (completeBipartiteGraph (Fin 3) (Fin 3)) G\n\n/--\nA finite simple graph `G` is *biplanar* (equivalently, has thickness at most two) if its edge set\ncan be partitioned into two subsets such that the two corresponding spanning subgraphs of `G` are\nboth planar.\n-/\ndef IsBiplanar (G : SimpleGraph V) : Prop :=\n  ∃ G₁ G₂ : SimpleGraph V, Disjoint G₁ G₂ ∧ G₁ ⊔ G₂ = G ∧ IsPlanar G₁ ∧ IsPlanar G₂\n\n/-- The empty graph is planar. -/\n@[category test, AMS 5]\ntheorem isPlanar_bot : IsPlanar (⊥ : SimpleGraph V) := by\n  refine ⟨?_, ?_⟩\n  · rintro ⟨B, -, -, hadj⟩\n    obtain ⟨a, -, b, -, hab⟩ := hadj 0 1 (by decide)\n    exact hab\n  · rintro ⟨B, -, -, hadj⟩\n    obtain ⟨a, -, b, -, hab⟩ := hadj (Sum.inl 0) (Sum.inr 0) (by simp)\n    exact hab\n\n/-- Every graph is a minor of itself. -/\n@[category test, AMS 5]\ntheorem isMinor_self (G : SimpleGraph V) : IsMinor G G := by\n  refine ⟨fun v ↦ {v}, fun v w hvw ↦ Set.disjoint_singleton.mpr hvw, fun v ↦ ?_, ?_⟩\n  · rw [induce_singleton_eq_top]\n    exact connected_top\n  · intro v w hvw\n    exact ⟨v, rfl, w, rfl, hvw⟩\n\n/-- The complete graph $K_5$ is not planar. -/\n@[category test, AMS 5]\ntheorem not_isPlanar_top_fin_five : ¬ IsPlanar (⊤ : SimpleGraph (Fin 5)) :=\n  fun h ↦ h.1 (isMinor_self _)\n\n/-- The complete bipartite graph $K_{3,3}$ is not planar. -/\n@[category test, AMS 5]\ntheorem not_isPlanar_completeBipartiteGraph_three_three :\n    ¬ IsPlanar (completeBipartiteGraph (Fin 3) (Fin 3)) :=\n  fun h ↦ h.2 (isMinor_self _)\n\n/-- Every planar graph is biplanar. -/\n@[category test, AMS 5]\ntheorem IsPlanar.isBiplanar {G : SimpleGraph V} (hG : IsPlanar G) : IsBiplanar G :=\n  ⟨G, ⊥, disjoint_bot_right, sup_bot_eq G, hG, isPlanar_bot⟩\n\n/--\n**The Earth–Moon problem.** What is the maximum chromatic number of a biplanar graph, i.e. of a\nfinite simple graph whose edges can be partitioned into two planar subgraphs?\n\nEquivalently: how many colours are needed to colour every map of the Earth and the Moon, where\neach country on the Earth has a colony on the Moon that must receive the same colour, and\ncountries sharing a border (on the Earth or on the Moon) must receive different colours?\n\nThe maximum exists since Ringel [Ri59] showed that every biplanar graph is $12$-colourable; it is\nknown to be at least $9$ [Sulanke, 1974].\n-/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    IsGreatest {k : ℕ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧ G.chromaticNumber = k}\n      answer(sorry) := by\n  sorry\n\n/--\nGethner's conjecture [Ge18]: the maximum chromatic number of a biplanar graph is $11$.\n-/\n@[category research open, AMS 5]\ntheorem earth_moon_problem.variants.gethner :\n    IsGreatest {k : ℕ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧ G.chromaticNumber = k}\n      11 := by\n  sorry\n\n/--\nEvery biplanar graph is $12$-colourable [Ri59]: a biplanar graph on $n$ vertices has at most\n$6n - 12$ edges, hence has a vertex of degree at most $11$, so a greedy colouring uses at most\n$12$ colours.\n-/\n@[category research solved, AMS 5]\ntheorem earth_moon_problem.variants.upper_bound (n : ℕ) (G : SimpleGraph (Fin n))\n    (hG : IsBiplanar G) : G.chromaticNumber ≤ 12 := by\n  sorry\n\n/--\nThere is a biplanar graph with chromatic number at least $9$ (Sulanke, 1974): the join of the\ncomplete graph $K_6$ and the cycle $C_5$ is biplanar and needs $6 + 3 = 9$ colours. This refuted\nRingel's original conjecture that $8$ colours always suffice.\n-/\n@[category research solved, AMS 5]\ntheorem earth_moon_problem.variants.lower_bound :\n    ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧ 9 ≤ G.chromaticNumber := by\n  sorry\n\nend EarthMoonProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition matches the statement; the notes' suggestion to define planarity via Kuratowski/Wagner restricted to finite simple graphs was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Planarity is defined for finite simple graphs via Wagner's theorem: `IsPlanar G := ¬ IsMinor K₅ G ∧ ¬ IsMinor K₃,₃ G`, rather than via a topological embedding into ℝ². This is equivalent for finite graphs (the only graphs the statement quantifies over) and is the criterion suggested in the decomposition notes; the docstring states this explicitly and notes the definition is intended only for finite graphs.",
+    "Minors are defined by the standard branch-set model: `∃ B : W → Set V, Pairwise (Disjoint on B) ∧ (∀ w, (G.induce (B w)).Connected) ∧ ∀ w w', H.Adj w w' → ∃ a ∈ B w, ∃ b ∈ B w', G.Adj a b`. `Connected` in Mathlib implies nonemptiness, so branch sets are nonempty as required.",
+    "Biplanar is defined literally as a partition of the edge set into two planar spanning subgraphs: `∃ G₁ G₂, Disjoint G₁ G₂ ∧ G₁ ⊔ G₂ = G ∧ IsPlanar G₁ ∧ IsPlanar G₂` (thickness ≤ 2). Since planar graphs have χ ≤ 4, the maximum over thickness ≤ 2 coincides with the maximum over thickness exactly 2, matching the article's 'graphs of thickness two'.",
+    "'Maximum chromatic number of biplanar graphs' is rendered as `IsGreatest` of the set of chromatic numbers (as ℕ) of finite biplanar graphs, with the vertex type ranging over `Fin n` (every finite simple graph is isomorphic to one on `Fin n`, and biplanarity and chromatic number are isomorphism invariants). `IsGreatest` rather than `sSup` because the maximum is known to exist (9 ≤ max ≤ 12); the empty graph (n = 0) is harmlessly included.",
+    "Answer type is ℕ (number of colours); `G.chromaticNumber = k` coerces ℕ to ℕ∞, which is exact for finite graphs.",
+    "Extra declarations beyond the slot: test lemmas for the bespoke definitions (`isPlanar_bot`, `isMinor_self`, `not_isPlanar_top_fin_five`, `not_isPlanar_completeBipartiteGraph_three_three`, `IsPlanar.isBiplanar`, all proved), and variants from the article: Gethner's 2018 conjecture (max = 11, research open), Ringel's upper bound χ ≤ 12 (research solved) and Sulanke's lower bound ∃ biplanar G with 9 ≤ χ (research solved)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.Copy` / `SimpleGraph.IsContained` (⊑) and `SimpleGraph.Subgraph` only capture subgraph containment, not edge contraction; no `Subdivision`/`IsMinor` exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "EarthMoonProblem.IsMinor",
+     "why_needed": "Mathlib has no notion of graph minor; needed to state Wagner's planarity criterion."
+    },
+    {
+     "closest_existing_considered": "`UnitDistancePlaneGraph` (a specific geometric graph, unrelated); Mathlib's only mention of planar graphs is in a TODO in `Mathlib/Combinatorics/SimpleGraph/Coloring.lean`.",
+     "name": "EarthMoonProblem.IsPlanar",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines planar graphs. Defined for finite graphs as having neither K₅ nor K₃,₃ as a minor (Wagner's theorem)."
+    },
+    {
+     "closest_existing_considered": "Lattice operations on `SimpleGraph V` (`⊔`, `Disjoint`) are used to express the partition; no `thickness` definition exists.",
+     "name": "EarthMoonProblem.IsBiplanar",
+     "why_needed": "No notion of graph thickness exists in Mathlib or the repo; biplanar = edge set partitioned into two planar spanning subgraphs."
+    }
+   ],
+   "per_slot": {
+    "earth_moon_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `IsGreatest {k : ℕ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧ G.chromaticNumber = k} answer(sorry)`. Mathlib and FormalConjecturesForMathlib have no planarity/thickness/minor notions, so `IsMinor`, `IsPlanar` (Wagner criterion, as the decomposition notes suggest) and `IsBiplanar` are defined in the file, restricted in use to finite simple graphs on `Fin n`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "earth_moon_problem": "/--\n**The Earth–Moon problem.** What is the maximum chromatic number of a biplanar graph, i.e. of a\nfinite simple graph whose edges can be partitioned into two planar subgraphs?\n\nEquivalently: how many colours are needed to colour every map of the Earth and the Moon, where\neach country on the Earth has a colony on the Moon that must receive the same colour, and\ncountries sharing a border (on the Earth or on the Moon) must receive different colours?\n\nThe maximum exists since Ringel [Ri59] showed that every biplanar graph is $12$-colourable; it is\nknown to be at least $9$ [Sulanke, 1974].\n-/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    IsGreatest {k : ℕ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧ G.chromaticNumber = k}\n      answer(sorry) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The Earth–Moon problem\n\nThe Earth–Moon problem, posed by Ringel in 1959, asks: what is the maximum chromatic number of\nbiplanar graphs? A finite simple graph is *biplanar* (equivalently, has thickness at most two)\nif its edge set can be partitioned into two subsets such that the two corresponding subgraphs\nare both planar.\n\nIt is known that the answer lies between $9$ (Sulanke's graph $K_6 + C_5$) and $12$\n(a degeneracy argument). Ringel conjectured the answer to be $8$; this was refuted by Sulanke.\nGethner conjectured in 2018 that the answer is $11$.\n\nPlanarity of a finite simple graph is defined here via Wagner's theorem: a finite graph is planar\nif and only if it has neither $K_5$ nor $K_{3,3}$ as a minor.\n\n*References:*\n- [Wikipedia, Earth–Moon problem](https://en.wikipedia.org/wiki/Earth%E2%80%93Moon_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Wagner's theorem](https://en.wikipedia.org/wiki/Wagner%27s_theorem)\n- [Ri59] Ringel, G., *Färbungsprobleme auf Flächen und Graphen*. VEB Deutscher Verlag der\n  Wissenschaften (1959).\n- [Ge18] Gethner, E., *To the Moon and beyond*. In: Graph Theory: Favorite Conjectures and Open\n  Problems, II. Springer (2018), 115--133. [doi:10.1007/978-3-319-97686-0_11](https://doi.org/10.1007/978-3-319-97686-0_11)\n- [Open Problem Garden, Earth–Moon problem](http://www.openproblemgarden.org/op/earth_moon_problem)\n-/\n\nopen Function SimpleGraph\n\nnamespace EarthMoonProblem\n\nvariable {V W : Type*}\n\n/-- `IsMinor H G` means that the simple graph `H` is a minor of the simple graph `G`: there is\na family of pairwise disjoint vertex sets `B w ⊆ V` (the *branch sets*), indexed by the\nvertices `w` of `H`, such that each `B w` induces a connected (in particular nonempty) subgraph\nof `G`, and for every edge `w₁w₂` of `H` there is an edge of `G` between `B w₁` and `B w₂`.\nContracting each branch set to a single vertex and deleting all other vertices and edges then\nyields a graph containing a copy of `H`. -/\ndef IsMinor (H : SimpleGraph W) (G : SimpleGraph V) : Prop :=\n  ∃ B : W → Set V, Pairwise (Disjoint on B) ∧ (∀ w, (G.induce (B w)).Connected) ∧\n    ∀ ⦃w₁ w₂⦄, H.Adj w₁ w₂ → ∃ v₁ ∈ B w₁, ∃ v₂ ∈ B w₂, G.Adj v₁ v₂\n\n/-- A simple graph `G` is *planar* if it has neither the complete graph $K_5$ nor the complete\nbipartite graph $K_{3,3}$ as a minor. By Wagner's theorem, for finite graphs this is equivalent\nto `G` having a drawing in the plane with no crossing edges. -/\ndef IsPlanar (G : SimpleGraph V) : Prop :=\n  ¬ IsMinor (completeGraph (Fin 5)) G ∧ ¬ IsMinor (completeBipartiteGraph (Fin 3) (Fin 3)) G\n\n/-- A simple graph `G` is *biplanar* if its edge set can be partitioned into two subsets such\nthat the two corresponding (spanning) subgraphs `G₁` and `G₂` are both planar. Equivalently,\n`G` has thickness at most two. One of the two parts may be empty, so every planar graph is\nbiplanar. -/\ndef IsBiplanar (G : SimpleGraph V) : Prop :=\n  ∃ G₁ G₂ : SimpleGraph V, Disjoint G₁ G₂ ∧ G₁ ⊔ G₂ = G ∧ IsPlanar G₁ ∧ IsPlanar G₂\n\n/-- The set of chromatic numbers of finite biplanar graphs. -/\ndef biplanarChromaticNumbers : Set ℕ :=\n  {n | ∃ (V : Type) (_ : Fintype V) (G : SimpleGraph V), IsBiplanar G ∧ G.chromaticNumber = n}\n\n/-- Every simple graph is a minor of itself. -/\n@[category API, AMS 5]\ntheorem isMinor_refl (G : SimpleGraph V) : IsMinor G G := by\n  refine ⟨fun v => {v}, fun v₁ v₂ h => Set.disjoint_singleton.mpr h, fun v => ?_,\n    fun v₁ v₂ h => ⟨v₁, rfl, v₂, rfl, h⟩⟩\n  exact ⟨Preconnected.of_subsingleton⟩\n\n/-- The complete graph $K_5$ is not planar. -/\n@[category test, AMS 5]\ntheorem not_isPlanar_completeGraph_fin_five : ¬ IsPlanar (completeGraph (Fin 5)) :=\n  fun h => h.1 (isMinor_refl _)\n\n/-- The complete bipartite graph $K_{3,3}$ is not planar. -/\n@[category test, AMS 5]\ntheorem not_isPlanar_completeBipartiteGraph_fin_three :\n    ¬ IsPlanar (completeBipartiteGraph (Fin 3) (Fin 3)) :=\n  fun h => h.2 (isMinor_refl _)\n\n/-- The edgeless graph is planar. -/\n@[category API, AMS 5]\ntheorem isPlanar_bot : IsPlanar (⊥ : SimpleGraph V) := by\n  refine ⟨fun ⟨_, _, _, h⟩ => ?_, fun ⟨_, _, _, h⟩ => ?_⟩\n  · obtain ⟨_, _, _, _, hadj⟩ := h (show (completeGraph (Fin 5)).Adj 0 1 by decide)\n    exact hadj\n  · obtain ⟨_, _, _, _, hadj⟩ :=\n      h (show (completeBipartiteGraph (Fin 3) (Fin 3)).Adj (Sum.inl 0) (Sum.inr 0) by simp)\n    exact hadj\n\n/-- Every planar graph is biplanar. -/\n@[category API, AMS 5]\ntheorem IsPlanar.isBiplanar {G : SimpleGraph V} (hG : IsPlanar G) : IsBiplanar G :=\n  ⟨G, ⊥, disjoint_bot_right, sup_bot_eq G, hG, isPlanar_bot⟩\n\n/-- **The Earth–Moon problem** (Ringel, 1959): what is the maximum chromatic number of\nbiplanar graphs?\n\nHere a biplanar graph is a finite simple graph whose edge set can be partitioned into two planar\nsubgraphs, i.e. a graph of thickness at most two. The maximum exists since every biplanar graph\nhas chromatic number at most $12$; it is known to be at least $9$. -/\n@[category research open, AMS 5]\ntheorem earth_moon_problem : IsGreatest biplanarChromaticNumbers answer(sorry) := by\n  sorry\n\n/-- Every biplanar graph has chromatic number at most $12$ [Ri59]. A biplanar graph on $n$\nvertices has at most $6n - 12$ edges, hence a vertex of degree at most $11$, so it is\n$11$-degenerate and greedy coloring uses at most $12$ colors. -/\n@[category research solved, AMS 5]\ntheorem earth_moon_problem.variants.upper_bound : 12 ∈ upperBounds biplanarChromaticNumbers := by\n  sorry\n\n/-- **Sulanke's graph**: the join $K_6 + C_5$ of the complete graph on $6$ vertices and the\ncycle on $5$ vertices, i.e. their disjoint union together with all edges between them. -/\ndef sulankeGraph : SimpleGraph (Fin 6 ⊕ Fin 5) :=\n  (completeGraph (Fin 6) ⊕g cycleGraph 5) ⊔ completeBipartiteGraph (Fin 6) (Fin 5)\n\n/-- Sulanke's graph $K_6 + C_5$ is biplanar and has chromatic number $9$ (Sulanke, 1974).\nThis refuted Ringel's conjecture that $8$ colors always suffice. -/\n@[category research solved, AMS 5]\ntheorem earth_moon_problem.variants.sulanke :\n    IsBiplanar sulankeGraph ∧ sulankeGraph.chromaticNumber = 9 := by\n  sorry\n\n/-- There is a biplanar graph with chromatic number $9$ (Sulanke, 1974), so the answer to the\nEarth–Moon problem is at least $9$. -/\n@[category research solved, AMS 5]\ntheorem earth_moon_problem.variants.lower_bound : 9 ∈ biplanarChromaticNumbers := by\n  sorry\n\n/-- Ringel's original conjecture [Ri59] that the maximum chromatic number of biplanar graphs is\n$8$ is false: Sulanke's graph $K_6 + C_5$ is biplanar and needs $9$ colors. -/\n@[category research solved, AMS 5]\ntheorem earth_moon_problem.variants.ringel : ¬ IsGreatest biplanarChromaticNumbers 8 := by\n  sorry\n\n/-- **Gethner's conjecture** [Ge18]: the maximum chromatic number of biplanar graphs is $11$. -/\n@[category research open, AMS 5]\ntheorem earth_moon_problem.variants.gethner : IsGreatest biplanarChromaticNumbers 11 := by\n  sorry\n\nend EarthMoonProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate: the list entry is one open-ended question, and the repo idiom `answer(sorry)` for the unknown maximum fits. Candidate answers from the background (Gethner's 11, Ringel's refuted 8) and the known bounds are recorded as `variants`, not as the slot itself.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "\"Maximum chromatic number of biplanar graphs\" is rendered as `IsGreatest S c` with `S = {χ(G) | G finite simple biplanar}` and `c = answer(sorry) : ℕ`. `IsGreatest` says c is attained and is an upper bound, i.e. c is the maximum; the maximum exists because 9 ≤ χ ≤ 12 is known. This avoids ℕ∞-valued `sSup` junk while matching the word \"maximum\".",
+    "Graphs are finite simple graphs: `∃ (V : Type) (_ : Fintype V) (G : SimpleGraph V)`. Universe `Type` (level 0) suffices since every finite graph is isomorphic to one on `Fin n`. Chromatic number is Mathlib's `SimpleGraph.chromaticNumber : ℕ∞`, compared with the cast of `n : ℕ`; it is finite for finite graphs.",
+    "Planarity is defined via Wagner's theorem (`IsPlanar G := ¬ IsMinor K₅ G ∧ ¬ IsMinor K₃,₃ G`) rather than a topological embedding into ℝ². This is faithful only for finite graphs, which is exactly the class quantified over in the theorem; the docstrings say so. A reviewer might prefer a topological definition, but the decomposition notes explicitly allow a Kuratowski/Wagner criterion.",
+    "Minor is defined by the standard branch-set (model) formulation: pairwise disjoint vertex sets `B w`, each inducing a connected (hence nonempty, since Mathlib's `Connected` includes `Nonempty`) subgraph, with an edge of `G` between `B w₁` and `B w₂` for every edge `w₁w₂` of `H`. Extra edges of `G` between branch sets are allowed, as in Diestel's `X ≼ Y ⇔ Y ⊇ MX`.",
+    "Biplanar is stated literally as a partition of the edge set: `∃ G₁ G₂, Disjoint G₁ G₂ ∧ G₁ ⊔ G₂ = G ∧ IsPlanar G₁ ∧ IsPlanar G₂`, with `G₁, G₂ : SimpleGraph V` spanning subgraphs. One part may be `⊥`, so planar graphs are biplanar (thickness ≤ 2), matching the Wikipedia definition. Dropping `Disjoint` would give an equivalent notion (subgraphs of planar graphs are planar) but the partition form is the literal one.",
+    "Extra declarations beyond the slot: API/test lemmas for the new definitions (`isMinor_refl`, `not_isPlanar_completeGraph_fin_five`, `not_isPlanar_completeBipartiteGraph_fin_three`, `isPlanar_bot`, `IsPlanar.isBiplanar`, all proved), and `earth_moon_problem.variants.*` recording the known bounds (≤ 12 upper bound, Sulanke's `K₆ + C₅` with χ = 9, 9 ∈ S), the refutation of Ringel's conjecture (`¬ IsGreatest S 8`) and Gethner's 2018 conjecture (`IsGreatest S 11`, research open). `sulankeGraph` is built as `(K₆ ⊕g C₅) ⊔ completeBipartiteGraph (Fin 6) (Fin 5)` since Mathlib has no graph join.",
+    "Definitions are placed in the problem file under `namespace EarthMoonProblem` (as prefix functions `IsMinor H G`, `IsPlanar G`, `IsBiplanar G`) because the task restricts output to one file; a maintainer may prefer moving them to `FormalConjecturesForMathlib/Combinatorics/SimpleGraph/` in the `SimpleGraph` namespace."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`SimpleGraph.Copy` / `SimpleGraph.IsContained` (subgraph containment, no contraction), `SimpleGraph.Subgraph`, `Matroid.IsMinor`.",
+     "name": "EarthMoonProblem.IsMinor",
+     "why_needed": "Wagner's planarity criterion requires the notion of a graph minor; neither Mathlib nor FormalConjecturesForMathlib defines minors for `SimpleGraph` (only `Matroid.IsMinor`, `Subgraph`, `Copy`/`IsContained`, which do not allow contraction)."
+    },
+    {
+     "closest_existing_considered": "None; searched `planar`, `Kuratowski`, `minor`, `thickness`, `embedding` across Mathlib and FormalConjecturesForMathlib.",
+     "name": "EarthMoonProblem.IsPlanar",
+     "why_needed": "No planarity notion exists in Mathlib or the repo (grep for planar in Combinatorics/SimpleGraph returns only a TODO in Coloring.lean). Defined via Wagner's theorem: no K₅ or K₃,₃ minor; faithful for finite graphs."
+    },
+    {
+     "closest_existing_considered": "Lattice operations `⊔`, `Disjoint` on `SimpleGraph V` (used to express the edge partition).",
+     "name": "EarthMoonProblem.IsBiplanar",
+     "why_needed": "Biplanar (thickness ≤ 2) graphs are the object of the problem; no thickness notion exists anywhere."
+    },
+    {
+     "closest_existing_considered": "Inlining the set comprehension in each theorem.",
+     "name": "EarthMoonProblem.biplanarChromaticNumbers",
+     "why_needed": "Set of chromatic numbers of finite biplanar graphs, so that the main statement and its variants share one `IsGreatest`/`upperBounds` target set (idiom of ErdosProblems/1026)."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.sum` (`⊕g`), `completeBipartiteGraph`, `cycleGraph`; no `SimpleGraph.join` exists.",
+     "name": "EarthMoonProblem.sulankeGraph",
+     "why_needed": "Concrete witness `K₆ + C₅` for the variant recording Sulanke's 9-chromatic biplanar graph; Mathlib has no graph join, so it is built as `(completeGraph (Fin 6) ⊕g cycleGraph 5) ⊔ completeBipartiteGraph (Fin 6) (Fin 5)`."
+    }
+   ],
+   "per_slot": {
+    "earth_moon_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `IsGreatest biplanarChromaticNumbers answer(sorry)`, where `biplanarChromaticNumbers` is the set of chromatic numbers of finite simple biplanar graphs. Mathlib and FormalConjecturesForMathlib have no planarity/minor/thickness notion, so `IsMinor`, `IsPlanar` (Wagner criterion: no K₅ or K₃,₃ minor) and `IsBiplanar` (edge set partitioned into two planar spanning subgraphs) are defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "earth_moon_problem": "/-- **The Earth–Moon problem** (Ringel, 1959): what is the maximum chromatic number of\nbiplanar graphs?\n\nHere a biplanar graph is a finite simple graph whose edge set can be partitioned into two planar\nsubgraphs, i.e. a graph of thickness at most two. The maximum exists since every biplanar graph\nhas chromatic number at most $12$; it is known to be at least $9$. -/\n@[category research open, AMS 5]\ntheorem earth_moon_problem : IsGreatest biplanarChromaticNumbers answer(sorry) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Earth–Moon problem\n\nThe Earth–Moon problem asks for the largest chromatic number of a finite simple graph whose\nedges can be partitioned into two planar graphs.\n\n*Reference:* [Wikipedia, Earth–Moon problem](https://en.wikipedia.org/wiki/Earth%E2%80%93Moon_problem)\n-/\n\nnamespace EarthMoonProblem\n\nopen SimpleGraph\n\n/-- A graph `G` contains `H` as a minor if the vertices of `H` can be represented by pairwise\ndisjoint, nonempty connected branch sets in `G`, with adjacent branch sets joined by an edge. -/\ndef ContainsMinor {V W : Type*} (G : SimpleGraph V) (H : SimpleGraph W) : Prop :=\n  ∃ branch : W → Set V,\n    (∀ w, (G.induce (branch w)).Connected) ∧\n    (Set.univ : Set W).PairwiseDisjoint branch ∧\n    ∀ ⦃x y⦄, H.Adj x y →\n      ∃ u ∈ branch x, ∃ v ∈ branch y, G.Adj u v\n\n/-- For the finite simple graphs used here, planarity is expressed by Wagner's criterion: a graph\nis planar if it contains neither the complete graph $K_5$ nor the complete bipartite graph\n$K_{3,3}$ as a minor. -/\ndef IsPlanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  ¬ ContainsMinor G (completeGraph (Fin 5)) ∧\n    ¬ ContainsMinor G (completeBipartiteGraph (Fin 3) (Fin 3))\n\n/-- A finite simple graph is biplanar (has thickness at most two) if its edge set can be\npartitioned into the edge sets of two planar spanning subgraphs. -/\ndef IsBiplanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  ∃ G₁ G₂ : SimpleGraph V,\n    IsPlanar G₁ ∧ IsPlanar G₂ ∧ Disjoint G₁ G₂ ∧ G = G₁ ⊔ G₂\n\n/--\n**Earth–Moon problem.** What is the maximum chromatic number of biplanar graphs?\n\nPrecisely, determine the supremum of the chromatic numbers of all finite simple graphs whose\nedges can be partitioned into two planar subgraphs (equivalently, graphs of thickness at most\ntwo).\n-/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    sSup {(G.chromaticNumber) |\n      (n : ℕ) (G : SimpleGraph (Fin n)) (_ : IsBiplanar G)} = answer(sorry) := by\n  sorry\n\nend EarthMoonProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “biplanar graphs” as finite simple graphs of thickness at most two, exactly as clarified by the background article: the edge set is partitioned into two planar spanning subgraphs.",
+    "Represented all finite simple graphs by graphs on `Fin n`, ranging over every `n : ℕ`; this covers every finite simple graph up to relabeling.",
+    "Used Wagner’s forbidden-minor characterization of finite planarity because neither Mathlib nor FormalConjecturesForMathlib provides a planar-simple-graph or thickness predicate.",
+    "Encoded an actual edge partition by requiring the two planar graphs to be disjoint and to have supremum equal to the original graph, rather than merely requiring two overlapping planar covers.",
+    "Formalized the requested maximum as the supremum in `ℕ∞` of Mathlib’s `SimpleGraph.chromaticNumber` over all finite biplanar graphs. The known finite upper bound makes this agree with the intended maximum.",
+    "Left the value as `answer(sorry)`, rather than asserting Gethner’s conjectured value 11, because the source asks an open-ended question and the decomposition explicitly calls for the repository’s unknown-answer idiom."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has graph copies/embeddings and matroid minors, but no simple-graph minor relation. FormalConjecturesForMathlib has internally disjoint walks but no complete graph-subdivision or simple-graph minor predicate.",
+     "name": "EarthMoonProblem.ContainsMinor",
+     "why_needed": "Needed to state finite planarity via Wagner’s criterion; it uses the standard branch-set characterization of graph-minor containment."
+    },
+    {
+     "closest_existing_considered": "Mathlib’s SimpleGraph coloring module lists planar graphs as TODO; searches found no graph planarity, Kuratowski, or Wagner predicate.",
+     "name": "EarthMoonProblem.IsPlanar",
+     "why_needed": "No planar-simple-graph predicate exists in Mathlib or FormalConjecturesForMathlib. For the finite graphs in the conjecture, excluding K₅ and K₃,₃ minors is equivalent to planarity by Wagner’s theorem."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides the complete lattice and disjointness operations on simple graphs, which are used inside the definition, but no existing thickness predicate.",
+     "name": "EarthMoonProblem.IsBiplanar",
+     "why_needed": "No graph-thickness or biplanarity predicate exists. This definition directly captures an edge partition into two planar subgraphs."
+    }
+   ],
+   "per_slot": {
+    "earth_moon_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "earth_moon_problem": "/--\n**Earth–Moon problem.** What is the maximum chromatic number of biplanar graphs?\n\nPrecisely, determine the supremum of the chromatic numbers of all finite simple graphs whose\nedges can be partitioned into two planar subgraphs (equivalently, graphs of thickness at most\ntwo).\n-/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    sSup {(G.chromaticNumber) |\n      (n : ℕ) (G : SimpleGraph (Fin n)) (_ : IsBiplanar G)} = answer(sorry) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Earth–Moon problem\n\n*Reference:* [Wikipedia: Earth–Moon problem](https://en.wikipedia.org/wiki/Earth%E2%80%93Moon_problem)\n-/\n\nnamespace EarthMoonProblem\n\nopen SimpleGraph\n\n/-- `ContainsMinor G H` says that `H` is a graph minor of `G`, using the branch-set\ncharacterization: the vertices of `H` are represented by pairwise disjoint connected sets of\nvertices of `G`, and every edge of `H` is represented by an edge between the corresponding sets. -/\ndef ContainsMinor {V W : Type*} (G : SimpleGraph V) (H : SimpleGraph W) : Prop :=\n  ∃ branch : W → Set V,\n    (∀ w, (G.induce (branch w)).Connected) ∧\n    (∀ ⦃x y⦄, x ≠ y → Disjoint (branch x) (branch y)) ∧\n    (∀ ⦃x y⦄, H.Adj x y → ∃ u ∈ branch x, ∃ v ∈ branch y, G.Adj u v)\n\n/-- A graph is planar if it has neither a `K₅` minor nor a `K₃,₃` minor, following Wagner's\nforbidden-minor characterization of finite planar graphs. -/\ndef IsPlanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  ¬ ContainsMinor G (completeGraph (Fin 5)) ∧\n    ¬ ContainsMinor G (completeBipartiteGraph (Fin 3) (Fin 3))\n\n/-- A graph is biplanar if its edge set is the disjoint union of the edge sets of two planar\nspanning subgraphs. Equivalently, it has thickness at most two. -/\ndef IsBiplanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  ∃ G₁ G₂ : SimpleGraph V, IsPlanar G₁ ∧ IsPlanar G₂ ∧ Disjoint G₁ G₂ ∧ G = G₁ ⊔ G₂\n\n/--\nThe Earth–Moon problem asks for the maximum chromatic number among all finite simple biplanar\ngraphs, where biplanar means that the edge set can be partitioned into two planar subgraphs.\n-/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    sSup {χ : ℕ∞ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)),\n      IsBiplanar G ∧ G.chromaticNumber = χ} = answer(sorry) := by\n  sorry\n\nend EarthMoonProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “biplanar” as thickness at most two: the graph's edge set is a disjoint union of two planar spanning subgraphs, matching the background article's edge-partition formulation.",
+    "Represented planarity of the finite simple graphs in scope by Wagner's exact forbidden-minor criterion: absence of K₅ and K₃,₃ minors.",
+    "Represented graph minors by the standard branch-set characterization: pairwise disjoint connected nonempty branch sets, with every minor edge witnessed by a host-graph edge between the corresponding sets. Mathlib's `SimpleGraph.Connected` already enforces nonemptiness.",
+    "Ranged over `SimpleGraph (Fin n)` for all natural numbers `n`; this captures all finite simple graphs up to relabeling.",
+    "Formalized “maximum chromatic number” as the `sSup` of the `ℕ∞`-valued Mathlib chromatic numbers. This follows the decomposition's supremum formulation and remains meaningful independently of formalizing the known bound that makes the supremum an attained finite maximum.",
+    "Used `answer(sorry)` for the unknown maximum rather than hard-coding Gethner's conjectured value 11, because the source asks an open-ended determination question."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's simple-graph subgraph, induced graph, embedding, connectivity, and contraction-related searches; no general minor or topological-minor predicate was present.",
+     "name": "EarthMoonProblem.ContainsMinor",
+     "why_needed": "An exact graph-minor predicate is needed to state Wagner's planarity criterion, and no graph-minor primitive was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib `SimpleGraph` APIs and FormalConjecturesForMathlib were searched for `Planar`, `IsPlanar`, Kuratowski, Wagner, thickness, and related terms; only unrelated geometric uses were found.",
+     "name": "EarthMoonProblem.IsPlanar",
+     "why_needed": "Biplanarity depends on planarity, but no simple-graph planarity predicate was found. For finite graphs this definition uses Wagner's exact K₅/K₃,₃ forbidden-minor characterization."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.IsEdgeColouring` captures edge partitions abstractly, but would not eliminate the need for a dedicated two-planar-class predicate and is less direct here; graph join and `Disjoint` were used as existing primitives.",
+     "name": "EarthMoonProblem.IsBiplanar",
+     "why_needed": "No graph thickness or biplanarity predicate exists in Mathlib or FormalConjecturesForMathlib; this definition directly states partitionability of the edge set into two planar subgraphs."
+    }
+   ],
+   "per_slot": {
+    "earth_moon_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "earth_moon_problem": "/--\nThe Earth–Moon problem asks for the maximum chromatic number among all finite simple biplanar\ngraphs, where biplanar means that the edge set can be partitioned into two planar subgraphs.\n-/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    sSup {χ : ℕ∞ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)),\n      IsBiplanar G ∧ G.chromaticNumber = χ} = answer(sorry) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Earth–Moon problem\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Earth%E2%80%93Moon_problem)\n-/\n\nnamespace EarthMoonProblem\n\nopen SimpleGraph\n\n/--\n`H` is a minor of `G` if the vertices of `H` can be represented by pairwise disjoint,\nnonempty connected branch sets in `G`, with every edge of `H` represented by an edge\nbetween the corresponding branch sets.\n-/\ndef IsMinor {V W : Type*} (H : SimpleGraph V) (G : SimpleGraph W) : Prop :=\n  ∃ branch : V → Set W,\n    Pairwise (fun v w ↦ Disjoint (branch v) (branch w)) ∧\n      (∀ v, (G.induce (branch v)).Connected) ∧\n      ∀ ⦃v w⦄, H.Adj v w →\n        ∃ x ∈ branch v, ∃ y ∈ branch w, G.Adj x y\n\n/--\nFor finite simple graphs, Wagner's criterion characterizes planarity by excluding\n$K_5$ and $K_{3,3}$ as minors.\n-/\ndef IsPlanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  ¬IsMinor (completeGraph (Fin 5)) G ∧\n    ¬IsMinor (completeBipartiteGraph (Fin 3) (Fin 3)) G\n\n/--\nA graph is biplanar (has thickness at most two) if its edge set can be partitioned\ninto the edge sets of two planar spanning subgraphs.\n-/\ndef IsBiplanar {V : Type*} (G : SimpleGraph V) : Prop :=\n  ∃ G₁ G₂ : SimpleGraph V,\n    IsPlanar G₁ ∧ IsPlanar G₂ ∧ Disjoint G₁ G₂ ∧ G₁ ⊔ G₂ = G\n\n/--\nThe Earth–Moon problem asks: what is the maximum chromatic number of finite simple\nbiplanar graphs, whose edges can be partitioned into two planar subgraphs?\n-/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    sSup {χ : ℕ∞ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧\n      G.chromaticNumber = χ} = answer(sorry) := by\n  sorry\n\nend EarthMoonProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “biplanar” according to the background article as a finite simple graph whose edge set is partitionable into two planar spanning subgraphs (thickness at most two). The Lean definition uses `Disjoint G₁ G₂` and `G₁ ⊔ G₂ = G` to encode a literal edge partition.",
+    "Defined planarity for the finite graphs in the conjecture using Wagner’s criterion: exclusion of `K₅` and `K₃,₃` minors. Graph minors are encoded by the standard branch-set model, where branch sets are pairwise disjoint and connected (hence nonempty in Mathlib), and every source edge is represented by an edge between branch sets.",
+    "Quantified finite simple graphs as `SimpleGraph (Fin n)` for arbitrary `n : ℕ`; this represents every finite simple graph up to relabeling and includes the empty graph harmlessly.",
+    "Expressed the requested maximum as the `sSup` of Mathlib’s `ℕ∞`-valued `SimpleGraph.chromaticNumber` over all finite biplanar graphs, equated to `answer(sorry)`. The known finite upper bound ensures this supremum is the intended maximum."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `SimpleGraph.IsContained` for subgraph copies, but subgraph containment does not include edge contraction and therefore cannot express forbidden minors.",
+     "name": "EarthMoonProblem.IsMinor",
+     "why_needed": "Wagner’s planarity criterion requires graph minors, but no graph-minor predicate was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "No existing planarity notion was found; the definition uses the finite simple graph characterization by forbidden `K₅` and `K₃,₃` minors.",
+     "name": "EarthMoonProblem.IsPlanar",
+     "why_needed": "No planar-graph predicate was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "The complete lattice operations on `SimpleGraph` provide edge union and disjointness, but there was no existing predicate packaging a partition into two planar subgraphs.",
+     "name": "EarthMoonProblem.IsBiplanar",
+     "why_needed": "No graph thickness or biplanarity predicate was found in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "earth_moon_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "earth_moon_problem": "/--\nThe Earth–Moon problem asks: what is the maximum chromatic number of finite simple\nbiplanar graphs, whose edges can be partitioned into two planar subgraphs?\n-/\n@[category research open, AMS 5]\ntheorem earth_moon_problem :\n    sSup {χ : ℕ∞ | ∃ (n : ℕ) (G : SimpleGraph (Fin n)), IsBiplanar G ∧\n      G.chromaticNumber = χ} = answer(sorry) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "earth_moon_problem": "c01"
+ },
+ "id": "wp-earth-moon-problem",
+ "main_attempt": "c01"
+}

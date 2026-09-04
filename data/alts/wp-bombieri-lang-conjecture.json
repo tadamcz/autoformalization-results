@@ -1,0 +1,389 @@
+{
+ "attempts": [
+  {
+   "bailed": true,
+   "cid": "c01",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The background article's general form, rather than its weak surface form or refined finiteness form, would be the intended reading: universal over number fields and positive-dimensional varieties of general type, with non-density in the variety's own Zariski topology.",
+    "The decomposition's geometrically integral and projective conventions were accepted. These ancillary notions could in principle be defined using base change and closed immersions into finite projective space, but doing so does not remove the central absence of a faithful general-type predicate."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "bombieri_lang_conjecture": {
+     "outcome": "missing_primitives",
+     "why": "A faithful statement requires an intrinsic predicate that a positive-dimensional geometrically integral projective variety is of general type (Kodaira dimension equal to its dimension). Hard searches of Mathlib, FormalConjecturesForMathlib, and existing conjecture files found no definition of general type or Kodaira/Iitaka dimension, and no scheme-level canonical/dualizing sheaf or divisor, pluricanonical ring, or bigness API from which to define it faithfully. Mathlib's low-level Kähler-differential, sheaf-of-modules, rational-map, smooth-morphism, and Krull-dimension APIs are insufficient to give a concise complete definition, especially for possibly singular varieties. An empty marker class, arbitrary predicate parameter, or vacuous True/False definition would subtly change the conjecture and violate the no-placeholder rule. Since this is the only slot, no candidate file was created, as required for a full bail-out."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Bombieri–Lang conjecture\n\nLet $K$ be a number field and let $X$ be a positive-dimensional algebraic variety of general\ntype over $K$. The Bombieri–Lang conjecture predicts that the set $X(K)$ of $K$-rational points\nof $X$ is not dense in the Zariski topology of $X$.\n\nMathlib has no notion of Kodaira dimension or of varieties of general type, so this file\ndefines them. A variety $X$ over $K$ is of general type if some (equivalently, any) smooth proper\nmodel $X'$ of $X$ has Kodaira dimension $\\kappa(X') = \\dim X'$, i.e. if the plurigenera\n$P_m = h^0(X', \\omega_{X'}^{\\otimes m})$ grow like $m^{\\dim X}$. Since Mathlib has no sheaf of\ndifferentials on schemes, we compute the plurigenera inside the function field $L = K(X)$:\nthe space $H^0(X', \\omega_{X'}^{\\otimes m})$ is the space of rational pluricanonical forms\n$s \\in (\\bigwedge^n \\Omega_{L/K})^{\\otimes m}$ (with $n = \\dim_L \\Omega_{L/K} = \\dim X$) that are\nregular on every smooth affine model $\\operatorname{Spec} A$ of $L$, i.e. that lie in the\n$A$-span of the forms $\\bigotimes_i (d a_{i,1} \\wedge \\dots \\wedge d a_{i,n})$ with\n$a_{i,j} \\in A$. (In characteristic zero, a form regular on a smooth proper model is regular on\nevery smooth affine model with the same function field, by the valuative criterion of properness\nand Hartogs' extension for locally free sheaves on normal schemes; conversely the affine opens of\n$X'$ are smooth affine models. Hence this space does not depend on the choice of $X'$.)\n\nThe conjecture is stated for every positive-dimensional variety $X$ of general type (an integral\nseparated scheme of finite type over $K$), as in the Wikipedia article. Since Zariski density of\n$X(K)$ only depends on a dense open subset of $X$, this is equivalent to the statement for\nsmooth projective varieties of general type.\n\n*References:*\n* [Wikipedia, Bombieri–Lang conjecture](https://en.wikipedia.org/wiki/Bombieri%E2%80%93Lang_conjecture)\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* [DT15] P. Das, A. Turchet, *Rational points, rational curves, and entire holomorphic curves on\n  projective varieties*, [arXiv:1407.7750](https://arxiv.org/abs/1407.7750), Section 3.\n* [Laz04] R. Lazarsfeld, *Positivity in Algebraic Geometry I*, Springer (2004), Section 2.1.C\n  (Kodaira dimension and the growth of plurigenera).\n-/\n\nopen AlgebraicGeometry CategoryTheory TensorProduct\n\nnamespace BombieriLangConjecture\n\nuniverse u\n\n/- ### Varieties of general type\n\nLet $L/K$ be a finitely generated field extension in characteristic zero (the function field of a\nvariety over $K$). Its `pluricanonicalForms K L m` are the rational $m$-pluricanonical forms that\nare regular on every smooth affine model of $L$; this is the space\n$H^0(X', \\omega_{X'}^{\\otimes m})$ for any smooth proper model $X'$ of $L$. -/\n\nsection GeneralType\n\nvariable (K L : Type*) [Field K] [Field L] [Algebra K L]\n\n/-- The space of rational $m$-pluricanonical forms of $L/K$: the $m$-th tensor power of the top\nexterior power $\\bigwedge^n \\Omega_{L/K}$ of the module of Kähler differentials, where\n$n = \\dim_L \\Omega_{L/K}$ is the transcendence degree of $L/K$ in characteristic zero. -/\nabbrev PluricanonicalForm (m : ℕ) : Type _ :=\n  ⨂[L]^m (⋀[L]^(Module.finrank L Ω[L⁄K]) Ω[L⁄K])\n\n/-- The rational $m$-pluricanonical forms of $L/K$ that are regular on the affine model\n$\\operatorname{Spec} A$, for a $K$-subalgebra $A \\subseteq L$: the $A$-span of the forms\n$\\bigotimes_{i} (d a_{i,1} \\wedge \\dots \\wedge d a_{i,n})$ with $a_{i,j} \\in A$. When $A$ is\nsmooth over $K$ with fraction field $L$, this is $H^0(\\operatorname{Spec} A, \\omega^{\\otimes m})$. -/\nnoncomputable def regularPluricanonicalForms (A : Subalgebra K L) (m : ℕ) :\n    Submodule A (PluricanonicalForm K L m) :=\n  Submodule.span A (Set.range fun a : Fin m → Fin (Module.finrank L Ω[L⁄K]) → A =>\n    ⨂ₜ[L] i, exteriorPower.ιMulti L _ fun j => KaehlerDifferential.D K L (a i j : L))\n\n/-- The $K$-vector space of rational $m$-pluricanonical forms of $L/K$ that are regular on every\nsmooth affine model $\\operatorname{Spec} A$ of $L$ (i.e. $A \\subseteq L$ a smooth $K$-subalgebra\nwith fraction field $L$). In characteristic zero this is $H^0(X', \\omega_{X'}^{\\otimes m})$ for\nany smooth proper variety $X'$ over $K$ with function field $L$. -/\nnoncomputable def pluricanonicalForms (m : ℕ) : Submodule K (PluricanonicalForm K L m) :=\n  ⨅ (A : Subalgebra K L) (_ : Algebra.Smooth K A) (_ : IsFractionRing A L),\n    (regularPluricanonicalForms K L A m).restrictScalars K\n\n/-- The $m$-th plurigenus $P_m = \\dim_K H^0(X', \\omega_{X'}^{\\otimes m})$ of (a smooth proper model\nof) a variety over $K$ with function field $L$. -/\nnoncomputable def plurigenus (m : ℕ) : ℕ :=\n  Module.finrank K (pluricanonicalForms K L m)\n\n/-- A variety over $K$ with function field $L$ is of *general type* if its Kodaira dimension equals\nits dimension $n = \\dim_L \\Omega_{L/K}$, i.e. if the plurigenera satisfy $P_m \\geq c \\cdot m^n$ for\nsome $c > 0$ and infinitely many $m$ (equivalently $\\limsup_m P_m / m^n > 0$; by Iitaka's theorem\non the growth of plurigenera this holds exactly when $\\kappa = n$). -/\ndef IsGeneralType : Prop :=\n  ∃ c : ℕ, 0 < c ∧ ∃ᶠ m : ℕ in Filter.atTop,\n    m ^ Module.finrank L Ω[L⁄K] ≤ c * plurigenus K L m\n\n/-- A zero-dimensional variety (a point $\\operatorname{Spec} K$) is of general type: all its\nplurigenera equal $1$. -/\n@[category test, AMS 14]\ntheorem isGeneralType_self : IsGeneralType K K := by\n  sorry\n\n/-- The projective line, with function field $K(t)$, is not of general type: its plurigenera $P_m$\nvanish for $m \\geq 1$. -/\n@[category test, AMS 14]\ntheorem not_isGeneralType_ratFunc [CharZero K] : ¬ IsGeneralType K (RatFunc K) := by\n  sorry\n\nend GeneralType\n\n/- ### Varieties over a field and their rational points -/\n\nsection Scheme\n\nvariable {K : Type u} [Field K] {X : Scheme.{u}}\n\n/-- The $K$-algebra structure on the function field $K(X)$ of an integral scheme $X$ with structure\nmorphism `f : X ⟶ Spec K`, given by $K = \\Gamma(\\operatorname{Spec} K, \\mathcal{O}) \\to\n\\Gamma(X, \\mathcal{O}_X) \\to K(X)$. -/\nnoncomputable def functionFieldAlgebra (f : X ⟶ Spec (.of K)) [IsIntegral X] :\n    Algebra K X.functionField :=\n  haveI : Nonempty (⊤ : X.Opens) := ⟨⟨genericPoint X, trivial⟩⟩\n  RingHom.toAlgebra <| (X.germToFunctionField ⊤).hom.comp <|\n    f.appTop.hom.comp (Scheme.ΓSpecIso (.of K)).inv.hom\n\n/-- An integral scheme $X$ over $K$, with structure morphism `f : X ⟶ Spec K`, is of general type\nif its function field $K(X)$ is of general type over $K$ (see `IsGeneralType`). Being of general\ntype is a birational property, so it only depends on $K(X)$. -/\ndef IsGeneralTypeOver (f : X ⟶ Spec (.of K)) [IsIntegral X] : Prop :=\n  letI := functionFieldAlgebra f\n  IsGeneralType K X.functionField\n\n/-- The set of $K$-rational points of a scheme $X$ over $K$ with structure morphism\n`f : X ⟶ Spec K`, viewed as a subset of the underlying space of $X$: the images of the sections\n$\\operatorname{Spec} K \\to X$ of `f`. -/\ndef rationalPoints (f : X ⟶ Spec (.of K)) : Set X :=\n  {x | ∃ s : Spec (.of K) ⟶ X, CategoryStruct.comp s f = 𝟙 _ ∧ s default = x}\n\n/-- The point $\\operatorname{Spec} K$ is a $K$-rational point of itself. -/\n@[category test, AMS 14]\ntheorem rationalPoints_id : rationalPoints (𝟙 (Spec (.of K))) = Set.univ :=\n  Set.eq_univ_of_forall fun _ => ⟨𝟙 _, Category.id_comp _, Subsingleton.elim _ _⟩\n\nend Scheme\n\n/-- **Bombieri–Lang conjecture.** Let $K$ be a number field and let $X$ be a positive-dimensional\nalgebraic variety (an integral separated scheme of finite type) over $K$ that is of general type.\nThen the set $X(K)$ of $K$-rational points of $X$ is not a dense set in the Zariski topology\nof $X$. -/\n@[category research open, AMS 11 14]\ntheorem bombieri_lang_conjecture (K : Type u) [Field K] [NumberField K] (X : Scheme.{u})\n    (f : X ⟶ Spec (.of K)) [IsIntegral X] [IsSeparated f] [LocallyOfFiniteType f]\n    [QuasiCompact f] (hdim : 0 < topologicalKrullDim X) (hX : IsGeneralTypeOver f) :\n    ¬ Dense (rationalPoints f) := by\n  sorry\n\nend BombieriLangConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.7,
+   "decomposition_objections": "None of substance. The table suggests restricting to '(geometrically integral, projective)' varieties; I followed the Wikipedia article's broader 'positive-dimensional algebraic variety of general type' (integral, separated, finite type), which is equivalent to the projective/geometrically integral version as explained in modeling_decisions, since 'general type' is a birational notion and Zariski density of rational points is a birational invariant of irreducible varieties.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Variety over K' is read as an integral, separated scheme of finite type over K ([IsIntegral X] [IsSeparated f] [LocallyOfFiniteType f] [QuasiCompact f]). Neither properness/projectivity nor geometric integrality is required, following the Wikipedia article's 'positive-dimensional algebraic variety of general type'. This is equivalent to the projective version: general type is defined birationally (via the function field), Zariski density of X(K) in an irreducible X depends only on a dense open subset, and in characteristic zero an integral but not geometrically integral variety has no K-points at all.",
+    "'Positive-dimensional' is formalized as 0 < topologicalKrullDim X (Krull dimension of the underlying Zariski space), which for a variety equals the dimension. The exponent in the general-type growth condition uses n = Module.finrank L Ω[L⁄K], which equals the transcendence degree (= dim X) in characteristic zero.",
+    "'General type' is defined intrinsically on the function field L = K(X): the m-th plurigenus is the K-dimension of the space of rational m-pluricanonical forms (elements of (⋀^n Ω_{L/K})^{⊗m}) that lie in the A-span of ⊗_i(d a_{i,1} ∧ … ∧ d a_{i,n}) for every smooth K-subalgebra A ⊆ L with fraction field L (every smooth affine model). This equals h^0(X', ω_{X'}^{⊗m}) for any smooth proper model X' (char 0, using resolution/compactification for existence, valuative criterion + Hartogs for independence of the model). A reviewer should check this identification; it is the substitute for the missing canonical sheaf in Mathlib.",
+    "General type is encoded as ∃ c > 0, ∃ᶠ m, m^n ≤ c · P_m (limsup P_m / m^n > 0), which by Iitaka's theorem on the growth of plurigenera is equivalent to Kodaira dimension = n; 'frequently' rather than 'eventually' is used so the definition needs only the growth theorem (κ = −∞ and κ < n both fail it).",
+    "K-rational points are the images in X of sections Spec K ⟶ X of the structure morphism f, and density is `Dense` for the Zariski topology on the underlying space of X. The composition is written `CategoryStruct.comp s f` because the repository's `FormalConjecturesForMathlib/Analysis/Asymptotics/Basic.lean` globally redefines the `≫` notation for big-O.",
+    "The K-algebra structure on K(X) is the composite K ≅ Γ(Spec K, O) → Γ(X, O_X) → K(X) (ΓSpecIso, f.appTop, germToFunctionField at ⊤).",
+    "The bespoke definitions are generic and kept in the problem file inside `namespace BombieriLangConjecture` per the task's single-file requirement; a maintainer may prefer to move them to FormalConjecturesForMathlib.",
+    "Three `@[category test]` sanity statements are included: Spec K (dimension 0) is of general type (all plurigenera are 1, consistent with the table's remark that 0-dimensional varieties are trivially of general type), ℙ¹ (function field K(t), char 0) is not of general type, and Spec K is a K-point of itself (proved). The first two are left as `sorry`, as is customary in the repository."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "KaehlerDifferential, exteriorPower, TensorPower (used as building blocks); no scheme-level cotangent sheaf exists in Mathlib.",
+     "name": "BombieriLangConjecture.PluricanonicalForm",
+     "why_needed": "Ambient L-vector space of rational m-pluricanonical forms of L/K: the m-th tensor power (TensorPower) of the top exterior power (exteriorPower, degree n = Module.finrank L Ω[L⁄K]) of the Kähler differentials Ω[L⁄K]. Mathlib has no sheaf of differentials or canonical bundle on schemes."
+    },
+    {
+     "closest_existing_considered": "Submodule.span (used); no notion of sections of the canonical sheaf on a scheme in Mathlib.",
+     "name": "BombieriLangConjecture.regularPluricanonicalForms",
+     "why_needed": "For a K-subalgebra A ⊆ L, the A-span of the forms ⊗_i (d a_{i,1} ∧ … ∧ d a_{i,n}) with a_{i,j} ∈ A; for A smooth over K with fraction field L this is H^0(Spec A, ω^{⊗m}) viewed inside the function-field version."
+    },
+    {
+     "closest_existing_considered": "No global-sections-of-a-line-bundle API for schemes in Mathlib; Scheme.Modules exists but has no differentials/determinant/tensor powers.",
+     "name": "BombieriLangConjecture.pluricanonicalForms",
+     "why_needed": "The K-space of rational m-pluricanonical forms regular on every smooth affine model Spec A of L (A : Subalgebra K L with Algebra.Smooth K A and IsFractionRing A L). In characteristic zero this is H^0(X', ω_{X'}^{⊗m}) for any smooth proper model X' of L (affine opens of X' are such models; conversely a form regular on a proper smooth model is regular on every smooth affine model by the valuative criterion plus Hartogs extension for locally free sheaves on normal schemes). This makes the notion birational by construction, which is exactly how 'general type' is defined for arbitrary (possibly singular, non-proper) varieties."
+    },
+    {
+     "closest_existing_considered": "Module.finrank (used).",
+     "name": "BombieriLangConjecture.plurigenus",
+     "why_needed": "P_m = dim_K of pluricanonicalForms K L m, the m-th plurigenus."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or FormalConjecturesForMathlib (searched for Kodaira, canonical, general type, differential in AlgebraicGeometry).",
+     "name": "BombieriLangConjecture.IsGeneralType",
+     "why_needed": "General type (Kodaira dimension = dimension n): ∃ c > 0 with m^n ≤ c · P_m for infinitely many m, i.e. limsup P_m/m^n > 0. By Iitaka's growth theorem (a m^κ ≤ P_m ≤ b m^κ for large m in the semigroup of effective multiples) this is equivalent to κ = n, and it rejects κ = −∞ and κ < n."
+    },
+    {
+     "closest_existing_considered": "AlgebraicGeometry.Scheme.functionField and its Γ(X,U)-algebra instance; Scheme.Hom.stalkMap.",
+     "name": "BombieriLangConjecture.functionFieldAlgebra",
+     "why_needed": "The K-algebra structure on the function field K(X) of an integral scheme with structure morphism f : X ⟶ Spec K, given by K ≅ Γ(Spec K, O) → Γ(X, O_X) → K(X) (ΓSpecIso, appTop, germToFunctionField). Mathlib has Algebra Γ(X,U) K(X) but no K-algebra structure induced by a structure morphism."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "BombieriLangConjecture.IsGeneralTypeOver",
+     "why_needed": "An integral scheme X over K is of general type iff its function field K(X) is (IsGeneralType with the algebra structure functionFieldAlgebra f). Wrapper so the theorem statement reads cleanly."
+    },
+    {
+     "closest_existing_considered": "Scheme.SpecToEquivOfField (morphisms Spec K ⟶ X ↔ points with an embedding of the residue field); Scheme.Hom.residueFieldMap. Neither packages the set X(K) for a K-scheme.",
+     "name": "BombieriLangConjecture.rationalPoints",
+     "why_needed": "The set of K-rational points of X as a subset of the underlying Zariski space: the images of sections s : Spec K ⟶ X of f (s ≫ f = 𝟙). Needed to state Zariski density of X(K)."
+    }
+   ],
+   "per_slot": {
+    "bombieri_lang_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `bombieri_lang_conjecture`: for every number field K and every integral, separated, finite-type scheme X over K (structure morphism f : X ⟶ Spec K) with positive Krull dimension and of general type, the set of K-rational points (images of sections of f) is not dense in the Zariski topology of X. 'General type' has no Mathlib counterpart and is built from Kähler differentials of the function field (see new_definitions)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "bombieri_lang_conjecture": "/-- **Bombieri–Lang conjecture.** Let $K$ be a number field and let $X$ be a positive-dimensional\nalgebraic variety (an integral separated scheme of finite type) over $K$ that is of general type.\nThen the set $X(K)$ of $K$-rational points of $X$ is not a dense set in the Zariski topology\nof $X$. -/\n@[category research open, AMS 11 14]\ntheorem bombieri_lang_conjecture (K : Type u) [Field K] [NumberField K] (X : Scheme.{u})\n    (f : X ⟶ Spec (.of K)) [IsIntegral X] [IsSeparated f] [LocallyOfFiniteType f]\n    [QuasiCompact f] (hdim : 0 < topologicalKrullDim X) (hX : IsGeneralTypeOver f) :\n    ¬ Dense (rationalPoints f) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Bombieri–Lang conjecture\n\nThe Bombieri–Lang conjecture: the $K$-rational points on a (positive-dimensional) variety of\ngeneral type over a number field $K$ are not dense in the Zariski topology.\n\nMathlib has no notion of Kodaira dimension, so this file sets up the necessary definitions.\nFor a smooth proper variety $Y$ of dimension $d$ over $K$ with function field $F = K(Y)$, the\nglobal sections of the $m$-th power of the canonical bundle $\\omega_Y = \\Omega^d_{Y/K}$ are\nthe rational pluricanonical forms $\\eta \\in (\\Omega^d_{F/K})^{\\otimes m}$ that are regular at\nevery point $y \\in Y$, i.e. that lie in the image of\n$(\\bigwedge^d \\Omega_{\\mathcal{O}_{Y,y}/K})^{\\otimes m}$. The variety $Y$ is of general type if\nthe plurigenera $P_m = \\dim_K H^0(Y, \\omega_Y^{\\otimes m})$ grow like $m^d$, i.e. if its Kodaira\ndimension equals $d$. A (possibly singular) variety is of general type if it is birational to a\nsmooth proper variety of general type.\n\n*References:*\n- [Wikipedia, Bombieri–Lang conjecture](https://en.wikipedia.org/wiki/Bombieri%E2%80%93Lang_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Kodaira dimension](https://en.wikipedia.org/wiki/Kodaira_dimension)\n-/\n\nnamespace BombieriLangConjecture\n\nopen AlgebraicGeometry CategoryTheory CategoryTheory.Limits TensorProduct Filter\n\nuniverse u\n\nvariable (K : Type u) [Field K] (X : Scheme.{u}) [X.Over (Spec (.of K))]\n\n/-- The `K`-algebra structure on the function field `K(X)` of a `K`-scheme `X`, given by\n`K ≅ Γ(Spec K, ⊤) → Γ(X, ⊤) → K(X)`. -/\nnoncomputable scoped instance functionFieldAlgebra [IrreducibleSpace X] :\n    Algebra K X.functionField :=\n  ((Scheme.ΓSpecIso (.of K)).inv ≫ (X ↘ Spec (.of K)).appTop ≫\n    X.presheaf.germ ⊤ (genericPoint X) trivial).hom.toAlgebra\n\n/-- The `K`-vector space $(\\Omega^d_{K(X)/K})^{\\otimes m}$ of rational pluricanonical forms of\nweight `m` on a `d`-dimensional irreducible `K`-scheme `X`, where $K(X)$ is the function field. -/\nnoncomputable abbrev PluricanonicalForms [IrreducibleSpace X] (d m : ℕ) : Type u :=\n  ⨂[X.functionField]^m (⋀[X.functionField]^d Ω[X.functionField⁄K])\n\n/-- The rational pluricanonical forms of weight `m` that are regular at the point `x`, i.e. the\nimage of $(\\bigwedge^d_{\\mathcal{O}_{X,x}} \\Omega_{\\mathcal{O}_{X,x}/K})^{\\otimes m}$ in\n$(\\Omega^d_{K(X)/K})^{\\otimes m}$. This image is the $\\mathcal{O}_{X,x}$-span of the forms\n$\\bigotimes_{j} (d a_{j,1} \\wedge \\dots \\wedge d a_{j,d})$ with all $a_{j,i} \\in \\mathcal{O}_{X,x}$,\nwritten here as a `K`-span. -/\nnoncomputable def regularAt [IrreducibleSpace X] (x : X) (d m : ℕ) :\n    Submodule K (PluricanonicalForms K X d m) :=\n  Submodule.span K {η | ∃ (b : X.presheaf.stalk x) (a : Fin m → Fin d → X.presheaf.stalk x),\n    η = algebraMap (X.presheaf.stalk x) X.functionField b •\n      ⨂ₜ[X.functionField] j, exteriorPower.ιMulti X.functionField d\n        fun i => KaehlerDifferential.D K X.functionField\n          (algebraMap (X.presheaf.stalk x) X.functionField (a j i))}\n\n/-- The rational pluricanonical forms of weight `m` that are regular at every point of `X`.\nFor `X` smooth of dimension `d` over `K`, this is the space of global sections\n$H^0(X, \\omega_X^{\\otimes m})$ of the `m`-th power of the canonical bundle. -/\nnoncomputable def regularForms [IrreducibleSpace X] (d m : ℕ) :\n    Submodule K (PluricanonicalForms K X d m) :=\n  ⨅ x, regularAt K X x d m\n\n/-- A smooth proper irreducible `K`-scheme `X` of dimension `d` has *big canonical bundle*, i.e.\nhas Kodaira dimension `d`, if its plurigenera $P_m = \\dim_K H^0(X, \\omega_X^{\\otimes m})$ satisfy\n$P_m \\geq c \\cdot m^d$ for some `c > 0` and infinitely many `m`.\n(Since $P_m = O(m^d)$ always holds, this says exactly that $\\limsup_m \\log P_m / \\log m = d$.) -/\ndef HasBigCanonicalBundle [IrreducibleSpace X] (d : ℕ) : Prop :=\n  ∃ c : ℝ, 0 < c ∧ ∃ᶠ m : ℕ in atTop,\n    c * (m : ℝ) ^ d ≤ (Module.finrank K (regularForms K X d m) : ℝ)\n\n/-- Two `K`-schemes `X` and `Y` are *birational* over `K` if they contain dense open subschemes\nthat are isomorphic as `K`-schemes. -/\ndef IsBirational (Y : Scheme.{u}) [Y.Over (Spec (.of K))] : Prop :=\n  ∃ (U : X.Opens) (V : Y.Opens) (e : (U : Scheme) ≅ V),\n    Dense (U : Set X) ∧ Dense (V : Set Y) ∧\n      (e.hom ≫ V.ι ≫ Y ↘ Spec (.of K)) = (U.ι ≫ X ↘ Spec (.of K))\n\n/-- A `K`-scheme `X` is *of general type* if it is birational (over `K`) to a smooth\nproper integral `K`-scheme `Y` of some dimension `d` whose canonical bundle is big, i.e. whose\nKodaira dimension is `d`. By birational invariance of the Kodaira dimension of smooth proper\nvarieties, this does not depend on the choice of `Y`. -/\ndef IsGeneralType : Prop :=\n  ∃ (Y : Scheme.{u}) (_ : Y.Over (Spec (.of K))) (_ : IsIntegral Y) (d : ℕ),\n    IsProper (Y ↘ Spec (.of K)) ∧ IsSmoothOfRelativeDimension d (Y ↘ Spec (.of K)) ∧\n      IsBirational K X Y ∧ HasBigCanonicalBundle K Y d\n\n/-- The set of `K`-rational points of a `K`-scheme `X`, viewed as a subset of the underlying\ntopological space of `X`: the points in the image of a `K`-morphism `Spec K ⟶ X`. -/\ndef rationalPoints : Set X :=\n  {x | ∃ p : Spec (.of K) ⟶ X,\n    (p ≫ X ↘ Spec (.of K)) = 𝟙 (Spec (.of K)) ∧ x ∈ Set.range p.base}\n\n@[category API, AMS 14]\ntheorem regularForms_le_regularAt [IrreducibleSpace X] (x : X) (d m : ℕ) :\n    regularForms K X d m ≤ regularAt K X x d m :=\n  iInf_le _ x\n\n/-- The unique point of `Spec K` is `K`-rational. -/\n@[category test, AMS 14]\ntheorem rationalPoints_spec : rationalPoints K (Spec (.of K)) = Set.univ :=\n  Set.eq_univ_of_forall fun x => ⟨𝟙 _, by simp, ⟨x, rfl⟩⟩\n\n/-- **Bombieri–Lang conjecture.** Let `K` be a number field and let `X` be a positive-dimensional\nvariety of general type over `K`, i.e. a geometrically integral proper `K`-scheme of positive\ndimension that is of general type. Then the set of `K`-rational points of `X` is not dense in the\nZariski topology of `X`. (Positive dimension is needed: a point is of general type and its\n`K`-rational point is dense.) -/\n@[category research open, AMS 11 14]\ntheorem bombieri_lang_conjecture [NumberField K] [IsIntegral X]\n    [IsIntegral (pullback (X ↘ Spec (.of K))\n      (Spec.map (CommRingCat.ofHom (algebraMap K (AlgebraicClosure K)))))]\n    [IsProper (X ↘ Spec (.of K))] (hdim : 0 < topologicalKrullDim X)\n    (hX : IsGeneralType K X) : ¬ Dense (rationalPoints K X) := by\n  sorry\n\nend BombieriLangConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate. Minor remark: the note says 'projective'; Mathlib has no projective morphisms, so `IsProper` is used (standard generality for Kodaira dimension, and equivalent for the conjecture over number fields via Chow's lemma and resolution of singularities).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Variety over K' is modeled as a scheme X with `[X.Over (Spec (.of K))]` that is `IsIntegral`, geometrically integral (`IsIntegral (pullback (X ↘ Spec K) (Spec.map (algebraMap K (AlgebraicClosure K))))`, following the decomposition note), and `IsProper (X ↘ Spec K)`. Proper is used instead of projective because Mathlib has no `IsProjective` morphism class; proper is the standard generality for Kodaira dimension, and over a number field (char 0) the projective and proper forms are equivalent via Chow's lemma + resolution of singularities.",
+    "'Positive-dimensional' (from the article's general form; needed since a point is of general type with dense rational point) is expressed as `0 < topologicalKrullDim X`.",
+    "'Of general type' (Kodaira dimension = dim X) is defined for a possibly singular X as: X is birational over K to a smooth proper integral K-scheme Y of relative dimension d (`IsSmoothOfRelativeDimension d`) with big canonical bundle. This is the standard definition (Kodaira dimension of a singular variety is that of a smooth proper model; well-defined by birational invariance).",
+    "Birationality over K (`IsBirational`) is defined as existence of dense opens U ⊆ X, V ⊆ Y and an isomorphism of schemes U ≅ V compatible with the structure morphisms to Spec K.",
+    "Big canonical bundle / Kodaira dimension d (`HasBigCanonicalBundle K Y d`): ∃ c > 0 such that P_m := dim_K H^0(Y, ω_Y^{⊗m}) ≥ c·m^d for infinitely many m (`∃ᶠ m in atTop`). This is the limsup characterization κ = limsup log P_m / log m = d; it is equivalent to the 'for all large m' form since a big line bundle has P_m ≍ m^d for all large m. Uses `Module.finrank K`, which is correct since these spaces are finite-dimensional for proper Y.",
+    "H^0(Y, ω_Y^{⊗m}) is realised, for smooth Y of dimension d, as the rational pluricanonical forms in `⨂[F]^m (⋀[F]^d Ω[F⁄K])` (F = K(Y) the function field) that are regular at every point y, where 'regular at y' (`regularAt`) is the image of `(⋀^d_{𝒪_y} Ω_{𝒪_y/K})^{⊗m}`, written as the K-span of `ι(b) • ⨂_j (d ι(a_{j,1}) ∧ … ∧ d ι(a_{j,d}))` with b, a_{j,i} ∈ 𝒪_{Y,y} (equivalently the 𝒪_y-span of the pure tensors of wedge generators). For a locally free sheaf on an integral scheme, global sections are exactly the rational sections regular at every point.",
+    "The K-algebra structure on the function field K(X) is defined (scoped instance) as K ≅ Γ(Spec K, ⊤) → Γ(X, ⊤) → K(X) via the structure morphism; it is only introduced for the function field, avoiding instance diamonds with Mathlib's `Algebra R (Spec R).functionField`.",
+    "K-rational points (`rationalPoints K X`) are the points of the underlying space lying in the image of a K-morphism p : Spec K ⟶ X (i.e. a section of X ↘ Spec K); Zariski density is `Dense` for the carrier topology of X.",
+    "Two small sanity statements are included: `regularForms_le_regularAt` (API) and `rationalPoints_spec` (test: the point of Spec K is K-rational), both proved.",
+    "Compositions of morphisms are fully parenthesised because the repository's `FormalConjecturesForMathlib` defines an unscoped global notation `≫` (for IsBigO) that clashes with the category-theory `≫`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "AlgebraicGeometry.Scheme.functionField algebra instances (`stalkFunctionFieldAlgebra`, `Algebra Γ(X, U) X.functionField`), `StructureSheaf.stalkAlgebra`",
+     "name": "BombieriLangConjecture.functionFieldAlgebra",
+     "why_needed": "Scoped instance `Algebra K X.functionField` for a K-scheme X, needed to form Kähler differentials Ω[K(X)⁄K] and K-vector spaces of forms. Mathlib only provides `Algebra Γ(X,U) X.functionField` and `Algebra R (Spec R).functionField`."
+    },
+    {
+     "closest_existing_considered": "KaehlerDifferential, exteriorPower, TensorPower (used as building blocks); no sheaf of relative differentials `Ω_{X/S}` exists in Mathlib.",
+     "name": "BombieriLangConjecture.PluricanonicalForms",
+     "why_needed": "The K-vector space (Ω^d_{K(X)/K})^{⊗m} of rational pluricanonical forms of weight m; Mathlib has no canonical sheaf or sheaf of differentials on schemes."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib (no canonical bundle / no sections of ω_X).",
+     "name": "BombieriLangConjecture.regularAt",
+     "why_needed": "The pluricanonical forms regular at a point x, i.e. the image of (⋀^d Ω_{𝒪_{X,x}/K})^{⊗m}; this is the local piece of H^0(X, ω_X^{⊗m})."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib.",
+     "name": "BombieriLangConjecture.regularForms",
+     "why_needed": "H^0(X, ω_X^{⊗m}) for smooth X: forms regular at every point (infimum of `regularAt` over all points)."
+    },
+    {
+     "closest_existing_considered": "No Kodaira dimension, bigness or plurigenera in Mathlib or FormalConjecturesForMathlib.",
+     "name": "BombieriLangConjecture.HasBigCanonicalBundle",
+     "why_needed": "Kodaira dimension = dimension for a smooth proper irreducible K-scheme of dimension d, via growth of plurigenera P_m ≥ c m^d for infinitely many m."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `AlgebraicGeometry.Scheme.RationalMap`/`PartialMap` (no notion of birational map or birational equivalence there).",
+     "name": "BombieriLangConjecture.IsBirational",
+     "why_needed": "Birationality of K-schemes over K (isomorphic dense open subschemes compatible with the structure maps), used to define general type for possibly singular varieties via smooth models."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or the repository.",
+     "name": "BombieriLangConjecture.IsGeneralType",
+     "why_needed": "'Variety of general type': birational over K to a smooth proper integral K-scheme with big canonical bundle."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Scheme.residueField`/`Scheme.Hom.IsOver`; no definition of rational points as a subset of a scheme.",
+     "name": "BombieriLangConjecture.rationalPoints",
+     "why_needed": "The set X(K) of K-rational points viewed inside the underlying space of X, to talk about Zariski density."
+    }
+   ],
+   "per_slot": {
+    "bombieri_lang_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `bombieri_lang_conjecture`: for every number field K and every geometrically integral proper K-scheme X of positive dimension that is of general type, the set of K-rational points of X is not dense in the Zariski topology of X. Mathlib has no Kodaira dimension / general type / birationality / rational points, so bespoke definitions were added in the file (see new_definitions)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "bombieri_lang_conjecture": "/-- **Bombieri–Lang conjecture.** Let `K` be a number field and let `X` be a positive-dimensional\nvariety of general type over `K`, i.e. a geometrically integral proper `K`-scheme of positive\ndimension that is of general type. Then the set of `K`-rational points of `X` is not dense in the\nZariski topology of `X`. (Positive dimension is needed: a point is of general type and its\n`K`-rational point is dense.) -/\n@[category research open, AMS 11 14]\ntheorem bombieri_lang_conjecture [NumberField K] [IsIntegral X]\n    [IsIntegral (pullback (X ↘ Spec (.of K))\n      (Spec.map (CommRingCat.ofHom (algebraMap K (AlgebraicClosure K)))))]\n    [IsProper (X ↘ Spec (.of K))] (hdim : 0 < topologicalKrullDim X)\n    (hX : IsGeneralType K X) : ¬ Dense (rationalPoints K X) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Bombieri–Lang conjecture\n\nThe Bombieri–Lang conjecture: the $K$-rational points on a (positive-dimensional) variety of\ngeneral type over a number field $K$ are not a dense set in the Zariski topology.\n\nMathlib has no canonical sheaf and no Kodaira dimension, so we define \"general type\" here.\nLet $X$ be an integral scheme which is smooth of relative dimension $n$ and proper over a field\n$k$, with function field $F$. Every point $x$ of $X$ gives the local ring\n$\\mathcal{O}_{X,x} \\subseteq F$. Inside the one-dimensional $F$-vector space\n$(\\bigwedge^n_F \\Omega_{F/k})^{\\otimes m}$ (the generic fibre of $\\omega_X^{\\otimes m}$), the\nstalk of $\\omega_X^{\\otimes m}$ at $x$ is the $\\mathcal{O}_{X,x}$-submodule spanned by the pure\ntensors of pure wedges of differentials coming from $\\Omega_{\\mathcal{O}_{X,x}/k}$. The global\nsections $H^0(X, \\omega_X^{\\otimes m})$ are the elements of the generic fibre lying in every stalk,\nand $h^0(X, \\omega_X^{\\otimes m})$ is the $k$-dimension of this space. Such an $X$ is of general\ntype when $h^0(X, \\omega_X^{\\otimes m}) \\geq c\\,m^n$ for some $c > 0$ and all large $m$, that is,\nwhen the Kodaira dimension of $X$ equals $n = \\dim X$. An arbitrary $k$-variety is of general\ntype when it is birational over $k$ to a smooth proper variety of general type; this is the usual\ndefinition of the Kodaira dimension of a singular or non-proper variety via a smooth proper model.\n\n*References:*\n- [Wikipedia: Bombieri–Lang conjecture](https://en.wikipedia.org/wiki/Bombieri%E2%80%93Lang_conjecture)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [HS00] M. Hindry, J. H. Silverman, *Diophantine Geometry: An Introduction*, GTM 201, Springer,\n  2000, Conjecture F.5.2.1.\n- [Po12] B. Poonen, *Uniform boundedness of rational points and preperiodic points*,\n  [arXiv:1206.7104](https://arxiv.org/abs/1206.7104).\n-/\n\nopen AlgebraicGeometry CategoryTheory Filter\nopen scoped TensorProduct\n\nuniverse u\n\nnamespace BombieriLangConjecture\n\nvariable {k : Type u} [Field k] {X Y : Scheme.{u}}\n\n/-- The set of `k`-rational points of a `k`-scheme `f : X ⟶ Spec k`, as a subset of the underlying\nZariski topological space of `X`: the images of the sections `Spec k ⟶ X` of `f`. -/\ndef rationalPoints (f : X ⟶ Spec (.of k)) : Set X :=\n  {x | ∃ s : Spec (.of k) ⟶ X, (s ≫ f) = 𝟙 _ ∧ x ∈ Set.range s.base}\n\n/-- Two `k`-schemes are birational over `k` if they contain dense open subschemes that are\nisomorphic over `k`. -/\ndef IsBirational (f : X ⟶ Spec (.of k)) (g : Y ⟶ Spec (.of k)) : Prop :=\n  ∃ (U : X.Opens) (V : Y.Opens) (e : (U : Scheme.{u}) ≅ V),\n    Dense (U : Set X) ∧ Dense (V : Set Y) ∧ (e.hom ≫ V.ι ≫ g) = (U.ι ≫ f)\n\n/-- Every point of `Spec k` is `k`-rational. -/\n@[category test, AMS 14]\ntheorem rationalPoints_id : rationalPoints (𝟙 (Spec (.of k))) = Set.univ := by\n  refine Set.eq_univ_of_forall fun x ↦ ⟨𝟙 _, Category.comp_id _, x, ?_⟩\n  simp\n\n@[category API, AMS 14]\ntheorem IsBirational.refl (f : X ⟶ Spec (.of k)) : IsBirational f f :=\n  ⟨⊤, ⊤, Iso.refl _, by simp, by simp, by simp⟩\n\n@[category API, AMS 14]\ntheorem IsBirational.symm {f : X ⟶ Spec (.of k)} {g : Y ⟶ Spec (.of k)} (h : IsBirational f g) :\n    IsBirational g f := by\n  obtain ⟨U, V, e, hU, hV, he⟩ := h\n  exact ⟨V, U, e.symm, hV, hU, by rw [← he, Iso.symm_hom, Iso.inv_hom_id_assoc]⟩\n\n/-- The `k`-algebra structure on the stalk `𝒪_{X,x}` of a `k`-scheme `f : X ⟶ Spec k`. -/\nnoncomputable def stalkAlgebra (f : X ⟶ Spec (.of k)) (x : X) : Algebra k (X.presheaf.stalk x) :=\n  ((Scheme.ΓSpecIso (.of k)).inv ≫ f.appTop ≫ X.presheaf.germ ⊤ x trivial).hom.toAlgebra\n\n/-- The inclusion `𝒪_{X,x} ⊆ K(X)` of a stalk into the function field is `k`-linear. -/\n@[category API, AMS 14]\nlemma stalkAlgebra_isScalarTower (f : X ⟶ Spec (.of k)) [IsIntegral X] (x : X) :\n    letI := stalkAlgebra f x\n    letI := stalkAlgebra f (genericPoint X)\n    IsScalarTower k (X.presheaf.stalk x) X.functionField := by\n  letI := stalkAlgebra f x\n  letI := stalkAlgebra f (genericPoint X)\n  apply IsScalarTower.of_algebraMap_eq'\n  show ((Scheme.ΓSpecIso (.of k)).inv ≫ f.appTop ≫ X.presheaf.germ ⊤ (genericPoint X) trivial).hom\n    = (X.presheaf.stalkSpecializes _).hom.comp\n      ((Scheme.ΓSpecIso (.of k)).inv ≫ f.appTop ≫ X.presheaf.germ ⊤ x trivial).hom\n  rw [← CommRingCat.hom_comp]\n  congr 1\n  simp only [Category.assoc, TopCat.Presheaf.germ_stalkSpecializes]\n\n/-- The dimension `h⁰(X, ω_X^{⊗m})` over `k` of the space of `m`-canonical forms on an integral\n`k`-scheme `f : X ⟶ Spec k` which is smooth of relative dimension `n` over `k`. Writing `F` for\nthe function field of `X`, an `m`-canonical form is an element of\n`(⋀[F]^n Ω[F⁄k])^{⊗ m}` which, for every point `x` of `X`, lies in the `𝒪_{X,x}`-submodule spanned\nby the pure tensors of pure wedges of differentials coming from `Ω[𝒪_{X,x}⁄k]`. -/\nnoncomputable def pluricanonicalDim (f : X ⟶ Spec (.of k)) [IsIntegral X] (n m : ℕ) : ℕ :=\n  letI : ∀ x : X, Algebra k (X.presheaf.stalk x) := stalkAlgebra f\n  haveI : ∀ x : X, IsScalarTower k (X.presheaf.stalk x) X.functionField :=\n    stalkAlgebra_isScalarTower f\n  let regular (x : X) :\n      Submodule (X.presheaf.stalk x)\n        (⨂[X.functionField]^m (⋀[X.functionField]^n Ω[X.functionField⁄k])) :=\n    Submodule.span (X.presheaf.stalk x) {ω | ∃ v : Fin m → Fin n → Ω[X.functionField⁄k],\n      (∀ j i, v j i ∈\n        Set.range (KaehlerDifferential.map k k (X.presheaf.stalk x) X.functionField)) ∧\n      ω = ⨂ₜ[X.functionField] j, exteriorPower.ιMulti X.functionField n (v j)}\n  Module.finrank k (Submodule.span k (⋂ x, SetLike.coe (regular x)))\n\n/-- A `k`-scheme `f : X ⟶ Spec k` is of general type if it is birational over `k` to an integral\nscheme `Y`, proper and smooth of some relative dimension `n` over `k`, whose pluricanonical\ndimensions satisfy `h⁰(Y, ω_Y^{⊗m}) ≥ c * m ^ n` for some `c > 0` and all sufficiently large `m`,\ni.e. whose Kodaira dimension equals `n = dim Y`. -/\ndef IsOfGeneralType (f : X ⟶ Spec (.of k)) : Prop :=\n  ∃ (n : ℕ) (Y : Scheme.{u}) (g : Y ⟶ Spec (.of k)) (_ : IsIntegral Y),\n    IsProper g ∧ IsSmoothOfRelativeDimension n g ∧ IsBirational f g ∧\n    ∃ c : ℝ, 0 < c ∧ ∀ᶠ m : ℕ in atTop, c * (m : ℝ) ^ n ≤ pluricanonicalDim g n m\n\n/-- **Bombieri–Lang conjecture.** Let $K$ be a number field and let $X$ be a positive-dimensional\nvariety (integral, separated scheme of finite type) of general type over $K$. Then the\n$K$-rational points of $X$ are not a dense set in the Zariski topology of $X$. -/\n@[category research open, AMS 11 14]\ntheorem bombieri_lang_conjecture [NumberField k] (f : X ⟶ Spec (.of k)) [IsIntegral X]\n    [IsSeparated f] [LocallyOfFiniteType f] [QuasiCompact f]\n    (hdim : 0 < topologicalKrullDim X) (hX : IsOfGeneralType f) :\n    ¬ Dense (rationalPoints f) := by\n  sorry\n\nend BombieriLangConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None of substance. The table lists '(geometrically integral, projective) variety'; I quantify over all integral separated finite-type varieties (as in the article's general form and Poonen's phrasing), which is a superset: projectivity is not needed because general type is defined via a smooth proper birational model and Zariski density of rational points is a birational invariant of integral varieties, and geometric integrality is not needed because non-geometrically-integral integral varieties never have Zariski-dense k-points. The table's gloss 'Kodaira dimension = dim X' is realised through the equivalent growth characterisation h⁰(ω^{⊗m}) ≥ c·mⁿ.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Variety = integral scheme X with a k-morphism f : X ⟶ Spec k that is separated (`IsSeparated f`), locally of finite type and quasi-compact. Geometric integrality is NOT required: an integral k-variety that is not geometrically integral has all its k-points inside the non-normal locus (normal local rings contain the algebraic closure of k in K(X)), so X(k) is never dense there and the conjecture is unaffected. Projectivity of X is NOT required, matching the article's 'general form' for arbitrary varieties; general type is defined through a smooth proper birational model.",
+    "Positive-dimensional is `0 < topologicalKrullDim X` (Krull dimension of the underlying Zariski space), following the article's general form; a point is of general type with trivially dense rational points.",
+    "k-rational points are the points of the underlying space that are images of sections s : Spec k ⟶ X with s ≫ f = 𝟙; these correspond bijectively to points with residue field k. Density is `Dense` in X's own Zariski topology.",
+    "General type (`IsOfGeneralType f`): there exist n, an integral scheme Y with g : Y ⟶ Spec k proper and smooth of relative dimension n (so dim Y = n and Ω_{Y/k} is locally free of rank n), birational to X over k (`IsBirational`: dense opens U ⊆ X, V ⊆ Y with a k-isomorphism), such that h⁰(Y, ω_Y^{⊗m}) ≥ c·mⁿ for some c > 0 and all large m. This growth condition is the standard characterisation 'K_Y is big' ⇔ κ(Y) = dim Y (Kodaira lemma / Iitaka's growth theorem; for big divisors the semigroup N(K_Y) contains all large m). Existential over the model is correct since Kodaira dimension is a birational invariant of smooth proper varieties; smooth *proper* (rather than projective) is used because Mathlib has `IsProper` but no projective morphisms, and pluricanonical spaces of smooth proper varieties agree with those of a smooth projective model (char 0).",
+    "h⁰(Y, ω^{⊗m}) (`pluricanonicalDim g n m`) is computed without sheaves: with F = K(Y), inside the F-space (⋀ⁿ_F Ω_{F/k})^{⊗m} (generic fibre of ω^{⊗m}), the stalk of ω^{⊗m} at x is the 𝒪_{Y,x}-span of pure tensors of pure wedges of images of Ω_{𝒪_{Y,x}/k} → Ω_{F/k}; global sections are the elements lying in every stalk (sections of a locally free sheaf on an integral scheme = elements of the generic fibre regular at all points); the k-dimension is `Module.finrank k` of its k-span (the set is already a k-subspace, taking the span avoids a closure proof). The k-algebra structures on stalks come from f via `ΓSpecIso`, `f.appTop` and germs; the scalar-tower compatibility with the inclusion 𝒪_{Y,x} ⊆ K(Y) is proved (`stalkAlgebra_isScalarTower`). Instance checks (`PiTensorProduct.module'`, `Algebra.toModule`, `stalkFunctionFieldAlgebra`) were verified by `rfl` in scratch files.",
+    "Only the list-entry statement (general form) is stated; the 'weak' surface form and the 'refined' finite-on-an-open-subset form are not included, per the decomposition table.",
+    "The repository's global `≫` notation for `IsBigO` clashes with categorical composition, so compositions in equations are parenthesised, e.g. `(s ≫ f) = 𝟙 _`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`AlgebraicGeometry.Scheme.residueField` / `fromSpecResidueField` (points with residue field k) and morphisms `Spec k ⟶ X`; neither packages X(k) as a set of points.",
+     "name": "BombieriLangConjecture.rationalPoints",
+     "why_needed": "Mathlib has no notion of the set of k-rational points of a k-scheme as a subset of its underlying space; needed to express Zariski density of X(k)."
+    },
+    {
+     "closest_existing_considered": "`AlgebraicGeometry.Scheme.RationalMap`, `Scheme.PartialMap`, `Scheme.Hom.IsOver` — none gives birationality.",
+     "name": "BombieriLangConjecture.IsBirational",
+     "why_needed": "General type for an arbitrary variety is defined via a smooth proper birational model; Mathlib has rational maps (`Scheme.RationalMap`) but no notion of birational equivalence (over a base)."
+    },
+    {
+     "closest_existing_considered": "`AlgebraicGeometry.stalkFunctionFieldAlgebra`, `StructureSheaf.stalkAlgebra` (only for Spec R), `Scheme.Over` — none provides `Algebra k (X.presheaf.stalk x)` for a general k-scheme.",
+     "name": "BombieriLangConjecture.stalkAlgebra",
+     "why_needed": "The k-algebra structure on stalks 𝒪_{X,x} (and on the function field) of a k-scheme f : X ⟶ Spec k, required to form Kähler differentials over k."
+    },
+    {
+     "closest_existing_considered": "`KaehlerDifferential` (`Ω[S⁄R]`) with `KaehlerDifferential.map`, `exteriorPower`/`ιMulti`, `TensorPower`/`PiTensorProduct.tprod`, `Scheme.functionField`, `SheafOfModules.IsVectorBundleWithRank` (FormalConjecturesForMathlib) — the last has no differentials/determinant/global-section API.",
+     "name": "BombieriLangConjecture.pluricanonicalDim",
+     "why_needed": "h⁰(X, ω_X^{⊗m}) for a smooth proper integral k-scheme of relative dimension n; Mathlib has no cotangent sheaf, canonical sheaf, line bundles, or sheaf cohomology on schemes."
+    },
+    {
+     "closest_existing_considered": "`IsSmoothOfRelativeDimension`, `IsProper` (used as building blocks); no Kodaira dimension or bigness anywhere in Mathlib.",
+     "name": "BombieriLangConjecture.IsOfGeneralType",
+     "why_needed": "'General type' (Kodaira dimension = dim) has no Mathlib definition; defined via a smooth proper birational model whose pluricanonical dimensions grow like mⁿ."
+    }
+   ],
+   "per_slot": {
+    "bombieri_lang_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `bombieri_lang_conjecture`: for every number field k, every integral separated finite-type k-scheme X of positive Krull dimension that is of general type, the set of k-rational points (images of sections Spec k ⟶ X) is not dense in the Zariski topology of X. Mathlib has no canonical sheaf / Kodaira dimension / general type, so these are built bespoke from Kähler differentials, exterior and tensor powers, stalks and the function field."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "bombieri_lang_conjecture": "/-- **Bombieri–Lang conjecture.** Let $K$ be a number field and let $X$ be a positive-dimensional\nvariety (integral, separated scheme of finite type) of general type over $K$. Then the\n$K$-rational points of $X$ are not a dense set in the Zariski topology of $X$. -/\n@[category research open, AMS 11 14]\ntheorem bombieri_lang_conjecture [NumberField k] (f : X ⟶ Spec (.of k)) [IsIntegral X]\n    [IsSeparated f] [LocallyOfFiniteType f] [QuasiCompact f]\n    (hdim : 0 < topologicalKrullDim X) (hX : IsOfGeneralType f) :\n    ¬ Dense (rationalPoints f) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c05",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Following the background article's general form and the fixed decomposition, the intended quantification is over every number field K and every positive-dimensional geometrically integral projective K-variety X of general type; the conclusion concerns non-density of the images of K-scheme points Spec K ⟶ X in X's own underlying Zariski topological space.",
+    "The weak smooth-surface form and the refined finite-points-on-a-dense-open form are not part of the list-entry statement and would not be added."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "bombieri_lang_conjecture": {
+     "outcome": "missing_primitives",
+     "why": "The essential hypothesis that X is of general type cannot presently be stated faithfully. Mathlib and FormalConjecturesForMathlib have no Kodaira dimension/general-type predicate and also lack the scheme-level canonical or dualizing sheaf/divisor, pluricanonical tensor powers and sections, and bigness/pluricanonical-map machinery needed to define it. Ring-level Kähler differentials do not suffice to express regular pluricanonical sections. An unconstrained predicate/structure field, or defining general type as True, would be a prohibited placeholder and would change the conjecture. Because this is the sole slot, it is omitted and no candidate.lean is produced."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Bombieri–Lang conjecture\n\nThe Bombieri–Lang conjecture predicts that the $K$-rational points of a positive-dimensional\nvariety of general type over a number field $K$ are not Zariski dense.\n\nMathlib has no notion of canonical bundle or Kodaira dimension, so this file defines \"general\ntype\" from scratch, following the classical description of pluricanonical forms as rational\ndifferential forms. For an integral scheme $X$ over $K$ with function field $F = K(X)$, an\n$m$-canonical rational form of degree $n$ is an element of\n$(\\bigwedge^n_F \\Omega_{F/K})^{\\otimes m}$. Such a form is regular on a nonempty affine open\n$U = \\operatorname{Spec} A$ if it is an $A$-linear combination of forms\n$(df_{1,1} \\wedge \\dots \\wedge df_{1,n}) \\otimes \\dots \\otimes (df_{m,1} \\wedge \\dots \\wedge df_{m,n})$\nwith all $f_{i,j} \\in A$. When $X$ is smooth of dimension $n$ over $K$, the forms regular on\nevery nonempty affine open are exactly the global sections $H^0(X, \\omega_X^{\\otimes m})$ of the\n$m$-th power of the canonical bundle, and their $K$-dimension is the $m$-th plurigenus $P_m(X)$.\nA smooth proper variety of dimension $n$ is of general type if its Kodaira dimension is $n$, i.e.\n$P_m(X)$ grows like $m^n$. Kodaira dimension is a birational invariant of smooth proper\nvarieties, and a general variety is of general type if some (equivalently, every) smooth proper\nvariety birational to it is.\n\n*References:*\n- [Wikipedia, Bombieri–Lang conjecture](https://en.wikipedia.org/wiki/Bombieri%E2%80%93Lang_conjecture)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Kodaira dimension](https://en.wikipedia.org/wiki/Kodaira_dimension)\n- [HS00] M. Hindry, J. H. Silverman, *Diophantine Geometry: An Introduction*, Springer GTM 201\n  (2000), Conjecture F.5.2.1.\n- [La74] S. Lang, *Higher dimensional diophantine problems*, Bull. Amer. Math. Soc. 80 (1974),\n  779–787.\n- [DT15] P. Das, A. Turchet, *Rational Points, Rational Curves, and Entire Holomorphic Curves on\n  Projective Varieties*, Contemp. Math. 654 (2015), [arXiv:1407.7750](https://arxiv.org/abs/1407.7750).\n-/\n\nnamespace BombieriLangConjecture\n\nopen CategoryTheory AlgebraicGeometry Filter\nopen scoped TensorProduct\n\nuniverse u\n\nvariable (K : Type u) [Field K]\n\n/-- The `K`-algebra structure on the function field $K(X)$ of an integral scheme `X` over\n`Spec K`, induced by the structure morphism `X ⟶ Spec K`. -/\nnoncomputable scoped instance functionFieldAlgebra (X : Scheme.{u}) [X.Over (Spec (.of K))]\n    [IsIntegral X] : Algebra K X.functionField :=\n  haveI : Nonempty (⊤ : X.Opens) := ⟨⟨genericPoint X, trivial⟩⟩\n  ((Scheme.ΓSpecIso (.of K)).inv ≫ (X ↘ Spec (.of K)).appTop ≫\n    X.germToFunctionField ⊤).hom.toAlgebra\n\n/-- The `K`-vector space $(\\bigwedge^n_{K(X)} \\Omega_{K(X)/K})^{\\otimes m}$ of rational\n`m`-canonical forms of degree `n` on an integral scheme `X` over `Spec K`, where $K(X)$ is\nthe function field of `X`. When `X` is smooth of dimension `n` over `K`, this is the generic\nfibre of the `m`-th tensor power $\\omega_X^{\\otimes m}$ of the canonical bundle. -/\nabbrev RationalPluricanonicalForm (X : Scheme.{u}) [X.Over (Spec (.of K))] [IsIntegral X]\n    (n m : ℕ) : Type u :=\n  ⨂[X.functionField]^m (⋀[X.functionField]^n Ω[X.functionField⁄K])\n\n/-- The rational `m`-canonical forms of degree `n` on an integral scheme `X` over `Spec K`\nthat are *regular* on the nonempty open `U`, meaning that they are\n$\\Gamma(X, U)$-linear combinations of forms\n$(df_{1,1} \\wedge \\dots \\wedge df_{1,n}) \\otimes \\dots \\otimes\n(df_{m,1} \\wedge \\dots \\wedge df_{m,n})$ with all $f_{i,j} \\in \\Gamma(X, U)$.\nSince $K$ maps into $\\Gamma(X, U)$, this $\\Gamma(X, U)$-span is the same as the `K`-span of\nthe forms $a \\cdot (df_{1,1} \\wedge \\dots \\wedge df_{1,n}) \\otimes \\dots$ with\n$a, f_{i,j} \\in \\Gamma(X, U)$.\n\nThis description is the correct one when `U` is affine and `X` is smooth of dimension `n`\nover `K`: then it is the space of sections of $\\omega_X^{\\otimes m}$ over `U`. -/\nnoncomputable def regularPluricanonicalForms (X : Scheme.{u}) [X.Over (Spec (.of K))]\n    [IsIntegral X] (n m : ℕ) (U : X.Opens) [Nonempty U] :\n    Submodule K (RationalPluricanonicalForm K X n m) :=\n  Submodule.span K {ω | ∃ (a : Γ(X, U)) (f : Fin m → Fin n → Γ(X, U)),\n    ω = algebraMap Γ(X, U) X.functionField a •\n      ⨂ₜ[X.functionField] i, exteriorPower.ιMulti X.functionField n fun j ↦\n        KaehlerDifferential.D K X.functionField (algebraMap Γ(X, U) X.functionField (f i j))}\n\n/-- The rational `m`-canonical forms of degree `n` on an integral scheme `X` over `Spec K`\nthat are regular on every nonempty affine open of `X`. When `X` is smooth of dimension `n`\nover `K`, this is the space of global sections $H^0(X, \\omega_X^{\\otimes m})$ of the `m`-th\ntensor power of the canonical bundle $\\omega_X = \\bigwedge^n \\Omega_{X/K}$. -/\nnoncomputable def globalPluricanonicalForms (X : Scheme.{u}) [X.Over (Spec (.of K))]\n    [IsIntegral X] (n m : ℕ) : Submodule K (RationalPluricanonicalForm K X n m) :=\n  ⨅ (U : X.Opens) (_ : IsAffineOpen U) (_ : Nonempty U), regularPluricanonicalForms K X n m U\n\n/-- The `m`-th *plurigenus* $P_m(X) = \\dim_K H^0(X, \\omega_X^{\\otimes m})$ of an integral\nscheme `X` over `Spec K`, computed with forms of degree `n`. This is the classical plurigenus\nwhen `X` is smooth and proper of dimension `n` over `K` (in which case\n$H^0(X, \\omega_X^{\\otimes m})$ is finite-dimensional). -/\nnoncomputable def plurigenus (X : Scheme.{u}) [X.Over (Spec (.of K))] [IsIntegral X]\n    (n m : ℕ) : ℕ :=\n  Module.finrank K (globalPluricanonicalForms K X n m)\n\n/-- A form that is regular on every nonempty affine open is regular on each of them. -/\n@[category API, AMS 14]\nlemma globalPluricanonicalForms_le (X : Scheme.{u}) [X.Over (Spec (.of K))] [IsIntegral X]\n    (n m : ℕ) (U : X.Opens) (hU : IsAffineOpen U) [Nonempty U] :\n    globalPluricanonicalForms K X n m ≤ regularPluricanonicalForms K X n m U :=\n  iInf_le_of_le U (iInf_le_of_le hU (iInf_le _ ‹_›))\n\n/-- Two schemes `X` and `Y` over `Spec K` are *birational* over `K` if they contain dense open\nsubschemes that are isomorphic as `K`-schemes. -/\ndef IsBirational (X Y : Scheme.{u}) [X.Over (Spec (.of K))] [Y.Over (Spec (.of K))] : Prop :=\n  ∃ (U : X.Opens) (V : Y.Opens) (e : (U : Scheme.{u}) ≅ V),\n    Dense (U : Set X) ∧ Dense (V : Set Y) ∧\n    (e.hom ≫ (V.ι ≫ (Y ↘ Spec (.of K)))) = (U.ι ≫ (X ↘ Spec (.of K)))\n\n/-- Every scheme over `Spec K` is birational to itself. -/\n@[category API, AMS 14]\nlemma isBirational_refl (X : Scheme.{u}) [X.Over (Spec (.of K))] : IsBirational K X X :=\n  ⟨⊤, ⊤, Iso.refl _, by simp, by simp, by simp⟩\n\n/-- A smooth proper integral scheme `X` of dimension `n` over `Spec K` is *of general type* if\nits Kodaira dimension $\\kappa(X)$ equals `n`, i.e. if its plurigenera $P_m(X)$ grow like\n$m^n$: there is a constant $c > 0$ with $m^n \\le c \\cdot P_m(X)$ for infinitely many `m`.\n\n(By Iitaka's theorem, $P_m(X) = O(m^{\\kappa(X)})$, and $P_m(X) \\ge a m^{\\kappa(X)}$ for all\nlarge `m` in the semigroup of `m` with $P_m(X) \\ne 0$, so this is equivalent to\n$\\kappa(X) = n$.) -/\ndef IsSmoothProperOfGeneralType (X : Scheme.{u}) [X.Over (Spec (.of K))] [IsIntegral X]\n    (n : ℕ) : Prop :=\n  IsProper (X ↘ Spec (.of K)) ∧ IsSmoothOfRelativeDimension n (X ↘ Spec (.of K)) ∧\n    ∃ c : ℕ, 0 < c ∧ ∃ᶠ m in atTop, m ^ n ≤ c * plurigenus K X n m\n\n/-- An integral scheme `X` over `Spec K` is *of general type* if it is birational over `K` to\na smooth proper integral `K`-scheme `X'` of some dimension `n` with Kodaira dimension\n$\\kappa(X') = n$. Since the Kodaira dimension is a birational invariant of smooth proper\nvarieties, the choice of `X'` does not matter. -/\ndef IsGeneralType (X : Scheme.{u}) [X.Over (Spec (.of K))] : Prop :=\n  ∃ (X' : Scheme.{u}) (_ : X'.Over (Spec (.of K))) (_ : IsIntegral X') (n : ℕ),\n    IsBirational K X X' ∧ IsSmoothProperOfGeneralType K X' n\n\n/-- A smooth proper integral `K`-scheme with Kodaira dimension equal to its dimension is of\ngeneral type. -/\n@[category API, AMS 14]\nlemma IsSmoothProperOfGeneralType.isGeneralType (X : Scheme.{u}) [X.Over (Spec (.of K))]\n    [IsIntegral X] {n : ℕ} (hX : IsSmoothProperOfGeneralType K X n) : IsGeneralType K X :=\n  ⟨X, inferInstance, inferInstance, n, isBirational_refl K X, hX⟩\n\n/-- The set of `K`-rational points of a scheme `X` over `Spec K`, viewed as a subset of the\nunderlying (Zariski) topological space of `X`: the images of the `K`-morphisms\n`Spec K ⟶ X`. -/\ndef rationalPoints (X : Scheme.{u}) [X.Over (Spec (.of K))] : Set X :=\n  {x | ∃ p : Spec (.of K) ⟶ X, (p ≫ (X ↘ Spec (.of K))) = 𝟙 _ ∧ p.base default = x}\n\n/-- **Bombieri–Lang conjecture.** Let $K$ be a number field and let $X$ be a positive-dimensional\nvariety (an integral separated scheme of finite type over $K$) of general type over $K$. Then\nthe set $X(K)$ of $K$-rational points of $X$ is not dense in the Zariski topology on $X$.\n\nThe positive-dimensionality hypothesis excludes the point $\\operatorname{Spec} K$, which is of\ngeneral type with trivially dense rational points. -/\n@[category research open, AMS 11 14]\ntheorem bombieri_lang_conjecture [NumberField K] (X : Scheme.{u}) [X.Over (Spec (.of K))]\n    [IsIntegral X] [IsSeparated (X ↘ Spec (.of K))] [QuasiCompact (X ↘ Spec (.of K))]\n    [LocallyOfFiniteType (X ↘ Spec (.of K))] (hdim : 0 < topologicalKrullDim X)\n    (hX : IsGeneralType K X) :\n    ¬ Dense (rationalPoints K X) := by\n  sorry\n\nend BombieriLangConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None of substance. The table asks for (geometrically integral, projective) varieties; the file quantifies over integral separated finite-type K-schemes and defines general type through smooth *proper* birational models. Both deviations are equivalent to the table's reading (geometric integrality is automatic where K-points can be dense in characteristic 0; proper vs projective and singular vs smooth are absorbed by birational invariance of both Kodaira dimension and Zariski density of rational points), and they avoid primitives Mathlib lacks (projective morphisms, geometric integrality).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Variety over K' is read as an integral, separated, quasi-compact, locally-of-finite-type scheme over Spec K (hypotheses [IsIntegral X] [IsSeparated] [QuasiCompact] [LocallyOfFiniteType] on X ↘ Spec (.of K)). Geometric integrality is NOT required: over a number field (char 0), an integral variety that is not geometrically integral has all K-points inside the non-normal locus, so the statement for integral varieties is equivalent to (and formally slightly stronger than) the one for geometrically integral varieties.",
+    "'General type' (`IsGeneralType K X`) is defined as: X is birational over K (dense open subschemes isomorphic as K-schemes, `IsBirational`) to some integral K-scheme X' that is proper, smooth of relative dimension n (Mathlib's `IsSmoothOfRelativeDimension`), and satisfies the Kodaira-dimension-n growth condition. This is the textbook convention (Kodaira dimension is a birational invariant of smooth proper varieties, and is defined for singular / non-proper varieties through a smooth proper model). Because Zariski density of K-points is also a birational invariant, this reading is equivalent to the standard smooth projective formulation.",
+    "'Proper' is used instead of 'projective' (Mathlib has no IsProjective morphism class). Over a field of characteristic 0, every smooth proper variety is birational to a smooth projective one (Chow + Hironaka), and plurigenera are birational invariants among smooth proper varieties, so this does not change the class of varieties of general type.",
+    "Pluricanonical forms are modelled concretely: an m-canonical rational form of degree n is an element of (⋀ⁿ_F Ω_{F/K})^{⊗m} for F = K(X) (Mathlib `KaehlerDifferential`, `exteriorPower`, `TensorPower`). A form is regular on a nonempty affine open U = Spec A iff it lies in the K-span (= A-span, since K maps into A) of forms a·(df₁₁∧…∧df₁ₙ)⊗…⊗(dfₘ₁∧…∧dfₘₙ) with a, f_{ij} ∈ A. For smooth X' of dimension n this is exactly Γ(U, ω_{X'}^{⊗m}) inside the generic fibre, and the intersection over all nonempty affine opens is H⁰(X', ω^{⊗m}) (sheaf gluing; sections of a locally free sheaf on an integral scheme inject into the generic fibre). Restricting to *affine* opens is essential (for non-affine U the A-span description is wrong).",
+    "Kodaira dimension = n is encoded by the growth condition ∃ c > 0, ∃ᶠ m in atTop, m^n ≤ c · P_m(X'), where P_m = Module.finrank K H⁰(X', ω^{⊗m}). By Iitaka's theorem P_m = O(m^κ) and P_m ≥ a·m^κ for large m in the semigroup {m : P_m ≠ 0}, so 'frequently' (limsup form) is exactly κ(X') = n; the 'eventually' form would also be equivalent (canonical bundle big ⇒ semigroup contains all large m) but needs an extra argument. finrank returns 0 for infinite-dimensional spaces, which cannot occur for proper X'.",
+    "The K-algebra structure on the function field K(X) is a scoped instance built from the structure morphism: K ≅ Γ(Spec K, ⊤) → Γ(X, ⊤) → K(X).",
+    "Rational points are the set {x : X | ∃ p : Spec K ⟶ X, p ≫ (X ↘ Spec K) = 𝟙 ∧ p.base default = x} of underlying points of K-morphisms; density is Mathlib's `Dense` in the underlying (Zariski) topological space of X.",
+    "'Positive-dimensional' (the article's general form) is encoded as 0 < topologicalKrullDim X, which for an integral finite-type K-scheme is the usual dimension; it excludes Spec K, which is of general type (κ = 0 = dim) with trivially dense rational points.",
+    "The number field K lives in the same universe as the scheme (`K : Type u`, `X : Scheme.{u}`), as required by `Spec (.of K)`.",
+    "Because FormalConjecturesForMathlib globally overloads `≫` as an asymptotic notation, categorical compositions in the file are fully parenthesised."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "AlgebraicGeometry.Scheme.germToFunctionField / stalkFunctionFieldAlgebra (only Γ(X,U)- or stalk-algebra structures)",
+     "name": "BombieriLangConjecture.functionFieldAlgebra",
+     "why_needed": "Scoped instance giving the K-algebra structure on the function field of an integral scheme over Spec K (needed to form Ω[K(X)⁄K]). Mathlib only provides Algebra Γ(X, U) X.functionField, not an algebra structure over the base field of a K-scheme."
+    },
+    {
+     "closest_existing_considered": "KaehlerDifferential, exteriorPower, TensorPower (used as building blocks); no scheme-level Ω_{X/S} exists",
+     "name": "BombieriLangConjecture.RationalPluricanonicalForm",
+     "why_needed": "The space (⋀ⁿ_{K(X)} Ω_{K(X)/K})^{⊗m} of rational m-canonical forms; Mathlib has no sheaf of differentials or canonical bundle on schemes."
+    },
+    {
+     "closest_existing_considered": "SheafOfModules / IsVectorBundleWithRank (no canonical bundle instance available)",
+     "name": "BombieriLangConjecture.regularPluricanonicalForms",
+     "why_needed": "Sections of ω^{⊗m} over a nonempty (affine) open U, as the K-span of forms a·(df₁₁∧…∧df₁ₙ)⊗…⊗(dfₘ₁∧…∧dfₘₙ) with a, f_{ij} ∈ Γ(X, U) inside the generic fibre; no Mathlib notion of sections of a canonical bundle."
+    },
+    {
+     "closest_existing_considered": "none (no canonical sheaf in Mathlib)",
+     "name": "BombieriLangConjecture.globalPluricanonicalForms",
+     "why_needed": "H⁰(X, ω_X^{⊗m}) as the intersection of the regular forms over all nonempty affine opens."
+    },
+    {
+     "closest_existing_considered": "Module.finrank (used)",
+     "name": "BombieriLangConjecture.plurigenus",
+     "why_needed": "P_m(X) = dim_K H⁰(X, ω_X^{⊗m}); needed to express Kodaira dimension."
+    },
+    {
+     "closest_existing_considered": "AlgebraicGeometry.Scheme.RationalMap / PartialMap (no notion of birational equivalence or inverse)",
+     "name": "BombieriLangConjecture.IsBirational",
+     "why_needed": "Birational equivalence over K (isomorphic dense open subschemes over Spec K), needed to define general type for arbitrary varieties via smooth proper models. Mathlib has RationalMap but no birationality predicate."
+    },
+    {
+     "closest_existing_considered": "none (no Kodaira dimension in Mathlib)",
+     "name": "BombieriLangConjecture.IsSmoothProperOfGeneralType",
+     "why_needed": "A smooth proper integral K-scheme of relative dimension n with Kodaira dimension n, i.e. plurigenera growing like m^n."
+    },
+    {
+     "closest_existing_considered": "none",
+     "name": "BombieriLangConjecture.IsGeneralType",
+     "why_needed": "A K-scheme is of general type if it is birational over K to a smooth proper integral K-scheme of general type (the standard birationally invariant definition)."
+    },
+    {
+     "closest_existing_considered": "Hom-sets Spec (.of K) ⟶ X and Scheme.Hom.IsOver (used to build the set); no existing 'set of rational points' definition",
+     "name": "BombieriLangConjecture.rationalPoints",
+     "why_needed": "The set of K-rational points of a K-scheme as a subset of its underlying Zariski space, so that Zariski density can be expressed with Mathlib's Dense."
+    }
+   ],
+   "per_slot": {
+    "bombieri_lang_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `bombieri_lang_conjecture`: for every number field K (same universe as the scheme) and every integral, separated, quasi-compact, locally finite type K-scheme X with 0 < topologicalKrullDim X and IsGeneralType K X, the set of K-rational points (images of K-morphisms Spec K ⟶ X) is not Dense in the Zariski topology of X. 'General type' has no Mathlib counterpart, so it is built from Kähler differentials on the function field (see new_definitions)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "bombieri_lang_conjecture": "/-- **Bombieri–Lang conjecture.** Let $K$ be a number field and let $X$ be a positive-dimensional\nvariety (an integral separated scheme of finite type over $K$) of general type over $K$. Then\nthe set $X(K)$ of $K$-rational points of $X$ is not dense in the Zariski topology on $X$.\n\nThe positive-dimensionality hypothesis excludes the point $\\operatorname{Spec} K$, which is of\ngeneral type with trivially dense rational points. -/\n@[category research open, AMS 11 14]\ntheorem bombieri_lang_conjecture [NumberField K] (X : Scheme.{u}) [X.Over (Spec (.of K))]\n    [IsIntegral X] [IsSeparated (X ↘ Spec (.of K))] [QuasiCompact (X ↘ Spec (.of K))]\n    [LocallyOfFiniteType (X ↘ Spec (.of K))] (hdim : 0 < topologicalKrullDim X)\n    (hX : IsGeneralType K X) :\n    ¬ Dense (rationalPoints K X) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c07",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The intended reading, if the missing theory becomes available, is the article's general form: universally quantify over every number field K and every positive-dimensional geometrically integral projective K-variety X of general type, take X(K) to be K-scheme morphisms Spec K → X (or their underlying images), and assert that this subset is not dense in the Zariski topology on the underlying space of X. The weak surface-only and refined open-subset finiteness variants are not included."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "bombieri_lang_conjecture": {
+     "outcome": "missing_primitives",
+     "why": "A faithful statement requires a mathematically defined predicate saying that a positive-dimensional geometrically integral projective variety has general type (Kodaira dimension equal to its dimension). Mathlib and FormalConjecturesForMathlib have schemes, Zariski topology, integral schemes, proper/finite-type morphisms, rational maps, and topological Krull dimension, but they do not provide canonical sheaves or canonical divisors, pluricanonical tensor powers and their global sections, big line bundles/divisors, or Iitaka/Kodaira dimension. Consequently, a genuine bespoke `IsOfGeneralType` definition cannot be constructed from the available primitives in this problem file. An unconstrained predicate, a structure field asserting `isOfGeneralType`, or externally supplied 'Kodaira dimension' data would only label arbitrary schemes and would be a forbidden placeholder rather than formalize general type. The slot is therefore omitted."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": true,
+   "cid": "c08",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The terse list entry was read as the article's general form: universal over number fields K and positive-dimensional varieties X, with density taken in the underlying Zariski topological space of X; the weak surface and refined open-subset forms were not included.",
+    "In accordance with the fixed decomposition, the intended variety domain would additionally be geometrically integral and projective. Existing scheme, rational-point, and Zariski-density APIs appear sufficient for those parts up to small bespoke wrappers, but they do not supply the essential general-type condition."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "bombieri_lang_conjecture": {
+     "outcome": "missing_primitives",
+     "why": "Mathlib and FormalConjecturesForMathlib have no definition of a variety of general type, Kodaira dimension, canonical/pluricanonical sheaves, or equivalent big-divisor machinery. A faithful bespoke definition of general type therefore cannot be built from the available algebraic-geometry primitives without developing substantial missing foundations. Treating general type as an arbitrary predicate or a field of a custom structure would be a circular placeholder and would not faithfully state the conjecture. Consequently the slot is omitted, as required."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  }
+ ],
+ "chosen": {
+  "bombieri_lang_conjecture": "c06"
+ },
+ "id": "wp-bombieri-lang-conjecture",
+ "main_attempt": "c06"
+}

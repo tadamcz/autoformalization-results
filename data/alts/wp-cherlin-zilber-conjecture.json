@@ -1,0 +1,489 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cherlin–Zilber conjecture\n\n*Reference:* [Wikipedia, Stable group](https://en.wikipedia.org/wiki/Stable_group)\n-/\n\nnamespace CherlinZilberConjecture\n\nopen Cardinal FirstOrder\nopen FirstOrder.Language\n\n/-- The function symbols of the first-order language of groups. -/\ninductive GroupFunc : ℕ → Type\n  | one : GroupFunc 0\n  | inv : GroupFunc 1\n  | mul : GroupFunc 2\n  deriving DecidableEq\n\n/-- The first-order language with multiplication, inverse, and identity as its only symbols. -/\ndef groupLanguage : FirstOrder.Language where\n  Functions := GroupFunc\n  Relations := fun _ ↦ Empty\n\n/-- The canonical interpretation of the first-order language of groups on an abstract group. -/\ndef groupStructure (G : Type*) [Group G] : groupLanguage.Structure G where\n  funMap := fun {n} f ↦ match n, f with\n    | _, .one => fun _ ↦ 1\n    | _, .inv => fun x ↦ (x 0)⁻¹\n    | _, .mul => fun x ↦ x 0 * x 1\n  RelMap := fun {_} r ↦ nomatch r\n\n/-- Two elements have the same complete first-order 1-type over `A` in the pure group language. -/\ndef SameTypeOver {M : Type*} [Group M] (A : Set M) (x y : M) : Prop :=\n  let _ : groupLanguage.Structure M := groupStructure M\n  ∀ φ : groupLanguage.Formula (A ⊕ Unit),\n    φ.Realize (Sum.elim Subtype.val (fun _ ↦ x)) ↔\n      φ.Realize (Sum.elim Subtype.val (fun _ ↦ y))\n\n/-- The setoid identifying elements with the same complete 1-type over a parameter set. -/\ndef sameTypeSetoid {M : Type*} [Group M] (A : Set M) : Setoid M where\n  r := SameTypeOver A\n  iseqv := ⟨fun _ _ ↦ Iff.rfl, fun h φ ↦ (h φ).symm,\n    fun h₁ h₂ φ ↦ (h₁ φ).trans (h₂ φ)⟩\n\n/-- The number of complete 1-types over `A` that are realized in `M`. -/\ndef numberOfRealizedOneTypes {M : Type*} [Group M] (A : Set M) : Cardinal :=\n  Cardinal.mk (Quotient (sameTypeSetoid A))\n\n/-- The complete pure group theory of `G` is omega-stable.\n\nThis uses the equivalent characterization that, in every elementarily equivalent group, at most\ncountably many 1-types over each countable parameter set are realized.\n-/\ndef IsOmegaStableGroup (G : Type u) [Group G] : Prop :=\n  let _ : groupLanguage.Structure G := groupStructure G\n  ∀ (M : Type u) (hM : Group M),\n    let _ : Group M := hM\n    let _ : groupLanguage.Structure M := groupStructure M\n    groupLanguage.completeTheory M = groupLanguage.completeTheory G →\n      ∀ A : Set M, #A ≤ ℵ₀ → numberOfRealizedOneTypes A ≤ ℵ₀\n\n/-- A subset of affine space cut out by an arbitrary family of polynomial equations. -/\ndef IsAlgebraicSet {K : Type*} [CommRing K] {n : ℕ} (X : Set (Fin n → K)) : Prop :=\n  ∃ S : Set (MvPolynomial (Fin n) K),\n    X = {x | ∀ p ∈ S, MvPolynomial.eval x p = 0}\n\n/-- Zariski connectedness for an affine algebraic set.\n\nSince the ambient set is algebraic, its relatively closed subsets are again affine algebraic sets,\nwhich permits this separation-based definition without installing a new topology.\n-/\ndef IsZariskiConnected {K : Type*} [CommRing K] {n : ℕ} (X : Set (Fin n → K)) : Prop :=\n  X.Nonempty ∧ ∀ A B : Set (Fin n → K), IsAlgebraicSet A → IsAlgebraicSet B →\n    A ⊆ X → B ⊆ X → X ⊆ A ∪ B → Disjoint A B → A = ∅ ∨ B = ∅\n\n/-- A concrete affine algebraic group over `K`: an affine algebraic set whose group operations are\nregular maps, represented coordinatewise by polynomials. -/\nstructure AffineAlgebraicGroup (K : Type*) [Field K] where\n  n : ℕ\n  carrier : Set (Fin n → K)\n  isAlgebraic : IsAlgebraicSet carrier\n  group : Group carrier\n  mul_polynomial : ∃ p : Fin n → MvPolynomial (Fin n ⊕ Fin n) K,\n    ∀ x y : carrier, ∀ i,\n      ((group.mul x y : carrier) : Fin n → K) i =\n        MvPolynomial.eval (Sum.elim (x : Fin n → K) (y : Fin n → K)) (p i)\n  inv_polynomial : ∃ p : Fin n → MvPolynomial (Fin n) K,\n    ∀ x : carrier, ∀ i,\n      ((group.inv x : carrier) : Fin n → K) i = MvPolynomial.eval x (p i)\n\n/-- A connected, positive-dimensional, simple affine algebraic group.\n\nHere positive-dimensionality is expressed by infinitude of the algebraic set, an equivalent\ncondition for affine algebraic sets of finite type over an algebraically closed field. Algebraic\nsimplicity means noncommutativity and absence of a proper nontrivial connected normal algebraic\nsubgroup.\n-/\ndef AffineAlgebraicGroup.IsSimple {K : Type*} [Field K] (A : AffineAlgebraicGroup K) : Prop :=\n  letI : Group A.carrier := A.group\n  IsZariskiConnected A.carrier ∧ A.carrier.Infinite ∧\n    (¬ ∀ x y : A.carrier, x * y = y * x) ∧\n    ∀ H : Subgroup A.carrier, H.Normal →\n      IsAlgebraicSet (((fun x : A.carrier ↦ (x : Fin A.n → K)) '' (H : Set A.carrier))) →\n      IsZariskiConnected (((fun x : A.carrier ↦ (x : Fin A.n → K)) '' (H : Set A.carrier))) →\n      H = ⊥ ∨ H = ⊤\n\n/-- **Cherlin–Zilber conjecture.** Every infinite nonabelian simple group whose complete\nfirst-order theory in the pure language of groups is $\\omega$-stable is isomorphic, as an abstract\ngroup, to the group of points of a connected positive-dimensional simple algebraic group over an\nalgebraically closed field.\n-/\n@[category research open, AMS 3 20]\ntheorem cherlin_zilber_conjecture (G : Type u) [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : ¬ ∀ x y : G, x * y = y * x) (hstable : IsOmegaStableGroup G) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (A : AffineAlgebraicGroup K),\n      A.IsSimple ∧ (letI : Group A.carrier := A.group; Nonempty (G ≃* A.carrier)) := by\n  sorry\n\nend CherlinZilberConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Following the Stable group article and the fixed decomposition, the source's terse “simple group” is formalized as an infinite nonabelian abstract simple group; infinitude excludes finite simple groups, which otherwise have omega-stable theories.",
+    "“Stable in aleph_0” is read as omega-stable, not merely stable or superstable. It is encoded by the standard equivalent criterion that every group elementarily equivalent to G realizes at most countably many complete 1-types over each countable parameter set.",
+    "The first-order theory is taken in the pure language of groups, with multiplication, inverse, identity, and built-in equality.",
+    "Because Mathlib has no algebraic-group or group-scheme primitive, an algebraic group is represented concretely as a Zariski-closed subset of finite-dimensional affine space whose multiplication and inversion are coordinatewise polynomial. Connected algebraic groups are affine varieties in the intended simple linear-algebraic-group setting, so this concrete presentation does not restrict the conjecture's intended conclusion.",
+    "Algebraic simplicity is modeled in the standard connected sense: the group is connected and noncommutative and has no proper nontrivial connected normal closed algebraic subgroup.",
+    "Positive dimension is represented by infinitude of the affine algebraic set. For finite-type affine algebraic sets over an algebraically closed field, this is equivalent to positive dimension.",
+    "The conclusion uses an abstract group isomorphism from G to the full K-point group of the represented algebraic group."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's FirstOrder.Language.ring and its compatible ring structure; no group-language analogue was found.",
+     "name": "GroupFunc, groupLanguage, groupStructure",
+     "why_needed": "To specify the complete first-order theory in exactly the pure language of groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib's FirstOrder.Language.Theory.CompleteType and completeTheory. CompleteType counts types in named free variables over a theory but does not directly provide stability over parameter subsets or an omega-stability predicate.",
+     "name": "SameTypeOver, sameTypeSetoid, numberOfRealizedOneTypes, IsOmegaStableGroup",
+     "why_needed": "To express omega-stability by counting complete 1-types over countable parameter sets in elementarily equivalent groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib's schemes, affine schemes, prime-spectrum Zariski topology, and MvPolynomial. No primitive for classical affine algebraic subsets of K^n was found.",
+     "name": "IsAlgebraicSet",
+     "why_needed": "To represent affine algebraic sets of K-points as common zero loci of multivariate polynomials."
+    },
+    {
+     "closest_existing_considered": "Mathlib's ConnectedSpace/IsConnected and prime-spectrum Zariski topology. No Zariski topology on K^n or classical affine algebraic sets was found.",
+     "name": "IsZariskiConnected",
+     "why_needed": "To express connectedness of a concrete affine algebraic set using separation by relatively closed algebraic subsets."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Scheme and AffineScheme APIs; no group scheme or algebraic group structure was found.",
+     "name": "AffineAlgebraicGroup",
+     "why_needed": "To model the K-points of an affine algebraic group, including polynomial regularity of multiplication and inversion."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsSimpleGroup, which concerns abstract normal subgroups and does not encode Zariski connectedness, algebraicity, or dimension.",
+     "name": "AffineAlgebraicGroup.IsSimple",
+     "why_needed": "To express connected, positive-dimensional algebraic simplicity rather than abstract simplicity alone."
+    }
+   ],
+   "per_slot": {
+    "cherlin_zilber_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Mathlib provides first-order syntax and semantics, abstract simple groups, algebraically closed fields, and multivariate polynomials, but it has neither omega-stability nor algebraic groups/group schemes. The file therefore gives concrete faithful definitions of both notions."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cherlin_zilber_conjecture": "/-- **Cherlin–Zilber conjecture.** Every infinite nonabelian simple group whose complete\nfirst-order theory in the pure language of groups is $\\omega$-stable is isomorphic, as an abstract\ngroup, to the group of points of a connected positive-dimensional simple algebraic group over an\nalgebraically closed field.\n-/\n@[category research open, AMS 3 20]\ntheorem cherlin_zilber_conjecture (G : Type u) [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : ¬ ∀ x y : G, x * y = y * x) (hstable : IsOmegaStableGroup G) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (A : AffineAlgebraicGroup K),\n      A.IsSimple ∧ (letI : Group A.carrier := A.group; Nonempty (G ≃* A.carrier)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cherlin–Zilber conjecture\n\n*References:*\n- [Wikipedia, *Stable group*](https://en.wikipedia.org/wiki/Stable_group)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [G. Cherlin, *Groups of small Morley rank*, Ann. Math. Logic 17 (1979), 1–28](https://doi.org/10.1016/0003-4843(79)90019-6)\n- [B. I. Zil'ber, *Groups and rings whose theory is categorical*, Fundam. Math. 95 (1977), 173–188](https://doi.org/10.4064/fm-95-3-173-188)\n- [T. Altınel, A. V. Borovik, G. Cherlin, *Simple groups of finite Morley rank*, AMS (2008)](https://doi.org/10.1090/surv/145)\n\nThe Cherlin–Zilber conjecture (also called the *algebraicity conjecture*) states that an infinite\nsimple group whose first-order theory is stable in $\\aleph_0$ (i.e. $\\omega$-stable) is a simple\nalgebraic group over an algebraically closed field.\n\nMathlib has neither $\\omega$-stability nor algebraic groups, so this file defines both.\n\n* `Language.group` is the first-order language of groups; every group is a structure for it.\n* A theory `T` is $\\omega$-stable (`IsOmegaStable`) if for every model `M` of `T` and every\n  countable set `A ⊆ M` of parameters, there are only countably many complete types over `A`.\n* Algebraic groups over an algebraically closed field `K` are modelled as Zariski-closed subgroups\n  of `GL n K`. This loses no generality: a simple algebraic group is non-commutative, hence affine\n  by Chevalley's structure theorem, hence isomorphic to a closed subgroup of some `GL n K`.\n  A closed subgroup is *connected* if it has no proper closed subgroup of finite index, and it is a\n  *simple algebraic group* if it is connected, non-commutative, and has no connected closed normal\n  subgroups other than the trivial subgroup and itself.\n-/\n\nnamespace CherlinZilberConjecture\n\nopen FirstOrder FirstOrder.Language\n\nuniverse u v\n\n/-- The function symbols of the first-order language of groups: a binary multiplication, a unary\ninversion and a constant for the identity. -/\ninductive groupFunc : ℕ → Type\n  | mul : groupFunc 2\n  | inv : groupFunc 1\n  | one : groupFunc 0\n\n/-- The first-order language of groups, with function symbols `*`, `⁻¹` and `1` and no relation\nsymbols. -/\ndef Language.group : Language :=\n  { Functions := groupFunc\n    Relations := fun _ => Empty }\n\n/-- Every group is a structure for the language of groups, interpreting the symbols by the group\noperations. -/\ninstance {G : Type*} [Group G] : Language.group.Structure G where\n  funMap {n} f x :=\n    match n, f with\n    | _, .mul => x 0 * x 1\n    | _, .inv => (x 0)⁻¹\n    | _, .one => 1\n  RelMap {_} r := r.elim\n\nsection groupStructure\n\nvariable {G : Type*} [Group G]\n\n@[category API, AMS 3 20]\ntheorem funMap_mul (x : Fin 2 → G) :\n    Structure.funMap (L := Language.group) groupFunc.mul x = x 0 * x 1 := rfl\n\n@[category API, AMS 3 20]\ntheorem funMap_inv (x : Fin 1 → G) :\n    Structure.funMap (L := Language.group) groupFunc.inv x = (x 0)⁻¹ := rfl\n\n@[category API, AMS 3 20]\ntheorem funMap_one (x : Fin 0 → G) :\n    Structure.funMap (L := Language.group) groupFunc.one x = 1 := rfl\n\nend groupStructure\n\n/-- A first-order theory `T` is *$\\omega$-stable* (or *stable in $\\aleph_0$*) if for every model\n`M` of `T`, every countable set `A ⊆ M` of parameters and every `m`, there are only countably many\ncomplete `m`-types over `A`, i.e. the complete theory of `M` in the language `L[[A]]` with a\nconstant for each element of `A` has only countably many complete types in `m` variables.\n\nAs for `FirstOrder.Language.Theory.IsSatisfiable`, the models range over `Type (max u v)`. By the\ndownward Löwenheim–Skolem theorem this loses no generality: the types over a countable set `A` in\na model `M` only depend on the complete theory of `M` in the language `L[[A]]`, which is shared by\nany countable elementary substructure of `M` containing `A`. -/\ndef IsOmegaStable {L : FirstOrder.Language.{u, v}} (T : L.Theory) : Prop :=\n  ∀ (M : Theory.ModelType.{u, v, max u v} T) (A : Set M), A.Countable →\n    ∀ m : ℕ, Countable ((L[[A]].completeTheory M).CompleteType (Fin m))\n\nvariable {K : Type*} [Field K] {n : ℕ}\n\n/-- A subgroup `H` of `GL n K` is *Zariski-closed* if it is the set of common zeros in `GL n K` of\nan ideal of polynomials in the matrix entries. -/\ndef IsZariskiClosed (H : Subgroup (GL (Fin n) K)) : Prop :=\n  ∃ I : Ideal (MvPolynomial (Fin n × Fin n) K),\n    ∀ g : GL (Fin n) K, g ∈ H ↔ (fun ij => g.val ij.1 ij.2) ∈ MvPolynomial.zeroLocus K I\n\n@[category test, AMS 14 20]\ntheorem isZariskiClosed_top : IsZariskiClosed (⊤ : Subgroup (GL (Fin n) K)) :=\n  ⟨⊥, fun _ => by simp⟩\n\nopen MvPolynomial in\n@[category test, AMS 14 20]\ntheorem isZariskiClosed_bot : IsZariskiClosed (⊥ : Subgroup (GL (Fin n) K)) := by\n  refine ⟨Ideal.span (Set.range fun ij : Fin n × Fin n =>\n    X ij - C ((1 : Matrix (Fin n) (Fin n) K) ij.1 ij.2)), fun g => ?_⟩\n  rw [zeroLocus_span, Set.mem_setOf_eq, Subgroup.mem_bot, Units.ext_iff, Units.val_one]\n  simp only [Set.forall_mem_range, map_sub, aeval_X, aeval_C, Algebra.algebraMap_self,\n    RingHom.id_apply, sub_eq_zero]\n  exact ⟨fun h ij => by rw [h], fun h => Matrix.ext fun i j => h (i, j)⟩\n\n/-- A subgroup `H` of `GL n K` is *Zariski-connected* if it has no Zariski-closed subgroup of finite\nindex other than itself. For a Zariski-closed subgroup `H` this is equivalent to connectedness in\nthe Zariski topology, since the identity component of `H` is a closed subgroup of finite index\ncontained in every closed subgroup of finite index. -/\ndef IsZariskiConnected (H : Subgroup (GL (Fin n) K)) : Prop :=\n  ∀ H' ≤ H, IsZariskiClosed H' → (H'.subgroupOf H).FiniteIndex → H' = H\n\n@[category test, AMS 14 20]\ntheorem isZariskiConnected_bot : IsZariskiConnected (⊥ : Subgroup (GL (Fin n) K)) :=\n  fun _ h _ _ => le_bot_iff.mp h\n\n/-- A subgroup `H` of `GL n K` is a *simple (linear) algebraic group* if it is Zariski-closed,\nconnected, non-commutative, and its only connected Zariski-closed normal subgroups are the\ntrivial subgroup and `H` itself. -/\ndef IsSimpleAlgebraicGroup (H : Subgroup (GL (Fin n) K)) : Prop :=\n  IsZariskiClosed H ∧ IsZariskiConnected H ∧ ¬ IsMulCommutative H ∧\n    ∀ N ≤ H, IsZariskiClosed N → IsZariskiConnected N → (N.subgroupOf H).Normal →\n      N = ⊥ ∨ N = H\n\n/-- **Cherlin–Zilber conjecture.** An infinite simple group $G$ whose first-order theory (in the\nlanguage of groups) is stable in $\\aleph_0$, i.e. $\\omega$-stable, is a simple algebraic group over\nan algebraically closed field: there are an algebraically closed field $K$ and a simple algebraic\ngroup $H$ over $K$, realised as a Zariski-closed subgroup of $\\mathrm{GL}_n(K)$, such that $G$ is\nisomorphic (as an abstract group) to the group $H(K)$ of $K$-points of $H$.\n\nThe hypothesis that $G$ is infinite excludes the finite simple groups, whose theories are trivially\n$\\omega$-stable. An infinite simple group is automatically non-abelian. -/\n@[category research open, AMS 3 20]\ntheorem cherlin_zilber_conjecture (G : Type u) [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : IsOmegaStable (Language.group.completeTheory G)) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (n : ℕ) (H : Subgroup (GL (Fin n) K)),\n      IsSimpleAlgebraicGroup H ∧ Nonempty (G ≃* H) := by\n  sorry\n\nend CherlinZilberConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.82,
+   "decomposition_objections": "None. The single-slot decomposition matches the source; the finite-Morley-rank remark is correctly treated as context only.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Added the implicit hypothesis `[Infinite G]` (from the Wikipedia article: 'infinite (ω-stable) simple groups'); without it the statement is false for finite simple groups. Non-abelianness is not added since an infinite simple group is automatically non-abelian.",
+    "'First-order theory' is taken as the complete theory `Language.group.completeTheory G` of G in the language of groups (symbols *, ⁻¹, 1, plus built-in equality), a bespoke language defined in the file in the style of Mathlib's `Language.ring`.",
+    "'Stable in ℵ₀' is formalized as ω-stability: for every model M of T, every countable parameter set A ⊆ M and every m, the set of complete m-types over A (Mathlib's `CompleteType` of the complete theory of M in the language L[[A]], in variables `Fin m`) is countable. Quantifying over all m rather than only 1-types is the standard (Marker-style) definition and is equivalent to the 1-type version.",
+    "Following Mathlib's convention for `Theory.IsSatisfiable`/`IsComplete`, models in `IsOmegaStable` range over `Type (max u v)` (here `Type 0`). By downward Löwenheim–Skolem this loses no generality (types over a countable A depend only on the L[[A]]-theory of M, shared with a countable elementary substructure containing A).",
+    "'Simple algebraic group over an algebraically closed field' is modelled concretely as a Zariski-closed subgroup H of GL n K with K algebraically closed (linear algebraic group in the classical, K-points sense), since every simple algebraic group is non-commutative, hence affine (Chevalley), hence linear. G is required to be isomorphic as an abstract group to H = H(K).",
+    "Zariski-closedness of a subgroup of GL n K is expressed via `MvPolynomial.zeroLocus` of an ideal in the n² matrix-entry variables; this is correct because GL n is an open subvariety of affine n²-space, so its Zariski topology is the subspace topology.",
+    "Connectedness of a closed subgroup is defined as 'no proper Zariski-closed subgroup of finite index', a standard characterization (the identity component is a closed subgroup of finite index contained in every closed subgroup of finite index; the Wikipedia article itself uses this form of the definition). Simplicity uses the standard 'connected, non-commutative, no proper nontrivial connected closed normal subgroups'. Note that since G is abstractly simple and infinite, any Zariski-closed subgroup of GL n K isomorphic to G automatically satisfies all these conditions, so the truth value of the statement is insensitive to these convention choices (e.g. 'simple' vs 'almost simple', or connected vs arbitrary closed normal subgroups).",
+    "K is required to live in the same universe as G (`K : Type u`). This is no restriction: |K| ≤ |G| whenever G ≅ H(K) for an infinite closed subgroup H of GL n K, so K can always be transported to universe u.",
+    "Category `research open`, AMS tags 3 (logic) and 20 (group theory); auxiliary API/test lemmas (rfl-checks for the group structure, Zariski-closedness of ⊤ and ⊥, connectedness of ⊥) are tagged `API`/`test` with AMS 3 20 / 14 20."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FirstOrder.Language.ring, FirstOrder.Ring.CompatibleRing (Mathlib/ModelTheory/Algebra/Ring/Basic.lean); Language.mk₂ no longer exists in this Mathlib.",
+     "name": "CherlinZilberConjecture.groupFunc / CherlinZilberConjecture.Language.group (+ Structure instance for any Group)",
+     "why_needed": "Mathlib has languages of rings/fields (`FirstOrder.Language.ring`) but no first-order language of groups, needed to speak of the first-order theory of a group."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.CompleteType (used as the building block), Cardinal.Categorical, Theory.IsSatisfiable (universe convention).",
+     "name": "CherlinZilberConjecture.IsOmegaStable",
+     "why_needed": "Mathlib's ModelTheory library has no notion of stability, ω-stability or Morley rank (grepped `Stable`, `Morley`, `omega` in Mathlib/ModelTheory and the repo)."
+    },
+    {
+     "closest_existing_considered": "MvPolynomial.zeroLocus (Mathlib/RingTheory/Nullstellensatz.lean), which is reused; PrimeSpectrum.zeroLocus and AlgebraicGeometry.Scheme / Grp_ Scheme were judged unsuitable for K-points of classical algebraic groups.",
+     "name": "CherlinZilberConjecture.IsZariskiClosed",
+     "why_needed": "No notion of Zariski-closed subgroup of GL n K / linear algebraic group in Mathlib."
+    },
+    {
+     "closest_existing_considered": "IsConnected/ConnectedSpace with a hand-made TopologicalSpace instance (rejected as more cumbersome); Subgroup.FiniteIndex is reused.",
+     "name": "CherlinZilberConjecture.IsZariskiConnected",
+     "why_needed": "Connectedness of an algebraic group is needed to define simple algebraic groups; no Zariski topology instance exists on GL n K in Mathlib."
+    },
+    {
+     "closest_existing_considered": "IsSimpleGroup (abstract simplicity, not the algebraic-group notion), Grp_ (CategoryTheory.Monoidal) has no simplicity/connectedness API.",
+     "name": "CherlinZilberConjecture.IsSimpleAlgebraicGroup",
+     "why_needed": "Mathlib has no algebraic groups, hence no simple algebraic groups."
+    }
+   ],
+   "per_slot": {
+    "cherlin_zilber_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every infinite simple group G (Type u) whose complete first-order theory in the language of groups is ω-stable, there exist an algebraically closed field K : Type u, n : ℕ and a Zariski-closed subgroup H of GL n K which is a simple algebraic group (connected, non-commutative, no connected closed normal subgroups besides ⊥ and H) with G ≃* H. Mathlib has neither ω-stability nor algebraic groups, so both were defined in the file (language of groups + structure instance, IsOmegaStable, IsZariskiClosed, IsZariskiConnected, IsSimpleAlgebraicGroup)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cherlin_zilber_conjecture": "/-- **Cherlin–Zilber conjecture.** An infinite simple group $G$ whose first-order theory (in the\nlanguage of groups) is stable in $\\aleph_0$, i.e. $\\omega$-stable, is a simple algebraic group over\nan algebraically closed field: there are an algebraically closed field $K$ and a simple algebraic\ngroup $H$ over $K$, realised as a Zariski-closed subgroup of $\\mathrm{GL}_n(K)$, such that $G$ is\nisomorphic (as an abstract group) to the group $H(K)$ of $K$-points of $H$.\n\nThe hypothesis that $G$ is infinite excludes the finite simple groups, whose theories are trivially\n$\\omega$-stable. An infinite simple group is automatically non-abelian. -/\n@[category research open, AMS 3 20]\ntheorem cherlin_zilber_conjecture (G : Type u) [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : IsOmegaStable (Language.group.completeTheory G)) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (n : ℕ) (H : Subgroup (GL (Fin n) K)),\n      IsSimpleAlgebraicGroup H ∧ Nonempty (G ≃* H) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# The Cherlin–Zilber conjecture\n\nThe Cherlin–Zilber conjecture predicts that every infinite nonabelian simple group whose theory in\nfirst-order group language is $\\aleph_0$-stable is an algebraic group over an algebraically closed\nfield.\n\n*References:*\n- [Wikipedia, *Stable group*](https://en.wikipedia.org/wiki/Stable_group)\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace CherlinZilberConjecture\nuniverse u v\n\nopen Cardinal FirstOrder\nopen FirstOrder.Language\n\n/-- The function symbols $1$, ${}^{-1}$, and $\\cdot$ of the first-order language of groups. -/\ninductive GroupFunction : ℕ → Type\n  | one : GroupFunction 0\n  | inv : GroupFunction 1\n  | mul : GroupFunction 2\n\n/-- The first-order language of groups. -/\ndef groupLanguage : FirstOrder.Language where\n  Functions := GroupFunction\n  Relations := fun _ ↦ Empty\n\n/-- The canonical first-order group-language structure on a group. -/\ndef groupStructure (G : Type*) [Group G] : groupLanguage.Structure G where\n  funMap := fun {_} f x ↦ match f with\n    | .one => 1\n    | .inv => (x 0)⁻¹\n    | .mul => x 0 * x 1\n  RelMap := fun {_} r _ ↦ r.elim\n\n/-- The number of complete $1$-types over an `L`-structure `M`. -/\ndef numberOfOneTypesOver (L : FirstOrder.Language) (M : Type*) [L.Structure M] : Cardinal :=\n  letI := constantsOn.structure (M := M) id\n  Cardinal.mk ((L.elementaryDiagram M).CompleteType (Fin 1))\n\n/-- A theory is $\\aleph_0$-stable if it has at most countably many complete $1$-types over each\ncountable model. -/\ndef IsOmegaStable {L : FirstOrder.Language.{u, v}} (T : L.Theory) : Prop :=\n  ∀ M : FirstOrder.Language.Theory.ModelType.{u, v, max u v} T, Cardinal.mk M.Carrier ≤ Cardinal.aleph0 →\n    numberOfOneTypesOver L M.Carrier ≤ Cardinal.aleph0\n\n/-- The Zariski topology on affine space, generated by the complements of polynomial zero loci. -/\ndef affineZariskiTopology (K : Type*) [CommRing K] (ι : Type*) : TopologicalSpace (ι → K) :=\n  TopologicalSpace.generateFrom\n    {U | ∃ p : MvPolynomial ι K, U = {x | MvPolynomial.eval x p ≠ 0}}\n\n/-- The Zariski topology on $\\operatorname{GL}_n(K)$ induced from its matrix entries. -/\ndef generalLinearZariskiTopology (K : Type*) [Field K] (n : ℕ) :\n    TopologicalSpace (Matrix.GeneralLinearGroup (Fin n) K) :=\n  TopologicalSpace.induced\n    (fun A : Matrix.GeneralLinearGroup (Fin n) K ↦ (fun ij ↦ (A : Matrix (Fin n) (Fin n) K) ij.1 ij.2))\n    (affineZariskiTopology K (Fin n × Fin n))\n\n/-- A linear algebraic group over `K`, presented as a Zariski-closed subgroup of some\n$\\operatorname{GL}_n(K)$. -/\nstructure LinearAlgebraicGroup (K : Type*) [Field K] where\n  /-- The dimension of an ambient faithful linear representation. -/\n  n : ℕ\n  /-- The group of `K`-points as a subgroup of a general linear group. -/\n  points : Subgroup (Matrix.GeneralLinearGroup (Fin n) K)\n  /-- The subgroup is Zariski closed. -/\n  isClosed : @IsClosed (Matrix.GeneralLinearGroup (Fin n) K) (generalLinearZariskiTopology K n) points\n\n/-- The Zariski topology on the points of a linear algebraic group. -/\ndef LinearAlgebraicGroup.zariskiTopology {K : Type*} [Field K]\n    (A : LinearAlgebraicGroup K) : TopologicalSpace A.points :=\n  TopologicalSpace.induced ((↑) : A.points → Matrix.GeneralLinearGroup (Fin A.n) K)\n    (generalLinearZariskiTopology K A.n)\n\n/-- A linear algebraic group is simple if it is connected and positive-dimensional, and its only\nZariski-closed normal subgroups are the trivial subgroup and the whole group. -/\ndef LinearAlgebraicGroup.IsSimple {K : Type*} [Field K]\n    (A : LinearAlgebraicGroup K) : Prop :=\n  (∃ x y : A.points, x * y ≠ y * x) ∧\n  @ConnectedSpace A.points A.zariskiTopology ∧\n  0 < @topologicalKrullDim A.points A.zariskiTopology ∧\n  ∀ N : Subgroup A.points, N.Normal → @IsClosed A.points A.zariskiTopology N →\n    N = ⊥ ∨ N = ⊤\n\n/--\nThe Cherlin–Zilber conjecture: every infinite nonabelian simple group whose complete first-order\ntheory in the language of groups is $\\aleph_0$-stable is isomorphic, as an abstract group, to the\npoints of a connected positive-dimensional simple algebraic group over an algebraically closed\nfield.\n-/\n@[category research open, AMS 3 20]\ntheorem cherlin_zilber_conjecture {G : Type u} [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : ∃ x y : G, x * y ≠ y * x)\n    (hstable : letI := groupStructure G\n      IsOmegaStable (groupLanguage.completeTheory G)) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (A : LinearAlgebraicGroup K),\n      A.IsSimple ∧ Nonempty (G ≃* A.points) := by\n  sorry\n\nend CherlinZilberConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “stable in ℵ₀” as ℵ₀-stable (ω-stable), not merely stable: the complete group theory has at most ℵ₀ complete 1-types over every countable model.",
+    "Included the article’s implicit infinitude hypothesis and the decomposition’s explicit nonabelian hypothesis, thereby excluding finite simple groups and the abelian simple case.",
+    "Used the ordinary first-order language of groups with symbols for identity, inverse, and multiplication, and took the complete theory of the given group in that language.",
+    "Modeled an algebraic group over K as a Zariski-closed subgroup of GL_n(K) for some finite n. This uses the standard linearity of affine algebraic groups and provides its K-points directly as an abstract group.",
+    "Modeled a simple algebraic group as noncommutative, connected, positive-dimensional in topological Krull dimension, and having no proper nontrivial Zariski-closed normal subgroup. The theorem concludes an abstract multiplicative equivalence between G and its K-points.",
+    "Required K to be an algebraically closed field in the same arbitrary Lean universe as G, avoiding an unintended cardinality restriction."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FirstOrder.Language and Mathlib’s packaged ring/order/graph languages.",
+     "name": "GroupFunction",
+     "why_needed": "Mathlib has no packaged first-order language of groups."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language; no existing Language.group was found.",
+     "name": "groupLanguage",
+     "why_needed": "Needed to state the complete first-order theory specifically in the language of groups."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Structure and the analogous ring/order structure implementations.",
+     "name": "groupStructure",
+     "why_needed": "Needed to interpret the group-language symbols on an arbitrary Lean group."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.CompleteType and FirstOrder.Language.elementaryDiagram.",
+     "name": "numberOfOneTypesOver",
+     "why_needed": "Needed to count complete 1-types over a parameter structure when defining ω-stability."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.CompleteType, Theory.ModelType, and Cardinal.aleph0.",
+     "name": "IsOmegaStable",
+     "why_needed": "Mathlib has complete types but no packaged stability or ω-stability predicate."
+    },
+    {
+     "closest_existing_considered": "PrimeSpectrum.zariskiTopology and AlgebraicGeometry.Scheme.",
+     "name": "affineZariskiTopology",
+     "why_needed": "Mathlib has scheme-theoretic Zariski topology but no topology on K-valued affine space suitable for concrete linear algebraic groups."
+    },
+    {
+     "closest_existing_considered": "Matrix.GeneralLinearGroup and affineZariskiTopology.",
+     "name": "generalLinearZariskiTopology",
+     "why_needed": "Needed the induced Zariski topology on GL_n(K) to express closed linear algebraic subgroups."
+    },
+    {
+     "closest_existing_considered": "AlgebraicGeometry.Scheme, Matrix.GeneralLinearGroup, and ClosedSubgroup.",
+     "name": "LinearAlgebraicGroup",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides algebraic groups or group schemes."
+    },
+    {
+     "closest_existing_considered": "TopologicalSpace.induced and the subtype topology.",
+     "name": "LinearAlgebraicGroup.zariskiTopology",
+     "why_needed": "Needed connectedness, dimension, and closed algebraic subgroups on the K-points of the presented algebraic group."
+    },
+    {
+     "closest_existing_considered": "IsSimpleGroup, ConnectedSpace, topologicalKrullDim, and closed normal subgroups.",
+     "name": "LinearAlgebraicGroup.IsSimple",
+     "why_needed": "No existing notion of a simple algebraic group is available."
+    }
+   ],
+   "per_slot": {
+    "cherlin_zilber_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cherlin_zilber_conjecture": "/--\nThe Cherlin–Zilber conjecture: every infinite nonabelian simple group whose complete first-order\ntheory in the language of groups is $\\aleph_0$-stable is isomorphic, as an abstract group, to the\npoints of a connected positive-dimensional simple algebraic group over an algebraically closed\nfield.\n-/\n@[category research open, AMS 3 20]\ntheorem cherlin_zilber_conjecture {G : Type u} [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : ∃ x y : G, x * y ≠ y * x)\n    (hstable : letI := groupStructure G\n      IsOmegaStable (groupLanguage.completeTheory G)) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (A : LinearAlgebraicGroup K),\n      A.IsSimple ∧ Nonempty (G ≃* A.points) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\nimport Mathlib.ModelTheory.Types\nimport Mathlib.RingTheory.MvPolynomial.Basic\n\n/-!\n# Cherlin–Zilber conjecture\n\n*Reference:* [Wikipedia, *Stable group*](https://en.wikipedia.org/wiki/Stable_group)\n-/\n\nopen Cardinal FirstOrder\n\nnamespace CherlinZilberConjecture\n\n/-- The function symbols in the first-order language of groups. -/\ninductive GroupFunction : ℕ → Type\n  | one : GroupFunction 0\n  | inv : GroupFunction 1\n  | mul : GroupFunction 2\n\n/-- The first-order language of groups, with symbols for one, inverse, and multiplication. -/\ndef groupLanguage : FirstOrder.Language where\n  Functions := GroupFunction\n  Relations := fun _ ↦ Empty\n\n/-- Every group has its canonical structure in the first-order language of groups. -/\ninstance {G : Type*} [Group G] : groupLanguage.Structure G where\n  funMap\n    | .one, _ => 1\n    | .inv, x => (x 0)⁻¹\n    | .mul, x => x 0 * x 1\n  RelMap := fun r ↦ nomatch r\n\n/-- A theory in the language of groups is ω-stable if, over every countable model, its space of\ncomplete $1$-types is countable. -/\ndef IsOmegaStable (T : groupLanguage.Theory) : Prop :=\n  ∀ M : FirstOrder.Language.Theory.ModelType.{0, 0, 0} T, #M = ℵ₀ →\n    #(((groupLanguage[[M]]).completeTheory M).CompleteType (Fin 1)) ≤ ℵ₀\n\n/-- A subset of affine space over `K` is algebraic if it is the common zero locus of a set of\nmultivariate polynomials. -/\ndef IsAffineAlgebraicSet {K : Type*} [CommRing K] {n : ℕ} (s : Set (Fin n → K)) : Prop :=\n  ∃ equations : Set (MvPolynomial (Fin n) K),\n    s = {x | ∀ p ∈ equations, MvPolynomial.eval x p = 0}\n\n/-- An algebraic set is irreducible if it is nonempty and is not the union of two proper closed\nalgebraic subsets. For an algebraic group, irreducibility is equivalent to connectedness. -/\ndef IsAffineIrreducible {K : Type*} [CommRing K] {n : ℕ} (s : Set (Fin n → K)) : Prop :=\n  s.Nonempty ∧ ∀ a b : Set (Fin n → K),\n    IsAffineAlgebraicSet a → IsAffineAlgebraicSet b → s ⊆ a ∪ b → s ⊆ a ∨ s ⊆ b\n\n/-- A concrete affine algebraic group over `K`: an algebraic subset of finite-dimensional affine\nspace, equipped with a group law whose multiplication and inverse maps are polynomial. -/\nstructure AffineAlgebraicGroup (K : Type*) [CommRing K] where\n  /-- The dimension of an ambient affine space. -/\n  ambientDimension : ℕ\n  /-- The set of `K`-points in the ambient affine space. -/\n  carrier : Set (Fin ambientDimension → K)\n  /-- The carrier is an algebraic set. -/\n  isAlgebraic : IsAffineAlgebraicSet carrier\n  /-- The group law on the `K`-points. -/\n  [group : Group ↥carrier]\n  /-- Multiplication is given in coordinates by polynomials. -/\n  mul_polynomial : ∃ p : Fin ambientDimension →\n      MvPolynomial (Fin ambientDimension ⊕ Fin ambientDimension) K,\n    ∀ x y : ↥carrier, ∀ i,\n      (↑(x * y) : Fin ambientDimension → K) i =\n        MvPolynomial.eval (Sum.elim (x : Fin ambientDimension → K) y) (p i)\n  /-- Inversion is given in coordinates by polynomials. -/\n  inv_polynomial : ∃ p : Fin ambientDimension → MvPolynomial (Fin ambientDimension) K,\n    ∀ x : ↥carrier, ∀ i,\n      (↑x⁻¹ : Fin ambientDimension → K) i = MvPolynomial.eval x (p i)\n\nattribute [instance] AffineAlgebraicGroup.group\n\n/-- The abstract group of `K`-points of an affine algebraic group. -/\nabbrev AffineAlgebraicGroup.KPoints {K : Type*} [CommRing K] (A : AffineAlgebraicGroup K) :=\n  ↥A.carrier\n\n/-- A positive-dimensional simple algebraic group is an infinite, connected, noncommutative\nalgebraic group with no nontrivial proper connected closed normal algebraic subgroup. Over an\nalgebraically closed field, infinitude of the points is equivalent to positive dimension. -/\ndef AffineAlgebraicGroup.IsSimple {K : Type*} [Field K] (A : AffineAlgebraicGroup K) : Prop :=\n  Infinite A.KPoints ∧\n    (∃ x y : A.KPoints, x * y ≠ y * x) ∧\n    IsAffineIrreducible A.carrier ∧\n    ∀ N : Subgroup A.KPoints, N.Normal →\n      IsAffineAlgebraicSet ((fun x : A.KPoints ↦ (x : Fin A.ambientDimension → K)) '' N) →\n      IsAffineIrreducible ((fun x : A.KPoints ↦ (x : Fin A.ambientDimension → K)) '' N) →\n      N = ⊥ ∨ N = ⊤\n\n/--\n**Cherlin–Zilber conjecture.** Every infinite nonabelian simple group whose complete first-order\ntheory in the language of groups is ω-stable is isomorphic, as an abstract group, to the group of\npoints of a connected positive-dimensional simple algebraic group over an algebraically closed\nfield.\n-/\n@[category research open, AMS 03 14 20]\ntheorem cherlin_zilber_conjecture {G : Type u} [Group G] [Infinite G] [IsSimpleGroup G]\n    (h_nonabelian : ∃ x y : G, x * y ≠ y * x)\n    (h_stable : IsOmegaStable (groupLanguage.completeTheory G)) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (A : AffineAlgebraicGroup K),\n      A.IsSimple ∧ Nonempty (G ≃* A.KPoints) := by\n  sorry\n\nend CherlinZilberConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Following the background article and the fixed decomposition, the theorem explicitly assumes that G is infinite and nonabelian; this excludes finite simple groups and removes the convention-dependent abelian simple cases.",
+    "“Stable in ℵ₀” is read as ω-stable, not merely stable: for every countably infinite model M of the complete group theory, the space of complete 1-types over the elementary diagram of M has cardinality at most ℵ₀.",
+    "Countable models are bundled at universe 0. This is mathematically sufficient because every countable structure is transportable to a universe-0 carrier, while the group language and its syntax are universe 0.",
+    "Because Mathlib has no algebraic-group or group-scheme primitive, algebraic groups are modeled concretely as affine algebraic subsets of finite-dimensional affine space with polynomial multiplication and inversion. This is faithful for the conjecture because positive-dimensional simple algebraic groups over fields are affine/linear.",
+    "Connectedness is represented by irreducibility of the underlying algebraic set, which is equivalent to connectedness for algebraic groups.",
+    "Positive dimension is represented by infinitude of the K-points. For finite-type algebraic sets over an algebraically closed field, zero-dimensional sets have finitely many K-points, so infinitude is equivalent to positive dimension in this setting.",
+    "A simple algebraic group is modeled as connected, positive-dimensional, noncommutative, and having no proper nontrivial connected closed normal algebraic subgroup. The conclusion asks for an abstract multiplicative equivalence between G and the full group of K-points."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has FirstOrder.Language and examples for graphs, orders, and arithmetic, but no language of groups.",
+     "name": "GroupFunction",
+     "why_needed": "Provides the arity-indexed symbols one, inverse, and multiplication for the first-order language of groups."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language; no pre-existing group-language specialization was found.",
+     "name": "groupLanguage",
+     "why_needed": "Defines the first-order language in which the complete theory of the abstract group is taken."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.CompleteType and completeTheory provide the underlying type-space API, but Mathlib has no stability-theory predicate.",
+     "name": "IsOmegaStable",
+     "why_needed": "States ω-stability by bounding complete 1-types over every countably infinite model."
+    },
+    {
+     "closest_existing_considered": "Mathlib has MvPolynomial and scheme/prime-spectrum zero loci, but no classical K-point affine algebraic-set predicate suitable for a concrete algebraic group.",
+     "name": "IsAffineAlgebraicSet",
+     "why_needed": "Defines affine algebraic subsets as common zero loci of multivariate polynomials."
+    },
+    {
+     "closest_existing_considered": "Topological IsPreirreducible exists, but Mathlib has no Zariski topology on K^n/K-point varieties; the definition uses the available algebraic closed sets directly.",
+     "name": "IsAffineIrreducible",
+     "why_needed": "Expresses irreducibility of a concrete affine algebraic set, used to model connected algebraic groups and connected algebraic subgroups."
+    },
+    {
+     "closest_existing_considered": "Mathlib's algebraic-geometry library has schemes but no group schemes or algebraic groups; GeneralLinearGroup alone does not encode Zariski-closed algebraic subgroups.",
+     "name": "AffineAlgebraicGroup",
+     "why_needed": "Bundles an affine algebraic set of K-points with a group law whose multiplication and inversion are polynomial maps."
+    },
+    {
+     "closest_existing_considered": "The subtype of AffineAlgebraicGroup.carrier; this is a convenience abbreviation.",
+     "name": "AffineAlgebraicGroup.KPoints",
+     "why_needed": "Names the abstract group of K-points used in the conclusion's group isomorphism."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsSimpleGroup only expresses abstract group simplicity and does not capture algebraic connectedness, dimension, or closed algebraic normal subgroups.",
+     "name": "AffineAlgebraicGroup.IsSimple",
+     "why_needed": "Expresses connected, positive-dimensional, noncommutative algebraic simplicity through irreducibility, infinitude, and connected closed normal algebraic subgroups."
+    }
+   ],
+   "per_slot": {
+    "cherlin_zilber_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Mathlib provides first-order syntax, complete theories, complete types, cardinal arithmetic, abstract simple groups, and multivariate polynomials, but it does not provide the first-order language of groups, ω-stability, or algebraic groups/simple algebraic groups. The file supplies concrete definitions for these missing notions."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cherlin_zilber_conjecture": "/--\n**Cherlin–Zilber conjecture.** Every infinite nonabelian simple group whose complete first-order\ntheory in the language of groups is ω-stable is isomorphic, as an abstract group, to the group of\npoints of a connected positive-dimensional simple algebraic group over an algebraically closed\nfield.\n-/\n@[category research open, AMS 03 14 20]\ntheorem cherlin_zilber_conjecture {G : Type u} [Group G] [Infinite G] [IsSimpleGroup G]\n    (h_nonabelian : ∃ x y : G, x * y ≠ y * x)\n    (h_stable : IsOmegaStable (groupLanguage.completeTheory G)) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (A : AffineAlgebraicGroup K),\n      A.IsSimple ∧ Nonempty (G ≃* A.KPoints) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cherlin–Zilber conjecture\n\nThe Cherlin–Zilber conjecture (also called the algebraicity conjecture) states that an infinite\nsimple group whose first-order theory is $\\aleph_0$-stable (ω-stable) is a simple algebraic group\nover an algebraically closed field.\n\nMathlib has neither the first-order language of groups, nor ω-stability, nor algebraic groups.\nThis file introduces them in the following concrete form:\n* the language of groups has function symbols for multiplication, inversion and the identity;\n* a theory `T` is ω-stable if for every model `M` of `T` and every countable set of parameters\n  `A ⊆ M` there are only countably many complete types over `A`;\n* an algebraic group over `K` is a Zariski closed subgroup of some `GL n K`, i.e. a linear\n  algebraic group. Simple algebraic groups are affine, hence linear, so this loses no generality.\n\n*References:*\n* [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* [Wikipedia, Stable group](https://en.wikipedia.org/wiki/Stable_group)\n* [Wikipedia, Stable theory](https://en.wikipedia.org/wiki/Stable_theory)\n* G. Cherlin, *Groups of small Morley rank*, Ann. Math. Logic 17 (1979), 1–28.\n-/\n\nnamespace CherlinZilberConjecture\n\nuniverse u v\n\nopen FirstOrder Language Matrix\nopen scoped MatrixGroups\n\nsection LanguageOfGroups\n\n/-- The function symbols of the first-order language of groups: multiplication, inversion and the\nidentity. -/\ninductive GroupFunc : ℕ → Type\n  | mul : GroupFunc 2\n  | inv : GroupFunc 1\n  | one : GroupFunc 0\n\n/-- The first-order language of groups, with function symbols `*`, `⁻¹` and `1` and no relation\nsymbols. -/\ndef Language.group : FirstOrder.Language where\n  Functions := GroupFunc\n  Relations _ := Empty\n\n/-- A group `G` is a structure for the language of groups in the canonical way. -/\ninstance instGroupStructure (G : Type*) [Group G] : Language.group.Structure G where\n  funMap {n} f x :=\n    match n, f with\n    | _, .mul => x 0 * x 1\n    | _, .inv => (x 0)⁻¹\n    | _, .one => 1\n  RelMap {_} r _ := r.elim\n\nend LanguageOfGroups\n\nsection OmegaStability\n\n/-- A first-order theory `T` is *ω-stable* (also called $\\aleph_0$-stable, or \"stable in\n$\\aleph_0$\") if for every model `M` of `T`, every countable set of parameters `A ⊆ M` and every\n`n`, there are only countably many complete `n`-types over `A`. Here a complete `n`-type over `A`\nis a complete type of the theory of `M` in the language `L[[A]]` expanded by constants for the\nelements of `A`. -/\ndef IsOmegaStable {L : FirstOrder.Language.{u, v}} (T : L.Theory) : Prop :=\n  ∀ (M : Theory.ModelType.{u, v, max u v} T) (A : Set M), A.Countable →\n    ∀ n : ℕ, Countable ((L[[A]].completeTheory M).CompleteType (Fin n))\n\nend OmegaStability\n\nsection SimpleAlgebraicGroups\n\nvariable {n : Type*} [Fintype n] [DecidableEq n] {K : Type*} [Field K]\n\n/-- A subgroup `H` of `GL n K` is *Zariski closed* if it is the set of common zeros in `GL n K` of\na set of polynomials in the matrix entries. -/\ndef IsZariskiClosed (H : Subgroup (GL n K)) : Prop :=\n  ∃ S : Set (MvPolynomial (n × n) K), ∀ g : GL n K,\n    g ∈ H ↔ ∀ p ∈ S, MvPolynomial.eval (fun ij ↦ (g : Matrix n n K) ij.1 ij.2) p = 0\n\n/-- A subgroup `H` of `GL n K` is *connected* (in the sense of algebraic groups) if it has no\nZariski closed subgroup of finite index other than itself. For a Zariski closed subgroup this is\nequivalent to being connected (equivalently, irreducible) in the Zariski topology. -/\ndef IsZariskiConnected (H : Subgroup (GL n K)) : Prop :=\n  ∀ N : Subgroup (GL n K), IsZariskiClosed N → N ≤ H → N.IsFiniteRelIndex H → N = H\n\n/-- A subgroup `H` of `GL n K` is a *simple algebraic group* (over `K`) if it is Zariski closed,\nconnected and non-commutative, and its only Zariski closed connected normal subgroups are the\ntrivial subgroup and `H` itself. -/\ndef IsSimpleAlgebraicGroup (H : Subgroup (GL n K)) : Prop :=\n  IsZariskiClosed H ∧ IsZariskiConnected H ∧ ¬ IsMulCommutative H ∧\n    ∀ N : Subgroup (GL n K), IsZariskiClosed N → IsZariskiConnected N → N ≤ H →\n      (N.subgroupOf H).Normal → N = ⊥ ∨ N = H\n\n/-- The whole group `GL n K` is Zariski closed. -/\n@[category test, AMS 14 20]\ntheorem isZariskiClosed_top : IsZariskiClosed (⊤ : Subgroup (GL n K)) :=\n  ⟨∅, by simp⟩\n\n/-- The trivial subgroup of `GL n K` is Zariski closed. -/\n@[category test, AMS 14 20]\ntheorem isZariskiClosed_bot : IsZariskiClosed (⊥ : Subgroup (GL n K)) := by\n  refine ⟨Set.range fun ij : n × n ↦\n    MvPolynomial.X ij - MvPolynomial.C ((1 : Matrix n n K) ij.1 ij.2), fun g ↦ ?_⟩\n  simp only [Subgroup.mem_bot, Set.forall_mem_range, map_sub, MvPolynomial.eval_X,\n    MvPolynomial.eval_C, sub_eq_zero, Prod.forall]\n  constructor\n  · rintro rfl i j\n    rfl\n  · intro h\n    ext i j\n    exact h i j\n\n/-- The trivial subgroup is not a simple algebraic group, since it is commutative. -/\n@[category test, AMS 14 20]\ntheorem not_isSimpleAlgebraicGroup_bot : ¬ IsSimpleAlgebraicGroup (⊥ : Subgroup (GL n K)) :=\n  fun h ↦ h.2.2.1 inferInstance\n\nend SimpleAlgebraicGroups\n\n/--\n**The Cherlin–Zilber conjecture** (algebraicity conjecture).\n\nLet $G$ be an infinite simple group whose first-order theory (in the language of groups) is\n$\\aleph_0$-stable (ω-stable). Then $G$ is a simple algebraic group over an algebraically closed\nfield: there are an algebraically closed field $K$ and a simple algebraic group $H$ over $K$ such\nthat $G$ is isomorphic, as an abstract group, to the group $H(K)$ of $K$-points of $H$.\n\nThe hypothesis that $G$ is infinite excludes the finite simple groups, whose theories are trivially\nω-stable.\n-/\n@[category research open, AMS 3 14 20]\ntheorem cherlin_zilber_conjecture (G : Type u) [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : IsOmegaStable (Language.group.completeTheory G)) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (m : ℕ) (H : Subgroup (GL (Fin m) K)),\n      IsSimpleAlgebraicGroup H ∧ Nonempty (G ≃* H) := by\n  sorry\n\nend CherlinZilberConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.82,
+   "decomposition_objections": "None. The single-slot decomposition matches the statement; the implicit 'infinite' hypothesis noted in the table is taken from the background article and included.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Simple group' is read (following the background article) as an *infinite* simple group: hypotheses `[Infinite G] [IsSimpleGroup G]`. Infinite + simple already forces non-abelian (abelian simple groups are Z/p), so no separate non-abelian hypothesis is added.",
+    "'First-order theory' is the complete theory `Language.group.completeTheory G` of G in the language {*, ⁻¹, 1} with no relation symbols (ω-stability is unchanged by the definable choice of signature).",
+    "'Stable in ℵ₀' = ω-stable, defined (`IsOmegaStable`) as: for every model M of T and every countable parameter set A ⊆ M and every n, the set of complete n-types over A (Mathlib `CompleteType` of the theory of M in the language L[[A]] with constants for A) is countable. Using all n-types rather than only 1-types is equivalent for countable languages (standard fact); both are standard definitions.",
+    "Following Mathlib's `Theory.IsSatisfiable`, models in `IsOmegaStable` are taken in `Type (max u v)` (so `Type 0` for the group language). By downward Löwenheim–Skolem (countable language) this is equivalent to quantifying over models in every universe.",
+    "'Algebraic group over K' is modelled as a Zariski-closed subgroup of GL n K (linear algebraic group), i.e. a subgroup that is the common zero set in GL n K of a set of polynomials in the matrix entries. Simple algebraic groups are affine (Chevalley structure theorem plus simplicity), hence linear, so this loses no generality; G is required to be isomorphic as an abstract group to H = H(K).",
+    "'Connected' for algebraic groups is formalized as 'no Zariski-closed subgroup of finite index other than itself', the standard equivalent characterization (the identity component is the smallest closed subgroup of finite index) and the same phrasing the Wikipedia article uses for groups of finite Morley rank; this avoids constructing a Zariski topology instance.",
+    "'Simple algebraic group' uses the standard (Humphreys/Borel) definition: connected, non-commutative, and every closed connected normal subgroup is trivial or everything (so SL_n would count). Since G is assumed abstractly simple, this is equivalent to the stronger reading with no proper nontrivial closed normal subgroups at all (Milne), because any closed normal subgroup of H is a normal subgroup of the abstractly simple group H(K).",
+    "Non-commutative replaces 'positive-dimensional': a connected commutative or trivial group is excluded, and connected non-trivial implies positive dimension.",
+    "The field K is existentially quantified in the same universe `Type u` as G (|K| = |G| whenever the conclusion holds, so this is faithful; a free universe would make the statement false for some instantiations for cardinality reasons).",
+    "The article's remark about the finite-Morley-rank special case is treated as context and not formalized, as the decomposition table prescribes."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FirstOrder.Language.ring (Mathlib/ModelTheory/Algebra/Ring/Basic.lean), used as the template; not applicable to groups.",
+     "name": "CherlinZilberConjecture.GroupFunc / CherlinZilberConjecture.Language.group",
+     "why_needed": "Mathlib has a first-order language of rings (`FirstOrder.Language.ring`) but no language of groups; the conjecture concerns the first-order theory of a group."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Ring.compatibleRingOfRing (for rings only).",
+     "name": "CherlinZilberConjecture.instGroupStructure",
+     "why_needed": "Interprets *, ⁻¹, 1 in a group so that `Language.group.completeTheory G` makes sense."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.CompleteType, Theory.ModelType, Theory.IsSatisfiable (used as building blocks/universe convention).",
+     "name": "CherlinZilberConjecture.IsOmegaStable",
+     "why_needed": "Mathlib has complete types (`Theory.CompleteType`) but no notion of (ω-)stability of a theory."
+    },
+    {
+     "closest_existing_considered": "MvPolynomial.zeroLocus (Mathlib/RingTheory/Nullstellensatz.lean), PrimeSpectrum topology, AlgebraicGeometry.Scheme (no group schemes / K-points API).",
+     "name": "CherlinZilberConjecture.IsZariskiClosed",
+     "why_needed": "Mathlib has no algebraic groups or Zariski topology on K-points of affine space; needed to define linear algebraic groups."
+    },
+    {
+     "closest_existing_considered": "IsConnected / IsIrreducible (topological; no Zariski topology instance available), Subgroup.IsFiniteRelIndex (used).",
+     "name": "CherlinZilberConjecture.IsZariskiConnected",
+     "why_needed": "Connectedness of an algebraic group, via the finite-index characterization."
+    },
+    {
+     "closest_existing_considered": "IsSimpleGroup (abstract simplicity; not the algebraic-group notion), CategoryTheory Grp_ objects (no scheme-level group objects with K-points).",
+     "name": "CherlinZilberConjecture.IsSimpleAlgebraicGroup",
+     "why_needed": "The conclusion 'simple algebraic group over an algebraically closed field' has no Mathlib counterpart."
+    }
+   ],
+   "per_slot": {
+    "cherlin_zilber_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every infinite simple group G (in universe u) whose complete first-order theory in the language of groups is ω-stable, there exist an algebraically closed field K : Type u, m : ℕ and a Zariski-closed subgroup H of GL (Fin m) K that is a simple algebraic group (closed, connected, non-commutative, no closed connected normal subgroups other than ⊥ and H) with G ≃* H. Mathlib lacks the language of groups, ω-stability and algebraic groups, so these are defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cherlin_zilber_conjecture": "/--\n**The Cherlin–Zilber conjecture** (algebraicity conjecture).\n\nLet $G$ be an infinite simple group whose first-order theory (in the language of groups) is\n$\\aleph_0$-stable (ω-stable). Then $G$ is a simple algebraic group over an algebraically closed\nfield: there are an algebraically closed field $K$ and a simple algebraic group $H$ over $K$ such\nthat $G$ is isomorphic, as an abstract group, to the group $H(K)$ of $K$-points of $H$.\n\nThe hypothesis that $G$ is infinite excludes the finite simple groups, whose theories are trivially\nω-stable.\n-/\n@[category research open, AMS 3 14 20]\ntheorem cherlin_zilber_conjecture (G : Type u) [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : IsOmegaStable (Language.group.completeTheory G)) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (m : ℕ) (H : Subgroup (GL (Fin m) K)),\n      IsSimpleAlgebraicGroup H ∧ Nonempty (G ≃* H) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cherlin–Zilber conjecture\n\nThe Cherlin–Zilber conjecture (also called the algebraicity conjecture) states that a simple\ngroup whose first-order theory is stable in $\\aleph_0$ (i.e. $\\omega$-stable) is a simple\nalgebraic group over an algebraically closed field.\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Stable group](https://en.wikipedia.org/wiki/Stable_group)\n- [Wikipedia, Linear algebraic group](https://en.wikipedia.org/wiki/Linear_algebraic_group)\n- G. Cherlin, *Groups of small Morley rank*, Ann. Math. Logic 17 (1979), 1–28.\n- B. I. Zil'ber, *Groups and rings whose theory is categorical*, Fundam. Math. 95 (1977),\n  173–188.\n-/\n\nnamespace CherlinZilberConjecture\n\nopen FirstOrder FirstOrder.Language Matrix\nopen scoped MatrixGroups\n\nuniverse u v\n\n/-- The function symbols of the first-order language of groups: a binary multiplication,\na unary inversion and a constant for the identity. -/\ninductive groupFunc : ℕ → Type\n  | mul : groupFunc 2\n  | inv : groupFunc 1\n  | one : groupFunc 0\n\n/-- The first-order language of groups $(\\cdot, {}^{-1}, 1)$. It has no relation symbols. -/\ndef Language.group : Language where\n  Functions := groupFunc\n  Relations := fun _ => Empty\n\n/-- A group is a structure for the language of groups, interpreting the symbols by the group\noperations. -/\ninstance {G : Type*} [Group G] : Language.group.Structure G where\n  funMap {n} f :=\n    match n, f with\n    | _, .mul => fun x => x 0 * x 1\n    | _, .inv => fun x => (x 0)⁻¹\n    | _, .one => fun _ => 1\n  RelMap r := r.elim\n\n/-- The multiplication symbol is interpreted by the multiplication of the group. -/\n@[category test, AMS 3 20]\ntheorem funMap_mul {G : Type*} [Group G] (x : Fin 2 → G) :\n    Structure.funMap (L := Language.group) (groupFunc.mul : Language.group.Functions 2) x =\n      x 0 * x 1 := rfl\n\n/-- The inversion symbol is interpreted by the inversion of the group. -/\n@[category test, AMS 3 20]\ntheorem funMap_inv {G : Type*} [Group G] (x : Fin 1 → G) :\n    Structure.funMap (L := Language.group) (groupFunc.inv : Language.group.Functions 1) x =\n      (x 0)⁻¹ := rfl\n\n/-- The constant symbol is interpreted by the identity of the group. -/\n@[category test, AMS 3 20]\ntheorem funMap_one {G : Type*} [Group G] (x : Fin 0 → G) :\n    Structure.funMap (L := Language.group) (groupFunc.one : Language.group.Functions 0) x =\n      1 := rfl\n\n/-- A first-order theory `T` is *$\\omega$-stable* (also called $\\aleph_0$-stable, or \"stable\nin $\\aleph_0$\") if for every model `M` of `T` and every countable set `A` of parameters from `M`\nthere are only countably many complete $1$-types over `A`. Here a complete $1$-type over `A`\nis a complete type in one variable of the complete theory of `M` in the language `L[[A]]`\nobtained from `L` by adding a constant symbol for each element of `A`. -/\ndef IsOmegaStable {L : FirstOrder.Language.{u, v}} (T : L.Theory) : Prop :=\n  ∀ (M : Theory.ModelType.{u, v, max u v} T) (A : Set M), A.Countable →\n    Countable ((L[[A]].completeTheory M).CompleteType Unit)\n\nvariable {K : Type*} [Field K] {n : Type*} [Fintype n] [DecidableEq n]\n\n/-- A subgroup `H` of `GL n K` is *Zariski closed* if it consists of the invertible matrices at\nwhich all polynomials of some ideal of polynomials in the matrix entries vanish. Zariski closed\nsubgroups of `GL n K` are the (linear) algebraic groups over `K` in the classical sense; every\naffine algebraic group over `K` is isomorphic to one of them. -/\ndef IsZariskiClosed (H : Subgroup (GL n K)) : Prop :=\n  ∃ I : Ideal (MvPolynomial (n × n) K),\n    ∀ g : GL n K, g ∈ H ↔\n      (fun ij : n × n => (g : Matrix n n K) ij.1 ij.2) ∈ MvPolynomial.zeroLocus K I\n\n/-- A Zariski closed subgroup `H` of `GL n K` is *connected* if it has no proper Zariski closed\nsubgroup of finite index. (The identity component of an algebraic group is a Zariski closed\nsubgroup of finite index, and a Zariski closed subgroup of finite index is also open.) -/\ndef IsConnectedZariskiClosed (H : Subgroup (GL n K)) : Prop :=\n  IsZariskiClosed H ∧ ∀ H' ≤ H, IsZariskiClosed H' → H'.relIndex H ≠ 0 → H' = H\n\n/-- A subgroup `H` of `GL n K` is a *simple algebraic group* if it is Zariski closed, connected\nand noncommutative, and it has no connected Zariski closed normal subgroups other than the\ntrivial subgroup and `H` itself. -/\nstructure IsSimpleAlgebraicGroup (H : Subgroup (GL n K)) : Prop where\n  isConnectedZariskiClosed : IsConnectedZariskiClosed H\n  not_isMulCommutative : ¬ IsMulCommutative H\n  eq_bot_or_eq_of_normal : ∀ N ≤ H, IsConnectedZariskiClosed N → (N.subgroupOf H).Normal →\n    N = ⊥ ∨ N = H\n\n/-- The whole group `GL n K` is Zariski closed. -/\n@[category test, AMS 14 20]\ntheorem isZariskiClosed_top : IsZariskiClosed (⊤ : Subgroup (GL n K)) :=\n  ⟨⊥, fun _ => by simp⟩\n\n/-- The trivial subgroup of `GL n K` is Zariski closed. -/\n@[category test, AMS 14 20]\ntheorem isZariskiClosed_bot : IsZariskiClosed (⊥ : Subgroup (GL n K)) := by\n  refine ⟨Ideal.span (Set.range fun ij : n × n =>\n    MvPolynomial.X ij - MvPolynomial.C ((1 : Matrix n n K) ij.1 ij.2)), fun g => ?_⟩\n  simp only [MvPolynomial.zeroLocus_span, Subgroup.mem_bot, Set.mem_setOf_eq,\n    Set.forall_mem_range, map_sub, MvPolynomial.aeval_X, MvPolynomial.aeval_C,\n    Algebra.algebraMap_self, RingHom.id_apply, sub_eq_zero, Prod.forall]\n  constructor\n  · rintro rfl i j\n    rfl\n  · intro h\n    exact Units.ext (Matrix.ext h)\n\n/-- The trivial subgroup of `GL n K` is connected. -/\n@[category test, AMS 14 20]\ntheorem isConnectedZariskiClosed_bot : IsConnectedZariskiClosed (⊥ : Subgroup (GL n K)) :=\n  ⟨isZariskiClosed_bot, fun _ hH' _ _ => le_bot_iff.mp hH'⟩\n\n/-- The trivial subgroup of `GL n K` is not a simple algebraic group. -/\n@[category test, AMS 14 20]\ntheorem not_isSimpleAlgebraicGroup_bot : ¬ IsSimpleAlgebraicGroup (⊥ : Subgroup (GL n K)) :=\n  fun h => h.not_isMulCommutative inferInstance\n\n/-- **Cherlin–Zilber conjecture.** Let `G` be an infinite simple group whose first-order theory\n(in the language of groups) is stable in $\\aleph_0$, i.e. $\\omega$-stable. Then `G` is a simple\nalgebraic group over an algebraically closed field: there are an algebraically closed field `K`\nand a Zariski closed subgroup `H` of some `GL n K` that is a simple algebraic group, such that\n`G` is isomorphic to `H` as an abstract group.\n\nThe hypothesis that `G` is infinite excludes the finite simple groups, whose first-order\ntheories are trivially $\\omega$-stable. An infinite simple group is automatically nonabelian. -/\n@[category research open, AMS 3 14 20]\ntheorem cherlin_zilber_conjecture (G : Type*) [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : IsOmegaStable (Language.group.completeTheory G)) :\n    ∃ (K : Type*) (_ : Field K) (_ : IsAlgClosed K) (n : ℕ) (H : Subgroup (GL (Fin n) K)),\n      IsSimpleAlgebraicGroup H ∧ Nonempty (G ≃* H) := by\n  sorry\n\nend CherlinZilberConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot decomposition (one universal Prop with the implicit \\\"infinite\\\" hypothesis, ω-stable read as ℵ₀-stable, and the finite-Morley-rank remark treated as context) matches the source; the explicit \\\"nonabelian\\\" in the notes is redundant given \\\"infinite simple\\\" and was not added as a separate hypothesis.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "\"Stable in ℵ₀\" is read as ω-stable (= ℵ₀-stable), as in the background article and the decomposition notes; it is applied to the complete theory `Language.group.completeTheory G` of G in the language of groups (·, ⁻¹, 1). The choice of signature is immaterial: inverse and identity are definable from multiplication, and stability notions are invariant under definitional expansions.",
+    "ω-stability is defined via 1-types (Tent–Ziegler / Marker style): for every model M of T and every countable parameter set A ⊆ M, the set of complete types in one variable of Th(M_A) (Mathlib's `(L[[A]].completeTheory M).CompleteType Unit`, with constants interpreted by the inclusion A ⊆ M) is countable. Countability of 1-types is equivalent to countability of n-types for all n (standard lemma), and `|A| ≤ ℵ₀` rather than `|A| = ℵ₀` is the Tent–Ziegler convention, equivalent for complete theories with infinite models.",
+    "The models in `IsOmegaStable` are quantified over `ModelType.{u, v, max u v} T` (Type 0 for the language of groups), following Mathlib's convention in `Theory.IsSatisfiable`. G itself need not live in that universe; by downward Löwenheim–Skolem the property depends only on the theory T, so this is universe-independent.",
+    "\"Simple algebraic group over an algebraically closed field\" is formalized classically (Borel/Humphreys/Borovik–Nesin): a Zariski-closed subgroup H of GL_n(K) (H = GL_n(K) ∩ V(I) for an ideal I of polynomials in the matrix entries, via `MvPolynomial.zeroLocus`) that is connected, noncommutative, and has no connected closed normal subgroups other than ⊥ and H. Restricting to linear algebraic groups loses nothing: by the Barsotti–Chevalley structure theorem a simple algebraic group H with H(K) ≅ G (G infinite simple, hence nonabelian) has trivial abelian-variety quotient, so H is affine, hence linear. This is also exactly the notion used in the Cherlin–Zilber literature (Borovik–Nesin; Altınel–Borovik–Cherlin).",
+    "Connectedness of a closed subgroup H is defined algebraically as \"no proper Zariski-closed subgroup of finite index\" (`H'.relIndex H ≠ 0 → H' = H`). This is equivalent to Zariski-connectedness for algebraic groups: the identity component is a closed subgroup of finite index, and a closed finite-index subgroup is also open.",
+    "Noncommutativity is included in `IsSimpleAlgebraicGroup` (Humphreys/Milne convention, excluding G_a, G_m and abelian varieties). Under the hypotheses of the conjecture all of connectedness, noncommutativity and algebraic simplicity of H are implied by the abstract simplicity and infinitude of G together with G ≃* H, so including them keeps the statement faithful to the wording without changing its truth value under either common convention for \"simple algebraic group\" (with or without noncommutativity, closed-connected-normal vs. Milne's \"proper normal subgroups finite\").",
+    "The hypothesis `[Infinite G]` is included as in the background article (\"infinite (ω-stable) simple groups\"); it is needed because finite simple groups have ω-stable theories. `IsSimpleGroup` is Mathlib's (nontrivial, normal subgroups are ⊥ or ⊤); no separate nonabelian hypothesis is added since infinite simple groups are automatically nonabelian.",
+    "The isomorphism is of abstract groups: `Nonempty (G ≃* H)` with H the subgroup of GL (Fin n) K (its K-points). The field K is existentially quantified over `Type*` (a fresh universe parameter of the theorem).",
+    "The bespoke definitions are placed in the problem file (namespace `CherlinZilberConjecture`) since the task restricts output to one file; a maintainer may prefer moving the language of groups and `IsOmegaStable` to `FormalConjecturesForMathlib`. Basic `@[category test]` lemmas (all fully proved) check the group-symbol interpretations, that ⊤ and ⊥ are Zariski closed, that ⊥ is connected, and that ⊥ is not a simple algebraic group."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FirstOrder.ringFunc (Mathlib/ModelTheory/Algebra/Ring/Basic.lean), whose pattern is mirrored.",
+     "name": "CherlinZilberConjecture.groupFunc",
+     "why_needed": "Function symbols (mul : 2, inv : 1, one : 0) of the first-order language of groups; Mathlib has no language of groups."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.ring, FirstOrder.Language.graph, FirstOrder.Language.order — none is the language of groups.",
+     "name": "CherlinZilberConjecture.Language.group",
+     "why_needed": "The first-order language of groups (functions groupFunc, no relations), needed to speak of the first-order theory of a group."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Ring.compatibleRingOfRing / CompatibleRing (ring analogue).",
+     "name": "CherlinZilberConjecture.instStructureGroup (anonymous instance `Language.group.Structure G` for `[Group G]`)",
+     "why_needed": "Interprets the symbols by the group operations so that `Language.group.completeTheory G` makes sense."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.CompleteType, Theory.ModelType, Language.withConstants, Theory.IsComplete (used as building blocks; no stability notion exists in Mathlib or FormalConjecturesForMathlib).",
+     "name": "CherlinZilberConjecture.IsOmegaStable",
+     "why_needed": "ω-stability of a first-order theory: for every model M and countable A ⊆ M, the complete 1-types over A (`(L[[A]].completeTheory M).CompleteType Unit`) are countable. Mathlib has no stability/ω-stability/Morley rank."
+    },
+    {
+     "closest_existing_considered": "MvPolynomial.zeroLocus (used), PrimeSpectrum.zeroLocus / Zariski topology on Spec (not on affine space points), AlgebraicGeometry.Scheme + Grp_ (no K-points/subgroup-scheme API).",
+     "name": "CherlinZilberConjecture.IsZariskiClosed",
+     "why_needed": "A subgroup of GL n K is Zariski closed (equals GL n K ∩ V(I) for an ideal I of polynomials in the matrix entries); this is the classical notion of a linear algebraic group over K. Mathlib has no algebraic groups."
+    },
+    {
+     "closest_existing_considered": "IsConnected / ConnectedSpace (would require a Zariski `TopologicalSpace` instance on matrices, which Mathlib lacks); Subgroup.relIndex (used).",
+     "name": "CherlinZilberConjecture.IsConnectedZariskiClosed",
+     "why_needed": "Connected Zariski-closed subgroup: closed and with no proper closed subgroup of finite index (equivalent to Zariski connectedness for algebraic groups)."
+    },
+    {
+     "closest_existing_considered": "IsSimpleGroup (abstract simplicity only; not the algebraic-group notion), IsMulCommutative and Subgroup.Normal (used as building blocks).",
+     "name": "CherlinZilberConjecture.IsSimpleAlgebraicGroup",
+     "why_needed": "Simple algebraic group: connected Zariski-closed, noncommutative, and no connected Zariski-closed normal subgroups other than ⊥ and itself."
+    }
+   ],
+   "per_slot": {
+    "cherlin_zilber_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `cherlin_zilber_conjecture`: for every infinite simple group G whose complete first-order theory in the language of groups (·, ⁻¹, 1) is ω-stable, there exist an algebraically closed field K, n : ℕ and a subgroup H of GL (Fin n) K that is a simple algebraic group (Zariski closed, connected, noncommutative, no proper nontrivial connected Zariski-closed normal subgroups) with G ≃* H. Mathlib lacks a language of groups, ω-stability, and algebraic groups, so these were defined in the file (see new_definitions); Mathlib's `CompleteType`, `completeTheory`, `withConstants`, `ModelType`, `MvPolynomial.zeroLocus`, `GL`, `Subgroup.relIndex`, `IsAlgClosed`, `IsSimpleGroup` are reused."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cherlin_zilber_conjecture": "/-- **Cherlin–Zilber conjecture.** Let `G` be an infinite simple group whose first-order theory\n(in the language of groups) is stable in $\\aleph_0$, i.e. $\\omega$-stable. Then `G` is a simple\nalgebraic group over an algebraically closed field: there are an algebraically closed field `K`\nand a Zariski closed subgroup `H` of some `GL n K` that is a simple algebraic group, such that\n`G` is isomorphic to `H` as an abstract group.\n\nThe hypothesis that `G` is infinite excludes the finite simple groups, whose first-order\ntheories are trivially $\\omega$-stable. An infinite simple group is automatically nonabelian. -/\n@[category research open, AMS 3 14 20]\ntheorem cherlin_zilber_conjecture (G : Type*) [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : IsOmegaStable (Language.group.completeTheory G)) :\n    ∃ (K : Type*) (_ : Field K) (_ : IsAlgClosed K) (n : ℕ) (H : Subgroup (GL (Fin n) K)),\n      IsSimpleAlgebraicGroup H ∧ Nonempty (G ≃* H) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c07",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The supplied Stable group article and fixed decomposition were read as quantifying over infinite nonabelian abstract simple groups; infinitude is essential because finite simple groups have ω-stable theories but are not the intended conclusion.",
+    "“Stable in ℵ₀” was read as ω-stable/ℵ₀-stable, not merely stable or superstable: the complete group theory must have only countably many complete 1-types over each countable model (equivalently in the usual countable-language setting, over each countable parameter set).",
+    "The conclusion was read as existence of an algebraically closed field K and a connected, positive-dimensional simple algebraic group over K whose K-points are isomorphic to the given group as an abstract group. No weaker matrix-group or point-group-simplicity surrogate was used."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "cherlin_zilber_conjecture": {
+     "outcome": "missing_primitives",
+     "why": "A faithful statement needs two substantial absent APIs. On the hypothesis side, Mathlib has first-order syntax, semantics, theories, and `Theory.CompleteType`, but no first-order language/structure for groups and no notion of complete 1-types over a parameter model or predicate expressing ω-stability (countably many 1-types over every countable model/parameter set). On the conclusion side, Mathlib has schemes and generic internal group objects, but no algebraic-group/group-scheme abstraction integrating these, no notion of a connected positive-dimensional simple algebraic group, and no packaged group of K-rational points to which the abstract group can be `MulEquiv`. Replacing these notions by abstract simplicity of K-points, ordinary topological connectedness, or an ad hoc family of matrix groups would not faithfully state the conjecture."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Cherlin–Zilber conjecture\n\nThe Cherlin–Zilber conjecture (also called the algebraicity conjecture) states that an infinite\nsimple group whose first-order theory is $\\omega$-stable (\"stable in $\\aleph_0$\") is a simple\nalgebraic group over an algebraically closed field.\n\n*References:*\n- [Wikipedia, Stable group](https://en.wikipedia.org/wiki/Stable_group)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics#Model_theory_and_formal_languages)\n- [Wikipedia, Simple algebraic group](https://en.wikipedia.org/wiki/Simple_algebraic_group)\n-/\n\nnamespace CherlinZilberConjecture\n\nopen FirstOrder FirstOrder.Language\n\nuniverse u v\n\n/- ### $\\omega$-stability -/\n\n/--\nA first-order theory `T` is *$\\omega$-stable* (or *$\\aleph_0$-stable*) if for every model `M` of\n`T`, every countable set `A` of parameters from `M` and every `n`, the space $S_n^M(A)$ of complete\n`n`-types over `A` is countable.\n\nHere $S_n^M(A)$ is realised as the space of complete types in `n` variables of the complete theory\nof `M` in the language `L[[A]]` obtained by adding a constant symbol for each element of `A`.\nAs for `FirstOrder.Language.Theory.IsSatisfiable`, models are taken in the universe `max u v`; by\nthe Löwenheim–Skolem theorem this is equivalent to allowing models in an arbitrary universe.\n-/\ndef IsOmegaStable {L : FirstOrder.Language.{u, v}} (T : L.Theory) : Prop :=\n  ∀ (M : Theory.ModelType.{u, v, max u v} T) (A : Set M), A.Countable →\n    ∀ n : ℕ, Countable ((L[[A]].completeTheory M).CompleteType (Fin n))\n\n/- ### The first-order language of groups -/\n\n/-- The function symbols of the first-order language of groups: `1`, `⁻¹` and `*`. -/\ninductive GroupFunc : ℕ → Type\n  | one : GroupFunc 0\n  | inv : GroupFunc 1\n  | mul : GroupFunc 2\n\n/-- The first-order language of groups: the function symbols `1`, `⁻¹`, `*` and no relation\nsymbols. -/\ndef groupLanguage : FirstOrder.Language where\n  Functions := GroupFunc\n  Relations _ := Empty\n\n/-- The constant symbol `1` of the language of groups. -/\nabbrev oneFunc : groupLanguage.Functions 0 := GroupFunc.one\n\n/-- The unary function symbol `⁻¹` of the language of groups. -/\nabbrev invFunc : groupLanguage.Functions 1 := GroupFunc.inv\n\n/-- The binary function symbol `*` of the language of groups. -/\nabbrev mulFunc : groupLanguage.Functions 2 := GroupFunc.mul\n\n/-- Every group is a structure for the language of groups, interpreting the symbols by the group\noperations. -/\ninstance (G : Type*) [Group G] : groupLanguage.Structure G where\n  funMap {n} f x :=\n    match n, f with\n    | _, GroupFunc.one => 1\n    | _, GroupFunc.inv => (x 0)⁻¹\n    | _, GroupFunc.mul => x 0 * x 1\n  RelMap {_} r _ := (r : Empty).elim\n\nsection GroupStructure\n\nvariable {G : Type*} [Group G]\n\n@[category API, AMS 3 20]\ntheorem funMap_oneFunc (x : Fin 0 → G) : Structure.funMap oneFunc x = 1 := rfl\n\n@[category API, AMS 3 20]\ntheorem funMap_invFunc (a : G) : Structure.funMap invFunc ![a] = a⁻¹ := rfl\n\n@[category API, AMS 3 20]\ntheorem funMap_mulFunc (a b : G) : Structure.funMap mulFunc ![a, b] = a * b := rfl\n\nend GroupStructure\n\n/- ### Simple algebraic groups -/\n\nsection AlgebraicGroup\n\nvariable {K : Type*} [Field K] {n : ℕ}\n\n/-- A set of `n × n` matrices over `K` is *Zariski closed* if it is the common zero set of a family\nof polynomials in the `n²` matrix entries. -/\ndef IsZariskiClosed (S : Set (Matrix (Fin n) (Fin n) K)) : Prop :=\n  ∃ P : Set (MvPolynomial (Fin n × Fin n) K),\n    S = {A | ∀ p ∈ P, MvPolynomial.eval (fun ij ↦ A ij.1 ij.2) p = 0}\n\n@[category test, AMS 14 20]\ntheorem isZariskiClosed_univ : IsZariskiClosed (Set.univ : Set (Matrix (Fin n) (Fin n) K)) :=\n  ⟨∅, by simp⟩\n\n@[category test, AMS 14 20]\ntheorem isZariskiClosed_empty : IsZariskiClosed (∅ : Set (Matrix (Fin n) (Fin n) K)) :=\n  ⟨{1}, by simp⟩\n\n/-- The Zariski topology on `n × n` matrices over `K`: the topology whose closed sets are the\nZariski closed sets. -/\ndef zariskiTopology : TopologicalSpace (Matrix (Fin n) (Fin n) K) :=\n  TopologicalSpace.generateFrom {U | IsZariskiClosed Uᶜ}\n\n/-- The set of matrices underlying a subgroup `H` of `GL_n(K)`. -/\ndef matrixSet (H : Subgroup (GL (Fin n) K)) : Set (Matrix (Fin n) (Fin n) K) :=\n  ((↑) : GL (Fin n) K → Matrix (Fin n) (Fin n) K) '' H\n\n/-- A subgroup `H` of `GL_n(K)` is a *linear algebraic group* if it is Zariski closed in\n`GL_n(K)`, i.e. it consists of the invertible matrices lying in some Zariski closed set of\nmatrices. -/\ndef IsAlgebraicSubgroup (H : Subgroup (GL (Fin n) K)) : Prop :=\n  ∃ Z : Set (Matrix (Fin n) (Fin n) K), IsZariskiClosed Z ∧\n    ∀ g : GL (Fin n) K, g ∈ H ↔ (g : Matrix (Fin n) (Fin n) K) ∈ Z\n\n@[category test, AMS 14 20]\ntheorem isAlgebraicSubgroup_top : IsAlgebraicSubgroup (⊤ : Subgroup (GL (Fin n) K)) :=\n  ⟨Set.univ, isZariskiClosed_univ, by simp⟩\n\n/-- A subgroup `H` of `GL_n(K)` is *connected* if it is connected as a subspace of `GL_n(K)` for\nthe Zariski topology. -/\ndef IsZariskiConnected (H : Subgroup (GL (Fin n) K)) : Prop :=\n  letI := zariskiTopology (K := K) (n := n)\n  IsConnected (matrixSet H)\n\n/-- A subgroup `H` of `GL_n(K)` is a *simple algebraic group* if it is a connected noncommutative\nlinear algebraic group whose only connected closed normal subgroups are the trivial group and `H`\nitself. -/\ndef IsSimpleAlgebraicGroup (H : Subgroup (GL (Fin n) K)) : Prop :=\n  IsAlgebraicSubgroup H ∧ IsZariskiConnected H ∧\n    (¬ ∀ a ∈ H, ∀ b ∈ H, a * b = b * a) ∧\n    ∀ N : Subgroup (GL (Fin n) K), N ≤ H → IsAlgebraicSubgroup N → IsZariskiConnected N →\n      (∀ h ∈ H, ∀ x ∈ N, h * x * h⁻¹ ∈ N) → N = ⊥ ∨ N = H\n\nend AlgebraicGroup\n\n/--\n**The Cherlin–Zilber conjecture** (algebraicity conjecture). Let $G$ be an infinite simple group\nwhose complete first-order theory (in the language of groups) is $\\omega$-stable. Then $G$ is a\nsimple algebraic group over an algebraically closed field: there are an algebraically closed field\n$K$ and a simple algebraic group $H \\le \\mathrm{GL}_n(K)$ over $K$ such that $G \\cong H$ as\nabstract groups.\n\nThe hypothesis that $G$ is infinite excludes the finite simple groups, whose theories are\ntrivially $\\omega$-stable.\n-/\n@[category research open, AMS 3 20]\ntheorem cherlin_zilber_conjecture (G : Type u) [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : IsOmegaStable (groupLanguage.completeTheory G)) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (n : ℕ) (H : Subgroup (GL (Fin n) K)),\n      IsSimpleAlgebraicGroup H ∧ Nonempty (G ≃* H) := by\n  sorry\n\nend CherlinZilberConjecture\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot table is appropriate; the finite-Morley-rank remark is context only.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Simple group' + implicit 'infinite' (from the Stable_group article: 'infinite (ω-stable) simple groups') formalized as `[Infinite G] [IsSimpleGroup G]`; the finite case is excluded because finite simple groups are ω-stable but are not connected algebraic groups.",
+    "'Stable in ℵ₀' read as ω-stability of the complete theory `groupLanguage.completeTheory G` (Th(G) in the language {1, ⁻¹, *}). ω-stability is defined textbook-style (Marker Def. 4.2.17 / Tent–Ziegler): for every model M, every countable parameter set A ⊆ M and every n, the space S_n^M(A) of complete n-types over A is countable; S_n^M(A) is realised as `(L[[A]].completeTheory M).CompleteType (Fin n)`. Using all n rather than only n = 1 is a standard equivalent choice.",
+    "Following Mathlib's convention for `IsSatisfiable`/`ModelsBoundedFormula`, models in `IsOmegaStable` range over `ModelType.{u, v, max u v}` (here `Type 0`); by Löwenheim–Skolem this is equivalent to allowing models in any universe.",
+    "'Simple algebraic group over an algebraically closed field' formalized concretely as a Zariski-closed subgroup H of GL_n(K) (K algebraically closed, any n) that is connected in the Zariski topology, noncommutative, and whose closed connected normal subgroups are only ⊥ and H (Humphreys/Borel definition; the variant that also forbids finite normal subgroups is equivalent here because G ≅ H is abstractly simple). Every affine algebraic group is a closed subgroup of some GL_n, and a simple algebraic group is affine, so nothing is lost. Under the hypotheses on G these algebraic-side conditions are in fact automatic for any closed H ≅ G, so the statement is robust to the choice of variant.",
+    "The Zariski topology on n×n matrices is defined as `TopologicalSpace.generateFrom` of the complements of Zariski-closed sets (common zero sets of sets of polynomials in the n² entries); since Zariski-closed sets are closed under finite unions and arbitrary intersections this is exactly the Zariski topology. Closed subgroups of GL_n(K) are those of the form {g ∈ GL_n(K) | g ∈ Z} with Z Zariski-closed in M_n(K).",
+    "The isomorphism is of abstract groups: `Nonempty (G ≃* H)`. The field K is quantified in the same universe as G (`Type u`); this is harmless since |K| ≤ |G| for any such H(K) ≅ G.",
+    "Normality of N in H is written explicitly as ∀ h ∈ H, ∀ x ∈ N, h * x * h⁻¹ ∈ N."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.CompleteType, FirstOrder.Language.completeTheory, Language.withConstants (used as building blocks); no stability notion exists in Mathlib.ModelTheory.",
+     "name": "CherlinZilberConjecture.IsOmegaStable",
+     "why_needed": "Mathlib has no notion of (ω-)stability of a theory; needed for the hypothesis 'first-order theory stable in ℵ₀'."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.ring / FirstOrder.Ring.compatibleRingOfRing (mirrored in design).",
+     "name": "CherlinZilberConjecture.GroupFunc / groupLanguage / oneFunc / invFunc / mulFunc and the `groupLanguage.Structure G` instance",
+     "why_needed": "Mathlib has a first-order language of rings (`Language.ring`) but no language of groups; needed to form the first-order theory of a group."
+    },
+    {
+     "closest_existing_considered": "MvPolynomial.zeroLocus (Nullstellensatz file; only for `σ → K`, so a direct polynomial zero-set definition on matrices was used), PrimeSpectrum.zariskiTopology (on Spec, not on K-points), Matrix.GeneralLinearGroup (used), CategoryTheory Grp_ objects in Scheme (no group-scheme API).",
+     "name": "CherlinZilberConjecture.IsZariskiClosed / zariskiTopology / matrixSet / IsAlgebraicSubgroup / IsZariskiConnected / IsSimpleAlgebraicGroup",
+     "why_needed": "Mathlib has no algebraic groups (no group schemes, no linear algebraic groups); a concrete notion of a (simple, connected) Zariski-closed subgroup of GL_n(K) is needed for the conclusion."
+    }
+   ],
+   "per_slot": {
+    "cherlin_zilber_conjecture": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `cherlin_zilber_conjecture`: for every infinite simple group `G` (Mathlib `IsSimpleGroup`, `Infinite`) whose complete first-order theory in the language of groups {1, ⁻¹, *} is ω-stable, there exist an algebraically closed field `K`, an `n`, and a simple algebraic group `H ≤ GL_n(K)` (Zariski-closed, connected, noncommutative, no proper nontrivial connected closed normal subgroups) with `G ≃* H`. Mathlib has no language of groups, no notion of stability/ω-stability, and no (linear) algebraic groups, so these were defined in the file on top of Mathlib's `CompleteType`, `completeTheory`, `withConstants`, `GL`, `MvPolynomial`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "cherlin_zilber_conjecture": "/--\n**The Cherlin–Zilber conjecture** (algebraicity conjecture). Let $G$ be an infinite simple group\nwhose complete first-order theory (in the language of groups) is $\\omega$-stable. Then $G$ is a\nsimple algebraic group over an algebraically closed field: there are an algebraically closed field\n$K$ and a simple algebraic group $H \\le \\mathrm{GL}_n(K)$ over $K$ such that $G \\cong H$ as\nabstract groups.\n\nThe hypothesis that $G$ is infinite excludes the finite simple groups, whose theories are\ntrivially $\\omega$-stable.\n-/\n@[category research open, AMS 3 20]\ntheorem cherlin_zilber_conjecture (G : Type u) [Group G] [Infinite G] [IsSimpleGroup G]\n    (hG : IsOmegaStable (groupLanguage.completeTheory G)) :\n    ∃ (K : Type u) (_ : Field K) (_ : IsAlgClosed K) (n : ℕ) (H : Subgroup (GL (Fin n) K)),\n      IsSimpleAlgebraicGroup H ∧ Nonempty (G ≃* H) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "cherlin_zilber_conjecture": "c08"
+ },
+ "id": "wp-cherlin-zilber-conjecture",
+ "main_attempt": "c08"
+}

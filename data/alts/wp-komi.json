@@ -1,0 +1,474 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Perfect komi\n\nWe model Go on a $19 \\times 19$ board with area scoring. Black moves first, suicide is forbidden,\npositional superko prevents repetition of a board position, and two consecutive passes end the\ngame. Empty regions bordered by both colours, including shared liberties in seki, score for neither\nplayer.\nThe perfect komi is the minimax value of Black's final score margin.\n\n*References:*\n\n- [Wikipedia, Komi (Go)](https://en.wikipedia.org/wiki/Komi_%28Go%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace Komi\n\n/-- The two stone colours. -/\ninductive Color\n  | black\n  | white\n  deriving DecidableEq, Fintype\n\n/-- The colour that plays after `c`. -/\ndef Color.other : Color → Color\n  | .black => .white\n  | .white => .black\n\nabbrev Point := Fin 19 × Fin 19\nabbrev Board := Point → Option Color\n\n/-- Orthogonal adjacency on the Go board. -/\ndef Adjacent (p q : Point) : Prop :=\n  (p.1.val + 1 = q.1.val ∧ p.2 = q.2) ∨\n  (q.1.val + 1 = p.1.val ∧ p.2 = q.2) ∨\n  (p.2.val + 1 = q.2.val ∧ p.1 = q.1) ∨\n  (q.2.val + 1 = p.2.val ∧ p.1 = q.1)\n\ninstance : DecidableRel Adjacent := fun p q => by\n  unfold Adjacent\n  infer_instance\n\n/-- Two points are connected through points on which `b` has the value `x`. -/\ndef Connected (b : Board) (x : Option Color) (p q : Point) : Prop :=\n  b p = x ∧ b q = x ∧\n    Relation.ReflTransGen (fun u v => Adjacent u v ∧ b u = x ∧ b v = x) p q\n\n/-- The chain containing `p` has a liberty. -/\ndef HasLiberty (b : Board) (p : Point) : Prop :=\n  ∃ q r, Connected b (b p) p q ∧ Adjacent q r ∧ b r = none\n\n/-- Put a stone on a board, before removing captured stones. -/\ndef place (b : Board) (c : Color) (p : Point) : Board :=\n  Function.update b p (some c)\n\n/-- The board after placing a stone and simultaneously removing every adjacent enemy chain\nwithout a liberty. -/\nnoncomputable def afterMove (b : Board) (c : Color) (p : Point) : Board := by\n  classical\n  let b' := place b c p\n  exact fun q =>\n    if b' q = some c.other ∧ ∃ r, Adjacent p r ∧ Connected b' (some c.other) r q ∧\n        ¬ HasLiberty b' r then none\n    else b' q\n\n/-- A state records the current board, all earlier board positions, the player to move, and the\nnumber of consecutive passes. -/\nstructure State where\n  board : Board\n  history : Finset Board\n  turn : Color\n  passes : ℕ\n\n/-- An action is either a pass (`none`) or placement at a board point (`some p`). -/\nabbrev Action := Option Point\n\n/-- Legality of an action. Stone placement requires an empty point, must not be suicide after\ncaptures, and must not repeat an earlier board position. -/\ndef Legal (s : State) : Action → Prop\n  | none => True\n  | some p =>\n      s.board p = none ∧\n      afterMove s.board s.turn p p = some s.turn ∧\n      HasLiberty (afterMove s.board s.turn p) p ∧\n      afterMove s.board s.turn p ∉ s.history\n\n/-- Update the state by a legal action. -/\nnoncomputable def play (s : State) : Action → State\n  | none => ⟨s.board, s.history, s.turn.other, s.passes + 1⟩\n  | some p =>\n      let b := afterMove s.board s.turn p\n      ⟨b, insert b s.history, s.turn.other, 0⟩\n\n/-- The finite collection of legal actions from a state. -/\nnoncomputable def legalActions (s : State) : Finset Action := by\n  classical\n  exact Finset.univ.filter (Legal s)\n\n/-- An empty point is territory of `c` when its entire connected empty region has a stone of colour\n`c` on its boundary and no stone of the other colour there. -/\ndef Territory (b : Board) (c : Color) (p : Point) : Prop :=\n  b p = none ∧\n  (∃ q r, Connected b none p q ∧ Adjacent q r ∧ b r = some c) ∧\n  ∀ q r, Connected b none p q → Adjacent q r → b r ≠ none → b r = some c\n\n/-- Area points belonging to a colour: its stones together with its surrounded territory. -/\nnoncomputable def area (b : Board) (c : Color) : ℕ := by\n  classical\n  exact (Finset.univ.filter fun p => b p = some c ∨ Territory b c p).card\n\n/-- Black's area score minus White's area score. -/\nnoncomputable def score (b : Board) : ℤ :=\n  area b .black - area b .white\n\n/-- Maximum of a list, with a value for the empty list. -/\ndef listMax (fallback : ℤ) : List ℤ → ℤ\n  | [] => fallback\n  | x :: xs => max x (listMax fallback xs)\n\n/-- Minimum of a list, with a value for the empty list. -/\ndef listMin (fallback : ℤ) : List ℤ → ℤ\n  | [] => fallback\n  | x :: xs => min x (listMin fallback xs)\n\n/-- Backward induction for Go. Black maximizes and White minimizes the final Black score margin.\nThe fuel is immaterial when it exceeds twice the number of board positions: superko allows each\nboard position at most once, and between two placements there can be at most one pass. -/\nnoncomputable def gameValue : ℕ → State → ℤ\n  | 0, s => score s.board\n  | n + 1, s =>\n      if s.passes ≥ 2 then score s.board\n      else\n        let outcomes := (legalActions s).toList.map fun a => gameValue n (play s a)\n        match s.turn with\n        | .black => listMax (score s.board) outcomes\n        | .white => listMin (score s.board) outcomes\n\n/-- The empty board. -/\ndef emptyBoard : Board := fun _ => none\n\n/-- The perfect komi: Black's final score margin under perfect play from an empty 19 by 19 board. -/\nnoncomputable def perfectKomi : ℤ :=\n  let initial : State := ⟨emptyBoard, {emptyBoard}, .black, 0⟩\n  gameValue (2 * Fintype.card Board + 2) initial\n\n/--\nThe perfect value of komi is 7 points: under perfect play on a $19 \\times 19$ board with the area\nscoring and positional-superko rules fixed above, adding 7 points to White's score produces jigo.\n-/\n@[category research open, AMS 5 91]\ntheorem komi : perfectKomi = 7 := by\n  sorry\n\nend Komi\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.87,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the candidate answer in the background article and fixed decomposition literally: the conjecture is that perfect komi is 7 points, rather than leaving the requested value as `answer(sorry)`.",
+    "Fixed a concrete ruleset because perfect komi is ruleset-dependent: a 19×19 board, Black first, alternating play, orthogonal chains and liberties, simultaneous capture of adjacent enemy chains, suicide forbidden, positional superko, and termination after two consecutive passes.",
+    "Used area scoring: each colour receives one point for each of its stones and for each empty point in a connected empty region whose nonempty boundary consists only of that colour. A region with no stone boundary (including the initial empty board) belongs to neither colour, and mixed-boundary/shared seki liberties belong to neither colour.",
+    "Modeled perfect play by finite backward induction: Black maximizes and White minimizes Black's integer area-score margin. Positional superko bounds placements by the number of boards, and at most one nonterminal pass can occur between placements, so fuel `2 * Fintype.card Board + 2` exceeds every legal play length.",
+    "Defined perfect komi as Black's final score margin, since adding exactly that amount to White's score makes the adjusted scores equal (jigo).",
+    "Did not impose a separate `NoSeki` restriction. The article invokes absence of seki to explain the odd-integer observation, while presenting 7 as the candidate perfect value; the chosen area-scoring predicate directly handles shared seki regions neutrally."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "No Go colour type exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Komi.Color",
+     "why_needed": "Represents Black and White stones and players."
+    },
+    {
+     "closest_existing_considered": "Generic `Bool` negation was considered, but named colours make the rules and score direction explicit.",
+     "name": "Komi.Color.other",
+     "why_needed": "Defines alternation of players."
+    },
+    {
+     "closest_existing_considered": "Uses the existing `Fin` and product types; the abbreviation records the fixed board size.",
+     "name": "Komi.Point",
+     "why_needed": "Represents intersections of the 19×19 board."
+    },
+    {
+     "closest_existing_considered": "Uses existing function and `Option` types; no Go board representation exists.",
+     "name": "Komi.Board",
+     "why_needed": "Represents an empty, Black, or White value at every point."
+    },
+    {
+     "closest_existing_considered": "Mathlib graph adjacency is generic and no existing grid-board relation fixes these boundaries.",
+     "name": "Komi.Adjacent",
+     "why_needed": "Defines orthogonal board adjacency used by chains, liberties, and territory."
+    },
+    {
+     "closest_existing_considered": "Built from Mathlib's `Relation.ReflTransGen`; no existing Go-chain predicate exists.",
+     "name": "Komi.Connected",
+     "why_needed": "Defines same-valued connected board regions and stone chains."
+    },
+    {
+     "closest_existing_considered": "No corresponding game-specific primitive exists.",
+     "name": "Komi.HasLiberty",
+     "why_needed": "Expresses the capture and suicide rule for a stone chain."
+    },
+    {
+     "closest_existing_considered": "Built from `Function.update`; the named operation clarifies the two-stage capture rule.",
+     "name": "Komi.place",
+     "why_needed": "Forms the provisional board after placing a stone."
+    },
+    {
+     "closest_existing_considered": "No Go move/capture operation exists.",
+     "name": "Komi.afterMove",
+     "why_needed": "Defines simultaneous removal of adjacent captured enemy chains."
+    },
+    {
+     "closest_existing_considered": "Mathlib's abstract combinatorial games do not encode these Go-specific state components.",
+     "name": "Komi.State",
+     "why_needed": "Stores board history for superko, player to move, and consecutive passes in addition to the board."
+    },
+    {
+     "closest_existing_considered": "Uses `Option Point`; no Go action type exists.",
+     "name": "Komi.Action",
+     "why_needed": "Represents either placement at a point or a pass."
+    },
+    {
+     "closest_existing_considered": "No existing Go legality predicate exists.",
+     "name": "Komi.Legal",
+     "why_needed": "Combines emptiness, capture, no-suicide, and positional-superko legality."
+    },
+    {
+     "closest_existing_considered": "No existing Go transition function exists.",
+     "name": "Komi.play",
+     "why_needed": "Updates the board, history, player, and pass count after an action."
+    },
+    {
+     "closest_existing_considered": "Uses `Finset.univ.filter`; no existing Go move generator exists.",
+     "name": "Komi.legalActions",
+     "why_needed": "Provides the finite move collection needed for backward induction."
+    },
+    {
+     "closest_existing_considered": "No territory or Go scoring predicate exists.",
+     "name": "Komi.Territory",
+     "why_needed": "Defines ownership of connected empty regions for area scoring."
+    },
+    {
+     "closest_existing_considered": "Uses existing finite filtering and cardinality; no Go area-score operation exists.",
+     "name": "Komi.area",
+     "why_needed": "Counts stones and owned empty points for one colour."
+    },
+    {
+     "closest_existing_considered": "No Go payoff function exists.",
+     "name": "Komi.score",
+     "why_needed": "Gives Black's integer area-score margin over White."
+    },
+    {
+     "closest_existing_considered": "`Finset.max'` requires a nonemptiness proof inside the recursive definition; this transparent list fold keeps the minimax definition simple.",
+     "name": "Komi.listMax",
+     "why_needed": "Takes Black's optimal payoff in finite backward induction, with a total empty-list fallback."
+    },
+    {
+     "closest_existing_considered": "`Finset.min'` requires a nonemptiness proof inside the recursive definition; this transparent list fold keeps the minimax definition simple.",
+     "name": "Komi.listMin",
+     "why_needed": "Takes White's optimal payoff in finite backward induction, with a total empty-list fallback."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `PGame`/`Game` APIs describe abstract combinatorial games but do not directly provide this finite scored-state backward induction with Go transitions.",
+     "name": "Komi.gameValue",
+     "why_needed": "Defines the finite perfect-play minimax score margin."
+    },
+    {
+     "closest_existing_considered": "The constant function exists generically, but this named definition records the intended initial Go board.",
+     "name": "Komi.emptyBoard",
+     "why_needed": "Specifies the initial board position."
+    },
+    {
+     "closest_existing_considered": "No existing perfect-komi or Go-value definition exists.",
+     "name": "Komi.perfectKomi",
+     "why_needed": "Names the minimax Black score margin from the initial 19×19 position, which is the quantity asked for."
+    }
+   ],
+   "per_slot": {
+    "komi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Mathlib and FormalConjecturesForMathlib have abstract combinatorial-game notions but no model of Go positions, captures, ko/superko, passing, area scoring, or perfect-play value. The file therefore supplies a transparent problem-local finite model and states `perfectKomi = 7`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "komi": "/--\nThe perfect value of komi is 7 points: under perfect play on a $19 \\times 19$ board with the area\nscoring and positional-superko rules fixed above, adding 7 points to White's score produces jigo.\n-/\n@[category research open, AMS 5 91]\ntheorem komi : perfectKomi = 7 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c02",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "The background article says that statistics “suggest that 7 is the correct value”; it does not establish 7 as the answer. For the list-page question “What is the perfect value of Komi?”, repository convention would normally make the unknown value `answer(sorry)`, once a precise Go value function exists, rather than hard-code equality to 7. The decomposition table simultaneously calls 7 the candidate answer and recommends the `value = answer(sorry)` shape; those are not the same statement.",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "No concrete Go ruleset was selected: the source does not resolve the materially relevant differences among area-scoring rulesets.",
+    "No candidate file was written, as required for a full bail-out."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "komi": {
+     "outcome": "missing_primitives",
+     "why": "A faithful statement needs an actual 19×19 Go game model: board positions and chains/liberties, capture and suicide legality, passes and termination, ko/superko history constraints, area scoring and seki treatment, strategies, and the resulting minimax score. Hard searches found no Go model in Mathlib or FormalConjecturesForMathlib; Mathlib only has generic normal-play combinatorial games, which do not encode scored Go. Introducing an abstract or unconstrained `perfectKomi` value would be a prohibited placeholder. Moreover, the source says only “area scoring” and “absence of seki” and does not select the ko/superko, suicide, and termination rules needed to determine one game tree, so silently implementing a particular modern ruleset would not be faithful."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": true,
+   "cid": "c03",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Read the terse list entry through the supplied Komi article: “perfect komi” means White’s compensation that makes standard 19×19 Go a jigo under perfect play, and the article proposes 7 under area scoring with no seki.",
+    "Considered formalizing the candidate as `perfectKomi = answer(7)`, but rejected it because no existing term denotes the relevant ruleset’s minimax score and an unconstrained bespoke constant/opaque definition is prohibited.",
+    "Considered Mathlib’s generic `SetTheory.PGame.State` and repository finite minimax recursions; they still require all Go legal-position, move, terminal, and scoring semantics, which are absent.",
+    "Left `/workspace/candidate/candidate.lean` absent, as required when every slot is omitted."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "komi": {
+     "outcome": "missing_primitives",
+     "why": "A faithful statement requires a complete formal model of 19×19 Go: board adjacency, stones and turns, connected groups and liberties, capture and suicide rules, passing and termination, area scoring, seki, ko/superko history, and finite perfect-play minimax value. Neither Mathlib nor FormalConjecturesForMathlib/repository problem files provide a Go model; the generic combinatorial-game APIs only package an already-defined move relation. Defining merely an integer named `perfectKomi` would be a forbidden placeholder and would not constrain the requested answer. In addition, the source says only “area scoring” and “absence of seki” and does not fix the suicide or ko/superko convention, although the value depends on those choices. Inventing one would state a ruleset-specific theorem not determined by the source."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Komi\n\nKomi in the game of Go are points added to the score of the player with the white stones as\ncompensation for playing second. A *perfect* value of komi would make each game end in a draw\n(jigo) under perfect play by both sides. Under area scoring the perfect komi is an integer\n(Black's final score minus White's final score under perfect play), and statistics from\nprofessional and computer play suggest that its value on the standard `19 × 19` board is `7`.\n\nThis file models Go with the Tromp–Taylor rules (area scoring, positional superko, suicide\nallowed, game over after two consecutive passes), defines the value of the game under perfect\nplay, and asks for its value on the `19 × 19` board.\n\n*References:*\n- [Wikipedia, Komi (Go)](https://en.wikipedia.org/wiki/Komi_%28Go%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [J. Tromp, B. Taylor, The Logical Rules of Go](https://tromp.github.io/go.html)\n-/\n\nnamespace Komi\n\nopen SimpleGraph\n\n/-- The two colours of stones, which also name the two players. -/\ninductive Color\n  | black\n  | white\n  deriving DecidableEq, Fintype\n\n/-- The opponent's colour. -/\ndef Color.other : Color → Color\n  | .black => .white\n  | .white => .black\n\n/-- A point of the `n × n` grid. -/\nabbrev Point (n : ℕ) := Fin n × Fin n\n\n/-- Two points of the grid are adjacent if they are horizontally or vertically next to each\nother, i.e. adjacent in the box product of two path graphs. -/\nabbrev grid (n : ℕ) : SimpleGraph (Point n) := pathGraph n □ pathGraph n\n\n/-- A grid colouring: each point is empty (`none`) or carries a stone of some colour. -/\nabbrev Position (n : ℕ) := Point n → Option Color\n\nvariable {n : ℕ}\n\n/-- In the position `pos`, the point `p` *reaches* the colour `c` (where `none` stands for\n\"empty\") if there is a path of adjacent points, all coloured like `p`, from `p` to a point adjacent\nto a point coloured `c`. -/\ndef Reaches (pos : Position n) (p : Point n) (c : Option Color) : Prop :=\n  ∃ q r, Relation.ReflTransGen (fun a b => (grid n).Adj a b ∧ pos b = pos p) p q ∧\n    (grid n).Adj q r ∧ pos r = c\n\nopen scoped Classical in\n/-- *Clearing* the colour `c` empties every point of colour `c` that does not reach an empty\npoint. -/\nnoncomputable def clear (pos : Position n) (c : Color) : Position n :=\n  fun p => if pos p = some c ∧ ¬ Reaches pos p none then none else pos p\n\n/-- The position obtained when the player `c` plays at the point `p`: `p` is coloured `c`, then\nthe opponent's colour is cleared, then the player's own colour is cleared. -/\nnoncomputable def play (pos : Position n) (c : Color) (p : Point n) : Position n :=\n  clear (clear (Function.update pos p (some c)) c.other) c\n\n/-- The (area) score of the player `c` in the position `pos`: the number of points coloured `c`\nplus the number of empty points that reach `c` but not the opponent's colour. -/\nnoncomputable def score (pos : Position n) (c : Color) : ℕ :=\n  Nat.card {p : Point n // pos p = some c} +\n    Nat.card {p : Point n //\n      pos p = none ∧ Reaches pos p (some c) ∧ ¬ Reaches pos p (some c.other)}\n\n/-- The result of a finished game in the position `pos`: Black's score minus White's score. -/\nnoncomputable def result (pos : Position n) : ℤ :=\n  score pos .black - score pos .white\n\n/-- The state of a game of Go in progress. -/\nstructure State (n : ℕ) where\n  /-- The current grid colouring. -/\n  pos : Position n\n  /-- The player whose turn it is. -/\n  toMove : Color\n  /-- All grid colourings that have occurred so far, including the current one. -/\n  history : Finset (Position n)\n  /-- Whether the previous turn was a pass. -/\n  lastPass : Bool\n\nnamespace State\n\n/-- The initial state: an empty board, Black to move. -/\ndef initial (n : ℕ) : State n where\n  pos := fun _ => none\n  toMove := .black\n  history := {fun _ => none}\n  lastPass := false\n\n/-- The state after the player to move passes. -/\ndef pass (s : State n) : State n :=\n  { s with toMove := s.toMove.other, lastPass := true }\n\n/-- The state after the player to move plays at the point `p`. -/\nnoncomputable def move (s : State n) (p : Point n) : State n where\n  pos := play s.pos s.toMove p\n  toMove := s.toMove.other\n  history := insert (play s.pos s.toMove p) s.history\n  lastPass := false\n\n/-- Playing at `p` is legal if `p` is empty and the resulting grid colouring has not occurred\nearlier in the game (positional superko). -/\ndef Legal (s : State n) (p : Point n) : Prop :=\n  s.pos p = none ∧ play s.pos s.toMove p ∉ s.history\n\nopen scoped Classical in\n/-- The value of the game from the state `s` under perfect play, measured as Black's score minus\nWhite's score at the end of the game: Black maximises and White minimises over the legal turns\n(a pass, or a legal move), and the game ends after two consecutive passes. -/\nnoncomputable def value (s : State n) : ℤ :=\n  let passValue : ℤ := if s.lastPass then result s.pos else value s.pass\n  let options : Finset ℤ :=\n    insert passValue ((Finset.univ.filter s.Legal).attach.image fun p => value (s.move p.1))\n  if s.toMove = .black then options.max' (Finset.insert_nonempty _ _)\n  else options.min' (Finset.insert_nonempty _ _)\ntermination_by 2 * (Fintype.card (Position n) - s.history.card) + if s.lastPass then 0 else 1\ndecreasing_by\n  · simp_all [pass]\n  all_goals\n    have h₁ := (Finset.mem_filter.mp p.2).2\n    have h₂ : (insert (play s.pos s.toMove p.1) s.history).card ≤ Fintype.card (Position n) :=\n      Finset.card_le_univ _\n    simp only [move, Finset.card_insert_of_notMem h₁.2, Bool.false_eq_true, if_false] at h₂ ⊢\n    omega\n\nend State\n\n/-- The perfect komi on the `n × n` board: Black's score minus White's score under perfect play\nfrom the empty board. Giving White this many points of compensation makes the game end in a draw\nunder perfect play. -/\nnoncomputable def perfectKomi (n : ℕ) : ℤ :=\n  State.value (State.initial n)\n\n/-- On the `1 × 1` board no two points are adjacent, so no point reaches any colour. -/\n@[category API, AMS 91]\ntheorem not_reaches_one (pos : Position 1) (p : Point 1) (c : Option Color) :\n    ¬ Reaches pos p c := by\n  rintro ⟨q, r, -, hqr, -⟩\n  simp [pathGraph_adj] at hqr\n\n/-- On the `1 × 1` board every stone is cleared as soon as it is played. -/\n@[category API, AMS 91]\ntheorem play_one (pos : Position 1) (c : Color) (p : Point 1) :\n    play pos c p = fun _ => none := by\n  funext q\n  obtain rfl : q = p := Subsingleton.elim _ _\n  simp [play, clear, not_reaches_one]\n\nopen scoped Classical in\n/-- On the `1 × 1` board, once the empty board has occurred, every move is illegal (it would\nrecreate the empty board), so both players can only pass. -/\n@[category API, AMS 91]\ntheorem value_one (s : State 1) (hs : (fun _ => none) ∈ s.history) :\n    s.value = result s.pos := by\n  have himg : ∀ t : State 1, (fun _ => none) ∈ t.history →\n      Finset.image (fun p => (t.move p.1).value)\n        (Finset.filter t.Legal Finset.univ).attach = ∅ := by\n    intro t ht\n    rw [Finset.image_eq_empty, Finset.attach_eq_empty_iff, Finset.filter_eq_empty_iff]\n    intro p _ hp\n    exact hp.2 (play_one _ _ _ ▸ ht)\n  have key : ∀ t : State 1, (fun _ => none) ∈ t.history → t.lastPass = true →\n      t.value = result t.pos := by\n    intro t ht h\n    rw [State.value]\n    simp [h, himg t ht]\n  by_cases h : s.lastPass = true\n  · exact key s hs h\n  · rw [State.value]\n    simp [h, himg s hs, key s.pass hs rfl]\n    rfl\n\n/-- On the `1 × 1` board the only legal turn is a pass, so the perfect komi is `0`. -/\n@[category test, AMS 91]\ntheorem perfectKomi_one : perfectKomi 1 = 0 := by\n  rw [perfectKomi, value_one _ (Finset.mem_singleton_self _)]\n  simp [result, score, not_reaches_one, State.initial]\n\n/-- What is the perfect value of komi? That is, what is Black's final score minus White's final\nscore under perfect play on the `19 × 19` board, using the Tromp–Taylor rules (area scoring,\npositional superko)? Statistics from professional and computer play suggest that the answer is\n`7`. -/\n@[category research open, AMS 91]\ntheorem komi : perfectKomi 19 = answer(sorry) := by\n  sorry\n\nend Komi\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.75,
+   "decomposition_objections": "None. The table's single slot is right; its notes both say 'the Prop is the perfect komi equals 7' and that the repository shape is `value = answer(sorry)` with 7 as the candidate — I followed the latter (the source is a question) and recorded 7 in the docstring.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Ruleset: the informal statement does not fix a ruleset, and the value of perfect komi can in principle depend on it (area vs territory scoring, ko/superko rule, suicide). Following the article's pointer to area scoring, I used the Tromp–Taylor 'logical rules' of Go exactly: area scoring (stones + empty points reaching only one colour), positional superko (a move may not recreate any earlier grid colouring, including the initial empty board and the current one), suicide allowed (own colour is cleared after the opponent's), game ends after two consecutive passes. Reviewers should check whether they prefer e.g. suicide forbidden (Chinese/AGA/Japanese rules) or situational superko; the file documents the choice in the module and theorem docstrings.",
+    "Perfect komi is defined as the minimax value of (Black's score − White's score) rather than literally as 'the komi k for which the game with komi k is a draw under perfect play'. Under area scoring these coincide: with komi v (the minimax value) both sides can guarantee at least a draw, and with any k ≠ v one side can force a win; so the perfect komi is the unique integer v.",
+    "The statement is a question, so the repository's `value = answer(sorry)` shape is used (type ℤ); the candidate answer 7 from the article is recorded in the docstring rather than in the Lean statement.",
+    "The model is parametrised by the board size n (board `Fin n × Fin n`); the conjecture is for n = 19. Adjacency is `pathGraph n □ pathGraph n` (orthogonal grid adjacency).",
+    "Superko history is stored as a `Finset` of positions; the minimax `value` is defined by well-founded recursion on 2·(#positions − |history|) + [previous turn not a pass], which is why the game is finite. Passes are always available; Black maximises (`Finset.max'`) and White minimises (`Finset.min'`).",
+    "A fully proved sanity test `perfectKomi_one : perfectKomi 1 = 0` (only passes are legal on the 1×1 board because a stone is immediately cleared and would recreate the empty board) is included with three `category API` helper lemmas, to validate the definitions of `Reaches`, `clear`/`play`, `Legal` and `value`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Bool`/`Fin 2` (less readable); the repo's `CatchUp.Player` is problem-specific.",
+     "name": "Komi.Color, Komi.Color.other",
+     "why_needed": "The two stone colours / players and the opponent map."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.pathGraph n □ SimpleGraph.pathGraph n` is reused for the adjacency; Mathlib has no Go board/position notion.",
+     "name": "Komi.Point, Komi.grid, Komi.Position",
+     "why_needed": "Points of the n×n board, its orthogonal adjacency graph, and grid colourings (each point empty or a stone)."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Reachable` on `SimpleGraph.induce` (equivalent but heavier); used `Relation.ReflTransGen` directly.",
+     "name": "Komi.Reaches",
+     "why_needed": "Tromp–Taylor rule 3: a point reaches a colour if a same-coloured chain from it is adjacent to a point of that colour (used both for captures and scoring)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or the repository.",
+     "name": "Komi.clear, Komi.play",
+     "why_needed": "Clearing a colour (removing chains without liberties) and executing a move (place stone, clear opponent, clear own) — Tromp–Taylor rules 4 and 7."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Komi.score, Komi.result",
+     "why_needed": "Area score of a player (Tromp–Taylor rule 9) and Black's margin at the end of the game."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `SetTheory.PGame` (win/lose combinatorial games, no scores or passes) and the repo's `CatchUp.valueAux` (problem-specific recursive evaluator, whose style was followed).",
+     "name": "Komi.State (with State.initial, State.pass, State.move, State.Legal, State.value)",
+     "why_needed": "Game state (position, side to move, superko history, previous-turn-was-pass flag), the transitions, positional-superko legality, and the minimax value under perfect play by well-founded recursion."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Komi.perfectKomi",
+     "why_needed": "The perfect komi on the n×n board: the minimax value from the empty board."
+    }
+   ],
+   "per_slot": {
+    "komi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `perfectKomi 19 = answer(sorry)` where `perfectKomi n : ℤ` is the minimax value (Black's area score minus White's area score under perfect play from the empty n×n board) of Go under a complete formal model of the Tromp–Taylor rules (area scoring, positional superko, two consecutive passes end the game). Under area scoring this integer is exactly the komi that makes perfect play end in jigo, which is the article's definition of perfect komi. A full Go model had to be built in the file since neither Mathlib nor the repository has one."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "komi": "/-- What is the perfect value of komi? That is, what is Black's final score minus White's final\nscore under perfect play on the `19 × 19` board, using the Tromp–Taylor rules (area scoring,\npositional superko)? Statistics from professional and computer play suggest that the answer is\n`7`. -/\n@[category research open, AMS 91]\ntheorem komi : perfectKomi 19 = answer(sorry) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Komi\n\nKomi is the number of points added to White's score in the game of Go, to compensate for Black\nmoving first. The *perfect* komi is the value that makes a game on the standard $19 \\times 19$\nboard end in a draw (jigo) under perfect play by both sides. Equivalently, it is the minimax\nvalue of Black's final margin (Black's score minus White's score). Its value is not known.\nUnder area scoring, statistics from professional and computer play suggest the value $7$.\n\nThe value depends on the rules. We use the Tromp–Taylor rules, a precise formulation of\narea-scoring Go: Black moves first, players alternate, a turn is a pass or the placement of a\nstone on an empty point that does not repeat an earlier grid colouring (positional superko),\nsuicide is allowed, the game ends after two consecutive passes, and a player's score is the number\nof her stones plus the number of empty points that reach only her colour.\n\n*References:*\n- [Wikipedia, Komi (Go)](https://en.wikipedia.org/wiki/Komi_%28Go%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Tromp–Taylor rules of Go](https://tromp.github.io/go.html)\n-/\n\nnamespace Komi\n\nopen SimpleGraph\n\n/-- The two players of Go, identified with the colours of their stones. -/\ninductive Color\n  | black\n  | white\n  deriving DecidableEq, Fintype\n\n/-- The opponent's colour. -/\ndef Color.other : Color → Color\n  | .black => .white\n  | .white => .black\n\n/-- The points of the `n × n` board. -/\nabbrev Point (n : ℕ) := Fin n × Fin n\n\n/-- The `n × n` grid graph: two points are adjacent if they are vertical or horizontal\nneighbours. -/\ndef grid (n : ℕ) : SimpleGraph (Point n) := pathGraph n □ pathGraph n\n\n/-- A colouring of the board: each point is empty (`none`) or carries a stone of a colour. -/\nabbrev Position (n : ℕ) := Point n → Option Color\n\nvariable {n : ℕ}\n\n/-- A point `p` *reaches* the colour `c` (where `none` is empty) in the position `pos` if there is\na path of adjacent points of `p`'s colour from `p` to a point of colour `c`. -/\ndef Reaches (pos : Position n) (p : Point n) (c : Option Color) : Prop :=\n  ∃ q r, Relation.ReflTransGen (fun x y => (grid n).Adj x y ∧ pos y = pos p) p q ∧\n    (grid n).Adj q r ∧ pos r = c\n\nopen scoped Classical in\n/-- Clearing the colour `c`: empty all points of colour `c` that do not reach an empty point. -/\nnoncomputable def clear (pos : Position n) (c : Color) : Position n :=\n  fun p => if pos p = some c ∧ ¬ Reaches pos p none then none else pos p\n\n/-- Playing a stone of colour `c` on the point `p`: colour `p` with `c`, then clear the opponent's\ncolour, then clear one's own colour. -/\nnoncomputable def place (pos : Position n) (c : Color) (p : Point n) : Position n :=\n  clear (clear (Function.update pos p (some c)) c.other) c\n\n/-- The area score of the colour `c`: the number of points of colour `c` plus the number of empty\npoints that reach `c` but do not reach the other colour. -/\nnoncomputable def score (pos : Position n) (c : Color) : ℕ :=\n  {p : Point n | pos p = some c ∨\n    (pos p = none ∧ Reaches pos p (some c) ∧ ¬ Reaches pos p (some c.other))}.ncard\n\n/-- Black's margin: Black's score minus White's score. -/\nnoncomputable def margin (pos : Position n) : ℤ :=\n  score pos .black - score pos .white\n\n/-- The state of a game: the current position, the set of all grid colourings that have occurred\nso far (including the current one), the player to move, and whether the previous turn was a\npass. -/\nstructure State (n : ℕ) where\n  /-- The current position. -/\n  pos : Position n\n  /-- All grid colourings that have occurred so far, including the current one. -/\n  history : Finset (Position n)\n  /-- The player to move. -/\n  toMove : Color\n  /-- Whether the previous turn was a pass. -/\n  passed : Bool\n\n/-- The initial state: the empty board, Black to move. -/\ndef State.initial (n : ℕ) : State n where\n  pos := fun _ => none\n  history := {fun _ => none}\n  toMove := .black\n  passed := false\n\n/-- The state after the player to move passes. -/\ndef State.pass (s : State n) : State n :=\n  { s with toMove := s.toMove.other, passed := true }\n\n/-- The state after the player to move plays a stone on `p`. -/\nnoncomputable def State.play (s : State n) (p : Point n) : State n where\n  pos := place s.pos s.toMove p\n  history := insert (place s.pos s.toMove p) s.history\n  toMove := s.toMove.other\n  passed := false\n\n/-- The player to move may play a stone on `p` if `p` is empty and the resulting grid colouring\nhas not occurred earlier in the game (positional superko). -/\ndef State.Legal (s : State n) (p : Point n) : Prop :=\n  s.pos p = none ∧ place s.pos s.toMove p ∉ s.history\n\n/-- The outcome preferred by the player `c` among the outcome `x` and the outcomes in `o`, where\noutcomes are measured as Black's margin: Black maximises and White minimises. -/\nnoncomputable def Color.best (c : Color) (x : ℤ) (o : Finset ℤ) : ℤ :=\n  if c = .black then (insert x o).max' (Finset.insert_nonempty x o)\n  else (insert x o).min' (Finset.insert_nonempty x o)\n\nopen scoped Classical in\n/-- The minimax value of Black's margin from the state `s`: the player to move chooses the best\noutcome among a pass and the legal stone placements. A pass following a pass ends the game, which\nis then scored. Every stone placement adds a new grid colouring to the history, so the game is\nfinite. -/\nnoncomputable def value (s : State n) : ℤ :=\n  s.toMove.best (if _ : s.passed then margin s.pos else value s.pass)\n    ((Finset.univ.filter s.Legal).attach.image fun p => value (s.play p.1))\ntermination_by 2 * (Fintype.card (Position n) - s.history.card) + (if s.passed then 0 else 1)\ndecreasing_by\n  · simp_all [State.pass]\n  · have hp := (Finset.mem_filter.mp p.2).2.2\n    have h1 : (insert (place s.pos s.toMove p.1) s.history).card = s.history.card + 1 :=\n      Finset.card_insert_of_notMem hp\n    have h2 := Finset.card_le_univ (insert (place s.pos s.toMove p.1) s.history)\n    simp only [State.play, h1]\n    split <;> omega\n\n/-- The perfect komi on the `n × n` board: Black's margin under perfect play by both sides,\nstarting from the empty board. -/\nnoncomputable def perfectKomi (n : ℕ) : ℤ := value (State.initial n)\n\n/-- The two area scores count disjoint sets of points, so together they are at most the number of\npoints of the board. -/\n@[category API, AMS 91]\ntheorem score_black_add_score_white_le (pos : Position n) :\n    score pos .black + score pos .white ≤ n ^ 2 := by\n  rw [score, score, ← Set.ncard_union_eq]\n  · calc _ ≤ (Set.univ : Set (Point n)).ncard := Set.ncard_le_ncard (Set.subset_univ _)\n      _ = n ^ 2 := by simp [Set.ncard_univ, Nat.card_eq_fintype_card, sq]\n  · rw [Set.disjoint_left]\n    rintro p (h | ⟨h, h1, h2⟩) (h' | ⟨h', h1', h2'⟩) <;> simp_all [Color.other]\n\n/-- With no legal stone placement, the only option is to pass. -/\n@[category API, AMS 91]\ntheorem Color.best_empty (c : Color) (x : ℤ) : c.best x ∅ = x := by\n  cases c <;> simp [Color.best]\n\n/-- The $1 \\times 1$ board has no adjacent points. -/\n@[category API, AMS 91]\ntheorem grid_one_not_adj (p q : Point 1) : ¬ (grid 1).Adj p q := by\n  simp [grid, boxProd_adj, pathGraph_adj]\n\n/-- On the $1 \\times 1$ board no point reaches anything. -/\n@[category API, AMS 91]\ntheorem not_reaches_one (pos : Position 1) (p : Point 1) (c : Option Color) :\n    ¬ Reaches pos p c := by\n  rintro ⟨q, r, -, hqr, -⟩\n  exact grid_one_not_adj q r hqr\n\n/-- On the $1 \\times 1$ board every stone placement is a suicide that empties the board. -/\n@[category API, AMS 91]\ntheorem place_one (pos : Position 1) (c : Color) (p : Point 1) :\n    place pos c p = fun _ => none := by\n  funext q\n  obtain rfl : q = p := Subsingleton.elim q p\n  cases c <;> simp [place, clear, not_reaches_one, Color.other]\n\nopen scoped Classical in\n/-- On the $1 \\times 1$ board, once the empty board has occurred, no stone placement is legal. -/\n@[category API, AMS 91]\ntheorem filter_legal_one (s : State 1) (h : (fun _ => none) ∈ s.history) :\n    Finset.univ.filter s.Legal = ∅ := by\n  rw [Finset.filter_eq_empty_iff]\n  rintro p - ⟨-, hp⟩\n  exact hp (place_one _ _ _ ▸ h)\n\n/-- On the $1 \\times 1$ board, once the empty board has occurred, the player to move must pass. -/\n@[category API, AMS 91]\ntheorem value_one (s : State 1) (h : (fun _ => none) ∈ s.history) :\n    value s = if s.passed then margin s.pos else value s.pass := by\n  rw [value, filter_legal_one s h]\n  simp [Color.best_empty]\n\n/-- On the $1 \\times 1$ board the empty board scores $0$ for both players. -/\n@[category API, AMS 91]\ntheorem score_empty_one (c : Color) : score (n := 1) (fun _ => none) c = 0 := by\n  simp [score, not_reaches_one]\n\n/-- On the $1 \\times 1$ board the only legal turn is a pass, so the perfect komi is $0$. -/\n@[category test, AMS 91]\ntheorem perfectKomi_one : perfectKomi 1 = 0 := by\n  rw [perfectKomi, value_one, value_one]\n  · simp [State.initial, State.pass, margin, score_empty_one]\n  · simp [State.initial, State.pass]\n  · simp [State.initial]\n\n/-- What is the perfect value of komi? That is, what is Black's final margin (Black's area score\nminus White's area score) in a game of Go on the $19 \\times 19$ board under perfect play by both\nsides, so that a game played with this komi ends in jigo? Here the game is played under the\nTromp–Taylor rules (area scoring, positional superko). Statistics from professional and computer\nplay suggest the value $7$. -/\n@[category research open, AMS 91]\ntheorem komi : perfectKomi 19 = answer(sorry) := by\n  sorry\n\n/-- The perfect value of komi on the $19 \\times 19$ board (under area scoring, here in the form of\nthe Tromp–Taylor rules) is $7$. -/\n@[category research open, AMS 91]\ntheorem komi.variants.eq_seven : perfectKomi 19 = 7 := by\n  sorry\n\nend Komi\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None of substance. The table correctly notes that the value depends on the ruleset and that a full model of Go is required; I fixed the ruleset (Tromp–Taylor, area scoring) and recorded that choice. The notes both call the Prop 'perfect komi equals 7' and recommend the `value = answer(sorry)` shape; I used the `answer(sorry)` shape for the slot (the statement is a question) and added `komi.variants.eq_seven` for the explicit '= 7' conjecture.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Ruleset: the informal statement does not fix a ruleset, and the article says the value depends on it (area vs territory scoring, seki, ko rule); it attaches the candidate 7 to area scoring. I chose the Tromp–Taylor rules, the standard precise formulation of area-scoring Go (Black first, alternate turns, a turn is a pass or a stone on an empty point whose resulting grid colouring has not occurred before = positional superko, suicide allowed, game ends after two consecutive passes, area scoring: own stones plus empty points reaching only one's own colour). Other area-scoring rulesets (Chinese/AGA: suicide forbidden, situational superko) could in principle give a different value; a reviewer should confirm this choice is acceptable.",
+    "Perfect komi is formalised as the minimax value (an integer) of Black's margin, i.e. the unique k such that Black can force margin ≥ k and White can force margin ≤ k; this is equivalent to the article's 'value making each game end in jigo under perfect play'. Consequently the answer type is ℤ (no half-integer tie-break devices).",
+    "Question form: the statement is 'What is ...?', so the main declaration is `perfectKomi 19 = answer(sorry)` per CONTRIBUTING; the article's candidate 7 is given in the docstring and, since the decomposition notes name 'the perfect komi equals 7' as the Prop, also as a separate open variant `komi.variants.eq_seven : perfectKomi 19 = 7`.",
+    "Board size fixed to the standard 19×19 in the statement (`perfectKomi 19`); the definitions are parametrised by n so that a proved 1×1 sanity test (`perfectKomi_one`) is possible.",
+    "Superko history: `State.history` contains every grid colouring that has occurred, including the initial empty board and the current position (passes do not change the colouring, so add nothing). A placement is legal iff the point is empty and the resulting colouring is not in the history. This makes each placement strictly enlarge the history, which is the termination measure of the well-founded minimax recursion `value` (so `value` is a total function, no finiteness assumption is left implicit).",
+    "`Reaches pos p c` follows Tromp–Taylor rule 3 literally: a path of adjacent points of p's colour from p (via `Relation.ReflTransGen` with same-colour steps) ending at a point adjacent to one of colour c (`none` = empty). Clearing is simultaneous (evaluated on the position before clearing), and a move clears the opponent's colour first, then one's own (so suicide is legal, as in Tromp–Taylor).",
+    "Adjacency is the Mathlib grid graph `pathGraph n □ pathGraph n` (orthogonal neighbours only). Scoring uses `Set.ncard`; the API lemma `score_black_add_score_white_le` (proved) checks the two scores count disjoint sets.",
+    "Definitions are noncomputable / use `open scoped Classical in` since legality and reach are non-decidable Props; the game tree is astronomically large anyway. The helper `Color.best c x o` picks max (Black) or min (White) of `insert x o`, where x is the pass option, guaranteeing nonemptiness."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Bool or Fin 2 (less readable); no Go-specific type exists in Mathlib or the repo.",
+     "name": "Komi.Color, Komi.Color.other",
+     "why_needed": "The two players / stone colours of Go and the opponent map."
+    },
+    {
+     "closest_existing_considered": "Reused Mathlib's `SimpleGraph.pathGraph` and `SimpleGraph.boxProd` for the grid graph; `Position` is just `Point n → Option Color`.",
+     "name": "Komi.Point, Komi.Position, Komi.grid",
+     "why_needed": "Points of the n×n board, board colourings, and orthogonal adjacency."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Reachable` on an induced subgraph was considered; `Relation.ReflTransGen` with same-colour steps is simpler and equivalent. No capture/liberty notions exist anywhere.",
+     "name": "Komi.Reaches, Komi.clear, Komi.place",
+     "why_needed": "Tromp–Taylor rules 3, 4 and 7: reaching a colour through a chain, removal of chains without liberties, and the effect of a stone placement."
+    },
+    {
+     "closest_existing_considered": "`Set.ncard` used for counting; nothing Go-specific exists.",
+     "name": "Komi.score, Komi.margin",
+     "why_needed": "Area scoring (rule 9) and Black's score minus White's score, whose minimax value is the perfect komi."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `SetTheory.PGame` was considered but it has no scoring, no history-dependent (superko) legality and is not suited to a numerical minimax margin.",
+     "name": "Komi.State (with State.initial, State.pass, State.play, State.Legal)",
+     "why_needed": "Game state carrying position, history of colourings (for positional superko), player to move and pass flag; the legal-turn rule (rule 6) and game-end rule (rule 8)."
+    },
+    {
+     "closest_existing_considered": "`Finset.max'`/`min'` reused inside `Color.best`; the repo's CatchUp game (`CatchUp.value`) is the pattern followed but is game-specific and cannot be reused.",
+     "name": "Komi.Color.best, Komi.value, Komi.perfectKomi",
+     "why_needed": "Minimax choice of the player to move, the well-founded minimax evaluation of Black's margin, and the perfect komi as this value from the empty board."
+    }
+   ],
+   "per_slot": {
+    "komi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `perfectKomi 19 = answer(sorry)` where `perfectKomi n` is the minimax value (Black maximises, White minimises) of Black's final margin (Black's area score minus White's area score) in Go on the n×n board from the empty board, under a complete in-file model of the Tromp–Taylor rules (area scoring, positional superko, two consecutive passes end the game). This is exactly the value of komi that makes the game end in jigo under perfect play. No Go model exists in Mathlib or FormalConjecturesForMathlib, so the game is defined in the file (precedent: Paper/CatchUpConjecture.lean). The candidate answer 7 from the article is recorded in the docstring and as the extra variant `komi.variants.eq_seven`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "komi": "/-- What is the perfect value of komi? That is, what is Black's final margin (Black's area score\nminus White's area score) in a game of Go on the $19 \\times 19$ board under perfect play by both\nsides, so that a game played with this komi ends in jigo? Here the game is played under the\nTromp–Taylor rules (area scoring, positional superko). Statistics from professional and computer\nplay suggest the value $7$. -/\n@[category research open, AMS 91]\ntheorem komi : perfectKomi 19 = answer(sorry) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Komi\n\nIn the game of Go, *komi* is the number of points added to White's score to compensate for\nBlack moving first. A *perfect* komi is a value that makes the game end in a draw (*jigo*) under\nperfect play by both sides. Wikipedia's list of unsolved problems asks:\n\n> What is the perfect value of komi?\n\nThe answer depends on the ruleset. We use the Tromp-Taylor rules, a complete and precise ruleset\nwith area scoring: stones are placed on the empty points of a square grid; after a move, first the\nopponent's and then one's own stones without liberties are removed; a move may not recreate an\nearlier position (positional superko); the game ends after two consecutive passes; a player's\nscore is the number of points of their colour plus the number of empty points that reach only\ntheir colour. We also allow the variant in which suicide (a move that removes one's own stones)\nis forbidden, as in most other area scoring rulesets.\n\nUnder perfect play, Black can force a final score margin of at least some value $V$, and White\ncan force a margin of at most $V$; this minimax value $V$ (an integer) is the perfect komi:\nwith komi $V$ perfect play ends in *jigo*, with any other komi one side can force a win.\nUnder area scoring the perfect komi is conjectured to be $7$.\n\n*References:*\n- [Wikipedia, Komi (Go)](https://en.wikipedia.org/wiki/Komi_%28Go%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [J. Tromp, B. Taylor, The logical rules of Go](https://tromp.github.io/go.html)\n-/\n\nnamespace Komi\n\n/-- The two players, identified with the colour of their stones. -/\ninductive Color\n  | black\n  | white\n  deriving DecidableEq, Fintype\n\n/-- The opponent of a player. -/\ndef Color.opp : Color → Color\n  | black => white\n  | white => black\n\n/-- The points of an `n × n` Go board. -/\nabbrev Point (n : ℕ) := Fin n × Fin n\n\n/-- The grid graph of the board: two points are adjacent if they are horizontal or vertical\nneighbours. -/\nabbrev grid (n : ℕ) : SimpleGraph (Point n) :=\n  SimpleGraph.pathGraph n □ SimpleGraph.pathGraph n\n\n/-- A position colours each point of the board black, white or empty (`none`). -/\ndef Position (n : ℕ) := Point n → Option Color\n\nnamespace Position\n\nvariable {n : ℕ} (pos : Position n)\n\ninstance : Fintype (Position n) := inferInstanceAs (Fintype (Point n → Option Color))\n\ninstance : DecidableEq (Position n) := inferInstanceAs (DecidableEq (Point n → Option Color))\n\n/-- `pos.Chain p q` holds if `q` can be reached from `p` by a path of adjacent points all of\nthe same colour as `p`. -/\ndef Chain (p q : Point n) : Prop :=\n  Relation.ReflTransGen (fun a b => (grid n).Adj a b ∧ pos b = pos p) p q\n\n/-- A point `p` not coloured `c` *reaches* `c` if there is a path of adjacent points of `p`'s\ncolour from `p` to a point of colour `c`. -/\ndef Reaches (p : Point n) (c : Option Color) : Prop :=\n  pos p ≠ c ∧ ∃ q r, pos.Chain p q ∧ (grid n).Adj q r ∧ pos r = c\n\nopen scoped Classical in\n/-- Clearing a colour `c`: emptying all points of colour `c` that do not reach empty. -/\nnoncomputable def clear (c : Color) : Position n :=\n  fun p => if pos p = some c ∧ ¬ pos.Reaches p none then none else pos p\n\n/-- The position obtained when player `c` plays at the point `p`: colour `p` with `c`, then clear\nthe opponent's colour, then clear one's own colour. -/\nnoncomputable def play (c : Color) (p : Point n) : Position n :=\n  (Position.clear (Function.update pos p (some c)) c.opp).clear c\n\nopen scoped Classical in\n/-- The (area) score of player `c`: the number of points of colour `c` plus the number of empty\npoints that reach only colour `c`. -/\nnoncomputable def score (c : Color) : ℕ :=\n  (Finset.univ.filter fun p => pos p = some c ∨\n    (pos p = none ∧ pos.Reaches p (some c) ∧ ¬ pos.Reaches p (some c.opp))).card\n\n/-- Black's score minus White's score. -/\nnoncomputable def margin : ℤ :=\n  pos.score .black - pos.score .white\n\nend Position\n\n/-- The parameters of the ruleset: the side length of the board, and whether suicide (a move\nthat removes one's own stones) is allowed. -/\nstructure Rules where\n  /-- The side length of the (square) board. -/\n  size : ℕ\n  /-- Whether a move that removes one's own stones is allowed. -/\n  suicideAllowed : Bool\n\n/-- The Tromp-Taylor rules on the standard `19 × 19` board; suicide is allowed. -/\ndef Rules.trompTaylor : Rules where\n  size := 19\n  suicideAllowed := true\n\n/-- The state of a game: the current position, the player to move, the set of all positions\nthat have occurred so far (including the current one) and the number of consecutive passes\nthat have just been made. -/\nstructure State (n : ℕ) where\n  /-- The current position. -/\n  pos : Position n\n  /-- The player to move. -/\n  toMove : Color\n  /-- All positions that have occurred so far, including the current one. -/\n  history : Finset (Position n)\n  /-- The number of consecutive passes immediately preceding this state. -/\n  passes : ℕ\n  deriving DecidableEq\n\nnamespace State\n\nvariable {n : ℕ}\n\n/-- The initial state: the empty board, Black to move. -/\ndef initial (n : ℕ) : State n where\n  pos := fun _ => none\n  toMove := .black\n  history := {fun _ => none}\n  passes := 0\n\n/-- The game ends after two consecutive passes. -/\ndef IsTerminal (s : State n) : Prop := 2 ≤ s.passes\n\ninstance (s : State n) : Decidable s.IsTerminal := inferInstanceAs (Decidable (2 ≤ s.passes))\n\n/-- The state after the player to move passes. -/\ndef pass (s : State n) : State n :=\n  { s with toMove := s.toMove.opp, passes := s.passes + 1 }\n\n/-- The state after the player to move plays at `p`. -/\nnoncomputable def move (s : State n) (p : Point n) : State n where\n  pos := s.pos.play s.toMove p\n  toMove := s.toMove.opp\n  history := insert (s.pos.play s.toMove p) s.history\n  passes := 0\n\n/-- Playing at `p` is legal if `p` is empty, the resulting position has not occurred before\n(positional superko) and, unless suicide is allowed, the played stone is not removed. -/\ndef IsLegal (r : Rules) (s : State n) (p : Point n) : Prop :=\n  s.pos p = none ∧ s.pos.play s.toMove p ∉ s.history ∧\n    (r.suicideAllowed ∨ s.pos.play s.toMove p p = some s.toMove)\n\nopen scoped Classical in\n/-- The states that can be reached in one turn: by passing or by a legal move. -/\nnoncomputable def options (r : Rules) (s : State n) : Finset (State n) :=\n  insert s.pass ((Finset.univ.filter (s.IsLegal r)).image s.move)\n\n/-- A measure that decreases along every turn of a game that has not ended. -/\ndef measure (s : State n) : ℕ :=\n  2 * (Fintype.card (Position n) - s.history.card) + (2 - s.passes)\n\n/-- Passing is always an option. -/\n@[category API, AMS 91]\ntheorem pass_mem_options (r : Rules) (s : State n) : s.pass ∈ s.options r :=\n  Finset.mem_insert_self _ _\n\n/-- Every turn of a game that has not ended decreases `measure`. -/\n@[category API, AMS 91]\ntheorem measure_lt_of_mem_options {r : Rules} {s t : State n} (ht : t ∈ s.options r)\n    (hs : ¬ s.IsTerminal) : t.measure < s.measure := by\n  simp only [IsTerminal, not_le] at hs\n  simp only [options, Finset.mem_insert, Finset.mem_image, Finset.mem_filter,\n    Finset.mem_univ, true_and] at ht\n  obtain rfl | ⟨p, hp, rfl⟩ := ht\n  · simp only [measure, pass]\n    omega\n  · have h₁ := Finset.card_insert_of_notMem hp.2.1\n    have h₂ := Finset.card_le_univ (insert (s.pos.play s.toMove p) s.history)\n    simp only [measure, move]\n    omega\n\n/-- The minimax value, from state `s`, of Black's final score margin: Black maximises it and\nWhite minimises it. -/\nnoncomputable def value (r : Rules) (s : State n) : ℤ :=\n  if s.IsTerminal then s.pos.margin\n  else\n    have hne : (s.options r).attach.Nonempty :=\n      Finset.attach_nonempty_iff.2 ⟨_, s.pass_mem_options r⟩\n    if s.toMove = .black then\n      (s.options r).attach.sup' hne fun t => value r t.1\n    else\n      (s.options r).attach.inf' hne fun t => value r t.1\ntermination_by s.measure\ndecreasing_by all_goals exact measure_lt_of_mem_options t.2 ‹_›\n\nend State\n\n/-- The perfect komi under the rules `r`: the minimax value of Black's final score margin from\nthe empty board with Black to move. With this komi, perfect play by both sides ends in *jigo*. -/\nnoncomputable def perfectKomi (r : Rules) : ℤ :=\n  State.value r (State.initial r.size)\n\n/-- If passing is the only option, the value is the value after passing. -/\n@[category API, AMS 91]\ntheorem State.value_eq_of_options_eq_singleton {n : ℕ} {r : Rules} {s : State n}\n    (hs : ¬ s.IsTerminal) (h : s.options r = {s.pass}) : s.value r = s.pass.value r := by\n  rw [State.value, if_neg hs]\n  have hsub : ∀ t : {x // x ∈ s.options r}, t.1 = s.pass := fun t =>\n    Finset.mem_singleton.1 (by rw [← h]; exact t.2)\n  split_ifs\n  · exact le_antisymm (Finset.sup'_le _ _ fun t _ => by rw [hsub t])\n      (Finset.le_sup' (f := fun t : {x // x ∈ s.options r} => t.1.value r)\n        (b := ⟨s.pass, s.pass_mem_options r⟩) (Finset.mem_attach _ _))\n  · exact le_antisymm\n      (Finset.inf'_le (f := fun t : {x // x ∈ s.options r} => t.1.value r)\n        (b := ⟨s.pass, s.pass_mem_options r⟩) (Finset.mem_attach _ _))\n      (Finset.le_inf' _ _ fun t _ => by rw [hsub t])\n\n/-- On a `1 × 1` board no stone can ever be played, so both players pass and the perfect komi\nis `0`. -/\n@[category test, AMS 91]\ntheorem perfectKomi_size_one (b : Bool) : perfectKomi { size := 1, suicideAllowed := b } = 0 := by\n  -- no two points of a `1 × 1` board are adjacent, so nothing reaches anything\n  have hR (pos : Position 1) (p : Point 1) (c : Option Color) : ¬ pos.Reaches p c :=\n    fun ⟨_, q, r, _, h, _⟩ => h.ne (Subsingleton.elim q r)\n  -- hence a stone played on the board is removed at once\n  have hplay (pos : Position 1) (c : Color) (p : Point 1) : pos.play c p = fun _ => none := by\n    funext q\n    obtain rfl : q = p := Subsingleton.elim q p\n    simp [Position.play, Position.clear, hR]\n  -- so the only possible turn is to pass\n  have hopt (s : State 1) (hs : (fun _ => none) ∈ s.history) :\n      s.options { size := 1, suicideAllowed := b } = {s.pass} := by\n    have hleg (p : Point 1) : ¬ s.IsLegal { size := 1, suicideAllowed := b } p :=\n      fun ⟨_, h, _⟩ => h (by rw [hplay]; exact hs)\n    classical\n    rw [State.options, Finset.filter_false_of_mem fun p _ => hleg p, Finset.image_empty,\n      Finset.insert_empty]\n  have h0 : (fun _ => none) ∈ (State.initial 1).history := by simp [State.initial]\n  rw [perfectKomi, State.value_eq_of_options_eq_singleton (by decide) (hopt _ h0),\n    State.value_eq_of_options_eq_singleton (by decide) (hopt (State.initial 1).pass h0),\n    State.value, if_pos (by decide)]\n  simp [State.initial, State.pass, Position.margin, Position.score, hR]\n\n/--\nWhat is the perfect value of komi? That is, under the Tromp-Taylor rules on the standard\n`19 × 19` board, what is the minimax value of Black's final score margin, i.e. the komi with which\nperfect play by both sides ends in *jigo*?\n-/\n@[category research open, AMS 91]\ntheorem komi : perfectKomi .trompTaylor = answer(sorry) := by\n  sorry\n\n/--\nStatistics from professional and computer play suggest that under area scoring the perfect komi\nis $7$: under the Tromp-Taylor rules on the standard `19 × 19` board, the minimax value of\nBlack's final score margin is $7$.\n-/\n@[category research open, AMS 91]\ntheorem komi.variants.eq_seven : perfectKomi .trompTaylor = 7 := by\n  sorry\n\n/--\nWhat is the perfect value of komi on the standard `19 × 19` board under the Tromp-Taylor rules\nmodified to forbid suicide (as the Chinese and AGA rules do)?\n-/\n@[category research open, AMS 91]\ntheorem komi.variants.no_suicide :\n    perfectKomi { size := 19, suicideAllowed := false } = answer(sorry) := by\n  sorry\n\nend Komi\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. One remark: the table says 'the Prop is the perfect komi equals 7' but also recommends the `value = answer(sorry)` shape; I used `answer(sorry)` for the slot declaration `komi` (the statement is a question) and stated the candidate value 7 as the variant `komi.variants.eq_seven`.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Ruleset: the informal statement does not fix rules; following the article (which attributes the candidate value 7 to area scoring), the main statement uses the Tromp–Taylor rules (https://tromp.github.io/go.html): 19×19 board, Black first, area scoring, positional superko (a move may not recreate any earlier position, including the initial empty board and the current one), suicide allowed, game ends after two consecutive passes. A `Rules` structure with fields `size : ℕ` and `suicideAllowed : Bool` is used so the no-suicide variant (Chinese/AGA-style) can be stated as `komi.variants.no_suicide`. Territory (Japanese) scoring and situational superko are NOT modelled.",
+    "Perfect komi is defined as the minimax value V (in ℤ) of Black's final score margin (Black's area score minus White's): Black can force margin ≥ V and White can force ≤ V, so komi V is the unique komi with which perfect play yields jigo; any other komi lets one side force a win. This is the reading of 'perfect komi makes each game result in jigo under perfect play' from the article. Hence the answer type is ℤ (half-integer komis can never be perfect).",
+    "Minimax is defined by well-founded recursion on `State.measure = 2*(#positions − #history) + (2 − passes)`; termination is proved (`measure_lt_of_mem_options`), so no fuel/default values are involved. Black takes `Finset.sup'`, White `Finset.inf'` over the options (pass is always an option, giving nonemptiness). At a terminal state (two consecutive passes) the value is the margin regardless of whose turn it is.",
+    "Tromp–Taylor primitives are transcribed literally: `Reaches p c` = path of points of p's colour from p to a point adjacent to a point of colour c (with the 'p not coloured c' guard); `clear c` empties simultaneously all points of colour c not reaching empty; `play` = place stone on an empty point, clear opponent, then clear own colour; `score c` = points of colour c plus empty points reaching only colour c. Adjacency is the Mathlib grid graph `pathGraph n □ pathGraph n` (orthogonal neighbours).",
+    "No-suicide variant: a move is illegal if the played stone is removed by the own-colour clearing (`play … p ≠ some toMove`); this is equivalent to 'no own stones are removed' because in play every chain has a liberty before the move.",
+    "Main declaration uses `answer(sorry)` (the statement is a question); the article's candidate value 7 is stated separately as `komi.variants.eq_seven : perfectKomi .trompTaylor = 7` (research open).",
+    "AMS tag 91 (Game theory; combinatorial games 91A46).",
+    "The `test` theorem `perfectKomi_size_one` (1×1 board ⇒ perfect komi 0) is fully proved, together with a small API lemma `State.value_eq_of_options_eq_singleton`; these serve as executable sanity checks of the bespoke definitions (as CONTRIBUTING.md requests for bespoke definitions)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Bool`/`Fin 2` (less readable); no Mathlib notion of Go players.",
+     "name": "Komi.Color, Komi.Color.opp",
+     "why_needed": "The two players / stone colours and the opponent map."
+    },
+    {
+     "closest_existing_considered": "`grid` reuses Mathlib's `SimpleGraph.pathGraph n □ SimpleGraph.pathGraph n`; no Mathlib type for Go positions exists.",
+     "name": "Komi.Point, Komi.grid, Komi.Position",
+     "why_needed": "Board points `Fin n × Fin n`, the orthogonal-adjacency grid graph, and positions `Point n → Option Color` (with `Fintype`/`DecidableEq` instances)."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Reachable`/`induce` (Chain is `Relation.ReflTransGen` on a colour-restricted adjacency, which is simpler to use); nothing in Mathlib or FormalConjecturesForMathlib models Go captures or scoring.",
+     "name": "Komi.Position.Chain, Komi.Position.Reaches, Komi.Position.clear, Komi.Position.play, Komi.Position.score, Komi.Position.margin",
+     "why_needed": "Tromp–Taylor primitives: same-colour connectivity, 'reaches', capture (clearing), the result of a move, area score, and Black's score margin."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Komi.Rules, Komi.Rules.trompTaylor",
+     "why_needed": "Rule parameters (board size, whether suicide is allowed) so the main statement and the no-suicide variant share one definition of `perfectKomi`."
+    },
+    {
+     "closest_existing_considered": "Mathlib `SetTheory.PGame` and `SetTheory.Game.State` model normal-play win/loss games without scores; a scoring game with a draw outcome cannot be expressed faithfully as a `PGame`.",
+     "name": "Komi.State (initial, IsTerminal, pass, move, IsLegal, options, measure, value)",
+     "why_needed": "Game states (position, player to move, set of earlier positions for superko, consecutive-pass counter), the legal turns, a termination measure, and the minimax value of Black's final margin via well-founded recursion."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Komi.perfectKomi",
+     "why_needed": "The perfect komi under given rules: the minimax margin from the initial state."
+    }
+   ],
+   "per_slot": {
+    "komi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `theorem komi : perfectKomi .trompTaylor = answer(sorry)`, where `perfectKomi` is the minimax value (in ℤ) of Black's final area-score margin from the empty 19×19 board under a complete formal model of Go (Tromp–Taylor rules). This value is exactly the komi with which perfect play by both sides ends in jigo, matching the article's definition of perfect komi. Neither Mathlib nor the repo has a model of Go (Mathlib's `SetTheory.PGame`/`Game.State` are win–loss games without scoring), so the model is built in the file; every definition is total (well-founded recursion with a proved termination measure, no default values, no `sorry` in definitions). Variants `komi.variants.eq_seven` (the conjectured value 7) and `komi.variants.no_suicide` (same rules with suicide forbidden) are included, plus a fully proved `test` theorem `perfectKomi_size_one` and small API lemmas."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "komi": "/--\nWhat is the perfect value of komi? That is, under the Tromp-Taylor rules on the standard\n`19 × 19` board, what is the minimax value of Black's final score margin, i.e. the komi with which\nperfect play by both sides ends in *jigo*?\n-/\n@[category research open, AMS 91]\ntheorem komi : perfectKomi .trompTaylor = answer(sorry) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Komi\n\nKomi in the game of Go are points added to the score of White (the second player) as\ncompensation for playing second. The *perfect* value of komi is the value that makes a game\nof Go on the standard $19 \\times 19$ board end in jigo (a draw) under perfect play by both\nsides. Its exact value is not known; under area scoring rules statistics from professional\nand computer play suggest that it is $7$.\n\nThis file contains a complete formal model of Go following the Tromp–Taylor\n(\"logical\") rules with area scoring: a play colours an empty point, then removes the\nopponent's stones without liberties; suicide is forbidden (as in the Chinese and AGA rules);\na play may not recreate an earlier board colouring (positional superko); the game ends\nafter two consecutive passes; each player scores the points of her colour plus the empty\npoints that reach only her colour. The perfect komi on an $n \\times n$ board is the minimax\nvalue of Black's area minus White's area, with Black maximising and White minimising.\nWikipedia notes that under area scoring, and in the absence of seki, the perfect komi is an odd\ninteger.\n\n*References:*\n- [Wikipedia, Komi (Go)](https://en.wikipedia.org/wiki/Komi_%28Go%29)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [J. Tromp and B. Taylor, The Logical Rules of Go](https://tromp.github.io/go.html)\n-/\n\nnamespace Komi\n\n/-- The colours of the two players. Black moves first. -/\ninductive Color\n  | black\n  | white\n  deriving DecidableEq, Fintype\n\n/-- The colour of the opponent. -/\ndef Color.opposite : Color → Color\n  | .black => .white\n  | .white => .black\n\n/-- A point of the `n × n` grid. -/\nabbrev Point (n : ℕ) := Fin n × Fin n\n\n/-- The grid graph: two points are adjacent if they are horizontal or vertical neighbours. -/\ndef grid (n : ℕ) : SimpleGraph (Point n) :=\n  SimpleGraph.boxProd (SimpleGraph.pathGraph n) (SimpleGraph.pathGraph n)\n\n/-- A board colouring: every point is empty (`none`) or carries a stone of some colour. -/\nabbrev Board (n : ℕ) := Point n → Option Color\n\nnamespace Board\n\nvariable {n : ℕ} (b : Board n)\n\n/-- The graph on the points of the board joining adjacent points with the same colouring\n(both empty, or both carrying stones of the same colour). Its connected components are the\nstrings (groups) of stones and the maximal empty regions. -/\ndef sameColorGraph : SimpleGraph (Point n) :=\n  grid n ⊓ SimpleGraph.fromRel fun p q => b p = b q\n\n/-- `b.Reaches p c` means that there is a path of adjacent points, all coloured like `p`,\nfrom `p` to a point adjacent to a point coloured `c` (this is only used when `p` is not itself\ncoloured `c`). A string of stones has a liberty iff it reaches `none` (empty). -/\ndef Reaches (p : Point n) (c : Option Color) : Prop :=\n  ∃ q r, b.sameColorGraph.Reachable p q ∧ (grid n).Adj q r ∧ b r = c\n\n/-- Clearing the colour `c`: every stone of colour `c` that does not reach an empty point\n(i.e. every string of colour `c` without liberties) is removed from the board. -/\nnoncomputable def clear (c : Color) : Board n :=\n  open scoped Classical in\n  fun p => if b p = some c ∧ ¬ b.Reaches p none then none else b p\n\n/-- The area of colour `c`: the number of points coloured `c` plus the number of empty points\nthat reach `c` but do not reach the opposite colour. -/\nnoncomputable def area (c : Color) : ℕ :=\n  open scoped Classical in\n  (Finset.univ.filter fun p => b p = some c ∨\n    (b p = none ∧ b.Reaches p (some c) ∧ ¬ b.Reaches p (some c.opposite))).card\n\n/-- Black's area minus White's area. -/\nnoncomputable def margin : ℤ :=\n  b.area .black - b.area .white\n\n/-- The board after `c` places a stone on the point `p` and the opponent's strings without\nliberties are removed. -/\nnoncomputable def place (c : Color) (p : Point n) : Board n :=\n  Board.clear (Function.update b p (some c)) c.opposite\n\nend Board\n\n/-- The state of a game on the `n × n` board: the current board, the player to move, the set\nof all board colourings that have occurred so far (including the current one), and the number\nof consecutive passes immediately preceding this state. -/\nstructure State (n : ℕ) where\n  /-- The current board. -/\n  board : Board n\n  /-- The player to move. -/\n  toMove : Color\n  /-- All board colourings that have occurred so far, including the current one. -/\n  history : Finset (Board n)\n  /-- The number of consecutive passes immediately preceding this state. -/\n  passes : ℕ\n\n/-- A move is either a pass (`none`) or a play at a point (`some p`). -/\nabbrev Move (n : ℕ) := Option (Point n)\n\nnamespace State\n\nvariable {n : ℕ}\n\n/-- The initial state: the empty board with Black to move. -/\ndef initial (n : ℕ) : State n :=\n  ⟨fun _ => none, .black, {fun _ => none}, 0⟩\n\n/-- The game is over after two consecutive passes. -/\ndef IsOver (s : State n) : Prop :=\n  2 ≤ s.passes\n\ninstance (s : State n) : Decidable s.IsOver :=\n  inferInstanceAs (Decidable (2 ≤ s.passes))\n\n/-- A play at `p` is legal if `p` is empty, no string of the player's colour is left without\nliberties after the opponent's captured stones are removed (no suicide), and the resulting\nboard colouring has not occurred before (positional superko). -/\ndef IsLegalPlay (s : State n) (p : Point n) : Prop :=\n  s.board p = none ∧\n    (s.board.place s.toMove p).clear s.toMove = s.board.place s.toMove p ∧\n    s.board.place s.toMove p ∉ s.history\n\n/-- The legal moves in a state. There are none once the game is over; otherwise passing is\nalways legal. -/\nnoncomputable def legalMoves (s : State n) : Finset (Move n) :=\n  open scoped Classical in\n  if s.IsOver then ∅ else insert none ((Finset.univ.filter s.IsLegalPlay).image some)\n\n/-- Passing is always legal while the game is not over. -/\n@[category API, AMS 91]\ntheorem pass_mem_legalMoves (s : State n) (hs : ¬ s.IsOver) : none ∈ s.legalMoves := by\n  simp [legalMoves, hs]\n\n/-- A finished game has no legal moves. -/\n@[category API, AMS 91]\ntheorem legalMoves_eq_empty (s : State n) (hs : s.IsOver) : s.legalMoves = ∅ := by\n  simp [legalMoves, hs]\n\n/-- The state after a move. -/\nnoncomputable def play (s : State n) : Move n → State n\n  | none => { s with toMove := s.toMove.opposite, passes := s.passes + 1 }\n  | some p =>\n    let b := s.board.place s.toMove p\n    ⟨b, s.toMove.opposite, insert b s.history, 0⟩\n\n/-- A termination measure for the game: the number of board colourings that have not yet\noccurred, then the number of passes still allowed before the game ends. -/\ndef measure (s : State n) : ℕ × ℕ :=\n  (Fintype.card (Board n) - s.history.card, 2 - s.passes)\n\n/-- Every legal move decreases the termination measure. -/\n@[category API, AMS 91]\ntheorem measure_play_lt (s : State n) {m : Move n} (hm : m ∈ s.legalMoves) :\n    Prod.Lex (· < ·) (· < ·) (s.play m).measure s.measure := by\n  classical\n  have hs : ¬ s.IsOver := fun hs => by simp [legalMoves_eq_empty s hs] at hm\n  simp only [legalMoves, hs, if_false, Finset.mem_insert, Finset.mem_image, Finset.mem_filter,\n    Finset.mem_univ, true_and] at hm\n  rcases m with _ | p\n  · refine Prod.Lex.right _ ?_\n    simp only [IsOver, not_le] at hs\n    simp only [play]\n    omega\n  · refine Prod.Lex.left _ _ ?_\n    simp only [reduceCtorEq, Option.some.injEq, exists_eq_right, false_or] at hm\n    have h₁ := Finset.card_le_univ (insert (s.board.place s.toMove p) s.history)\n    simp only [play]\n    rw [Finset.card_insert_of_notMem hm.2.2] at h₁ ⊢\n    omega\n\n/-- The minimax value of a state: the final margin (Black's area minus White's area) under\nperfect play by both sides, with Black maximising and White minimising the margin. -/\nnoncomputable def value (s : State n) : ℤ :=\n  if h : s.IsOver then s.board.margin\n  else\n    have hne : s.legalMoves.attach.Nonempty :=\n      ⟨⟨none, s.pass_mem_legalMoves h⟩, Finset.mem_attach _ _⟩\n    match s.toMove with\n    | .black => s.legalMoves.attach.sup' hne fun m => (s.play m.1).value\n    | .white => s.legalMoves.attach.inf' hne fun m => (s.play m.1).value\ntermination_by s.measure\ndecreasing_by\n  all_goals exact s.measure_play_lt m.2\n\nend State\n\n/-- The perfect komi on the `n × n` board: the final margin of Black's area over White's area\nunder perfect play by both sides. Equivalently, it is the unique komi for which the game ends\nin jigo (a draw) under perfect play. -/\nnoncomputable def perfectKomi (n : ℕ) : ℤ :=\n  (State.initial n).value\n\n/-- The `1 × 1` grid has no edges. -/\n@[category API, AMS 91]\ntheorem grid_one_adj {q r : Point 1} : ¬ (grid 1).Adj q r := by\n  simp [grid, SimpleGraph.boxProd_adj, SimpleGraph.pathGraph_adj]\n\n/-- On the `1 × 1` board no point reaches anything. -/\n@[category API, AMS 91]\ntheorem not_reaches_one (b : Board 1) (p : Point 1) (c : Option Color) : ¬ b.Reaches p c :=\n  fun ⟨_, _, _, h, _⟩ => grid_one_adj h\n\n/-- On the `1 × 1` board every play is suicide, hence illegal. -/\n@[category API, AMS 91]\ntheorem not_isLegalPlay_one (s : State 1) (p : Point 1) : ¬ s.IsLegalPlay p := by\n  rintro ⟨-, h, -⟩\n  have := congrFun h p\n  obtain ⟨b, c, hist, ps⟩ := s\n  cases c <;> simp [Board.clear, Board.place, not_reaches_one, Color.opposite] at this\n\n/-- On the `1 × 1` board passing is the only legal move while the game is not over. -/\n@[category API, AMS 91]\ntheorem legalMoves_one (s : State 1) (hs : ¬ s.IsOver) : s.legalMoves = {none} := by\n  classical\n  rw [State.legalMoves, if_neg hs, Finset.filter_false_of_mem fun p _ => not_isLegalPlay_one s p]\n  simp\n\n/-- On the `1 × 1` board the value of a state is the value after a pass. -/\n@[category API, AMS 91]\ntheorem value_one (s : State 1) (hs : ¬ s.IsOver) : s.value = (s.play none).value := by\n  rw [State.value, dif_neg hs]\n  have key : ∀ m ∈ s.legalMoves, m = none := by\n    simp [legalMoves_one s hs]\n  have hmem : ⟨none, s.pass_mem_legalMoves hs⟩ ∈ s.legalMoves.attach := Finset.mem_attach _ _\n  obtain ⟨b, c, hist, ps⟩ := s\n  cases c\n  · exact le_antisymm (Finset.sup'_le _ _ fun m _ => by rw [key m.1 m.2])\n      (Finset.le_sup' (fun m : {x // x ∈ _} => (State.play _ m.1).value) hmem)\n  · exact le_antisymm (Finset.inf'_le (fun m : {x // x ∈ _} => (State.play _ m.1).value) hmem)\n      (Finset.le_inf' _ _ fun m _ => by rw [key m.1 m.2])\n\n/-- On the `1 × 1` board no play is legal, so both players pass and the margin is `0`. -/\n@[category test, AMS 91]\ntheorem perfectKomi_one : perfectKomi 1 = 0 := by\n  rw [perfectKomi, value_one _ (by decide), value_one _ (by decide), State.value,\n    dif_pos (by decide)]\n  simp [State.initial, State.play, Board.margin, Board.area, not_reaches_one]\n\n/-- **Perfect komi.** What is the perfect value of komi? That is, what is the value of komi\nthat makes a game of Go on the standard $19 \\times 19$ board end in jigo (a draw) under perfect\nplay by both sides? Under the area scoring rules modelled here (positional superko, suicide\nforbidden) this is the final margin of Black's area over White's area under perfect play.\nStatistics from professional and computer play suggest that the value is $7$. -/\n@[category research open, AMS 91]\ntheorem komi : perfectKomi 19 = answer(sorry) := by\n  sorry\n\nend Komi\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.75,
+   "decomposition_objections": "None. The single slot matches the statement. One note: the decomposition says 'the Prop is the perfect komi equals 7' but also asks for the repository's `value = answer(sorry)` shape; I followed the `answer(sorry)` shape (the statement is a question) and recorded 7 as the conjectured value in the docstring. The notes' remark that the value depends on the ruleset is correct; the ruleset choice is recorded in modeling_decisions.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Ruleset: the informal statement does not fix a ruleset, and the perfect komi can in principle depend on it (area vs territory scoring, seki handling, ko/superko variant, suicide rule). Following the article's remark that the candidate value 7 is 'under area scoring rules', the file fixes the Tromp–Taylor logical rules (area scoring, positional superko, game ends after two consecutive passes, no dead-stone agreement: dead stones must actually be captured) with the standard Chinese/AGA prohibition of suicide. Tromp–Taylor's default allows suicide; New Zealand rules also allow it. Reviewer should confirm this choice.",
+    "Perfect komi is defined as the minimax value of Black's area minus White's area (Black maximises, White minimises), rather than literally as 'the komi k such that the game with komi k is a draw under perfect play'. These are equivalent: with komi equal to the minimax value both sides can force at least a draw, and with any other komi one side forces a win. The docstring records this equivalence.",
+    "Board size fixed to the standard 19×19 (`perfectKomi 19`), as the article's discussion of komi and the value 7 concern the standard board; the model is generic in n only to allow the proven 1×1 sanity test.",
+    "Answer type is ℤ (integer komi). Under area scoring the minimax margin is an integer, so a half-integer 'tournament' komi is not what the question asks for; the article's candidate 7 is an integer.",
+    "Statement shape is `perfectKomi 19 = answer(sorry)` (the question form), with the conjectured value 7 recorded only in the docstring, per the decomposition notes and repository convention for 'determine the value' problems.",
+    "Reaching/liberties/scoring follow Tromp–Taylor verbatim: `Reaches p c` = a same-colour path from p to a point adjacent to a point coloured c; `clear c` removes c-stones not reaching empty; `area c` = c-stones plus empty points reaching c but not the opposite colour (empty points reaching both or neither colour count for nobody, e.g. seki eyes and dame).",
+    "No-suicide is formalised as: after placing the stone and clearing the opponent, clearing one's own colour changes nothing. This is equivalent to 'the new stone's string has a liberty' since only that string can lose its last liberty.",
+    "Positional superko compares the board after captures with the set of all board colourings that have occurred (history initialised with the empty board; passes do not add positions). Once the game is over (two consecutive passes) the set of legal moves is empty.",
+    "The minimax is defined by well-founded recursion on the lexicographic measure (number of board colourings not yet seen, passes remaining before the game ends); `measure_play_lt` proves every legal move decreases it, so no fuel bound is needed."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Bool / Fin 2 (less readable; no existing Go colour type in Mathlib or the repo).",
+     "name": "Komi.Color, Komi.Color.opposite",
+     "why_needed": "The two players/stone colours of Go and the opponent map."
+    },
+    {
+     "closest_existing_considered": "Built directly from Mathlib's `SimpleGraph.pathGraph` and `SimpleGraph.boxProd`; Mathlib has no named grid graph.",
+     "name": "Komi.Point, Komi.grid",
+     "why_needed": "Points of the n×n board and the orthogonal-adjacency grid graph."
+    },
+    {
+     "closest_existing_considered": "`SimpleGraph.Reachable` and `SimpleGraph.fromRel`/`⊓` (used to build them); `SetTheory.PGame` (normal-play combinatorial games only, cannot express scoring/komi).",
+     "name": "Komi.Board, Komi.Board.sameColorGraph, Komi.Board.Reaches, Komi.Board.clear, Komi.Board.area, Komi.Board.margin, Komi.Board.place",
+     "why_needed": "Board colourings, strings (connected same-colour regions), Tromp–Taylor 'reaching', capture (clearing), area scoring, and the result of a play. No Go rules exist in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`CatchUp.valueAux` in FormalConjectures/Paper/CatchUpConjecture.lean (a minimax for a different game, used as a style template); Mathlib `SetTheory.PGame` (unsuitable for scored games).",
+     "name": "Komi.State, Komi.Move, Komi.State.initial, Komi.State.IsOver, Komi.State.IsLegalPlay, Komi.State.legalMoves, Komi.State.play, Komi.State.measure, Komi.State.value",
+     "why_needed": "Game states (board, player to move, position history for positional superko, consecutive passes), legality of moves, transitions, and the well-founded minimax value of a state."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or the repo.",
+     "name": "Komi.perfectKomi",
+     "why_needed": "The perfect komi on the n×n board: the minimax margin from the initial position; the statement is `perfectKomi 19 = answer(sorry)`."
+    }
+   ],
+   "per_slot": {
+    "komi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `perfectKomi 19 = answer(sorry)` where `perfectKomi n` is the minimax value (Black maximising, White minimising) of Black's area minus White's area on the n×n board under a complete formal model of Go (Tromp–Taylor area-scoring rules with suicide forbidden and positional superko). This is exactly the komi for which a game ends in jigo under perfect play. No Go model exists in Mathlib or the repo, so the model is built from Mathlib graph primitives (`pathGraph`, `boxProd`, `Reachable`) and a well-founded minimax recursion."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "komi": "/-- **Perfect komi.** What is the perfect value of komi? That is, what is the value of komi\nthat makes a game of Go on the standard $19 \\times 19$ board end in jigo (a draw) under perfect\nplay by both sides? Under the area scoring rules modelled here (positional superko, suicide\nforbidden) this is the final margin of Black's area over White's area under perfect play.\nStatistics from professional and computer play suggest that the value is $7$. -/\n@[category research open, AMS 91]\ntheorem komi : perfectKomi 19 = answer(sorry) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c08",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The background article was read as asking for Black's final score margin under perfect play on the standard 19×19 board, so that adding the same number of points to White produces jigo. Its candidate is 7 under area scoring without seki; however, a concrete ko/superko convention and the complete underlying Go rules would still have to be fixed before this can become a Lean statement."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "komi": {
+     "outcome": "missing_primitives",
+     "why": "A faithful statement needs a full formal model of 19×19 Go: board positions and adjacency, chains/liberties, captures, suicide legality, passes and termination, history-sensitive ko/superko legality, area scoring, the stipulated treatment/exclusion of seki, and a finite minimax score-margin evaluator for perfect play. Hard searches of Mathlib, FormalConjecturesForMathlib, and existing FormalConjectures files found no Go model. Mathlib's abstract PGame/State API only packages move relations that must already be supplied and does not provide Go rules or terminal score semantics. Introducing an uninterpreted `perfectKomi` value would be a forbidden placeholder and would not faithfully formalize the question."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  }
+ ],
+ "chosen": {
+  "komi": "c06"
+ },
+ "id": "wp-komi",
+ "main_attempt": "c06"
+}

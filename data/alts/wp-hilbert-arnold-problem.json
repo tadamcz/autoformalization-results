@@ -1,0 +1,526 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hilbert–Arnold problem\n\nIs there a uniform bound on limit cycles in generic finite-parameter families of vector fields\non a sphere?\n\nMore precisely, let $k \\geq 0$, let $K \\subseteq \\mathbb{R}^k$ be compact (the base of the family)\nand let $\\{v_b\\}_{b \\in K}$ be a family of smooth vector fields on the two-sphere $S^2$ depending\nsmoothly on the parameter $b$. Is it true that, for a generic such family (i.e. for every family in\na residual subset of the space of families with the $C^\\infty$ topology), there is a number $N$\nsuch that for every $b \\in K$ the vector field $v_b$ has at most $N$ limit cycles (isolated periodic\norbits)?\n\nThe problem was formulated by Arnold and Ilyashenko in the 1980s. It is conjectured that the answer\nis positive.\n\nModelling choices:\n- $S^2$ is the unit sphere `𝕊²` in `ℝ³`, with its manifold structure from Mathlib. A vector field\n  on `𝕊²` is a map `v : 𝕊² → ℝ³` with `v x` tangent to the sphere at `x`.\n- A limit cycle of `v` is an isolated periodic orbit of `v`.\n- A smooth $k$-parameter family is a `C^∞` map `V : ℝ^k × 𝕊² → ℝ³`, each `V (b, ·)` being a\n  tangent vector field; the family with base `K` is its restriction to `K × 𝕊²`. The space of\n  families is given the `C^∞` topology relative to `K`: convergence means uniform convergence on\n  `K × 𝕊²` of all derivatives of all orders, computed in the charts of `𝕊²`.\n- \"Generic\" is understood in the sense of Baire category: a property is generic if it holds on a\n  residual set (a set containing a countable intersection of dense open sets) of families.\n\n*References:*\n- [Wikipedia, Hilbert–Arnold problem](https://en.wikipedia.org/wiki/Hilbert%E2%80%93Arnold_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ilyashenko, *Centennial history of Hilbert's 16th problem*, Bull. AMS 39 (2002)](https://doi.org/10.1090/S0273-0979-02-00946-1)\n-/\n\nopen scoped Manifold ContDiff InnerProductSpace EuclideanGeometry\nopen Metric Filter Topology\n\nnamespace HilbertArnoldProblem\n\n/-- The unit two-sphere in $\\mathbb{R}^3$. -/\nlocal notation \"𝕊²\" => sphere (0 : ℝ^3) 1\n\n/-- A tangent vector field on `𝕊²`, written as a map `v : 𝕊² → ℝ³`: the vector `v x` is\ntangent to the sphere at `x`, i.e. orthogonal to `x`. -/\ndef IsTangentField (v : 𝕊² → ℝ^3) : Prop :=\n  ∀ x : 𝕊², ⟪v x, (x : ℝ^3)⟫_ℝ = 0\n\n/-- `γ : ℝ → 𝕊²` is an integral curve of the vector field `v` on `𝕊²`: at every time `t`,\nthe velocity of `γ` (as a curve in `ℝ³`) is `v (γ t)`. -/\ndef IsSphereIntegralCurve (v : 𝕊² → ℝ^3) (γ : ℝ → 𝕊²) : Prop :=\n  ∀ t, HasDerivAt (fun s => (γ s : ℝ^3)) (v (γ t)) t\n\n/-- `C ⊆ 𝕊²` is a periodic orbit (closed orbit) of `v`: `C` is the trajectory of a non-constant\nperiodic integral curve of `v`. -/\ndef IsPeriodicOrbit (v : 𝕊² → ℝ^3) (C : Set 𝕊²) : Prop :=\n  ∃ γ : ℝ → 𝕊², IsSphereIntegralCurve v γ ∧ (∃ T > 0, Function.Periodic γ T) ∧\n    (∃ t, γ t ≠ γ 0) ∧ C = Set.range γ\n\n/-- A limit cycle of `v` is an isolated periodic orbit: a periodic orbit `C` of `v` having a\nneighbourhood `U` such that `C` is the only periodic orbit of `v` contained in `U`. -/\ndef IsLimitCycle (v : 𝕊² → ℝ^3) (C : Set 𝕊²) : Prop :=\n  IsPeriodicOrbit v C ∧ ∃ U ∈ 𝓝ˢ C, ∀ C', IsPeriodicOrbit v C' → C' ⊆ U → C' = C\n\n/-- A smooth `k`-parameter family of vector fields on `𝕊²`: a `C^∞` map\n`V : ℝ^k × 𝕊² → ℝ³` such that, for every parameter `b`, the map `x ↦ V (b, x)` is a tangent\nvector field on `𝕊²`. -/\ndef Family (k : ℕ) : Type :=\n  {V : ℝ^k × 𝕊² → ℝ^3 //\n    ContMDiff (𝓘(ℝ, ℝ^k).prod (𝓡 2)) 𝓘(ℝ, ℝ^3) ∞ V ∧ ∀ b, IsTangentField fun x => V (b, x)}\n\n/-- The vector field with parameter `b` in the family `V`. -/\ndef Family.field {k : ℕ} (V : Family k) (b : ℝ^k) : 𝕊² → ℝ^3 :=\n  fun x => V.1 (b, x)\n\n/-- The `C^∞` topology on maps `V : ℝ^k × 𝕊² → ℝ³`, relative to a set `K ⊆ ℝ^k` of parameters.\nIt is the coarsest topology such that, for every chart `e` of `𝕊²` (a stereographic projection),\nevery compact set `L` in the target of `e` and every order `i`, the `i`-th derivative of the map\n`(b, y) ↦ V (b, e.symm y)` depends continuously on `V` for the topology of uniform convergence on\n`K × L`. That is, maps converge iff all their derivatives of all orders, computed in charts,\nconverge uniformly on `K × 𝕊²`. -/\ndef cInfTopology (k : ℕ) (K : Set (ℝ^k)) : TopologicalSpace (ℝ^k × 𝕊² → ℝ^3) :=\n  ⨅ (e : OpenPartialHomeomorph 𝕊² (ℝ^2)) (_ : e ∈ atlas (ℝ^2) 𝕊²) (L : Set (ℝ^2))\n    (_ : IsCompact L) (_ : L ⊆ e.target) (i : ℕ),\n    TopologicalSpace.induced\n      (fun V => UniformFun.ofFun fun q : ↥(K ×ˢ L) =>\n        iteratedFDeriv ℝ i (fun q : ℝ^k × ℝ^2 => V (q.1, e.symm q.2)) q)\n      inferInstance\n\n/-- The `C^∞` topology on the space of smooth `k`-parameter families of vector fields on `𝕊²`,\nrelative to the base `K`. -/\ndef Family.topology (k : ℕ) (K : Set (ℝ^k)) : TopologicalSpace (Family k) :=\n  (cInfTopology k K).induced Subtype.val\n\n/-- **Hilbert–Arnold problem.** Is there a uniform bound on limit cycles in generic\nfinite-parameter families of vector fields on a sphere?\n\nThat is: for every $k$ and every compact base $K \\subseteq \\mathbb{R}^k$, is it true that a\ngeneric smooth family $\\{v_b\\}_{b \\in K}$ of vector fields on $S^2$ (generic in the sense of\nBaire: every family in some residual subset of the space of families with the $C^\\infty$ topology)\nadmits a number $N$ such that every $v_b$, $b \\in K$, has at most $N$ limit cycles? -/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔ ∀ (k : ℕ) (K : Set (ℝ^k)), IsCompact K →\n      ∀ᶠ V in @residual (Family k) (Family.topology k K),\n        ∃ N : ℕ, ∀ b ∈ K, {C | IsLimitCycle (V.field b) C}.encard ≤ N := by\n  sorry\n\n/-- The family of zero vector fields is a smooth family; in particular `Family k` is nonempty. -/\n@[category test, AMS 34 37]\ntheorem nonempty_family (k : ℕ) : Nonempty (Family k) :=\n  ⟨⟨fun _ => 0, contMDiff_const, fun _ _ => inner_zero_left _⟩⟩\n\n/-- A limit cycle is a periodic orbit. -/\n@[category API, AMS 34 37]\ntheorem IsLimitCycle.isPeriodicOrbit {v : 𝕊² → ℝ^3} {C : Set 𝕊²} (h : IsLimitCycle v C) :\n    IsPeriodicOrbit v C :=\n  h.1\n\n/-- The zero vector field has no periodic orbits: all its integral curves are constant. -/\n@[category test, AMS 34 37]\ntheorem not_isPeriodicOrbit_zero (C : Set 𝕊²) : ¬ IsPeriodicOrbit (fun _ => 0) C := by\n  rintro ⟨γ, hγ, -, ⟨t, ht⟩, -⟩\n  refine ht (Subtype.ext ?_)\n  exact is_const_of_deriv_eq_zero (fun s => (hγ s).differentiableAt) (fun s => (hγ s).deriv) t 0\n\n/-- The zero vector field has no limit cycles. -/\n@[category test, AMS 34 37]\ntheorem limitCycles_zero : {C | IsLimitCycle (fun _ => 0) C} = ∅ :=\n  Set.eq_empty_of_forall_notMem fun C hC => not_isPeriodicOrbit_zero C hC.isPeriodicOrbit\n\nend HilbertArnoldProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot decomposition (yes/no question with quantifiers ∀k, ∀ generic family with compact base ⊆ ℝ^k, ∃ N uniform in the parameter) matches the article's formulation. One remark: the article's 'compact set in finite dimensional Euclidean space' as base means 'smooth family' can only be interpreted via smooth extension to a neighbourhood (equivalently, all of ℝ^k) when the compact set is not a manifold with boundary; the formalization follows this interpretation.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Sphere: S² is `Metric.sphere (0 : ℝ^3) 1` with Mathlib's stereographic charted-space structure; a vector field on S² is a map `v : 𝕊² → ℝ³` with `v x ⊥ x` (tangency). This is the standard embedded-submanifold representation of tangent fields; Mathlib's abstract `TangentSpace` formalism was avoided as it is chart-dependent and awkward on the sphere.",
+    "Integral curves are `γ : ℝ → 𝕊²` with `HasDerivAt (fun s => (γ s : ℝ³)) (v (γ t)) t` for all t (complete trajectories; S² is compact so all trajectories are complete). A periodic orbit is the range of a non-constant periodic integral curve.",
+    "Limit cycle = isolated periodic orbit (Ilyashenko's convention, matching the decomposition note 'isolated periodic orbits'): a periodic orbit C with a neighbourhood U such that C is the only periodic orbit contained in U. On S² this is equivalent to the 'no other periodic orbit meets U' reading (a periodic orbit crosses a transversal at most once), and to the 'some trajectory spirals to it' reading for isolated orbits; a reviewer may want to confirm they accept the isolated-orbit convention.",
+    "Families: a smooth k-parameter family is a `C^∞` map `V : ℝ^k × 𝕊² → ℝ³` (ContMDiff on the product manifold) whose slices are tangent fields; the family with compact base K is its restriction to K × 𝕊². Requiring smoothness on all of ℝ^k (rather than on a neighbourhood of K) is harmless: any family smooth near K × 𝕊² agrees near K × 𝕊² with a globally smooth one (cut-off in the parameter), and the topology only sees K × 𝕊².",
+    "Topology on families: the C^∞ topology relative to K, defined as the initial topology of the maps V ↦ (i-th derivative of (b,y) ↦ V(b, e.symm y) on K × L), for all charts e in the atlas of 𝕊², all compact L ⊆ e.target, all orders i, with the uniform-convergence topology (`UniformFun`). This is the textbook (Hirsch) weak = strong Whitney C^∞ topology on maps from the compact set K × 𝕊². It is not T0 as a topology on maps defined on all of ℝ^k × 𝕊² (maps with the same jets along K × 𝕊² are indistinguishable), but the property in the statement only depends on the restriction to K × 𝕊², and residual sets of a space correspond exactly to residual sets of its Kolmogorov quotient (the space of C^∞ families with base K), so genericity is faithfully captured. For K a closed ball / compact manifold with boundary this quotient is exactly C^∞(K × S², TS²).",
+    "'Generic' = Baire-generic: the property holds for all families in a residual set (`∀ᶠ V in residual _`), i.e. a set containing a countable intersection of dense open sets. The decomposition allows residual or open-dense; residual (the weaker notion, containing open-dense) was chosen as the standard Baire-category meaning. If the intended meaning is 'open dense', the positive answer to the intended question implies the positive answer to this one.",
+    "Quantifier structure: for every k : ℕ (including k = 0, a single vector field) and every compact K ⊆ ℝ^k (including K = ∅, where the bound is trivial), generic families admit N depending on the family (not on the parameter) with `{C | IsLimitCycle (V.field b) C}.encard ≤ N` for all b ∈ K; `encard ≤ N` with N : ℕ forces finiteness as well as the bound.",
+    "Reference DOI for Ilyashenko's 'Centennial history of Hilbert's 16th problem' (Bull. AMS 39 (2002)) was written from memory (no network access in the sandbox) and should be checked."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Sections of Mathlib's `TangentBundle`/`TangentSpace (𝓡 2)` — chart-dependent model-space values, not usable with ambient derivatives.",
+     "name": "HilbertArnoldProblem.IsTangentField",
+     "why_needed": "Tangency of an ℝ³-valued field to the unit sphere (⟪v x, x⟫ = 0); no Mathlib predicate for tangent fields on the embedded sphere."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsIntegralCurve γ v` — requires v to be a section of the abstract tangent bundle (`∀ x, TangentSpace I x`), incompatible with the ℝ³-valued representation.",
+     "name": "HilbertArnoldProblem.IsSphereIntegralCurve",
+     "why_needed": "Integral curves of an ambient-valued tangent field on the sphere via `HasDerivAt` of the coerced curve."
+    },
+    {
+     "closest_existing_considered": "`Function.IsPeriodicPt` / `Flow` / `Function.Periodic` — no notion of orbit of a vector field; `Function.Periodic` is used inside the definition.",
+     "name": "HilbertArnoldProblem.IsPeriodicOrbit",
+     "why_needed": "Closed orbits (range of a non-constant periodic integral curve) of a vector field on S²."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or FormalConjecturesForMathlib (searched 'limit cycle', 'periodic orbit').",
+     "name": "HilbertArnoldProblem.IsLimitCycle",
+     "why_needed": "Limit cycle = isolated periodic orbit; not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "`ContMDiffMap` — carries no topology and cannot express the tangency side condition.",
+     "name": "HilbertArnoldProblem.Family",
+     "why_needed": "The space of smooth k-parameter families of tangent vector fields on S² (subtype of `ℝ^k × 𝕊² → ℝ³` by `ContMDiff` on the product manifold and tangency)."
+    },
+    {
+     "closest_existing_considered": "`Function.curry` (would obscure the statement).",
+     "name": "HilbertArnoldProblem.Family.field",
+     "why_needed": "Convenience: the vector field of the family at parameter b."
+    },
+    {
+     "closest_existing_considered": "Compact-open topology on `C(·, ·)` / `UniformFun`, `UniformOnFun` — only C⁰ convergence; used as building blocks together with `iteratedFDeriv` and the sphere's `atlas`.",
+     "name": "HilbertArnoldProblem.cInfTopology",
+     "why_needed": "The Whitney C^∞ topology (relative to the parameter set K) on maps ℝ^k × 𝕊² → ℝ³; Mathlib has no C^r/C^∞ topology on function spaces."
+    },
+    {
+     "closest_existing_considered": "`TopologicalSpace.induced` (used directly).",
+     "name": "HilbertArnoldProblem.Family.topology",
+     "why_needed": "Subspace C^∞ topology on `Family k` relative to K, needed to form the `residual` filter."
+    }
+   ],
+   "per_slot": {
+    "hilbert_arnold_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ k, ∀ compact K ⊆ ℝ^k, ∀ᶠ V in residual (Family k) [C^∞ topology relative to K], ∃ N, ∀ b ∈ K, #{limit cycles of V(b,·)} ≤ N`. Mathlib has the sphere as a manifold, ContMDiff, residual filters, iteratedFDeriv and uniform-convergence topologies, but no notion of periodic orbit/limit cycle for tangent fields on the sphere, nor a Whitney C^∞ topology on function spaces, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hilbert_arnold_problem": "/-- **Hilbert–Arnold problem.** Is there a uniform bound on limit cycles in generic\nfinite-parameter families of vector fields on a sphere?\n\nThat is: for every $k$ and every compact base $K \\subseteq \\mathbb{R}^k$, is it true that a\ngeneric smooth family $\\{v_b\\}_{b \\in K}$ of vector fields on $S^2$ (generic in the sense of\nBaire: every family in some residual subset of the space of families with the $C^\\infty$ topology)\nadmits a number $N$ such that every $v_b$, $b \\in K$, has at most $N$ limit cycles? -/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔ ∀ (k : ℕ) (K : Set (ℝ^k)), IsCompact K →\n      ∀ᶠ V in @residual (Family k) (Family.topology k K),\n        ∃ N : ℕ, ∀ b ∈ K, {C | IsLimitCycle (V.field b) C}.encard ≤ N := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hilbert–Arnold problem\n\nIs there a uniform bound on the number of limit cycles in generic finite-parameter families of\nvector fields on the sphere $S^2$?\n\nMore precisely: given $k$ and a compact set $B \\subseteq \\mathbb{R}^k$, consider smooth\n$k$-parameter families of smooth vector fields on $S^2$ (smoothly parameterized by $b \\in B$).\nThe problem asks whether a generic such family (one in a residual subset of the space of all such\nfamilies with the $C^\\infty$ topology) admits a bound $N$, depending only on the family, such\nthat every member of the family has at most $N$ limit cycles, i.e. isolated periodic orbits.\n\nVector fields on $S^2 \\subseteq \\mathbb{R}^3$ are modelled here as smooth vector fields on\n$\\mathbb{R}^3$ that are tangent to $S^2$ along $S^2$ (every smooth vector field on $S^2$ arises\nthis way), so that the $C^\\infty$ topology can be expressed through iterated Fréchet derivatives.\n\n*References:*\n- [Wikipedia: Hilbert–Arnold problem](https://en.wikipedia.org/wiki/Hilbert%E2%80%93Arnold_problem)\n- [Wikipedia: List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nopen Topology ContDiff\nopen scoped EuclideanGeometry InnerProductSpace\n\nnamespace HilbertArnoldProblem\n\n/-- The unit sphere $S^2 \\subseteq \\mathbb{R}^3$. -/\nabbrev unitSphere : Set ℝ³ := Metric.sphere 0 1\n\n/-- A vector field `v` on $\\mathbb{R}^3$ is *tangent to $S^2$* if $v(x) \\perp x$ for every\n$x \\in S^2$; its restriction to $S^2$ is then a vector field on the sphere. -/\ndef IsTangentToSphere (v : ℝ³ → ℝ³) : Prop :=\n  ∀ x ∈ unitSphere, ⟪v x, x⟫_ℝ = 0\n\n/-- `C` is a *periodic orbit* (closed orbit) of the vector field `v` lying on $S^2$: the image of a\nnon-constant periodic solution $\\gamma$ of $\\dot\\gamma = v(\\gamma)$ contained in $S^2$. -/\ndef IsPeriodicOrbit (v : ℝ³ → ℝ³) (C : Set ℝ³) : Prop :=\n  C ⊆ unitSphere ∧ ∃ (γ : ℝ → ℝ³) (T : ℝ), 0 < T ∧ (∀ t, HasDerivAt γ (v (γ t)) t) ∧\n    Function.Periodic γ T ∧ (¬ ∃ c, ∀ t, γ t = c) ∧ Set.range γ = C\n\n/-- `C` is a *limit cycle* of `v` on $S^2$: an isolated periodic orbit on $S^2$, i.e. a periodic\norbit having a neighbourhood which contains no other periodic orbit on $S^2$. -/\ndef IsLimitCycle (v : ℝ³ → ℝ³) (C : Set ℝ³) : Prop :=\n  IsPeriodicOrbit v C ∧ ∃ U, IsOpen U ∧ C ⊆ U ∧ ∀ C', IsPeriodicOrbit v C' → C' ⊆ U → C' = C\n\n/-- A smooth `k`-parameter family of vector fields on $S^2$: a $C^\\infty$ map\n$F \\colon \\mathbb{R}^k \\times \\mathbb{R}^3 \\to \\mathbb{R}^3$ such that, for every parameter\n$b \\in \\mathbb{R}^k$, the vector field $F(b, \\cdot)$ is tangent to $S^2$. -/\nstructure SmoothFamily (k : ℕ) where\n  /-- The underlying map `(b, x) ↦ F (b, x)`. -/\n  toFun : ℝ^k × ℝ³ → ℝ³\n  /-- The family is $C^\\infty$ jointly in the parameter and the phase variable. -/\n  contDiff : ContDiff ℝ ∞ toFun\n  /-- Each member of the family is tangent to $S^2$. -/\n  tangent : ∀ b, IsTangentToSphere fun x ↦ toFun (b, x)\n\nnamespace SmoothFamily\n\nvariable {k : ℕ}\n\ninstance : CoeFun (SmoothFamily k) fun _ ↦ ℝ^k × ℝ³ → ℝ³ := ⟨toFun⟩\n\n/-- The $n$-th iterated derivative of a smooth family, as a continuous map. -/\nnoncomputable def iteratedFDerivCM (n : ℕ) (F : SmoothFamily k) :\n    C(ℝ^k × ℝ³, (ℝ^k × ℝ³) [×n]→L[ℝ] ℝ³) :=\n  ⟨iteratedFDeriv ℝ n F, F.contDiff.continuous_iteratedFDeriv (mod_cast le_top)⟩\n\n/-- The $C^\\infty$ topology on smooth families: the coarsest topology for which every iterated\nderivative $F \\mapsto D^n F$ is continuous into the space of continuous maps with the\ncompact-open topology, i.e. the topology of uniform convergence of all derivatives on compact\nsets (the weak Whitney $C^\\infty$ topology). -/\ninstance : TopologicalSpace (SmoothFamily k) :=\n  ⨅ n : ℕ, TopologicalSpace.induced (iteratedFDerivCM n) inferInstance\n\nend SmoothFamily\n\n/--\n**Hilbert–Arnold problem.**\nIs there a uniform bound on the number of limit cycles in generic finite-parameter families of\nvector fields on the sphere? That is, is it true that for every $k$ and every compact set\n$B \\subseteq \\mathbb{R}^k$, a generic (in the sense of Baire category: all families in a residual\nsubset of the space of $C^\\infty$ families with the $C^\\infty$ topology) smooth $k$-parameter\nfamily $F$ of vector fields on $S^2$ admits a bound $N$, depending only on the family, such that\nfor every parameter value $b \\in B$ the vector field $F(b, \\cdot)$ has at most $N$ limit cycles?\n-/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔ ∀ (k : ℕ) (B : Set (ℝ^k)), IsCompact B →\n      ∀ᶠ F in residual (SmoothFamily k), ∃ N : ℕ, ∀ b ∈ B,\n        {C | IsLimitCycle (fun x ↦ F (b, x)) C}.encard ≤ N := by\n  sorry\n\n/-- The zero vector field is tangent to $S^2$. -/\n@[category test, AMS 34 37]\ntheorem isTangentToSphere_zero : IsTangentToSphere 0 := by\n  intro x _\n  simp\n\n/-- The rotation field $(x, y, z) \\mapsto (-y, x, 0)$ is tangent to $S^2$. -/\n@[category test, AMS 34 37]\ntheorem isTangentToSphere_rotation : IsTangentToSphere fun x ↦ !₂[-x 1, x 0, 0] := by\n  intro x _\n  simp [EuclideanSpace.inner_eq_star_dotProduct, Fin.sum_univ_three, dotProduct]\n  ring\n\n/-- The zero vector field has no periodic orbits, since all its solutions are constant. -/\n@[category test, AMS 34 37]\ntheorem not_isPeriodicOrbit_zero (C : Set ℝ³) : ¬ IsPeriodicOrbit 0 C := by\n  rintro ⟨-, γ, T, -, hγ, -, hne, -⟩\n  exact hne ⟨γ 0, fun t ↦ is_const_of_deriv_eq_zero (fun t ↦ (hγ t).differentiableAt)\n    (fun t ↦ (hγ t).deriv) t 0⟩\n\n/-- The zero vector field has no limit cycles. -/\n@[category test, AMS 34 37]\ntheorem not_isLimitCycle_zero (C : Set ℝ³) : ¬ IsLimitCycle 0 C :=\n  fun h ↦ not_isPeriodicOrbit_zero C h.1\n\n/-- The constant family of zero vector fields, showing that the space of smooth families is\nnonempty. -/\n@[category test, AMS 34 37]\ninstance (k : ℕ) : Inhabited (SmoothFamily k) :=\n  ⟨⟨0, contDiff_const, fun _ ↦ isTangentToSphere_zero⟩⟩\n\nend HilbertArnoldProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single slot matches the list entry; the notes' prescriptions (yes/no `answer(sorry) ↔ P`, generic as a Baire-category condition, compact base in ℝ^k, bound uniform over parameters but depending on the family, limit cycles as isolated periodic orbits, no local B(k)/E(k) variants) were all followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Vector fields on S² are modelled extrinsically: a smooth map v : ℝ³ → ℝ³ with ⟪v x, x⟫ = 0 for ‖x‖ = 1 (IsTangentToSphere). Every smooth vector field on S² is the restriction of such a field (extend via a bump function times radial projection), and the restriction map is a continuous linear surjection of Fréchet spaces with a continuous right inverse, so the space of ambient families splits as (intrinsic families) × (kernel); by Kuratowski–Ulam, a property depending only on the restriction to S² is residual in the ambient space iff it is residual in the intrinsic space. Reviewers should confirm they accept this in place of sections of the tangent bundle of Mathlib's sphere manifold (for which no C^∞ topology exists in Mathlib).",
+    "'Smooth k-parameter family parameterized over a compact set B ⊆ ℝ^k' is modelled as a C^∞ map F : ℝ^k × ℝ³ → ℝ³ (tangent to S² for every parameter), with the uniform bound required over an arbitrary compact set B ⊆ ℝ^k. Smoothness on a non-open compact set is thus read as 'restriction of a smooth map on the ambient parameter space', the usual meaning.",
+    "'Generic' is made precise as the Baire-category condition `∀ᶠ F in residual (SmoothFamily k)`, i.e. the property holds on a residual (comeagre) set of families, as the decomposition notes prescribe; this is the weakest of the standard readings (open-dense implies residual), so 'yes' is the most inclusive positive answer.",
+    "The topology on SmoothFamily k is the C^∞ compact-open (weak Whitney) topology: the initial topology making every F ↦ iteratedFDeriv ℝ n F continuous into C(ℝ^k × ℝ³, _) with the compact-open topology, i.e. uniform convergence of all derivatives on compact sets. This space is Fréchet (hence Baire), so `residual` is meaningful. Since the relevant part of the domain (B × S²) is compact, the weak/strong Whitney distinction is immaterial for the intended statement.",
+    "The compact base B is quantified outside the residual quantifier (∀ B compact, ∀ᶠ F, …). This is equivalent to putting it inside (∀ᶠ F, ∀ B compact, …) by countable exhaustion of ℝ^k by closed balls and monotonicity of the property in B, and it matches the reading where B is part of the family's data.",
+    "Limit cycle = isolated periodic orbit on S²: a periodic orbit C (image of a non-constant periodic solution γ of γ' = v(γ) with T > 0 and range γ ⊆ S²) that has an open neighbourhood U in ℝ³ containing no other periodic orbit on S² (∀ C', IsPeriodicOrbit v C' → C' ⊆ U → C' = C). Openness in ℝ³ vs relative openness in S² is equivalent here since all orbits considered lie in S². Vector fields are C^∞, so uniqueness of solutions makes orbits well defined.",
+    "The count uses `Set.encard ≤ (N : ℕ∞)`, so 'at most N' also forces finiteness of the set of limit cycles for every member of the family; the bound N may depend on the family but not on b ∈ B.",
+    "Smoothness is C^∞ (`ContDiff ℝ ∞`), following the article's 'smooth vector fields'; C^r variants are not stated."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Metric.sphere (0 : EuclideanSpace ℝ (Fin 3)) 1 (used directly as the definition); Mathlib's sphere manifold structure was considered but has no C^∞ topology on sections of its tangent bundle.",
+     "name": "HilbertArnoldProblem.unitSphere",
+     "why_needed": "Abbreviation for the unit sphere S² ⊆ ℝ³ as `Metric.sphere 0 1`, used to state tangency and containment of orbits."
+    },
+    {
+     "closest_existing_considered": "Sections of `TangentBundle (𝓡 2) (sphere 0 1)` with `ContMDiff`; rejected because no topology on such sections is available in Mathlib.",
+     "name": "HilbertArnoldProblem.IsTangentToSphere",
+     "why_needed": "Expresses that an ambient vector field v : ℝ³ → ℝ³ restricts to a vector field on S² (v x ⊥ x on S²)."
+    },
+    {
+     "closest_existing_considered": "`IsIntegralCurve` (Mathlib.Geometry.Manifold.IntegralCurve) and `Function.Periodic`; the latter is used, the former is replaced by `HasDerivAt` since the model is extrinsic.",
+     "name": "HilbertArnoldProblem.IsPeriodicOrbit",
+     "why_needed": "Closed orbit of an ODE on S²: image of a non-constant periodic solution of γ' = v(γ) lying in S². Mathlib has integral curves (`IsIntegralCurve`) on manifolds but no notion of periodic/closed orbit."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (no notion of limit cycle, ω-limit-set-based cycles, or isolated orbits).",
+     "name": "HilbertArnoldProblem.IsLimitCycle",
+     "why_needed": "Limit cycle = isolated periodic orbit; no such notion exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "`ContDiffMapSupportedIn` / test functions (require compact support, which vector fields on S² do not have); `ContMDiffMap` (no topology).",
+     "name": "HilbertArnoldProblem.SmoothFamily",
+     "why_needed": "The space of smooth k-parameter families of vector fields on S² (C^∞ map ℝ^k × ℝ³ → ℝ³, tangent to S² for each parameter), which is the space on which genericity (residual) is asserted."
+    },
+    {
+     "closest_existing_considered": "`iteratedFDeriv` and `ContDiff.continuous_iteratedFDeriv` (used).",
+     "name": "HilbertArnoldProblem.SmoothFamily.iteratedFDerivCM",
+     "why_needed": "Bundles the n-th iterated derivative of a family as a continuous map, so that the C^∞ topology can be defined as an initial topology."
+    },
+    {
+     "closest_existing_considered": "`ContinuousMap.compactOpen` (used as the target topology); `ContDiffMapSupportedIn.topologicalSpace` (compact support required, not applicable).",
+     "name": "HilbertArnoldProblem.SmoothFamily.instTopologicalSpace",
+     "why_needed": "The C^∞ compact-open (weak Whitney) topology on families: ⨅ over n of the topology induced by iteratedFDerivCM n from the compact-open topology on C(ℝ^k × ℝ³, _). Mathlib has no C^∞ topology on spaces of smooth maps that are not compactly supported."
+    }
+   ],
+   "per_slot": {
+    "hilbert_arnold_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ k, ∀ B ⊆ ℝ^k compact, ∀ᶠ F in residual (SmoothFamily k), ∃ N : ℕ, ∀ b ∈ B, {C | IsLimitCycle (F b) C}.encard ≤ N`. Mathlib has no C^∞ topology on spaces of vector fields / families and no notion of limit cycle, so bespoke definitions (tangent field on S², periodic orbit, limit cycle, smooth family with its C^∞ topology) were added in the problem file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hilbert_arnold_problem": "/--\n**Hilbert–Arnold problem.**\nIs there a uniform bound on the number of limit cycles in generic finite-parameter families of\nvector fields on the sphere? That is, is it true that for every $k$ and every compact set\n$B \\subseteq \\mathbb{R}^k$, a generic (in the sense of Baire category: all families in a residual\nsubset of the space of $C^\\infty$ families with the $C^\\infty$ topology) smooth $k$-parameter\nfamily $F$ of vector fields on $S^2$ admits a bound $N$, depending only on the family, such that\nfor every parameter value $b \\in B$ the vector field $F(b, \\cdot)$ has at most $N$ limit cycles?\n-/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔ ∀ (k : ℕ) (B : Set (ℝ^k)), IsCompact B →\n      ∀ᶠ F in residual (SmoothFamily k), ∃ N : ℕ, ∀ b ∈ B,\n        {C | IsLimitCycle (fun x ↦ F (b, x)) C}.encard ≤ N := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hilbert–Arnold problem\n\nIs there a uniform bound on the number of limit cycles in generic finite-parameter families of\nvector fields on a sphere?\n\nMore precisely: for every $k$, is it true that for a generic family of smooth vector fields on\nthe two-sphere $S^2$, smoothly parameterized over a compact set $B \\subseteq \\mathbb{R}^k$, the\nnumber of limit cycles is bounded uniformly across all parameter values? Here \"generic\" means\n\"for all families in a residual set\", i.e. a set containing a countable intersection of open\ndense sets, for the (weak) $C^\\infty$ topology on the space of families.\n\n*References:*\n- [Wikipedia, Hilbert–Arnold problem](https://en.wikipedia.org/wiki/Hilbert%E2%80%93Arnold_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Ilyashenko, *Centennial history of Hilbert's 16th problem*, Bull. AMS 39 (2002)](https://doi.org/10.1090/S0273-0979-02-00946-1)\n-/\n\nnamespace HilbertArnoldProblem\n\nopen Set Function TopologicalSpace\nopen scoped ContDiff EuclideanGeometry InnerProductSpace\n\n/-- The unit sphere $S^2 \\subseteq \\mathbb{R}^3$. -/\nlocal notation \"𝕊²\" => Metric.sphere (0 : ℝ³) 1\n\nsection SmoothMap\n\nvariable (E F : Type*) [NormedAddCommGroup E] [NormedSpace ℝ E]\n  [NormedAddCommGroup F] [NormedSpace ℝ F]\n\n/-- The space of smooth maps `E → F`. -/\ndef SmoothMap : Type _ := {f : E → F // ContDiff ℝ ∞ f}\n\nvariable {E F}\n\n/-- The `n`-th iterated derivative of a smooth map, as a continuous map. -/\nnoncomputable def SmoothMap.iteratedFDerivCM (n : ℕ) (f : SmoothMap E F) :\n    C(E, E [×n]→L[ℝ] F) :=\n  ⟨iteratedFDeriv ℝ n f.1, f.2.continuous_iteratedFDeriv (by exact_mod_cast le_top)⟩\n\n/-- The weak (compact-open) `C^∞` topology on smooth maps: the coarsest topology making every\niterated derivative `f ↦ D^n f` continuous into `C(E, E [×n]→L[ℝ] F)` with the compact-open\ntopology. A net of smooth maps converges iff all its iterated derivatives converge uniformly on\ncompact sets. -/\nnoncomputable instance : TopologicalSpace (SmoothMap E F) :=\n  ⨅ n : ℕ, induced (SmoothMap.iteratedFDerivCM n) inferInstance\n\nend SmoothMap\n\n/-- A `k`-parameter family of smooth vector fields on the sphere `𝕊² ⊆ ℝ³`, realised as a\nsmooth map `F : ℝ^k × ℝ³ → ℝ³` such that, for each parameter `b`, the vector `F (b, x)` is\ntangent to `𝕊²` at every `x ∈ 𝕊²`. The parameter `b` ranges over `ℝ^k`; a family with a\ncompact base `B ⊆ ℝ^k` is the restriction of such an `F` to `B × 𝕊²`. -/\ndef Family (k : ℕ) : Type :=\n  {F : SmoothMap (ℝ^k × ℝ³) ℝ³ // ∀ b, ∀ x ∈ 𝕊², ⟪x, F.1 (b, x)⟫_ℝ = 0}\n\n/-- The space of families carries the subspace topology of the weak `C^∞` topology. -/\nnoncomputable instance (k : ℕ) : TopologicalSpace (Family k) := instTopologicalSpaceSubtype\n\n/-- The member of the family `F` with parameter `b`, as a vector field on `ℝ³`. -/\ndef Family.vectorField {k : ℕ} (F : Family k) (b : ℝ^k) : ℝ³ → ℝ³ :=\n  fun x ↦ F.1.1 (b, x)\n\n/-- `Γ` is a (nontrivial) periodic orbit of the vector field `v` on the sphere `𝕊²`: the\nimage of a nonconstant periodic solution `γ` of `γ' = v (γ)` that lies in `𝕊²`. -/\ndef IsPeriodicOrbit (v : ℝ³ → ℝ³) (Γ : Set ℝ³) : Prop :=\n  ∃ (γ : ℝ → ℝ³) (T : ℝ), 0 < T ∧ (∀ t, HasDerivAt γ (v (γ t)) t) ∧ Periodic γ T ∧\n    (∃ t, γ t ≠ γ 0) ∧ range γ ⊆ 𝕊² ∧ Γ = range γ\n\n/-- `Γ` is a limit cycle of the vector field `v` on the sphere `𝕊²`: a periodic orbit of `v`\non `𝕊²` which is isolated among the periodic orbits, i.e. it has a neighbourhood containing no\nother periodic orbit. -/\ndef IsLimitCycle (v : ℝ³ → ℝ³) (Γ : Set ℝ³) : Prop :=\n  IsPeriodicOrbit v Γ ∧\n    ∃ U, IsOpen U ∧ Γ ⊆ U ∧ ∀ Γ', IsPeriodicOrbit v Γ' → Γ' ⊆ U → Γ' = Γ\n\n/-- The zero vector field has no periodic orbits. -/\n@[category test, AMS 34 37]\ntheorem not_isPeriodicOrbit_zero (Γ : Set ℝ³) : ¬ IsPeriodicOrbit 0 Γ := by\n  rintro ⟨γ, T, -, hγ, -, ⟨t, ht⟩, -, -⟩\n  have hd : ∀ s, HasDerivAt γ 0 s := hγ\n  exact ht <| is_const_of_deriv_eq_zero (fun s ↦ (hd s).differentiableAt)\n    (fun s ↦ (hd s).deriv) t 0\n\n/-- **Hilbert–Arnold problem.** Is there a uniform bound on the number of limit cycles in generic\nfinite-parameter families of vector fields on the sphere?\n\nPrecisely: is it true that for every $k$ and every compact set $B \\subseteq \\mathbb{R}^k$, a\ngeneric family $F$ of smooth vector fields on $S^2$, smoothly parameterized by\n$b \\in \\mathbb{R}^k$ (generic in the sense of Baire category: for all $F$ in a residual subset of\nthe space of families with the weak $C^\\infty$ topology), admits a number $N$, depending on $F$\nbut not on the parameter, such that for every $b \\in B$ the vector field $F_b$ has at most $N$\nlimit cycles?\n\nA limit cycle is an isolated periodic orbit. -/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔ ∀ (k : ℕ) (B : Set (ℝ^k)), IsCompact B →\n      ∀ᶠ F in residual (Family k), ∃ N : ℕ, ∀ b ∈ B,\n        {Γ | IsLimitCycle (F.vectorField b) Γ}.encard ≤ N := by\n  sorry\n\nend HilbertArnoldProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single slot matches the source; the local versions (B(k), E(k), Kaloshin's bound) are correctly treated as background and not stated.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Smooth vector fields on S² are modeled as smooth maps v : ℝ³ → ℝ³ with ⟪x, v x⟫ = 0 for all x ∈ S² (every smooth vector field on the embedded sphere is the restriction of such a map). A k-parameter family is a jointly smooth F : ℝ^k × ℝ³ → ℝ³ tangent to S² for every parameter; a family with compact base B is its restriction to B × S². The tangency condition is imposed for all b ∈ ℝ^k, not only b ∈ B (harmless normalization).",
+    "'Generic' is formalized as a Baire-category condition: the property holds for all F in a set belonging to `residual (Family k)`, i.e. containing a countable intersection of open dense sets, where `Family k` carries the subspace topology of the weak (compact-open) C^∞ topology on smooth maps (all iterated derivatives converge uniformly on compact sets). This is the standard meaning of 'generic' in dynamics; an alternative reading ('open dense set of families') would be a stronger positive claim and was not used.",
+    "The topology is placed on globally defined smooth maps on ℝ^k × ℝ³ (a Fréchet, hence Baire, space) rather than on maps defined only on B × S². The bounded-limit-cycle property depends only on the restriction to B × S²; residuality of such saturated sets is preserved under the continuous open linear restriction map (open mapping + Bartle–Graves), so this agrees with the literature's 'residual in the space of families over B'. Because the space is Baire, the residual filter is proper and the statement is not vacuous.",
+    "The compact base is quantified as an arbitrary compact set B ⊆ ℝ^k (per the article 'a compact set in finite dimensional Euclidean space'); since any compact B lies in a closed ball, this is equivalent to fixing B to be the closed unit ball as in Ilyashenko–Kaloshin.",
+    "Limit cycle = nontrivial periodic orbit isolated among periodic orbits: Γ is the image of a nonconstant periodic solution γ' = v(γ) lying in S², and there is an open U ⊇ Γ such that Γ is the only periodic orbit contained in U. On S² this is equivalent to the other common definitions (isolated closed trajectory; periodic orbit that is an α- or ω-limit set of another trajectory). Orbits are required to lie in S² so that ambient periodic orbits off the sphere are not counted. Limit cycles are counted as distinct orbit sets, with `Set.encard` (in ℕ∞) so that infinitely many limit cycles violate the bound.",
+    "The bound N depends on the family F (and on k, B) but not on the parameter b, matching 'uniform bound' over the family; the quantifier order is ∀ k, ∀ B, generic F, ∃ N, ∀ b ∈ B.",
+    "The k = 0 case (single vector field) and B = ∅ are allowed and are consistent with the problem (Peixoto's theorem for k = 0; trivial for B = ∅).",
+    "Smoothness is C^∞ (`ContDiff ℝ ∞`) as the source says 'smooth vector fields'; a C^r variant was not stated."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `ContDiffMapSupportedIn` / `TestFunction` (only compactly supported functions with support in a fixed compact set, an artificial restriction here) and `ContMDiffMap` (no C^∞ topology); no Mathlib type carries the C^∞ topology on all smooth maps.",
+     "name": "HilbertArnoldProblem.SmoothMap (with its TopologicalSpace instance)",
+     "why_needed": "The space of smooth maps E → F with the weak (compact-open) C^∞ topology, needed to make 'generic family' precise as a Baire-category (residual) condition. Defined as `⨅ n, induced (f ↦ iteratedFDeriv ℝ n f) (compact-open)`, mirroring Mathlib's `ContDiffMapSupportedIn.topologicalSpace`."
+    },
+    {
+     "closest_existing_considered": "`ContDiffMapSupportedIn.structureMapLM` (only for compactly supported functions).",
+     "name": "HilbertArnoldProblem.SmoothMap.iteratedFDerivCM",
+     "why_needed": "Bundles the n-th iterated derivative of a smooth map as a continuous map into `C(E, E [×n]→L[ℝ] F)`, used to define the induced topology."
+    },
+    {
+     "closest_existing_considered": "Mathlib's manifold vector fields (`Π x, TangentSpace I x` on `Metric.sphere` with `IsManifold (𝓡 2)`) — no topology on the space of such sections and heavy to use; the ambient model is standard and equivalent.",
+     "name": "HilbertArnoldProblem.Family (with subspace TopologicalSpace instance) and Family.vectorField",
+     "why_needed": "k-parameter families of smooth vector fields on S² ⊆ ℝ³ realised as smooth maps ℝ^k × ℝ³ → ℝ³ tangent to the sphere, and the member vector field at a parameter."
+    },
+    {
+     "closest_existing_considered": "`IsMIntegralCurve` (integral curves on manifolds, no periodic orbit notion), `Function.Periodic` (used inside the definition), `Function.IsPeriodicPt` (discrete dynamics only).",
+     "name": "HilbertArnoldProblem.IsPeriodicOrbit",
+     "why_needed": "Nontrivial periodic orbits (images of nonconstant periodic solutions of γ' = v(γ) lying in S²) of a vector field."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or FormalConjecturesForMathlib defines limit cycles.",
+     "name": "HilbertArnoldProblem.IsLimitCycle",
+     "why_needed": "Limit cycle = periodic orbit isolated among periodic orbits; the objects counted by the problem."
+    }
+   ],
+   "per_slot": {
+    "hilbert_arnold_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ k, ∀ compact B ⊆ ℝ^k, ∀ᶠ F in residual (Family k), ∃ N, ∀ b ∈ B, (number of limit cycles of F_b) ≤ N` (with `Set.encard`, so infinite sets are not bounded). A family is a smooth map ℝ^k × ℝ³ → ℝ³ tangent to the unit sphere, with the weak C^∞ topology; 'generic' is membership in the residual filter (Baire category); limit cycle = isolated (nontrivial) periodic orbit lying in S². Needed bespoke definitions because Mathlib has neither a C^∞ topology on smooth maps nor periodic orbits / limit cycles."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hilbert_arnold_problem": "/-- **Hilbert–Arnold problem.** Is there a uniform bound on the number of limit cycles in generic\nfinite-parameter families of vector fields on the sphere?\n\nPrecisely: is it true that for every $k$ and every compact set $B \\subseteq \\mathbb{R}^k$, a\ngeneric family $F$ of smooth vector fields on $S^2$, smoothly parameterized by\n$b \\in \\mathbb{R}^k$ (generic in the sense of Baire category: for all $F$ in a residual subset of\nthe space of families with the weak $C^\\infty$ topology), admits a number $N$, depending on $F$\nbut not on the parameter, such that for every $b \\in B$ the vector field $F_b$ has at most $N$\nlimit cycles?\n\nA limit cycle is an isolated periodic orbit. -/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔ ∀ (k : ℕ) (B : Set (ℝ^k)), IsCompact B →\n      ∀ᶠ F in residual (Family k), ∃ N : ℕ, ∀ b ∈ B,\n        {Γ | IsLimitCycle (F.vectorField b) Γ}.encard ≤ N := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hilbert–Arnold Problem\n\nThe Hilbert–Arnold problem asks whether a generic smooth finite-parameter family of vector fields\non the two-sphere has a bound on its limit cycles that is uniform over the parameter space.\n\n*References:*\n- [Wikipedia, Hilbert–Arnold problem](https://en.wikipedia.org/wiki/Hilbert%E2%80%93Arnold_problem)\n-/\n\nnamespace HilbertArnoldProblem\n\nopen Filter Set\nopen scoped ContDiff Topology\n\n/-- The unit two-sphere in three-dimensional Euclidean space. -/\nabbrev Sphere := Metric.sphere (0 : EuclideanSpace ℝ (Fin 3)) 1\n\n/--\nAn ambient representative of a smooth family of vector fields on `Sphere`, parameterized by the\ncompact set `K`. The map is defined on the ambient Euclidean spaces so that ordinary Fréchet\nsmoothness can be used. Only its restriction to `K × Sphere` is mathematically relevant.\n-/\nstructure AmbientFamily (k : ℕ) (K : Set (Fin k → ℝ)) where\n  toFun : ((Fin k → ℝ) × EuclideanSpace ℝ (Fin 3)) → EuclideanSpace ℝ (Fin 3)\n  contDiff_toFun : ContDiff ℝ ∞ toFun\n  tangent_to_sphere : ∀ a ∈ K, ∀ x ∈ Metric.sphere (0 : EuclideanSpace ℝ (Fin 3)) 1,\n    inner ℝ x (toFun (a, x)) = 0\n\n/--\nThe sets generating the compact-open $C^\\infty$ topology on ambient representatives. They require\nuniform closeness of an iterated derivative on a compact ball.\n-/\ndef cinftyGeneratingSets (k : ℕ) (K : Set (Fin k → ℝ)) :\n    Set (Set (AmbientFamily k K)) :=\n  {U | ∃ (F : AmbientFamily k K) (n m : ℕ) (ε : ℝ), 0 < ε ∧\n    U = {G | ∀ z ∈ Metric.closedBall 0 (m : ℝ),\n      ‖iteratedFDeriv ℝ n G.toFun z - iteratedFDeriv ℝ n F.toFun z‖ < ε}}\n\ninstance (k : ℕ) (K : Set (Fin k → ℝ)) : TopologicalSpace (AmbientFamily k K) :=\n  TopologicalSpace.generateFrom (cinftyGeneratingSets k K)\n\n/-- Two ambient representatives define the same family when they agree on `K × Sphere`. -/\ndef ambientFamilySetoid (k : ℕ) (K : Set (Fin k → ℝ)) : Setoid (AmbientFamily k K) where\n  r F G := ∀ a ∈ K, ∀ x ∈ Metric.sphere (0 : EuclideanSpace ℝ (Fin 3)) 1,\n    F.toFun (a, x) = G.toFun (a, x)\n  iseqv := ⟨\n    fun _F _a _ _x _ ↦ rfl,\n    fun {_ _} h a ha x hx ↦ (h a ha x hx).symm,\n    fun {_ _ _} h₁ h₂ a ha x hx ↦ (h₁ a ha x hx).trans (h₂ a ha x hx)⟩\n\n/--\nA smooth family of vector fields on `Sphere`, parameterized by `K`. Quotienting by restriction\nensures that the chosen smooth ambient extension is not part of the family.\n-/\ndef SmoothFamily (k : ℕ) (K : Set (Fin k → ℝ)) := Quotient (ambientFamilySetoid k K)\n\ninstance (k : ℕ) (K : Set (Fin k → ℝ)) : TopologicalSpace (SmoothFamily k K) :=\n  TopologicalSpace.coinduced (Quotient.mk (ambientFamilySetoid k K)) inferInstance\n\n/-- The vector field in the family `F` at the parameter `a`. -/\ndef SmoothFamily.vectorField {k : ℕ} {K : Set (Fin k → ℝ)}\n    (F : SmoothFamily k K) (a : K) : Sphere → EuclideanSpace ℝ (Fin 3) :=\n  Quotient.liftOn F (fun G x ↦ G.toFun (a, x)) fun G H h ↦ by\n    funext x\n    exact h a a.property x x.property\n\n/--\nA periodic orbit of a vector field is the image of a nonconstant, periodic integral curve. Orbit\nimages, rather than choices of parametrization or base point, are the objects being counted.\n-/\ndef IsPeriodicOrbit (X : Sphere → EuclideanSpace ℝ (Fin 3)) (C : Set Sphere) : Prop :=\n  ∃ (γ : ℝ → Sphere) (T : ℝ), 0 < T ∧\n    (∀ t, HasDerivAt (fun s ↦ (γ s : EuclideanSpace ℝ (Fin 3))) (X (γ t)) t) ∧\n    (∀ t, γ (t + T) = γ t) ∧\n    (∃ t, γ t ≠ γ 0) ∧\n    C = range γ\n\n/-- A limit cycle is a periodic orbit isolated from all other periodic orbits. -/\ndef IsLimitCycle (X : Sphere → EuclideanSpace ℝ (Fin 3)) (C : Set Sphere) : Prop :=\n  IsPeriodicOrbit X C ∧\n    ∃ U : Set Sphere, IsOpen U ∧ C ⊆ U ∧\n      ∀ D : Set Sphere, IsPeriodicOrbit X D → D ⊆ U → D = C\n\n/-- The set of geometric limit cycles of the vector field `X`. -/\ndef limitCycles (X : Sphere → EuclideanSpace ℝ (Fin 3)) : Set (Set Sphere) :=\n  {C | IsLimitCycle X C}\n\n/--\nThe Hilbert–Arnold problem asks whether, for every finite parameter dimension and compact\nparameter set $K \\subseteq \\mathbb R^k$, a residual set of smooth families has a family-dependent\nnatural-number bound $N$ such that every parameter value has at most $N$ limit cycles.\n-/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔\n      ∀ (k : ℕ) (K : Set (Fin k → ℝ)), IsCompact K →\n        {F : SmoothFamily k K | ∃ N : ℕ, ∀ a : K,\n          (limitCycles (F.vectorField a)).Finite ∧\n            (limitCycles (F.vectorField a)).ncard ≤ N} ∈ residual (SmoothFamily k K) := by\n  sorry\n\nend HilbertArnoldProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “generic” as saying that the set of families admitting a uniform finite bound is residual (comeagre) in the space of smooth families, rather than as an undefined predicate on an individual family.",
+    "Chose the C^∞ version allowed by the decomposition. The compact-open C^∞ topology is generated by uniform control of each iterated Fréchet derivative on compact Euclidean balls.",
+    "Modeled S² as the unit sphere in EuclideanSpace ℝ (Fin 3). A vector field is represented by an ambient ℝ³-valued smooth map whose value is orthogonal to the radius on the sphere.",
+    "Modeled a smooth family over K ⊆ ℝ^k as the restriction to K × S² of a globally smooth ambient map. Ambient extensions agreeing on K × S² are quotiented, so extension choices are not mathematical data; the family-space topology is the resulting quotient topology.",
+    "Took smooth parameterization over an arbitrary compact subset K to mean joint smooth extendability in the parameter and phase variables. This is a standard precise reading when K itself need not be a manifold.",
+    "Defined a periodic orbit as the image of a nonconstant positive-period integral curve, so shifted, rescaled-period, and other parametrizations of the same geometric orbit are counted once.",
+    "Defined a limit cycle as a periodic orbit having an open neighborhood that contains no distinct periodic orbit. This expresses isolation of the geometric periodic orbit.",
+    "Quantified one natural-number bound N after choosing the family and before choosing a ∈ K. Thus N may depend on the family but is uniform over all parameter values.",
+    "Included both finiteness and an ncard bound, because Mathlib's Set.ncard alone evaluates to zero on infinite sets.",
+    "Included k = 0 and allowed the compact parameter set to be empty; these harmless boundary cases make the universal statement precise and do not weaken its nonempty positive-dimensional cases."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Metric.sphere exists in Mathlib; this is only a problem-local abbreviation at the required dimension.",
+     "name": "Sphere",
+     "why_needed": "Fixes the phase space as the unit two-sphere."
+    },
+    {
+     "closest_existing_considered": "Mathlib has vector-field and ContDiff predicates but no bundled topology-bearing space of smooth finite-parameter sphere vector-field families.",
+     "name": "AmbientFamily",
+     "why_needed": "Bundles a jointly C^∞ ambient representative and the condition that its restriction is tangent to S²."
+    },
+    {
+     "closest_existing_considered": "Mathlib's ContDiffMapSupportedIn topology applies to maps with fixed compact support, not arbitrary smooth families or sphere restrictions; no general Whitney/C^∞ smooth-map topology was found.",
+     "name": "cinftyGeneratingSets",
+     "why_needed": "Defines the compact-open C^∞ topology through uniform convergence of every iterated derivative on compact balls."
+    },
+    {
+     "closest_existing_considered": "No existing restriction-equivalence construction for smooth vector-field families was found.",
+     "name": "ambientFamilySetoid",
+     "why_needed": "Identifies ambient smooth extensions with the same restriction to K × S²."
+    },
+    {
+     "closest_existing_considered": "No Mathlib or FormalConjecturesForMathlib type bundles smooth parameterized sphere vector fields with a C^∞ topology.",
+     "name": "SmoothFamily",
+     "why_needed": "Makes a smooth family independent of its chosen ambient extension and equips the quotient with the required C^∞ topology."
+    },
+    {
+     "closest_existing_considered": "No existing family evaluation applies to the bespoke quotient family space.",
+     "name": "SmoothFamily.vectorField",
+     "why_needed": "Evaluates an extension-independent family at a parameter to obtain its sphere vector field."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsPeriodicPt concerns iterates of discrete self-maps; manifold integral-curve APIs exist, but no periodic-orbit predicate for vector fields was found.",
+     "name": "IsPeriodicOrbit",
+     "why_needed": "Defines continuous-time geometric periodic orbits as images of nonconstant periodic integral curves."
+    },
+    {
+     "closest_existing_considered": "No limit-cycle or isolated periodic-orbit notion was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsLimitCycle",
+     "why_needed": "Adds the isolation condition that distinguishes limit cycles from arbitrary periodic orbits."
+    },
+    {
+     "closest_existing_considered": "No existing collection of limit cycles was found.",
+     "name": "limitCycles",
+     "why_needed": "Provides the set of geometric limit cycles whose finite cardinality is uniformly bounded."
+    }
+   ],
+   "per_slot": {
+    "hilbert_arnold_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hilbert_arnold_problem": "/--\nThe Hilbert–Arnold problem asks whether, for every finite parameter dimension and compact\nparameter set $K \\subseteq \\mathbb R^k$, a residual set of smooth families has a family-dependent\nnatural-number bound $N$ such that every parameter value has at most $N$ limit cycles.\n-/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔\n      ∀ (k : ℕ) (K : Set (Fin k → ℝ)), IsCompact K →\n        {F : SmoothFamily k K | ∃ N : ℕ, ∀ a : K,\n          (limitCycles (F.vectorField a)).Finite ∧\n            (limitCycles (F.vectorField a)).ncard ≤ N} ∈ residual (SmoothFamily k K) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hilbert–Arnold problem\n\nThe Hilbert–Arnold problem asks for a bound on the number of limit cycles in a generic\nfinite-parameter family of smooth vector fields on the two-sphere.\n\n*Reference:* [Wikipedia, Hilbert–Arnold problem](https://en.wikipedia.org/wiki/Hilbert%E2%80%93Arnold_problem)\n-/\n\nopen Set Function Filter TopologicalSpace\nopen scoped Topology ContDiff\n\nnamespace HilbertArnoldProblem\n\n/-- Euclidean parameter space of dimension `k`. -/\nabbrev ParameterSpace (k : ℕ) := EuclideanSpace ℝ (Fin k)\n\n/-- The ambient Euclidean space containing the two-sphere. -/\nabbrev AmbientSpace := EuclideanSpace ℝ (Fin 3)\n\n/-- The unit two-sphere. -/\nabbrev Sphere := Metric.sphere (0 : AmbientSpace) 1\n\n/-- A smooth `k`-parameter family of vector fields on the two-sphere, represented by a smooth\nambient map. The tangency condition says that its value is orthogonal to the radius vector. -/\nstructure SmoothFamily (k : ℕ) where\n  toFun : ParameterSpace k × AmbientSpace → AmbientSpace\n  contDiff_toFun : ContDiff ℝ ∞ toFun\n  tangent_to_sphere : ∀ (p : ParameterSpace k) (x : Sphere),\n    inner ℝ (toFun (p, x)) (x : AmbientSpace) = 0\n\ninstance (k : ℕ) : FunLike (SmoothFamily k)\n    (ParameterSpace k × AmbientSpace) AmbientSpace where\n  coe := SmoothFamily.toFun\n  coe_injective' F G h := by\n    cases F with\n    | mk f hf ht =>\n      cases G with\n      | mk g hg hu =>\n        dsimp only [SmoothFamily.toFun] at h\n        cases h\n        rfl\n\n/-- The parameter coordinate fields together with the projections of the three ambient coordinate\nfields onto the tangent planes of the sphere. On `K × S²` these fields span every parameter and\nsphere tangent space. -/\nnoncomputable def spanningDirection {k : ℕ} (a : Fin k ⊕ Fin 3)\n    (z : ParameterSpace k × AmbientSpace) : ParameterSpace k × AmbientSpace :=\n  a.elim (fun i ↦ (EuclideanSpace.single i 1, 0)) fun j ↦\n    let e : AmbientSpace := EuclideanSpace.single j 1\n    (0, e - inner ℝ e z.2 • z.2)\n\n/-- Iterated differentiation along a word in the fixed spanning vector fields. On the sphere its\nvalue depends only on the restriction of the ambient map to the sphere. -/\nnoncomputable def iteratedDirectionalDerivative {k : ℕ} :\n    List (Fin k ⊕ Fin 3) →\n      (ParameterSpace k × AmbientSpace → AmbientSpace) →\n        ParameterSpace k × AmbientSpace → AmbientSpace\n  | [], f => f\n  | a :: w, f => fun z ↦ fderiv ℝ (iteratedDirectionalDerivative w f) z (spanningDirection a z)\n\n/-- A basic `C^∞` neighborhood controls all iterated derivatives of order at most `r`, along fixed\nfields spanning the parameter and sphere tangent spaces, uniformly on `K × S²`. -/\ndef cInfinityNeighborhood {k : ℕ} (K : Set (ParameterSpace k)) (F : SmoothFamily k)\n    (r : ℕ) (ε : ℝ) : Set (SmoothFamily k) :=\n  {G | ∀ w : List (Fin k ⊕ Fin 3), w.length ≤ r → ∀ p ∈ K, ∀ x : Sphere,\n    ‖iteratedDirectionalDerivative w G (p, (x : AmbientSpace)) -\n      iteratedDirectionalDerivative w F (p, (x : AmbientSpace))‖ < ε}\n\n/-- The intrinsic compact-open `C^∞` topology on families over `K × S²`, generated by uniform\nbounds on all finite collections of derivatives along spanning tangent fields. -/\ndef cInfinityTopology {k : ℕ} (K : Set (ParameterSpace k)) : TopologicalSpace (SmoothFamily k) :=\n  generateFrom {U | ∃ (F : SmoothFamily k) (r : ℕ) (ε : ℝ),\n    0 < ε ∧ U = cInfinityNeighborhood K F r ε}\n\n/-- A periodic orbit is the image of a nonconstant periodic integral curve. Using its image makes\nthis independent of the choice of starting point and period. -/\ndef IsPeriodicOrbit {k : ℕ} (F : SmoothFamily k) (p : ParameterSpace k)\n    (C : Set Sphere) : Prop :=\n  ∃ (γ : ℝ → Sphere) (T : ℝ), 0 < T ∧ Periodic γ T ∧\n    (∃ s t, γ s ≠ γ t) ∧\n    (∀ t, HasDerivAt (fun s ↦ (γ s : AmbientSpace)) (F (p, (γ t : AmbientSpace))) t) ∧\n    C = range γ\n\n/-- A limit cycle is a periodic orbit isolated from all other periodic orbits by a neighborhood\nof its image in the sphere. -/\ndef IsLimitCycle {k : ℕ} (F : SmoothFamily k) (p : ParameterSpace k)\n    (C : Set Sphere) : Prop :=\n  IsPeriodicOrbit F p C ∧ ∃ U : Set Sphere, IsOpen U ∧ C ⊆ U ∧\n    ∀ C' : Set Sphere, IsPeriodicOrbit F p C' → C' ⊆ U → C' = C\n\n/-- A family has a uniform limit-cycle bound on `K` if one finite bound works for every parameter\nin `K`. -/\ndef HasUniformLimitCycleBound {k : ℕ} (K : Set (ParameterSpace k))\n    (F : SmoothFamily k) : Prop :=\n  ∃ N : ℕ, ∀ p ∈ K,\n    {C : Set Sphere | IsLimitCycle F p C}.Finite ∧\n      {C : Set Sphere | IsLimitCycle F p C}.ncard ≤ N\n\n/--\n**Hilbert–Arnold problem.** Is it true that, for every finite parameter dimension and every compact\nparameter set `K`, the smooth families of vector fields on $S^2$ whose numbers of isolated periodic\norbits have a family-dependent bound uniform over `K` form a residual set in the compact-open\n$C^∞$ topology on families?\n-/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔ ∀ (k : ℕ) (K : Set (ParameterSpace k)), IsCompact K →\n      {F : SmoothFamily k | HasUniformLimitCycleBound K F} ∈\n        @residual (SmoothFamily k) (cInfinityTopology K) := by\n  sorry\n\nend HilbertArnoldProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “generic” as a Baire-category assertion: for each finite parameter dimension and compact parameter set K, the set of families with a uniform limit-cycle bound is residual in the explicitly defined compact-open C-infinity topology.",
+    "Represented a smooth family of vector fields on S² by a globally smooth ambient map ℝ^k × ℝ³ → ℝ³ whose values on S² are orthogonal to the radius. This is a concrete representation of smooth tangent vector fields and their smooth parameter dependence.",
+    "Defined the intrinsic C-infinity topology using uniform control on K × S² of iterated directional derivatives along parameter coordinate fields and three projected ambient coordinate fields spanning each sphere tangent plane. Thus the topology ignores normal behavior of ambient extensions and agrees with the usual compact-open smooth topology on the restricted family.",
+    "Treated “limit cycle” as an isolated nonconstant periodic orbit. A periodic orbit is represented by the image set of a periodic integral curve, avoiding duplicate counts from time shifts or nonminimal choices of period; isolation means that a neighborhood of the orbit contains no other periodic orbit wholly inside it.",
+    "Required both finiteness and an ncard bound for the set of limit cycles, because Set.ncard alone is zero on infinite sets in Mathlib.",
+    "Allowed k = 0 and an empty compact parameter set. These are harmless boundary cases of the universal finite-dimensional/compact formulation; for an empty set, uniformity is vacuous.",
+    "Used C-infinity rather than a finite C^r topology, as explicitly permitted by the supplied decomposition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "EuclideanSpace ℝ (Fin k), which this abbreviation directly uses.",
+     "name": "ParameterSpace",
+     "why_needed": "Names the finite-dimensional Euclidean parameter space ℝ^k."
+    },
+    {
+     "closest_existing_considered": "EuclideanSpace ℝ (Fin 3), which this abbreviation directly uses.",
+     "name": "AmbientSpace",
+     "why_needed": "Names the ambient ℝ³ containing S²."
+    },
+    {
+     "closest_existing_considered": "Metric.sphere, which this abbreviation directly uses.",
+     "name": "Sphere",
+     "why_needed": "Names the unit two-sphere on which the vector fields live."
+    },
+    {
+     "closest_existing_considered": "Mathlib has ContMDiffMap and tangent bundles/vector fields, but no bundled finite-parameter space of smooth vector-field families with the needed function-space topology.",
+     "name": "SmoothFamily",
+     "why_needed": "Bundles a globally smooth ambient representative of a smoothly parameterized tangent vector-field family."
+    },
+    {
+     "closest_existing_considered": "Mathlib tangent spaces and projected vectors were considered, but there is no ready-made finite spanning family for this parameter-product sphere.",
+     "name": "spanningDirection",
+     "why_needed": "Provides fixed smooth fields spanning parameter directions and tangent directions of S², used to define intrinsic smooth seminorms."
+    },
+    {
+     "closest_existing_considered": "Mathlib iteratedFDeriv controls all ambient derivatives and would incorrectly include normal-extension data.",
+     "name": "iteratedDirectionalDerivative",
+     "why_needed": "Defines derivatives along words in the fixed spanning fields, ensuring the topology depends only on restriction to K × S²."
+    },
+    {
+     "closest_existing_considered": "Mathlib's ContDiffMapSupportedIn topology uses analogous derivative seminorms, but applies to compactly supported maps on normed spaces rather than vector-field families on a sphere.",
+     "name": "cInfinityNeighborhood",
+     "why_needed": "Defines uniform finite-order smooth neighborhoods on the compact parameter set times S²."
+    },
+    {
+     "closest_existing_considered": "Mathlib has residual filters and compact-open topologies but no C-infinity topology on spaces of smooth manifold maps or vector-field families.",
+     "name": "cInfinityTopology",
+     "why_needed": "Makes residual genericity precise in the compact-open C-infinity topology on families."
+    },
+    {
+     "closest_existing_considered": "Mathlib has Function.Periodic and IsMIntegralCurve, but no periodic-orbit object or predicate suitable for counting orbit images.",
+     "name": "IsPeriodicOrbit",
+     "why_needed": "Defines a nonconstant periodic integral orbit of a member of the family as an image set."
+    },
+    {
+     "closest_existing_considered": "No limit-cycle abstraction exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsLimitCycle",
+     "why_needed": "Defines a limit cycle as a periodic orbit isolated from all other periodic orbits in S²."
+    },
+    {
+     "closest_existing_considered": "No existing predicate combines limit-cycle counting with parameter-uniform boundedness.",
+     "name": "HasUniformLimitCycleBound",
+     "why_needed": "Packages existence of a family-dependent finite bound valid at every parameter in K."
+    }
+   ],
+   "per_slot": {
+    "hilbert_arnold_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hilbert_arnold_problem": "/--\n**Hilbert–Arnold problem.** Is it true that, for every finite parameter dimension and every compact\nparameter set `K`, the smooth families of vector fields on $S^2$ whose numbers of isolated periodic\norbits have a family-dependent bound uniform over `K` form a residual set in the compact-open\n$C^∞$ topology on families?\n-/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔ ∀ (k : ℕ) (K : Set (ParameterSpace k)), IsCompact K →\n      {F : SmoothFamily k | HasUniformLimitCycleBound K F} ∈\n        @residual (SmoothFamily k) (cInfinityTopology K) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c06",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "The phrase “for every generic family” is not itself the standard Baire-category formulation: genericity ordinarily means that the set of families satisfying the boundedness property is residual (or perhaps open dense) in a specified family space. In addition, “residual/open-dense” and “C^∞ or C^r” are alternatives, not interchangeable definitions; the decomposition does not select r or one genericity condition. This ambiguity could be resolved by choosing the residual condition in the Whitney C^∞ topology, but that topology is absent from the available libraries.",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The intended positive proposition was read as: for each finite parameter dimension and compact parameter base, the set of smooth families whose number of isolated periodic orbits is bounded uniformly over the parameter belongs to the residual filter on the corresponding Whitney C^∞ (or specified C^r) family space.",
+    "A limit cycle was read as an isolated nonconstant periodic orbit of the continuous-time flow, not as a periodic point of a discrete self-map.",
+    "The bound may depend on the family (and its compact parameter base) but not on the parameter value.",
+    "No candidate file was created because the only slot was omitted under the task's full-bail-out rule."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "hilbert_arnold_problem": {
+     "outcome": "missing_primitives",
+     "why": "A faithful statement requires the Baire-category notion of genericity on the space of smooth finite-parameter families of vector fields, equipped with a Whitney C^∞ or C^r topology. Mathlib has the residual filter, smooth manifolds (including spheres), bundled ContMDiffMap values, and manifold integral curves, but ContMDiffMap has no Whitney topology. Its available function-space topologies do not encode convergence of derivatives. ContDiffMapSupportedIn has a derivative topology only for compactly supported maps between normed spaces and does not supply the required mapping space of tangent-bundle sections over an arbitrary compact parameter subset times S². Mathlib and FormalConjecturesForMathlib also lack a continuous-flow limit-cycle abstraction; the discrete periodic-point API is inapplicable. Defining periodic integral-curve images is possible, but defining isolated periodic orbits and, decisively, the correct Whitney topology on parameterized smooth tangent-bundle sections would require substantial missing differential-topology infrastructure. Using the compact-open or pointwise topology would change which sets are residual and would therefore not faithfully state the problem."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hilbert–Arnold problem\n\nThe Hilbert–Arnold problem asks whether there is a uniform bound on the number of limit cycles\nin generic finite-parameter families of vector fields on the two-sphere $S^2$. More precisely:\nis it true that, for a generic family of smooth vector fields on $S^2$, smoothly parameterised\nby a compact set $B$ in a finite-dimensional Euclidean space $\\mathbb{R}^k$, the number of limit\ncycles of the members of the family is bounded uniformly in the parameter?\n\nIn this file a vector field on $S^2 \\subseteq \\mathbb{R}^3$ is described in ambient coordinates,\nas a map $w : \\mathbb{R}^3 \\to \\mathbb{R}^3$ tangent to $S^2$ along $S^2$; only the values of\n$w$ on the sphere matter. A limit cycle is a closed orbit (a periodic trajectory which is not an\nequilibrium) that is isolated in the set of closed orbits. A smooth $k$-parameter family with\ncompact base $B \\subseteq \\mathbb{R}^k$ is a smooth map $B \\times S^2 \\to TS^2$, i.e. the\nrestriction to $B \\times S^2$ of a smooth map $\\mathbb{R}^k \\times \\mathbb{R}^3 \\to \\mathbb{R}^3$\ntangent to $S^2$ for the parameters in $B$. The space of families carries the $C^\\infty$\ntopology, and \"generic\" means: on a residual set (a set containing a dense $G_\\delta$ set).\n\n*References:*\n- [Wikipedia, Hilbert–Arnold problem](https://en.wikipedia.org/wiki/Hilbert%E2%80%93Arnold_problem)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- Yu. Ilyashenko, *Centennial history of Hilbert's 16th problem*, Bull. Amer. Math. Soc. 39\n  (2002), 301–354.\n-/\n\nopen Set\nopen scoped ContDiff EuclideanGeometry InnerProductSpace UniformConvergence\n\nnamespace HilbertArnoldProblem\n\n/-- The unit sphere $S^2 \\subseteq \\mathbb{R}^3$. -/\nlocal notation \"𝕊²\" => Metric.sphere (0 : ℝ^3) 1\n\n/-- `γ : ℝ → ℝ³` is an integral curve on the sphere of the vector field `w`: it stays on the\nsphere and solves $\\gamma'(t) = w(\\gamma(t))$ for all $t$. -/\ndef IsIntegralCurveOnSphere (w : ℝ^3 → ℝ^3) (γ : ℝ → ℝ^3) : Prop :=\n  (∀ t, γ t ∈ 𝕊²) ∧ ∀ t, HasDerivAt γ (w (γ t)) t\n\n/-- `C` is a closed orbit of `w` on the sphere: the trajectory of a periodic integral curve on the\nsphere which is not an equilibrium point. -/\ndef IsClosedOrbit (w : ℝ^3 → ℝ^3) (C : Set (ℝ^3)) : Prop :=\n  ∃ γ : ℝ → ℝ^3, IsIntegralCurveOnSphere w γ ∧ (∃ T, 0 < T ∧ Function.Periodic γ T) ∧\n    range γ = C ∧ C.Nontrivial\n\n/-- `C` is a limit cycle of `w` on the sphere: a closed orbit which is isolated in the set of\nclosed orbits, i.e. some neighbourhood of `C` contains no other closed orbit. -/\ndef IsLimitCycle (w : ℝ^3 → ℝ^3) (C : Set (ℝ^3)) : Prop :=\n  IsClosedOrbit w C ∧ ∃ U, IsOpen U ∧ C ⊆ U ∧ ∀ C', IsClosedOrbit w C' → C' ⊆ U → C' = C\n\n/-- The number of limit cycles of the vector field `w` on the sphere (possibly infinite). -/\nnoncomputable def numLimitCycles (w : ℝ^3 → ℝ^3) : ℕ∞ :=\n  {C | IsLimitCycle w C}.encard\n\n/-- Being an integral curve on the sphere only depends on the values of the vector field on the\nsphere. -/\n@[category API, AMS 34 37]\ntheorem isIntegralCurveOnSphere_congr {w w' : ℝ^3 → ℝ^3} (h : EqOn w w' 𝕊²) {γ : ℝ → ℝ^3} :\n    IsIntegralCurveOnSphere w γ ↔ IsIntegralCurveOnSphere w' γ := by\n  refine ⟨fun ⟨hγ, hd⟩ => ⟨hγ, fun t => ?_⟩, fun ⟨hγ, hd⟩ => ⟨hγ, fun t => ?_⟩⟩\n  · rw [← h (hγ t)]\n    exact hd t\n  · rw [h (hγ t)]\n    exact hd t\n\n/-- Being a closed orbit only depends on the values of the vector field on the sphere. -/\n@[category API, AMS 34 37]\ntheorem isClosedOrbit_congr {w w' : ℝ^3 → ℝ^3} (h : EqOn w w' 𝕊²) {C : Set (ℝ^3)} :\n    IsClosedOrbit w C ↔ IsClosedOrbit w' C := by\n  simp only [IsClosedOrbit, isIntegralCurveOnSphere_congr h]\n\n/-- Being a limit cycle only depends on the values of the vector field on the sphere. -/\n@[category API, AMS 34 37]\ntheorem isLimitCycle_congr {w w' : ℝ^3 → ℝ^3} (h : EqOn w w' 𝕊²) {C : Set (ℝ^3)} :\n    IsLimitCycle w C ↔ IsLimitCycle w' C := by\n  simp only [IsLimitCycle, isClosedOrbit_congr h]\n\n/-- The number of limit cycles only depends on the values of the vector field on the sphere. -/\n@[category API, AMS 34 37]\ntheorem numLimitCycles_congr {w w' : ℝ^3 → ℝ^3} (h : EqOn w w' 𝕊²) :\n    numLimitCycles w = numLimitCycles w' := by\n  simp only [numLimitCycles, isLimitCycle_congr h]\n\n/-- The zero vector field has no closed orbits. -/\n@[category test, AMS 34 37]\ntheorem not_isClosedOrbit_zero (C : Set (ℝ^3)) : ¬ IsClosedOrbit 0 C := by\n  rintro ⟨γ, ⟨-, hd⟩, -, rfl, x, ⟨s, rfl⟩, y, ⟨t, rfl⟩, hxy⟩\n  exact hxy <| is_const_of_deriv_eq_zero (fun t => (hd t).differentiableAt)\n    (fun t => (hd t).deriv) s t\n\n/-- The zero vector field has no limit cycles. -/\n@[category test, AMS 34 37]\ntheorem numLimitCycles_zero : numLimitCycles 0 = 0 := by\n  simp [numLimitCycles, IsLimitCycle, not_isClosedOrbit_zero]\n\nsection SmoothMap\n\nvariable (E F : Type*) [NormedAddCommGroup E] [NormedSpace ℝ E]\n  [NormedAddCommGroup F] [NormedSpace ℝ F]\n\n/-- The type of smooth ($C^\\infty$) maps from `E` to `F`, carrying the $C^\\infty$ topology. -/\ndef SmoothMap : Type _ := {f : E → F // ContDiff ℝ ∞ f}\n\ninstance : FunLike (SmoothMap E F) E F where\n  coe f := f.1\n  coe_injective' := Subtype.val_injective\n\n/-- The $C^\\infty$ topology on smooth maps: the coarsest topology for which, for every `n`, the\n`n`-th derivative `f ↦ D^n f` is continuous into the space of maps with the topology of uniform\nconvergence on compact sets. That is, `fᵢ → f` iff all derivatives of `fᵢ` converge uniformly on\ncompact sets to the corresponding derivatives of `f`. -/\ninstance : TopologicalSpace (SmoothMap E F) :=\n  ⨅ n : ℕ, TopologicalSpace.induced\n    (fun f : SmoothMap E F => UniformOnFun.ofFun {K : Set E | IsCompact K} (iteratedFDeriv ℝ n f))\n    inferInstance\n\nvariable {E F}\n\n/-- For every `n`, the `n`-th derivative is continuous from the $C^\\infty$ topology into the\ntopology of uniform convergence on compact sets. -/\n@[category API, AMS 46]\ntheorem continuous_iteratedFDeriv (n : ℕ) :\n    Continuous fun f : SmoothMap E F =>\n      UniformOnFun.ofFun {K : Set E | IsCompact K} (iteratedFDeriv ℝ n f) :=\n  continuous_iInf_dom (i := n) continuous_induced_dom\n\n/-- Evaluation at a point is continuous for the $C^\\infty$ topology. -/\n@[category API, AMS 46]\ntheorem continuous_eval (x : E) : Continuous fun f : SmoothMap E F => f x := by\n  have h1 : Continuous fun g : E →ᵤ[{K : Set E | IsCompact K}] (E [×0]→L[ℝ] F) =>\n      UniformOnFun.toFun _ g x :=\n    (UniformOnFun.uniformContinuous_eval_of_mem _ _ (mem_singleton x)\n      isCompact_singleton).continuous\n  have h2 := (continuousMultilinearCurryFin0 ℝ E F).continuous.comp\n    (h1.comp (continuous_iteratedFDeriv (E := E) (F := F) 0))\n  convert h2 using 2\n\nend SmoothMap\n\nvariable (k : ℕ) (B : Set (ℝ^k))\n\n/-- A representative of a `k`-parameter family of vector fields on the sphere with parameter\nbase `B ⊆ ℝ^k`: a smooth map `v : ℝ^k × ℝ³ → ℝ³` such that for every parameter `ε ∈ B`, the\nvector field `x ↦ v (ε, x)` is tangent to the sphere along the sphere. It carries the\n$C^\\infty$ topology. -/\nabbrev FamilyRep : Type :=\n  {v : SmoothMap (ℝ^k × ℝ^3) (ℝ^3) // ∀ ε ∈ B, ∀ x ∈ 𝕊², ⟪v (ε, x), x⟫_ℝ = 0}\n\n/-- Two representatives define the same family of vector fields on the sphere iff they agree\non `B × 𝕊²`. -/\ninstance familySetoid : Setoid (FamilyRep k B) where\n  r v w := EqOn (⇑v.1) (⇑w.1) (B ×ˢ 𝕊²)\n  iseqv := ⟨fun _ => eqOn_refl _ _, fun h => h.symm, fun h h' => h.trans h'⟩\n\n/-- The space of smooth `k`-parameter families of vector fields on the sphere with parameter\nbase `B ⊆ ℝ^k`, i.e. smooth maps `B × 𝕊² → T𝕊²`, with the $C^\\infty$ topology (the quotient\ntopology induced from the $C^\\infty$ topology on the ambient representatives). -/\nabbrev Family : Type := Quotient (familySetoid k B)\n\nvariable {k B}\n\n/-- The vector field `x ↦ v (ε, x)` at the parameter `ε` of the family `v`. -/\ndef FamilyRep.field (v : FamilyRep k B) (ε : ℝ^k) : ℝ^3 → ℝ^3 :=\n  fun x => v.1 (ε, x)\n\n/-- Whether the members of a family have a common bound on their number of limit cycles does\nnot depend on the choice of representative. -/\n@[category API, AMS 34 37]\ntheorem exists_forall_numLimitCycles_le_congr {v w : FamilyRep k B} (h : v ≈ w) :\n    (∃ N : ℕ, ∀ ε ∈ B, numLimitCycles (v.field ε) ≤ N) ↔\n      ∃ N : ℕ, ∀ ε ∈ B, numLimitCycles (w.field ε) ≤ N := by\n  refine exists_congr fun N => forall₂_congr fun ε hε => ?_\n  have : EqOn (v.field ε) (w.field ε) 𝕊² := fun x hx => h ⟨hε, hx⟩\n  rw [numLimitCycles_congr this]\n\n/-- A family of vector fields on the sphere has *uniformly bounded limit cycles* if there is\n`N` such that every member of the family has at most `N` limit cycles. -/\ndef HasUniformlyBoundedLimitCycles (F : Family k B) : Prop :=\n  Quotient.lift (fun v : FamilyRep k B => ∃ N : ℕ, ∀ ε ∈ B, numLimitCycles (v.field ε) ≤ N)\n    (fun _ _ h => propext (exists_forall_numLimitCycles_le_congr h)) F\n\n/-- Unfolding `HasUniformlyBoundedLimitCycles` on a representative. -/\n@[category API, AMS 34 37]\ntheorem hasUniformlyBoundedLimitCycles_mk (v : FamilyRep k B) :\n    HasUniformlyBoundedLimitCycles ⟦v⟧ ↔ ∃ N : ℕ, ∀ ε ∈ B, numLimitCycles (v.field ε) ≤ N :=\n  Iff.rfl\n\n/--\n**Hilbert–Arnold problem.**\nIs there a uniform bound on the number of limit cycles in generic finite-parameter families of\nvector fields on the sphere? That is: is it true that for every $k$ and every compact set\n$B \\subseteq \\mathbb{R}^k$, the set of smooth families of vector fields on $S^2$ with parameter\nbase $B$ whose members have a uniformly bounded number of limit cycles is residual (contains a\ndense $G_\\delta$ set) in the space of all such families with the $C^\\infty$ topology?\n-/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔ ∀ (k : ℕ) (B : Set (ℝ^k)), IsCompact B →\n      {F : Family k B | HasUniformlyBoundedLimitCycles F} ∈ residual (Family k B) := by\n  sorry\n\nend HilbertArnoldProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.72,
+   "decomposition_objections": "None. The single slot matches the list entry; the notes' choices (residual genericity, compact base in ℝ^k, bound depending on the family only, isolated periodic orbits) were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Generic' is made precise as a Baire-category condition: the set of good families belongs to `residual (Family k B)` (i.e. contains a dense G_δ). The stronger 'open dense' reading of generic is not used; if the intended reading is open-dense, the formal statement is the (weaker-to-be-true) residual variant.",
+    "'Smooth' is taken as C^∞ (article says 'smooth vector fields'); the topology on families is the C^∞ topology, not a C^r topology for finite r.",
+    "The parameter base is an arbitrary compact set B ⊆ ℝ^k (as in the article: 'compact set in finite dimensional Euclidean space'), quantified over all k and all compact B. Ilyashenko often takes B to be a ball; the two versions are equivalent (restriction from a ball is an open continuous surjection between Polish spaces, which preserves comeagerness), but the reviewer should check they accept the all-compact-B form.",
+    "Vector fields on S² are described in ambient coordinates: a map w : ℝ³ → ℝ³ with ⟪w x, x⟫ = 0 for x ∈ S². Integral curves are curves γ : ℝ → ℝ³ that stay on S² and satisfy γ' = w ∘ γ; only values of w on S² are used (proved in the `_congr` lemmas).",
+    "A k-parameter family is modelled as the quotient of the space of smooth maps v : ℝ^k × ℝ³ → ℝ³ (tangent to S² for ε ∈ B) by agreement on B × S², i.e. the restriction of v to B × S². The C^∞ topology on ambient maps is the weak (compact-open) C^∞ topology: `⨅ n, induced (f ↦ iteratedFDeriv ℝ n f)` into `UniformOnFun` with 𝔖 = compact sets; the family space carries the quotient topology. For B a compact manifold with boundary this coincides with the intrinsic C^∞ topology on C^∞(B × S², TS²) by the open mapping theorem; for arbitrary compact B it is the natural (Whitney-style) meaning of 'smooth on B'.",
+    "Limit cycle = closed orbit (range of a periodic, non-constant integral curve on S²; non-equilibrium is encoded as `Set.Nontrivial` of the orbit) that is isolated among closed orbits (some open U ⊇ C contains no other closed orbit C' ⊆ U). The alternative 'ω/α-limit set of another trajectory' reading is not used; the decomposition notes specify 'isolated periodic orbits'.",
+    "The number of limit cycles is `Set.encard` of the set of limit-cycle orbits (ℕ∞), and the uniform bound is `∃ N : ℕ, ∀ ε ∈ B, numLimitCycles (v.field ε) ≤ N`, so N depends on the family but not on the parameter, and an infinite number of cycles at some parameter violates the bound.",
+    "Well-definedness of the bound property on the quotient is proved (`Quotient.lift` with `exists_forall_numLimitCycles_le_congr`) rather than assumed; API lemmas `continuous_iteratedFDeriv` and `continuous_eval` check the C^∞ topology is sensible (not degenerate)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "IsMIntegralCurve (Mathlib.Geometry.Manifold.IntegralCurve.Basic)",
+     "name": "HilbertArnoldProblem.IsIntegralCurveOnSphere",
+     "why_needed": "Integral curves of an ambient-coordinate vector field constrained to the sphere; Mathlib's `IsMIntegralCurve` works with abstract `TangentSpace` model vectors and cannot be combined with a jointly smooth parameter dependence and a topology on families."
+    },
+    {
+     "closest_existing_considered": "Function.Periodic, Function.IsPeriodicPt",
+     "name": "HilbertArnoldProblem.IsClosedOrbit",
+     "why_needed": "Closed (periodic, non-equilibrium) orbits of a flow on S²; Mathlib only has periodic points of discrete maps."
+    },
+    {
+     "closest_existing_considered": "none (Mathlib only mentions limit cycles in docstrings)",
+     "name": "HilbertArnoldProblem.IsLimitCycle",
+     "why_needed": "Isolated closed orbit; no notion of limit cycle exists in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Set.encard",
+     "name": "HilbertArnoldProblem.numLimitCycles",
+     "why_needed": "Number (in ℕ∞) of limit cycles of a vector field on S²."
+    },
+    {
+     "closest_existing_considered": "ContDiffMapSupportedIn, ContMDiffMap (no topology), ContinuousMap (C^0 only)",
+     "name": "HilbertArnoldProblem.SmoothMap (with FunLike and TopologicalSpace instances)",
+     "why_needed": "Bundled C^∞ maps between normed spaces with the C^∞ topology (uniform convergence of all derivatives on compact sets); Mathlib has this only for compactly supported functions with a fixed support (`ContDiffMapSupportedIn`), which would force an artificial choice of support set."
+    },
+    {
+     "closest_existing_considered": "ContMDiffMap on a product manifold (B is an arbitrary compact set, not a manifold, and no C^∞ topology exists)",
+     "name": "HilbertArnoldProblem.FamilyRep, HilbertArnoldProblem.FamilyRep.field, HilbertArnoldProblem.familySetoid, HilbertArnoldProblem.Family",
+     "why_needed": "The space of smooth k-parameter families of vector fields on S² with compact base B, as the quotient of tangent ambient smooth maps by agreement on B × S², with the quotient C^∞ topology."
+    },
+    {
+     "closest_existing_considered": "none",
+     "name": "HilbertArnoldProblem.HasUniformlyBoundedLimitCycles",
+     "why_needed": "The property 'some N bounds the number of limit cycles of every member of the family', lifted to the quotient space of families."
+    }
+   ],
+   "per_slot": {
+    "hilbert_arnold_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ k, ∀ compact B ⊆ ℝ^k, {families with a uniform bound on the number of limit cycles} ∈ residual (Family k B)`. Needed bespoke definitions for limit cycles of a vector field on S², for the C^∞ topology on smooth maps, and for the space of smooth k-parameter families B × S² → TS² (none exist in Mathlib or FormalConjecturesForMathlib)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hilbert_arnold_problem": "/--\n**Hilbert–Arnold problem.**\nIs there a uniform bound on the number of limit cycles in generic finite-parameter families of\nvector fields on the sphere? That is: is it true that for every $k$ and every compact set\n$B \\subseteq \\mathbb{R}^k$, the set of smooth families of vector fields on $S^2$ with parameter\nbase $B$ whose members have a uniformly bounded number of limit cycles is residual (contains a\ndense $G_\\delta$ set) in the space of all such families with the $C^\\infty$ topology?\n-/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔ ∀ (k : ℕ) (B : Set (ℝ^k)), IsCompact B →\n      {F : Family k B | HasUniformlyBoundedLimitCycles F} ∈ residual (Family k B) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Hilbert–Arnold problem\n\n*Reference:* [Wikipedia](https://en.wikipedia.org/wiki/Hilbert%E2%80%93Arnold_problem)\n-/\n\nopen scoped ContDiff\n\n\nnamespace HilbertArnoldProblem\n\nprivate abbrev ParameterSpace (k : ℕ) := EuclideanSpace ℝ (Fin k)\nprivate abbrev AmbientSpace := EuclideanSpace ℝ (Fin 3)\n\n/-- A smooth `k`-parameter family of vector fields tangent to the unit two-sphere. -/\nstructure SmoothFamily (k : ℕ) where\n  toFun : ParameterSpace k × AmbientSpace → AmbientSpace\n  contDiff_toFun : ContDiff ℝ ∞ toFun\n  tangent_to_sphere : ∀ a x, x ∈ Metric.sphere (0 : AmbientSpace) 1 →\n    inner ℝ x (toFun (a, x)) = 0\n\ninstance (k : ℕ) : FunLike (SmoothFamily k) (ParameterSpace k × AmbientSpace) AmbientSpace where\n  coe := SmoothFamily.toFun\n  coe_injective' F G h := by cases F; cases G; cases h; rfl\n\n/-- The `n`th jet of a smooth family, bundled as a continuous map. -/\nnoncomputable def SmoothFamily.jet {k : ℕ} (F : SmoothFamily k) (n : ℕ) :\n    C(ParameterSpace k × AmbientSpace,\n      (ParameterSpace k × AmbientSpace)[×n]→L[ℝ] AmbientSpace) :=\n  ⟨iteratedFDeriv ℝ n F, F.contDiff_toFun.continuous_iteratedFDeriv\n    (show (n : WithTop ℕ∞) ≤ ∞ from WithTop.coe_le_coe.mpr le_top)⟩\n\n/-- The weak `C∞` topology: compact-open convergence of every iterated derivative. -/\ninstance (k : ℕ) : TopologicalSpace (SmoothFamily k) :=\n  TopologicalSpace.induced (fun F n ↦ F.jet n) inferInstance\n\n/-- A nonconstant periodic orbit on the unit two-sphere, represented by its image. -/\ndef IsPeriodicOrbit {k : ℕ} (F : SmoothFamily k) (a : ParameterSpace k)\n    (C : Set AmbientSpace) : Prop :=\n  ∃ (γ : ℝ → AmbientSpace) (T : ℝ),\n    0 < T ∧\n    (∀ t, HasDerivAt γ (F (a, γ t)) t) ∧\n    Function.Periodic γ T ∧\n    (¬ ∀ s t, γ s = γ t) ∧\n    C = Set.range γ ∧\n    C ⊆ Metric.sphere (0 : AmbientSpace) 1\n\n/-- A limit cycle is a periodic orbit isolated among periodic orbits by an open neighborhood. -/\ndef IsLimitCycle {k : ℕ} (F : SmoothFamily k) (a : ParameterSpace k)\n    (C : Set AmbientSpace) : Prop :=\n  IsPeriodicOrbit F a C ∧\n    ∃ U : Set AmbientSpace, IsOpen U ∧ C ⊆ U ∧\n      ∀ D : Set AmbientSpace, IsPeriodicOrbit F a D → D ⊆ U → D = C\n\n/--\n**Hilbert–Arnold problem.** Is the following true for every finite parameter dimension `k` and\ncompact parameter set `K ⊆ ℝ^k`? In the weak `C∞` topology, a residual set of smooth families of\nvector fields on `S²` has a bound `N`, depending on the family but not on the parameter in `K`,\nfor the number of limit cycles (isolated nonconstant periodic orbits) of every member of the\nfamily.\n-/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔\n      ∀ (k : ℕ) (K : Set (ParameterSpace k)), IsCompact K →\n        ∀ᶠ F in residual (SmoothFamily k),\n          ∃ N : ℕ, ∀ a ∈ K,\n            {C : Set AmbientSpace | IsLimitCycle F a C}.Finite ∧\n              {C : Set AmbientSpace | IsLimitCycle F a C}.ncard ≤ N := by\n  sorry\n\nend HilbertArnoldProblem\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.84,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “generic” as a residual (comeagre) property: for each finite dimension k and compact K, the families admitting a uniform bound form a member of Mathlib's `residual` filter.",
+    "Chose the weak C∞ topology rather than a finite-C^r topology. It is defined by compact-open convergence of every iterated Fréchet derivative.",
+    "Modeled S² as the unit sphere in `EuclideanSpace ℝ (Fin 3)`. A vector field is represented by a globally smooth ambient map whose value is orthogonal to the radius along S².",
+    "Modeled a smoothly parameterized family over compact K as the restriction to K of a jointly smooth global map on ℝ^k × ℝ^3. The ambient extension supplies concrete derivatives and a C∞ topology; the asserted cycle bound only concerns parameters in K.",
+    "Defined a periodic orbit by its image set, so time shifts and other parametrizations of the same geometric orbit are not counted separately. Required a positive period, a nonconstant integral curve, and image contained in S².",
+    "Defined a limit cycle as a periodic orbit having an ambient open neighborhood that contains no other periodic-orbit image. This makes “isolated periodic orbit” precise.",
+    "Required both finiteness of the set of limit-cycle images and an `ncard ≤ N` bound, avoiding Mathlib's default `ncard` value on infinite sets. The existential N occurs after the generic family, so it may depend on that family, but before parameters in K, so it is uniform over K."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib manifold vector fields (`x ↦ TangentSpace I x`), `ContMDiffMap`, and `ContDiffMapSupportedIn`; none bundle this parameterized sphere-specific family space with the needed topology.",
+     "name": "SmoothFamily",
+     "why_needed": "Mathlib has vector fields and smoothness predicates but no bundled space of jointly smooth finite-parameter vector-field families on S² carrying the required C∞ topology."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `iteratedFDeriv` and compact-open topology on `ContinuousMap`; these provide the ingredients but not the bundled jet map for unrestricted smooth families.",
+     "name": "SmoothFamily.jet",
+     "why_needed": "Used to realize the weak C∞ topology through all iterated derivatives."
+    },
+    {
+     "closest_existing_considered": "`ContinuousMap.compactOpen` and the topology on `ContDiffMapSupportedIn`; the latter only handles compactly supported maps, which is not the family space in the conjecture.",
+     "name": "TopologicalSpace (SmoothFamily k) instance",
+     "why_needed": "Baire-category genericity requires a precise topology on the family space, and Mathlib has no existing C∞ topology on this space."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsMIntegralCurve`, `HasDerivAt`, and `Function.Periodic`; none identifies parametrizations by their image or excludes equilibria as required here.",
+     "name": "IsPeriodicOrbit",
+     "why_needed": "Mathlib has integral-curve and periodic-function primitives but no geometric periodic-orbit predicate for vector fields on S²."
+    },
+    {
+     "closest_existing_considered": "No limit-cycle or isolated-periodic-orbit definition was found in Mathlib or FormalConjecturesForMathlib; the definition is built from `IsPeriodicOrbit` and ambient open neighborhoods.",
+     "name": "IsLimitCycle",
+     "why_needed": "Mathlib has no notion of an isolated periodic orbit/limit cycle."
+    }
+   ],
+   "per_slot": {
+    "hilbert_arnold_problem": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "hilbert_arnold_problem": "/--\n**Hilbert–Arnold problem.** Is the following true for every finite parameter dimension `k` and\ncompact parameter set `K ⊆ ℝ^k`? In the weak `C∞` topology, a residual set of smooth families of\nvector fields on `S²` has a bound `N`, depending on the family but not on the parameter in `K`,\nfor the number of limit cycles (isolated nonconstant periodic orbits) of every member of the\nfamily.\n-/\n@[category research open, AMS 34 37]\ntheorem hilbert_arnold_problem :\n    answer(sorry) ↔\n      ∀ (k : ℕ) (K : Set (ParameterSpace k)), IsCompact K →\n        ∀ᶠ F in residual (SmoothFamily k),\n          ∃ N : ℕ, ∀ a ∈ K,\n            {C : Set AmbientSpace | IsLimitCycle F a C}.Finite ∧\n              {C : Set AmbientSpace | IsLimitCycle F a C}.ncard ≤ N := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "hilbert_arnold_problem": "c07"
+ },
+ "id": "wp-hilbert-arnold-problem",
+ "main_attempt": "c07"
+}

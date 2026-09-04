@@ -1,0 +1,705 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Is the minimum ropelength of a knot linear in its crossing number?\n\nThe *ropelength* of a closed curve $C$ in $\\mathbb{R}^3$ is the scale-invariant ratio\n$\\operatorname{Len}(C)/\\tau(C)$ of its length to its thickness. Following Gonzalez–Maddocks and\nCantarella–Kusner–Sullivan, the thickness $\\tau(C)$ is the infimum of the radii of the circles\nthrough three distinct points of $C$. It equals the radius of the largest embedded normal tube\naround $C$. The ropelength $\\operatorname{Rop}(K)$ of a knot type $K$ is the infimum of the\nropelength over all curves that realize $K$. The crossing number $\\operatorname{Cr}(K)$ is the\nleast number of crossings in a regular projection of a curve that realizes $K$.\n\nDiao, Ernst, Por and Ziegler proved\n$\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$.\nThe Wikipedia list of unsolved problems asks whether the upper bound is in fact linear:\nis $\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K))$?\n\nThe unknot has crossing number $0$ and ropelength $2\\pi > 0$, so the linear bound must allow an\nadditive constant. Since every nontrivial knot has crossing number at least $3$, this is the same\nas a purely linear bound for nontrivial knots. Ropelength is measured in units of the thickness\nradius; measuring in diameters halves it and does not affect the question.\n\n*References:*\n- [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [CKS02] Cantarella, J., Kusner, R. B., Sullivan, J. M., *On the minimum ropelength of knots and\n  links*, Invent. Math. 150 (2002), 257–286. [arXiv:math/0103224](https://arxiv.org/abs/math/0103224)\n- [DEPZ19] Diao, Y., Ernst, C., Por, A., Ziegler, U., *The ropelengths of knots are almost linear\n  in terms of their crossing numbers*, J. Knot Theory Ramifications 28 (2019), 1950085.\n-/\n\nnamespace IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n\nopen scoped EuclideanGeometry unitInterval ENNReal NNReal\n\n/-- A (closed) knot: a $C^1$ closed curve in $\\mathbb{R}^3$ with nowhere vanishing derivative,\nparametrised by $\\mathbb{R}$ with period `1` and injective on each period. -/\nstructure IsKnot (γ : ℝ → ℝ³) : Prop where\n  periodic : Function.Periodic γ 1\n  contDiff : ContDiff ℝ 1 γ\n  deriv_ne_zero : ∀ t, deriv γ t ≠ 0\n  injective : ∀ s t, γ s = γ t → ∃ n : ℤ, t = s + n\n\n/-- Two closed curves are *ambient isotopic* (have the same knot type) if a continuous family of\nhomeomorphisms of $\\mathbb{R}^3$ starting at the identity carries the image of the first onto the\nimage of the second. -/\ndef Isotopic (γ₀ γ₁ : ℝ → ℝ³) : Prop :=\n  ∃ H : I → ℝ³ ≃ₜ ℝ³, Continuous (fun p : I × ℝ³ => H p.1 p.2) ∧\n    H 0 = Homeomorph.refl ℝ³ ∧ H 1 '' Set.range γ₀ = Set.range γ₁\n\n/-- Every closed curve is ambient isotopic to itself, by the constant family of identities. -/\n@[category API, AMS 57]\nlemma Isotopic.refl (γ : ℝ → ℝ³) : Isotopic γ γ :=\n  ⟨fun _ => Homeomorph.refl ℝ³, continuous_snd, rfl, Set.image_id _⟩\n\n/-- The length of one period of the closed curve `γ`. -/\nnoncomputable def length (γ : ℝ → ℝ³) : ℝ := ∫ t in (0:ℝ)..1, ‖deriv γ t‖\n\n/-- The *thickness* of the curve `γ` (Gonzalez–Maddocks, [CKS02, Section 2]): the infimum of the\ncircumradii of all non-degenerate triangles with vertices on the curve. Collinear triples of\npoints, which have infinite circumradius, do not contribute to the infimum. -/\nnoncomputable def thickness (γ : ℝ → ℝ³) : ℝ :=\n  ⨅ s : {s : Affine.Simplex ℝ ℝ³ 2 // ∀ i, s.points i ∈ Set.range γ}, s.1.circumradius\n\n/-- The *ropelength* of the curve `γ`: its length divided by its thickness, measured in units of\nthe thickness radius. It is `∞` when the thickness is `0`. -/\nnoncomputable def curveRopelength (γ : ℝ → ℝ³) : ℝ≥0∞ :=\n  ENNReal.ofReal (length γ) / ENNReal.ofReal (thickness γ)\n\n/-- The (minimum) *ropelength* of the knot type of `γ`: the infimum of the ropelength over all\nknots ambient isotopic to `γ`. -/\nnoncomputable def ropelength (γ : ℝ → ℝ³) : ℝ≥0∞ :=\n  ⨅ (γ' : ℝ → ℝ³) (_ : IsKnot γ') (_ : Isotopic γ γ'), curveRopelength γ'\n\n/-- The orthogonal projection of $\\mathbb{R}^3$ onto the plane orthogonal to `u`. -/\nnoncomputable def proj (u : ℝ³) : ℝ³ →L[ℝ] ℝ³ := (ℝ ∙ u)ᗮ.starProjection\n\n/-- The *crossings* of the projection of `γ` along `u`: the unordered pairs of distinct parameters\nin one period whose projections coincide, encoded as pairs `(s, t)` with `0 ≤ s < t < 1`. -/\ndef crossings (γ : ℝ → ℝ³) (u : ℝ³) : Set (ℝ × ℝ) :=\n  {p | p.1 ∈ Set.Ico 0 1 ∧ p.2 ∈ Set.Ico 0 1 ∧ p.1 < p.2 ∧\n    proj u (γ p.1) = proj u (γ p.2)}\n\n/-- The projection along the direction `u ≠ 0` is a *regular projection* of the knot `γ`: the\nprojected curve is regular (no tangent of `γ` is parallel to `u`), every point of the plane has\nat most two preimages on the curve, the double points are transverse, and there are finitely many\nof them. -/\nstructure IsRegularProjection (γ : ℝ → ℝ³) (u : ℝ³) : Prop where\n  ne_zero : u ≠ 0\n  deriv_ne_zero : ∀ t, proj u (deriv γ t) ≠ 0\n  encard_le_two : ∀ y, {t ∈ Set.Ico (0:ℝ) 1 | proj u (γ t) = y}.encard ≤ 2\n  transverse : ∀ p ∈ crossings γ u,\n    LinearIndependent ℝ ![proj u (deriv γ p.1), proj u (deriv γ p.2)]\n  finite : (crossings γ u).Finite\n\n/-- The *crossing number* of the knot type of `γ`: the least number of crossings in a regular\nprojection of a knot ambient isotopic to `γ`. -/\nnoncomputable def crossingNumber (γ : ℝ → ℝ³) : ℕ∞ :=\n  ⨅ (γ' : ℝ → ℝ³) (_ : IsKnot γ') (_ : Isotopic γ γ') (u : ℝ³)\n    (_ : IsRegularProjection γ' u), (crossings γ' u).encard\n\n/-- Is the minimum ropelength of a closed knot bounded above by a linear function of its crossing\nnumber? That is, are there constants $a, b$ such that every knot type $K$ satisfies\n$\\operatorname{Rop}(K) \\le a \\operatorname{Cr}(K) + b$? -/\n@[category research open, AMS 51 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ a b : ℝ≥0, ∀ γ : ℝ → ℝ³, IsKnot γ →\n      ropelength γ ≤ a * (crossingNumber γ : ℝ≥0∞) + b := by\n  sorry\n\nend IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (universal constant, restriction to tame closed knots, treatment of the unknot via an additive constant or nontrivial-knot restriction, radius-vs-diameter convention irrelevant) match my reading of the source; I followed the additive-constant option so the theorem ranges over all knot types without a bespoke 'unknot' definition.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Knot type: a knot is a C¹ map γ : ℝ → ℝ³ with period 1, nowhere-vanishing derivative and injective modulo the period (a C¹ embedding of the circle); knot types are ambient isotopy classes of images (unoriented; a continuous family of homeomorphisms of ℝ³ starting at the identity carrying one image onto the other). C¹ knots are tame, so this ranges over exactly the tame knot types; both invariants are orientation- and mirror-independent so the choice of unoriented ambient isotopy does not change the claim.",
+    "Thickness: Gonzalez–Maddocks global radius of curvature as in CKS02 §2 — the infimum over all non-degenerate triangles (`Affine.Simplex ℝ ℝ³ 2`) with vertices on the curve of their circumradius. Collinear triples (infinite radius in CKS) are omitted; they never affect the infimum. Measured as a radius, so the unknot has ropelength 2π (Wikipedia's convention). The real-valued `⨅` is 0 only in the unreachable case where the curve lies in a line.",
+    "Ropelength of a curve is ℝ≥0∞-valued: `ENNReal.ofReal length / ENNReal.ofReal thickness`, giving ∞ for zero thickness (matching CKS's 'finite ropelength' language) instead of Lean's real `x / 0 = 0`. Length is ∫₀¹ ‖γ'‖. Minimum ropelength of a knot type is the infimum over C¹ realizations; no loss since CKS show any curve of finite ropelength is C^{1,1}.",
+    "Crossing number is ℕ∞-valued: the infimum, over knots γ' isotopic to γ and directions u ≠ 0, of the number of crossings of a regular projection. A regular projection requires: u ≠ 0 (otherwise the projection is the identity and every knot would get crossing number 0), projected curve regular (no tangent parallel to u), every point of the plane has at most two preimages in one period (no triple points), transverse double points (linearly independent projected tangents), finitely many double points. Crossings are counted as pairs (s,t) with 0 ≤ s < t < 1 and equal projections. Requiring transversality/regularity is the literal textbook definition; the minimum over the isotopy class equals the classical crossing number.",
+    "Linearity is formalised as an affine bound `Rop ≤ a·Cr + b` with a, b : ℝ≥0 (coerced to ℝ≥0∞), i.e. big-O; the additive constant is needed for the unknot and, given Cr ≥ 3 for nontrivial knots, is equivalent to `∃ c, ∀ nontrivial K, Rop K ≤ c·Cr K`. Using ℝ≥0 rather than ℝ≥0∞ for a, b prevents the trivial witness a = ⊤.",
+    "Degenerate cases: if some knot type had no realization of positive thickness or no regular projection (impossible for tame knots), the ℝ≥0∞/ℕ∞ infima give ⊤, making the bound false rather than vacuously true; the only Lean default that is reached in a non-mathematical way is none. With a = 0 and Cr = ⊤ the ENNReal product is 0, but Cr = ⊤ is unreachable."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Path`/`ContinuousMap` on `AddCircle` (no C¹/regularity structure); manifold embeddings (no usable API for closed curves).",
+     "name": "IsKnot",
+     "why_needed": "No notion of a (C¹, tame) knot in ℝ³ exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "`ContinuousMap.Homotopy` (homotopy, not an isotopy through homeomorphisms); `Homeomorph`.",
+     "name": "Isotopic",
+     "why_needed": "Ambient isotopy of closed curves in ℝ³ (knot type) is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "`eVariationOn` (total variation; equivalent for C¹ curves but ℝ≥0∞-valued and less transparent).",
+     "name": "length",
+     "why_needed": "Arc length of a C¹ closed curve over one period."
+    },
+    {
+     "closest_existing_considered": "`Affine.Simplex.circumradius` (used as the building block); `Metric.infDist`/reach (not in Mathlib).",
+     "name": "thickness",
+     "why_needed": "Gonzalez–Maddocks/CKS thickness (infimal circumradius over triples on the curve) is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "curveRopelength",
+     "why_needed": "Length/thickness ratio of a curve, ∞ when thickness is 0."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "ropelength",
+     "why_needed": "Infimum of ropelength over the knot type."
+    },
+    {
+     "closest_existing_considered": "`Submodule.starProjection` (used directly; `proj` is a thin abbreviation for readability).",
+     "name": "proj",
+     "why_needed": "Orthogonal projection onto the plane orthogonal to a direction, used to define knot diagrams."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "crossings",
+     "why_needed": "Set of double points of a projection, needed to count crossings."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "IsRegularProjection",
+     "why_needed": "Regular projection (knot diagram) of a knot is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "None (the repo has graph crossing numbers only in unrelated contexts, if at all).",
+     "name": "crossingNumber",
+     "why_needed": "Crossing number of a knot type is not in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ a b : ℝ≥0, ∀ γ, IsKnot γ → ropelength γ ≤ a * crossingNumber γ + b`, i.e. Rop(K) = O(Cr(K)) over all (tame, C¹) knot types, with an additive constant to accommodate the unknot (Cr = 0, Rop = 2π); this is equivalent to a purely linear bound over nontrivial knots since those have Cr ≥ 3. Mathlib and the repo have no knot theory, so knots, ambient isotopy, length, thickness, ropelength, regular projections and crossing number are defined in the file, following Cantarella–Kusner–Sullivan (the article's cited source) for thickness/ropelength and the standard regular-projection definition of crossing number."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": "/-- Is the minimum ropelength of a closed knot bounded above by a linear function of its crossing\nnumber? That is, are there constants $a, b$ such that every knot type $K$ satisfies\n$\\operatorname{Rop}(K) \\le a \\operatorname{Cr}(K) + b$? -/\n@[category research open, AMS 51 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ a b : ℝ≥0, ∀ γ : ℝ → ℝ³, IsKnot γ →\n      ropelength γ ≤ a * (crossingNumber γ : ℝ≥0∞) + b := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Is the upper bound of a closed knot's minimum ropelength linear to its crossing number?\n\nThe *ropelength* of a closed curve $C$ in $\\mathbb{R}^3$ is the quotient\n$\\operatorname{Len}(C) / \\tau(C)$ of its length by its *thickness* $\\tau(C)$, the radius of the\nlargest embedded normal tube around $C$. Following Gonzalez–Maddocks and\nCantarella–Kusner–Sullivan, the thickness is the infimum of the circumradii $r(x, y, z)$ over\nall triples of distinct points of $C$ (a circle through three collinear points has infinite\nradius). The (minimum) ropelength $\\operatorname{Rop}(K)$ of a knot type $K$ is the infimum of\nthe ropelength over all curves realizing $K$.\n\nThe crossing number $\\operatorname{Cr}(K)$ is the least number of crossings in a knot diagram\nof $K$, i.e. in a regular projection to a plane of a curve realizing $K$.\n\nIt is known that $\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$\n(Diao–Ernst–Por–Ziegler), and that there are families of knots whose ropelength grows linearly\nin the crossing number. The question asks whether the upper bound can be improved to a linear\none: is there a universal constant $c$ with $\\operatorname{Rop}(K) \\le c \\operatorname{Cr}(K)$\nfor every nontrivial knot $K$?\n\n*References:*\n- [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Crossing number (knot theory)](https://en.wikipedia.org/wiki/Crossing_number_(knot_theory))\n- J. Cantarella, R. B. Kusner, J. M. Sullivan, *On the minimum ropelength of knots and links*,\n  Invent. Math. 150 (2002), [arXiv:math/0103224](https://arxiv.org/abs/math/0103224)\n- Y. Diao, C. Ernst, A. Por, U. Ziegler, *The ropelengths of knots are almost linear in terms of\n  their crossing numbers*, J. Knot Theory Ramifications 28 (2019),\n  [doi:10.1142/S0218216519500858](https://doi.org/10.1142/S0218216519500858)\n-/\n\nopen scoped EuclideanGeometry\n\nnamespace IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n\n/-- A ($C^1$) knot: a $1$-periodic $C^1$ map $\\gamma : \\mathbb{R} \\to \\mathbb{R}^3$ which is\ninjective on a period, so that it traces out a simple closed curve exactly once. -/\nstructure IsKnot (γ : ℝ → ℝ³) : Prop where\n  contDiff : ContDiff ℝ 1 γ\n  periodic : Function.Periodic γ 1\n  injOn : Set.InjOn γ (Set.Ico 0 1)\n\n/-- Two subsets $A, B \\subseteq \\mathbb{R}^3$ are *ambient isotopic* if there is a\nlevel-preserving homeomorphism $F$ of $\\mathbb{R}^3 \\times [0, 1]$ which is the identity on the\nlevel $t = 0$ and carries $A$ onto $B$ on the level $t = 1$. Two knots have the same knot type\nexactly when their images are ambient isotopic. -/\ndef AmbientIsotopic (A B : Set ℝ³) : Prop :=\n  ∃ F : ℝ³ × unitInterval ≃ₜ ℝ³ × unitInterval,\n    (∀ p, (F p).2 = p.2) ∧ (∀ x, F (x, 0) = (x, 0)) ∧ (fun x => (F (x, 1)).1) '' A = B\n\n/-- The *thickness* (Gonzalez–Maddocks global radius of curvature) of a set\n$A \\subseteq \\mathbb{R}^3$: the infimum of the circumradii of all nondegenerate triangles\nwith vertices in $A$. For a $C^1$ closed curve this is the radius of the largest embedded normal\ntube around the curve (Cantarella–Kusner–Sullivan, Lemma 2), and it is positive exactly when the\ncurve is a $C^{1,1}$ simple closed curve. -/\nnoncomputable def thickness (A : Set ℝ³) : ℝ :=\n  sInf {r | ∃ s : Affine.Simplex ℝ ℝ³ 2, (∀ i, s.points i ∈ A) ∧ s.circumradius = r}\n\n/-- The length $\\int_0^1 \\|\\gamma'(t)\\| \\, dt$ of one period of a $C^1$ closed curve\n$\\gamma : \\mathbb{R} \\to \\mathbb{R}^3$ of period $1$. -/\nnoncomputable def length (γ : ℝ → ℝ³) : ℝ :=\n  ∫ t in (0 : ℝ)..1, ‖deriv γ t‖\n\n/-- The (minimum) *ropelength* of the knot type of `γ₀`: the infimum of\n$\\operatorname{Len}(\\gamma) / \\tau(\\gamma)$ over all knots `γ` of positive thickness that are\nambient isotopic to `γ₀`. -/\nnoncomputable def ropelength (γ₀ : ℝ → ℝ³) : ℝ :=\n  sInf {ρ | ∃ γ, IsKnot γ ∧ AmbientIsotopic (Set.range γ₀) (Set.range γ) ∧\n    0 < thickness (Set.range γ) ∧ ρ = length γ / thickness (Set.range γ)}\n\n/-- The projection $\\mathbb{R}^3 \\to \\mathbb{R}^2$ along the third coordinate axis. -/\ndef proj (x : ℝ³) : ℝ² := !₂[x 0, x 1]\n\n/-- The double points of the planar projection of a closed curve `γ` of period `1`: the points of\nthe plane that are hit by `proj ∘ γ` at two different parameters `s ≠ t` in `[0, 1)`. -/\ndef doublePoints (γ : ℝ → ℝ³) : Set ℝ² :=\n  {p | ∃ s ∈ Set.Ico (0 : ℝ) 1, ∃ t ∈ Set.Ico (0 : ℝ) 1,\n    s ≠ t ∧ proj (γ s) = p ∧ proj (γ t) = p}\n\n/-- The planar projection of the closed curve `γ` of period `1` is *regular*, i.e. it is a knot\ndiagram of `γ`: the projected curve is an immersion, no point of the plane is hit at three\ndifferent parameters in `[0, 1)`, and at every double point the two strands cross\ntransversally. -/\nstructure IsRegularProjection (γ : ℝ → ℝ³) : Prop where\n  deriv_ne_zero : ∀ t, deriv (proj ∘ γ) t ≠ 0\n  no_triple_points : ∀ r ∈ Set.Ico (0 : ℝ) 1, ∀ s ∈ Set.Ico (0 : ℝ) 1,\n    ∀ t ∈ Set.Ico (0 : ℝ) 1, proj (γ r) = proj (γ s) → proj (γ r) = proj (γ t) →\n    r = s ∨ r = t ∨ s = t\n  transverse : ∀ s ∈ Set.Ico (0 : ℝ) 1, ∀ t ∈ Set.Ico (0 : ℝ) 1, s ≠ t →\n    proj (γ s) = proj (γ t) →\n    LinearIndependent ℝ ![deriv (proj ∘ γ) s, deriv (proj ∘ γ) t]\n\n/-- The *crossing number* of the knot type of `γ₀`: the least number of double points of a\nregular projection (i.e. the least number of crossings of a knot diagram) of a knot ambient\nisotopic to `γ₀`. Every tame knot type contains a knot whose projection is regular with finitely\nmany double points, and rotating a knot is an ambient isotopy, so it suffices to project along a\nfixed direction. If `γ₀` is not tame, the set is empty and the value is `0` by convention. -/\nnoncomputable def crossingNumber (γ₀ : ℝ → ℝ³) : ℕ :=\n  sInf {n | ∃ γ, IsKnot γ ∧ AmbientIsotopic (Set.range γ₀) (Set.range γ) ∧\n    IsRegularProjection γ ∧ (doublePoints γ).encard = n}\n\n/-- Ambient isotopy is reflexive. -/\n@[category API, AMS 57]\ntheorem ambientIsotopic_refl (A : Set ℝ³) : AmbientIsotopic A A :=\n  ⟨Homeomorph.refl _, fun _ => rfl, fun _ => rfl, Set.image_id _⟩\n\n/-- The thickness of a set is nonnegative. -/\n@[category API, AMS 53]\ntheorem thickness_nonneg (A : Set ℝ³) : 0 ≤ thickness A := by\n  apply Real.sInf_nonneg\n  rintro r ⟨s, -, rfl⟩\n  exact s.circumradius_nonneg\n\n/-- The length of a closed curve is nonnegative. -/\n@[category API, AMS 53]\ntheorem length_nonneg (γ : ℝ → ℝ³) : 0 ≤ length γ :=\n  intervalIntegral.integral_nonneg zero_le_one fun _ _ => norm_nonneg _\n\n/-- The ropelength of a knot is nonnegative. -/\n@[category API, AMS 53 57]\ntheorem ropelength_nonneg (γ₀ : ℝ → ℝ³) : 0 ≤ ropelength γ₀ := by\n  apply Real.sInf_nonneg\n  rintro ρ ⟨γ, -, -, hτ, rfl⟩\n  exact div_nonneg (length_nonneg γ) hτ.le\n\n/--\n**Is the upper bound of a closed knot's minimum ropelength linear to its crossing number?**\n\nIs there a universal constant $c$ such that\n$\\operatorname{Rop}(K) \\le c \\cdot \\operatorname{Cr}(K)$ for every nontrivial (tame) knot type\n$K$, where $\\operatorname{Rop}(K)$ is the minimum ropelength and $\\operatorname{Cr}(K)$ the\ncrossing number of $K$? In other words, is $\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K))$?\n\nKnot types are represented by a $C^1$ knot `γ` of positive thickness, i.e. a knot that can be\ntied in rope (this is exactly the class of knots with finite ropelength; every tame knot type has\nsuch a representative). The unknot is excluded, since it has crossing number $0$ but positive\nropelength, by requiring $\\operatorname{Cr}(K) > 0$. Ropelength is measured in units of the\ntube radius; the choice of units does not affect the question.\n\nThe best known upper bound is\n$\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$\n(Diao–Ernst–Por–Ziegler); a linear upper bound would be optimal, since there are families of\nknots whose ropelength grows linearly in the crossing number.\n-/\n@[category research open, AMS 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ, ∀ γ : ℝ → ℝ³,\n      IsKnot γ → 0 < thickness (Set.range γ) → 0 < crossingNumber γ →\n        ropelength γ ≤ c * crossingNumber γ := by\n  sorry\n\nend IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's single slot and its notes (implicit universal constant, inf over C¹ realizations of Len/thickness, exclusion of the unknot or an additive constant, radius-vs-diameter convention irrelevant) match my reading of the statement and the background article; I followed the option of excluding the unknot via `0 < crossingNumber`.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Knot types are represented by a C¹ knot `γ : ℝ → ℝ³` (1-periodic, C¹, injective on [0,1)) with positive thickness. Positive thickness is exactly the class of knots with finite ropelength (CKS: thickness > 0 ⇔ C^{1,1} simple closed curve), so every tame knot type has such a representative and only tame types are quantified over. `ropelength` and `crossingNumber` are defined as infima over the ambient isotopy class of `range γ`, hence are knot-type invariants.",
+    "Ambient isotopy is defined (Burde–Zieschang Def. 1.3) as a level-preserving homeomorphism F of ℝ³ × [0,1] with F(x,0) = (x,0) whose level-1 map carries A onto B, applied to the images of the curves (unoriented knot types).",
+    "Thickness follows Gonzalez–Maddocks / Cantarella–Kusner–Sullivan: sInf of `Affine.Simplex.circumradius` over nondegenerate triangles with vertices in the set. CKS assign radius ∞ to collinear triples, so omitting them changes nothing for a simple closed curve (which always contains a non-collinear triple). CKS Lemma 2 shows this equals the radius of the largest embedded normal tube; ropelength is thus measured in units of the tube radius (the Wikipedia convention). The factor 2 of the diameter convention is irrelevant for the existence of a linear constant.",
+    "Ropelength of a knot type is the infimum of `length γ / thickness (range γ)` over C¹ realizations `γ` with `0 < thickness`. Requiring positive thickness avoids Lean's `x / 0 = 0`; curves of zero thickness have infinite ropelength and are not C^{1,1} anyway (CKS), so restricting to C¹ realizations does not change the infimum. Length is `∫ t in 0..1, ‖deriv γ t‖`, the length of one period; for C¹ γ the integrand is continuous, so no integrability convention is triggered.",
+    "Crossing number is the least `n` such that some C¹ knot in the isotopy class has a regular vertical projection (immersion, no triple points, transverse double points) with exactly `n` double points (`Set.encard = n` forces finiteness). Projecting along the fixed third axis loses nothing because rotations are ambient isotopies. A C¹ knot with a regular projection is tame and its diagram determines the knot type, so this agrees with the classical crossing number; if no such representative exists (wild knot) the value is `sInf ∅ = 0`, which is harmless since the theorem requires `0 < crossingNumber γ`.",
+    "The unknot (crossing number 0, positive ropelength) is excluded via `0 < crossingNumber γ`, as suggested by the decomposition notes; this is equivalent to the version with an additive constant `Rop ≤ a·Cr + b` since nontrivial knots have Cr ≥ 3 and only finitely many knot types have bounded crossing number.",
+    "`answer(True)` asserts the existence of a universal linear constant (positive answer); `answer(False)` asserts no such constant exists. The constant `c` is not required positive since `ropelength ≥ 0` and nontrivial knots have positive ropelength, so any witness is automatically positive.",
+    "Four short provable `@[category API]` lemmas (reflexivity of ambient isotopy, nonnegativity of thickness, length and ropelength) were added as basic tests of the bespoke definitions, as CONTRIBUTING.md asks."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`IsEmbedding γ` for `γ : Circle → ℝ²` as in `FormalConjectures/Wikipedia/InscribedSquare.lean`; rejected because derivatives and arc length are awkward on `Circle`/`AddCircle` and Mathlib has no knot type.",
+     "name": "IsKnot",
+     "why_needed": "No notion of a (C¹) knot / simple closed curve in ℝ³ exists in Mathlib or the repo; a 1-periodic C¹ map ℝ → ℝ³ injective on a period is the simplest form allowing `deriv`, length integrals and injectivity."
+    },
+    {
+     "closest_existing_considered": "`ContinuousMap.Homotopy` / `HomotopyEquiv` (homotopy, not isotopy through homeomorphisms) and `Homeomorph`; used `Homeomorph` of ℝ³ × unitInterval to express a level-preserving isotopy.",
+     "name": "AmbientIsotopic",
+     "why_needed": "Knot equivalence (ambient isotopy) is absent from Mathlib; needed to define knot-type invariants."
+    },
+    {
+     "closest_existing_considered": "`Affine.Simplex.circumradius` (used as the building block, following Gonzalez–Maddocks / CKS); Federer's reach and normal tubes do not exist in Mathlib.",
+     "name": "thickness",
+     "why_needed": "Knot thickness (radius of the largest embedded normal tube) is absent from Mathlib; there is also no `reach` of a set."
+    },
+    {
+     "closest_existing_considered": "`eVariationOn γ (Set.Icc 0 1)` (ENNReal-valued, would need `toReal`); the C¹ formula `∫ ‖deriv γ‖` was preferred as the transparent textbook length for C¹ curves.",
+     "name": "length",
+     "why_needed": "Length of a parametrized closed curve as a real number."
+    },
+    {
+     "closest_existing_considered": "None available.",
+     "name": "ropelength",
+     "why_needed": "The minimum ropelength of a knot type is not in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "`EuclideanSpace.proj` (scalar coordinate projections); a direct `!₂[x 0, x 1]` is simpler.",
+     "name": "proj",
+     "why_needed": "Fixed projection ℝ³ → ℝ² along the third axis used to form knot diagrams."
+    },
+    {
+     "closest_existing_considered": "None available.",
+     "name": "doublePoints",
+     "why_needed": "The set of crossings of the planar projection of a closed curve."
+    },
+    {
+     "closest_existing_considered": "None available.",
+     "name": "IsRegularProjection",
+     "why_needed": "Regular projection (knot diagram) conditions: immersion, no triple points, transverse double points."
+    },
+    {
+     "closest_existing_considered": "None available.",
+     "name": "crossingNumber",
+     "why_needed": "The crossing number of a knot type is absent from Mathlib (only quandles/Reidemeister-move remarks exist in `Mathlib.Algebra.Quandle`)."
+    }
+   ],
+   "per_slot": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ c : ℝ, ∀ γ, IsKnot γ → 0 < thickness (range γ) → 0 < crossingNumber γ → ropelength γ ≤ c * crossingNumber γ`. Neither Mathlib nor the repo has knots, ambient isotopy, thickness/ropelength or crossing number, so these were defined in the file following Cantarella–Kusner–Sullivan (thickness = Gonzalez–Maddocks infimum of circumradii over triples of points, ropelength = Len/τ) and the standard knot-diagram definition of crossing number."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": "/--\n**Is the upper bound of a closed knot's minimum ropelength linear to its crossing number?**\n\nIs there a universal constant $c$ such that\n$\\operatorname{Rop}(K) \\le c \\cdot \\operatorname{Cr}(K)$ for every nontrivial (tame) knot type\n$K$, where $\\operatorname{Rop}(K)$ is the minimum ropelength and $\\operatorname{Cr}(K)$ the\ncrossing number of $K$? In other words, is $\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K))$?\n\nKnot types are represented by a $C^1$ knot `γ` of positive thickness, i.e. a knot that can be\ntied in rope (this is exactly the class of knots with finite ropelength; every tame knot type has\nsuch a representative). The unknot is excluded, since it has crossing number $0$ but positive\nropelength, by requiring $\\operatorname{Cr}(K) > 0$. Ropelength is measured in units of the\ntube radius; the choice of units does not affect the question.\n\nThe best known upper bound is\n$\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$\n(Diao–Ernst–Por–Ziegler); a linear upper bound would be optimal, since there are families of\nknots whose ropelength grows linearly in the crossing number.\n-/\n@[category research open, AMS 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ, ∀ γ : ℝ → ℝ³,\n      IsKnot γ → 0 < thickness (Set.range γ) → 0 < crossingNumber γ →\n        ropelength γ ≤ c * crossingNumber γ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Ropelength versus crossing number\n\n*References:*\n- [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nopen Topology\n\nnamespace IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n\n/-- Three-dimensional Euclidean space. -/\nabbrev Space := EuclideanSpace ℝ (Fin 3)\n\n/-- A regular $C^1$ parametrization of a closed knot. The parametrization has period one and is\ninjective modulo its period. -/\nstructure ClosedKnot where\n  toFun : ℝ → Space\n  contDiff : ContDiff ℝ 1 toFun\n  periodic : Function.Periodic toFun 1\n  injectiveModuloPeriod : ∀ {x y}, toFun x = toFun y → ∃ n : ℤ, y = x + n\n  regular : ∀ x, fderiv ℝ toFun x 1 ≠ 0\n\ninstance : CoeFun ClosedKnot (fun _ ↦ ℝ → Space) := ⟨ClosedKnot.toFun⟩\n\n/-- Two closed knots are ambient isotopic. Here `H` is the isotopy and `G` is its jointly\ncontinuous inverse. -/\ndef AmbientIsotopic (K L : ClosedKnot) : Prop :=\n  ∃ H G : ℝ → Space → Space,\n    Continuous (Function.uncurry H) ∧ Continuous (Function.uncurry G) ∧\n    (∀ x, H 0 x = x) ∧\n    (∀ t ∈ Set.Icc (0 : ℝ) 1, ∀ x, G t (H t x) = x ∧ H t (G t x) = x) ∧\n    H 1 '' Set.range K = Set.range L\n\n/-- The length of one period of a closed knot, defined as the supremal length of its inscribed\npolygons. -/\nnoncomputable def knotLength (K : ClosedKnot) : ℝ :=\n  variationOnFromTo K Set.univ 0 1\n\n/-- The thickness of a closed knot, defined as the reach of its image: the largest radius such\nthat every point at smaller distance from the knot has a unique nearest point on it. -/\nnoncomputable def thickness (K : ClosedKnot) : ℝ :=\n  sSup {r : ℝ | 0 ≤ r ∧ ∀ x : Space, Metric.infDist x (Set.range K) < r →\n    ∃! y : Space, y ∈ Set.range K ∧ dist x y = Metric.infDist x (Set.range K)}\n\n/-- Orthogonal projection onto the plane perpendicular to a unit vector `u`. -/\nnoncomputable def planeProjection (u x : Space) : Space := x - inner ℝ u x • u\n\n/-- Parameter pairs giving double points in the projection of `K` along `u`. Restricting to\n$0 \\le x < y < 1$ counts each unordered pair once. -/\ndef crossingPairs (K : ClosedKnot) (u : Space) : Set (ℝ × ℝ) :=\n  {p | 0 ≤ p.1 ∧ p.1 < p.2 ∧ p.2 < 1 ∧\n    planeProjection u (K p.1) = planeProjection u (K p.2)}\n\n/-- A regular knot projection has a unit projection direction, finitely many double points, no\ntriple points, and linearly independent projected tangent vectors at every double point. -/\ndef IsRegularProjection (K : ClosedKnot) (u : Space) : Prop :=\n  ‖u‖ = 1 ∧ (crossingPairs K u).Finite ∧\n    (∀ p ∈ crossingPairs K u, ∀ q ∈ crossingPairs K u, p.1 = q.1 → p.2 = q.2) ∧\n    ∀ p ∈ crossingPairs K u,\n      LinearIndependent ℝ ![planeProjection u (fderiv ℝ K.toFun p.1 1),\n        planeProjection u (fderiv ℝ K.toFun p.2 1)]\n\n/-- The crossing number of a knot is the least number of crossings among regular projections of\nall ambient-isotopic realizations. -/\nnoncomputable def crossingNumber (K : ClosedKnot) : ℕ :=\n  sInf {n : ℕ | ∃ L : ClosedKnot, AmbientIsotopic K L ∧ ∃ u : Space,\n    IsRegularProjection L u ∧ n = (crossingPairs L u).ncard}\n\n/-- The minimum ropelength of a knot type is the infimum of length divided by thickness over all\npositive-thickness, ambient-isotopic $C^1$ realizations. -/\nnoncomputable def minimumRopelength (K : ClosedKnot) : ℝ :=\n  sInf {r : ℝ | ∃ L : ClosedKnot, AmbientIsotopic K L ∧ 0 < thickness L ∧\n    r = knotLength L / thickness L}\n\n/--\nIs there a universal constant $c$ such that every nontrivial closed knot $K$ has minimum\nropelength at most $c\\,\\operatorname{Cr}(K)$? The restriction\n$\\operatorname{Cr}(K) \\ne 0$ excludes the unknot, whose crossing number is zero but whose minimum\nropelength is positive.\n-/\n@[category research open, AMS 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ, 0 < c ∧ ∀ K : ClosedKnot, crossingNumber K ≠ 0 →\n      minimumRopelength K ≤ c * crossingNumber K := by\n  sorry\n\nend IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the yes/no question using `answer(sorry) ↔` and placed the unknown answer outside the quantified linear-bound proposition.",
+    "Used the decomposition table's purely multiplicative formulation and restricted to nontrivial knot types via `crossingNumber K ≠ 0`; this avoids the unknot boundary case, where crossing number is zero but minimum ropelength is positive.",
+    "Represented a tame closed knot by a regular period-one C¹ parametrization of ℝ³ that is injective modulo integer periods. C¹ embedded knots are tame.",
+    "Identified knot type by ambient isotopy of ℝ³, represented by a jointly continuous family of homeomorphisms with a jointly continuous inverse, starting at the identity and mapping one knot image to the other at time one.",
+    "Defined curve length as metric variation over one period, equivalent to the supremum of lengths of inscribed polygons.",
+    "Defined thickness as Federer reach. The cited primary source proves that for C¹ links this equals both its three-point thickness and the radius of the largest embedded normal tube.",
+    "Defined crossing number as the minimum number of transverse double points among regular orthogonal projections of all ambient-isotopic realizations. Parameter pairs satisfy `0 ≤ x < y < 1`, so each crossing is counted once and the period endpoint is not duplicated; finiteness and no-triple-point conditions prevent degenerate projections.",
+    "Defined minimum ropelength as the infimum of length divided by thickness over positive-thickness ambient-isotopic C¹ realizations, following the decomposition table's explicit infimum reading.",
+    "Required the universal real constant to be positive. This is equivalent to the usual nonnegative big-O constant here and makes its intended role explicit."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `EuclideanSpace ℝ (Fin 3)` is used directly; the abbreviation only shortens the problem-local definitions.",
+     "name": "Space",
+     "why_needed": "Fixes the ambient space as three-dimensional Euclidean space."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `ContDiff`, `fderiv`, `Topology.IsEmbedding`, and a manifold `Circle`, but no knot type combining closedness, regularity, and embeddedness. A periodic parametrization permits direct use of the normed-space C¹ API.",
+     "name": "ClosedKnot",
+     "why_needed": "No bundled notion of a regular C¹ embedded circle/knot was found in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib has paths, homotopies, homeomorphisms, and `IsEmbedding`, but no ambient-isotopy relation for embedded circles.",
+     "name": "AmbientIsotopic",
+     "why_needed": "Minimum ropelength and crossing number must range over realizations of the same knot type."
+    },
+    {
+     "closest_existing_considered": "Defined directly using Mathlib's `variationOnFromTo`, the existing metric-variation notion of curve length.",
+     "name": "knotLength",
+     "why_needed": "Ropelength requires the geometric arclength of a realization."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Metric.infDist` supplies distance to a set; the definition uses the standard unique-nearest-point characterization of reach, which equals knot thickness for C¹ links.",
+     "name": "thickness",
+     "why_needed": "Neither Mathlib nor the helper library has knot thickness or Federer reach."
+    },
+    {
+     "closest_existing_considered": "Mathlib has orthogonal projection onto complete subspaces; the explicit standard formula for the plane perpendicular to a unit vector is simpler and avoids packaging a varying subspace.",
+     "name": "planeProjection",
+     "why_needed": "Crossing number requires projections of a spatial knot onto planes."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `Set.ncard` but no knot-diagram crossing set.",
+     "name": "crossingPairs",
+     "why_needed": "The crossings of a particular projected parametrized knot must be represented and counted."
+    },
+    {
+     "closest_existing_considered": "Built from Mathlib's `Set.Finite` and `LinearIndependent`; no existing regular-knot-projection predicate was found.",
+     "name": "IsRegularProjection",
+     "why_needed": "Only finite transverse double-point projections without triple points represent regular knot diagrams; this restriction also prevents infinite sets from receiving `Set.ncard = 0`."
+    },
+    {
+     "closest_existing_considered": "Uses existing `sInf` on naturals over crossing counts of regular projections of ambient-isotopic realizations.",
+     "name": "crossingNumber",
+     "why_needed": "No knot crossing-number invariant exists in Mathlib or the helper library."
+    },
+    {
+     "closest_existing_considered": "Uses existing real `sInf`, metric variation, and the bespoke standard thickness and ambient-isotopy definitions.",
+     "name": "minimumRopelength",
+     "why_needed": "No knot ropelength invariant exists in Mathlib or the helper library."
+    }
+   ],
+   "per_slot": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": "/--\nIs there a universal constant $c$ such that every nontrivial closed knot $K$ has minimum\nropelength at most $c\\,\\operatorname{Cr}(K)$? The restriction\n$\\operatorname{Cr}(K) \\ne 0$ excludes the unknot, whose crossing number is zero but whose minimum\nropelength is positive.\n-/\n@[category research open, AMS 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ, 0 < c ∧ ∀ K : ClosedKnot, crossingNumber K ≠ 0 →\n      minimumRopelength K ≤ c * crossingNumber K := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Ropelength and crossing number\n\nThis file asks whether the minimum ropelength of a nontrivial closed knot is bounded above by a\nuniversal constant times its crossing number.\n\n*References:*\n- [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n- J. Cantarella, R. B. Kusner, and J. M. Sullivan, *On the minimum ropelength of knots and links*\n- Y. Diao, C. Ernst, A. Por, and U. Ziegler, *The ropelengths of knots are almost linear in terms\n  of their crossing numbers*\n-/\n\nnoncomputable section\n\nnamespace IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n\nopen Set\nopen scoped ENNReal NNReal Matrix RealInnerProductSpace unitInterval\n\nabbrev Point3 := EuclideanSpace ℝ (Fin 3)\n\n/-- A parametrized tame closed knot: a regular `C¹`, `2π`-periodic curve which is injective on a\nhalf-open fundamental interval. -/\nstructure ClosedKnot where\n  toFun : ℝ → Point3\n  contDiff : ContDiff ℝ 1 toFun\n  periodic : Function.Periodic toFun (2 * Real.pi)\n  injectiveOn : Set.InjOn toFun (Set.Ico 0 (2 * Real.pi))\n  regular : ∀ t, fderiv ℝ toFun t (1 : ℝ) ≠ 0\n\ninstance : FunLike ClosedKnot ℝ Point3 where\n  coe := ClosedKnot.toFun\n  coe_injective' f g h := by cases f; cases g; cases h; rfl\n\n/-- Two parametrized knots have the same knot type when they are joined by an isotopy through\nregular closed embeddings. This agrees with ambient isotopy by the isotopy extension theorem. -/\ndef Isotopic (f g : ClosedKnot) : Prop :=\n  ∃ F : I → ClosedKnot,\n    Continuous (fun p : I × ℝ ↦ F p.1 p.2) ∧\n      (F 0 : ℝ → Point3) = f ∧ (F 1 : ℝ → Point3) = g\n\n/-- The usual vector cross product in three-dimensional Euclidean space. -/\ndef cross (x y : Point3) : Point3 :=\n  WithLp.toLp 2 (crossProduct (WithLp.ofLp x) (WithLp.ofLp y))\n\n/-- The radius of the circle through three points, with value `∞` for collinear points. -/\ndef circumradius (x y z : Point3) : ℝ≥0∞ :=\n  if ‖cross (y - x) (z - x)‖ = 0 then ∞\n  else ENNReal.ofReal (dist x y * dist y z * dist z x /\n    (2 * ‖cross (y - x) (z - x)‖))\n\n/-- Knot thickness, defined as the infimum of the circumradii through triples of distinct points\nof the curve. -/\ndef thickness (f : ClosedKnot) : ℝ≥0∞ :=\n  sInf {r | ∃ x ∈ Set.Ico (0 : ℝ) (2 * Real.pi),\n    ∃ y ∈ Set.Ico (0 : ℝ) (2 * Real.pi),\n    ∃ z ∈ Set.Ico (0 : ℝ) (2 * Real.pi),\n      x ≠ y ∧ y ≠ z ∧ z ≠ x ∧ r = circumradius (f x) (f y) (f z)}\n\n/-- The length of one traversal of a closed knot. -/\ndef length (f : ClosedKnot) : ℝ≥0∞ :=\n  eVariationOn f (Set.Icc 0 (2 * Real.pi))\n\n/-- The ropelength of a realization is its length divided by its thickness. -/\ndef ropelength (f : ClosedKnot) : ℝ≥0∞ := length f / thickness f\n\n/-- The minimum ropelength in the isotopy class of `f`. -/\ndef minimumRopelength (f : ClosedKnot) : ℝ≥0∞ :=\n  sInf {r | ∃ g : ClosedKnot, Isotopic f g ∧ r = ropelength g}\n\n/-- Orthogonal projection onto the plane perpendicular to `v`. -/\ndef projectPerp (v x : Point3) : Point3 := x - (inner ℝ x v • v)\n\n/-- The unordered pairs of parameters which become double points under projection along `v`. -/\ndef crossingPairs (f : ClosedKnot) (v : Point3) : Set (ℝ × ℝ) :=\n  {p | p.1 ∈ Set.Ico 0 (2 * Real.pi) ∧ p.2 ∈ Set.Ico 0 (2 * Real.pi) ∧ p.1 < p.2 ∧\n    projectPerp v (f p.1) = projectPerp v (f p.2)}\n\n/-- A projection direction is regular if it is a unit direction, the projected curve is immersed,\nhas finitely many double points, has no triple points, and the two projected tangents at every\ndouble point are transverse. -/\ndef IsRegularProjection (f : ClosedKnot) (v : Point3) : Prop :=\n  ‖v‖ = 1 ∧ (crossingPairs f v).Finite ∧\n    (∀ t ∈ Set.Ico (0 : ℝ) (2 * Real.pi),\n      projectPerp v (fderiv ℝ f.toFun t 1) ≠ 0) ∧\n    (∀ x ∈ Set.Ico (0 : ℝ) (2 * Real.pi),\n      ∀ y ∈ Set.Ico (0 : ℝ) (2 * Real.pi),\n      ∀ z ∈ Set.Ico (0 : ℝ) (2 * Real.pi),\n        projectPerp v (f x) = projectPerp v (f y) →\n        projectPerp v (f x) = projectPerp v (f z) → x = y ∨ x = z ∨ y = z) ∧\n    ∀ p ∈ crossingPairs f v,\n      cross (projectPerp v (fderiv ℝ f.toFun p.1 1))\n        (projectPerp v (fderiv ℝ f.toFun p.2 1)) ≠ 0\n\n/-- The crossing number of a knot type: the minimum number of crossings among all regular\nprojections of all isotopic realizations. -/\ndef crossingNumber (f : ClosedKnot) : ℕ :=\n  sInf {n | ∃ g : ClosedKnot, Isotopic f g ∧\n    ∃ v : Point3, IsRegularProjection g v ∧ n = (crossingPairs g v).ncard}\n\n/-- Is the upper bound of a closed knot's minimum ropelength linear in its crossing number?\nPrecisely: is there a finite universal constant $c$ such that every nontrivial tame closed knot\n$K$ satisfies $\\operatorname{Rop}(K) \\le c\\,\\operatorname{Cr}(K)$? Here ropelength uses tube\nradius (thickness), and `crossingNumber f ≠ 0` excludes the unknot, whose crossing number is zero\nbut whose minimum ropelength is positive. -/\n@[category research open, AMS 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ≥0, ∀ f : ClosedKnot, crossingNumber f ≠ 0 →\n      minimumRopelength f ≤ (c : ℝ≥0∞) * (crossingNumber f : ℝ≥0∞) := by\n  sorry\n\nend IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the yes/no list entry as asking whether there exists a finite universal constant c such that Rop(K) ≤ c·Cr(K) for every nontrivial tame closed knot type, as specified by the background article and decomposition notes.",
+    "Excluded the unknot by the hypothesis `crossingNumber f ≠ 0`, rather than adding an additive constant, because the unknot has crossing number zero but positive minimum ropelength.",
+    "Represented a closed knot by a regular C¹, 2π-periodic parametrization that is injective on the half-open fundamental interval [0,2π). Such regular C¹ embeddings are tame.",
+    "Represented equality of knot types by a continuous isotopy through regular closed embeddings. This is equivalent to ambient isotopy in this setting by isotopy extension.",
+    "Defined thickness by the Gonzalez–Maddocks infimum of circumradii through triples of distinct points. Collinear triples have infinite circumradius. This is equivalent to the radius of the largest embedded normal tube for C¹ knots.",
+    "Defined curve length using Mathlib's extended metric variation on [0,2π], and minimum ropelength as an ENNReal infimum over isotopic realizations.",
+    "Defined crossing number by minimizing the finite number of transverse double points over regular orthogonal projections of all isotopic realizations. Regularity explicitly requires an immersed projection, no triple points, and transverse double points.",
+    "Used tube radius rather than diameter as the thickness convention; this only changes ropelength by a universal factor and matches the cited primary definition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`EuclideanSpace ℝ (Fin 3)` is the existing Mathlib type and is exactly what this abbreviation expands to.",
+     "name": "Point3",
+     "why_needed": "Provides a local abbreviation for three-dimensional Euclidean space used throughout the geometric model."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `ContDiff`, `Function.Periodic`, and `Set.InjOn`, but no structure combining them into a closed knot.",
+     "name": "ClosedKnot",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no type for regular C¹ embedded closed curves or tame knots."
+    },
+    {
+     "closest_existing_considered": "Mathlib has paths and homeomorphisms but no topology/API for knot embeddings or an ambient isotopy relation; a continuous path through regular embeddings directly captures knot isotopy.",
+     "name": "Isotopic",
+     "why_needed": "No knot-isotopy or ambient-isotopy primitive exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `crossProduct` acts on raw functions `Fin 3 → ℝ`; `cross` transparently transports it through `WithLp` to `EuclideanSpace ℝ (Fin 3)`.",
+     "name": "cross",
+     "why_needed": "The Euclidean-space form of the 3D vector cross product was needed repeatedly."
+    },
+    {
+     "closest_existing_considered": "Mathlib contains circle and sphere geometry but no total extended-real circumradius primitive; the standard side-product over four-area formula is used, with infinity for collinear triples.",
+     "name": "circumradius",
+     "why_needed": "No circumradius-of-three-points function suitable for arbitrary triples in Euclidean 3-space exists in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Searched for thickness, reach, normal injectivity radius, and circumradius APIs. The primary literature's equivalent three-point circumradius definition was directly formalizable.",
+     "name": "thickness",
+     "why_needed": "Neither knot thickness nor reach specialized to curves exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Built directly from Mathlib's `eVariationOn`; no separate closed-curve length wrapper exists.",
+     "name": "length",
+     "why_needed": "Names the geometric length of one traversal of a `ClosedKnot`."
+    },
+    {
+     "closest_existing_considered": "Defined transparently as the cited ratio `length / thickness` in `ℝ≥0∞`.",
+     "name": "ropelength",
+     "why_needed": "No ropelength invariant exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "No knot-type optimization primitive exists; this is a direct `sInf` over isotopic `ClosedKnot` realizations.",
+     "name": "minimumRopelength",
+     "why_needed": "The conjecture concerns the infimum of ropelength over realizations of one knot type."
+    },
+    {
+     "closest_existing_considered": "Mathlib has inner products and general submodule projections, but this direct formula is the minimal transparent specialization to a unit vector.",
+     "name": "projectPerp",
+     "why_needed": "Regular knot diagrams require orthogonal projection along a spatial direction."
+    },
+    {
+     "closest_existing_considered": "No knot-diagram or crossing API exists; this set directly records ordered-by-parameter pairs with equal projections.",
+     "name": "crossingPairs",
+     "why_needed": "The crossings of a projected parametrized knot must be represented and counted."
+    },
+    {
+     "closest_existing_considered": "No regular knot projection predicate exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsRegularProjection",
+     "why_needed": "Counting arbitrary projection coincidences would not define the standard crossing number; regular diagrams must exclude cusps, tangencies, and triple points."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Set.ncard` and `sInf` provide the cardinality and minimization operations, but the knot-theoretic invariant itself required this transparent definition.",
+     "name": "crossingNumber",
+     "why_needed": "No crossing-number invariant for knots exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": "/-- Is the upper bound of a closed knot's minimum ropelength linear in its crossing number?\nPrecisely: is there a finite universal constant $c$ such that every nontrivial tame closed knot\n$K$ satisfies $\\operatorname{Rop}(K) \\le c\\,\\operatorname{Cr}(K)$? Here ropelength uses tube\nradius (thickness), and `crossingNumber f ≠ 0` excludes the unknot, whose crossing number is zero\nbut whose minimum ropelength is positive. -/\n@[category research open, AMS 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ≥0, ∀ f : ClosedKnot, crossingNumber f ≠ 0 →\n      minimumRopelength f ≤ (c : ℝ≥0∞) * (crossingNumber f : ℝ≥0∞) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Ropelength and crossing number\n\n*References:*\n- [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n- [Cantarella, Kusner, and Sullivan, *On the minimum ropelength of knots and links*](https://arxiv.org/abs/math/0103224)\n-/\n\nnamespace IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n\nopen scoped ENNReal\n\nabbrev Point := EuclideanSpace ℝ (Fin 3)\n\n/--\nA regular period-one parametrized closed $C^1$ knot. Injectivity is imposed on one half-open\nperiod, and regularity means that the velocity never vanishes.\n-/\ndef IsKnotCurve (γ : ℝ → Point) : Prop :=\n  ContDiff ℝ 1 γ ∧ Function.Periodic γ 1 ∧ Set.InjOn γ (Set.Ico 0 1) ∧\n    ∀ t, fderiv ℝ γ t 1 ≠ 0\n\n/-- The contour length of one period of a closed curve. -/\nnoncomputable def curveLength (γ : ℝ → Point) : ℝ :=\n  (eVariationOn γ (Set.Icc 0 1)).toReal\n\n/--\nThe thickness of a curve, defined as its reach: the supremum of the radii for which every\npoint at distance less than the radius has a unique nearest point on the curve.\nFor $C^1$ knots this equals the radius of the largest embedded normal tube.\n-/\nnoncomputable def thickness (γ : ℝ → Point) : ℝ :=\n  sSup {r : ℝ | 0 ≤ r ∧ ∀ p : Point, Metric.infDist p (Set.range γ) < r →\n    ∃! q : Point, q ∈ Set.range γ ∧ dist p q = Metric.infDist p (Set.range γ)}\n\n/-- Two parametrized knots are isotopic through a continuous family of $C^1$ knot curves. -/\ndef Isotopic (γ η : ℝ → Point) : Prop :=\n  ∃ F : ℝ × ℝ → Point, Continuous F ∧\n    (∀ s, F (0, s) = γ s) ∧ (∀ s, F (1, s) = η s) ∧\n    ∀ t ∈ Set.Icc (0 : ℝ) 1, IsKnotCurve (fun s ↦ F (t, s))\n\n/-- The minimum ropelength in the knot type represented by `γ`. -/\nnoncomputable def minimumRopelength (γ : ℝ → Point) : ℝ :=\n  sInf {r : ℝ | ∃ η : ℝ → Point, Isotopic γ η ∧ 0 < thickness η ∧\n    r = curveLength η / thickness η}\n\n/-- Orthogonal projection to the plane perpendicular to a unit vector `v`. -/\nnoncomputable def projectPerp (v x : Point) : Point := x - inner ℝ x v • v\n\n/-- Ordered parameter pairs which form crossings in the projection along `v`. -/\ndef projectionCrossings (γ : ℝ → Point) (v : Point) : Set (ℝ × ℝ) :=\n  {p | p.1 ∈ Set.Ico (0 : ℝ) 1 ∧ p.2 ∈ Set.Ico (0 : ℝ) 1 ∧ p.1 < p.2 ∧\n    projectPerp v (γ p.1) = projectPerp v (γ p.2)}\n\n/--\nA regular knot projection: the projected curve is an immersion, it has finitely many double\npoints, every double point has exactly two preimages, and all crossings are transverse.\n-/\ndef IsRegularProjection (γ : ℝ → Point) (v : Point) : Prop :=\n  (∀ t ∈ Set.Ico (0 : ℝ) 1, projectPerp v (fderiv ℝ γ t 1) ≠ 0) ∧\n  (projectionCrossings γ v).Finite ∧\n  ∀ p ∈ projectionCrossings γ v,\n    (∀ u ∈ Set.Ico (0 : ℝ) 1, projectPerp v (γ u) = projectPerp v (γ p.1) →\n      u = p.1 ∨ u = p.2) ∧\n    LinearIndependent ℝ ![\n      projectPerp v (fderiv ℝ γ p.1 1), projectPerp v (fderiv ℝ γ p.2 1)]\n\n/-- The crossing number of the knot type represented by `γ`. -/\nnoncomputable def crossingNumber (γ : ℝ → Point) : ℕ :=\n  sInf {n : ℕ | ∃ (η : ℝ → Point) (v : Point), Isotopic γ η ∧ ‖v‖ = 1 ∧\n    IsRegularProjection η v ∧ n = (projectionCrossings η v).ncard}\n\n/--\nIs there a universal linear upper bound for minimum ropelength in terms of crossing number?\nPrecisely, does there exist $c>0$ such that every nontrivial tame closed knot type $K$ satisfies\n$\\operatorname{Rop}(K) \\leq c\\,\\operatorname{Cr}(K)$? Here knot types are represented by closed\n$C^1$ curves, thickness is measured in units of tube radius, and nontriviality is expressed by\npositive crossing number (excluding the unknot, whose crossing number is zero).\n-/\n@[category research open, AMS 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ, 0 < c ∧ ∀ γ : ℝ → Point, IsKnotCurve γ →\n      0 < crossingNumber γ → minimumRopelength γ ≤ c * crossingNumber γ := by\n  sorry\n\nend IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the yes/no question as `answer(sorry) ↔ ∃ c > 0, ∀ K, Rop(K) ≤ c * Cr(K)`, so a positive answer corresponds to the asserted universal linear bound.",
+    "Restricted the universal quantifier to nontrivial knots by requiring positive crossing number. This avoids the unknot boundary case `Cr = 0` with positive minimum ropelength, as anticipated by the decomposition table.",
+    "Represented a tame closed knot by a regular, period-one `C¹` parametrization in Euclidean three-space, injective on the half-open fundamental period. Regular `C¹` embedded circles are tame.",
+    "Modeled knot type using a continuous isotopy through regular `C¹` embedded closed curves. For tame embedded circles, isotopy of embeddings and ambient isotopy determine the same knot types by isotopy extension.",
+    "Defined thickness as Federer reach (the supremal radius within which every point has a unique nearest point on the curve). The cited primary source proves that this equals knot thickness and the normal injectivity radius for `C¹` links. Thus the convention uses tube radius, not diameter.",
+    "Defined contour length as total metric variation over one period and minimum ropelength as the infimum of length divided by positive thickness over isotopic realizations. Positive-thickness restriction omits only realizations having infinite conventional ropelength.",
+    "Defined crossing number by minimizing the number of double points over isotopic realizations and unit-direction orthogonal projections. Required the projected curve to be an immersion, every crossing to have exactly two preimages, finitely many crossings, and transverse projected tangents, matching regular knot diagrams."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`EuclideanSpace ℝ (Fin 3)` is the existing Mathlib type and is used directly by the abbreviation.",
+     "name": "Point",
+     "why_needed": "Provides a local abbreviation for Euclidean three-space used throughout the knot definitions."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `ContDiff`, `Function.Periodic`, `Set.InjOn`, and `fderiv` provide the ingredients but no assembled knot-curve notion.",
+     "name": "IsKnotCurve",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no predicate for regular closed knot embeddings."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `eVariationOn` supplies metric total variation; the local definition specializes it to one period and converts the finite value to `ℝ`.",
+     "name": "curveLength",
+     "why_needed": "A named contour length for one period is needed to define ropelength."
+    },
+    {
+     "closest_existing_considered": "`Metric.infDist` and `sSup` suffice to define Federer reach, which the primary source identifies with thickness for `C¹` knots.",
+     "name": "thickness",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines knot thickness or reach."
+    },
+    {
+     "closest_existing_considered": "Mathlib has general homotopies, but they do not enforce that every time slice remains a regular embedding; the bespoke predicate adds exactly that condition.",
+     "name": "Isotopic",
+     "why_needed": "No ambient-isotopy or isotopy-of-embeddings primitive for knots exists in Mathlib or the repository."
+    },
+    {
+     "closest_existing_considered": "Built from the local contour length, thickness, isotopy, and real `sInf`; no existing invariant was available.",
+     "name": "minimumRopelength",
+     "why_needed": "No ropelength invariant exists in Mathlib or the repository."
+    },
+    {
+     "closest_existing_considered": "Mathlib inner-product operations provide the formula, but a local specialization to the plane perpendicular to a direction keeps the crossing definitions explicit.",
+     "name": "projectPerp",
+     "why_needed": "A local orthogonal projection formula is needed for knot diagrams."
+    },
+    {
+     "closest_existing_considered": "Mathlib sets and `Set.ncard` provide the set/count infrastructure, but not the geometric crossing relation.",
+     "name": "projectionCrossings",
+     "why_needed": "No notion counting double points of a projected knot curve exists."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `LinearIndependent`, `fderiv`, and finiteness predicates provide the ingredients, but no regular knot-projection predicate exists.",
+     "name": "IsRegularProjection",
+     "why_needed": "Crossing number must minimize only over regular knot diagrams, excluding cusps, tangent crossings, and multiple points."
+    },
+    {
+     "closest_existing_considered": "Defined as a natural-number infimum of crossing counts over isotopic regular projections; graph crossing-number notions, where available, would not represent knot diagrams.",
+     "name": "crossingNumber",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines knot crossing number."
+    }
+   ],
+   "per_slot": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": "/--\nIs there a universal linear upper bound for minimum ropelength in terms of crossing number?\nPrecisely, does there exist $c>0$ such that every nontrivial tame closed knot type $K$ satisfies\n$\\operatorname{Rop}(K) \\leq c\\,\\operatorname{Cr}(K)$? Here knot types are represented by closed\n$C^1$ curves, thickness is measured in units of tube radius, and nontriviality is expressed by\npositive crossing number (excluding the unknot, whose crossing number is zero).\n-/\n@[category research open, AMS 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ, 0 < c ∧ ∀ γ : ℝ → Point, IsKnotCurve γ →\n      0 < crossingNumber γ → minimumRopelength γ ≤ c * crossingNumber γ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Is the upper bound of a closed knot's minimum ropelength linear to its crossing number?\n\nThe *ropelength* of a curve $C$ in $\\mathbb{R}^3$ is $\\operatorname{Len}(C)/\\tau(C)$, the\nquotient of its length by its thickness. The (minimum) ropelength $\\operatorname{Rop}(K)$ of a\nknot type $K$ is the infimum of the ropelength over all curves realizing $K$. It is known that\n$\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K)\\log^5\\operatorname{Cr}(K))$, where\n$\\operatorname{Cr}(K)$ is the crossing number, and it is conjectured that the tight upper bound\nis linear in the crossing number.\n\nFollowing Gonzalez–Maddocks and Cantarella–Kusner–Sullivan, the thickness of a curve is the\ninfimal radius of a circle through three distinct points of the curve (the tube *radius*).\nLength is the one-dimensional Hausdorff measure of the curve. The crossing number is the least\nnumber of crossings in a regular projection of a polygonal representative of the knot type, so it\nis only meaningful for tame knots.\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n- [Wikipedia, Crossing number (knot theory)](https://en.wikipedia.org/wiki/Crossing_number_(knot_theory))\n- [CKS02] Cantarella, J., Kusner, R. B., Sullivan, J. M.,\n  _On the minimum ropelength of knots and links_. Invent. Math. 150 (2002), 257–286.\n  [arXiv:math/0103224](https://arxiv.org/abs/math/0103224)\n- [DEPZ19] Diao, Y., Ernst, C., Por, A., Ziegler, U.,\n  _The ropelengths of knots are almost linear in terms of their crossing numbers_.\n  J. Knot Theory Ramifications 28 (2019), 1950085.\n-/\n\nnamespace IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n\nopen MeasureTheory\nopen scoped EuclideanGeometry ENNReal NNReal unitInterval\n\n/- ### Knots and ambient isotopy -/\n\n/-- A (closed) **knot** is a subset of `ℝ³` homeomorphic to a circle. -/\ndef IsKnot (K : Set ℝ³) : Prop :=\n  Nonempty (K ≃ₜ Circle)\n\n/-- Two subsets `K₀`, `K₁` of `ℝ³` are **ambient isotopic** if there is a continuous family\n`H t` (`t ∈ [0, 1]`) of homeomorphisms of `ℝ³` with `H 0` the identity and\n`H 1 '' K₀ = K₁`. The knot type of a knot is its ambient isotopy class. -/\ndef AmbientIsotopic (K₀ K₁ : Set ℝ³) : Prop :=\n  ∃ H : I → ℝ³ ≃ₜ ℝ³, Continuous (fun p : I × ℝ³ => H p.1 p.2) ∧\n    H 0 = Homeomorph.refl ℝ³ ∧ H 1 '' K₀ = K₁\n\n/-- The closed polygon with consecutive vertices `v 0, v 1, …, v (n - 1)` (and `v (n - 1)` joined\nback to `v 0`). -/\ndef closedPolygon {n : ℕ} (v : Fin n → ℝ³) : Set ℝ³ :=\n  ⋃ i, segment ℝ (v i) (v (finRotate n i))\n\n/-- A knot is **tame** if it is ambient isotopic to a closed polygon. -/\ndef IsTame (K : Set ℝ³) : Prop :=\n  ∃ (n : ℕ) (v : Fin n → ℝ³), AmbientIsotopic K (closedPolygon v)\n\n/-- The standard **unknot**: the unit circle in the `xy`-plane. -/\ndef unknot : Set ℝ³ :=\n  Metric.sphere (0 : ℝ³) 1 ∩ {x | x 2 = 0}\n\n/- ### Thickness and ropelength -/\n\nopen scoped Classical in\n/-- The radius of the circle through three points of `ℝ³`, defined to be `∞` when the three\npoints are not affinely independent (i.e. are collinear or not distinct). -/\nnoncomputable def circumradius (x y z : ℝ³) : ℝ≥0∞ :=\n  if h : AffineIndependent ℝ ![x, y, z] then\n    ENNReal.ofReal (⟨![x, y, z], h⟩ : Affine.Triangle ℝ ℝ³).circumradius\n  else ⊤\n\n/-- The **thickness** of a curve `K ⊆ ℝ³` is the infimal radius of a circle through three\ndistinct points of `K` (Gonzalez–Maddocks; [CKS02, Section 2]). For a `C¹` curve this is the\nradius of the largest embedded normal tube around `K`; positive thickness forces `K` to be\n`C^{1,1}` [CKS02, Section 3]. -/\nnoncomputable def thickness (K : Set ℝ³) : ℝ≥0∞ :=\n  ⨅ (x ∈ K) (y ∈ K) (z ∈ K) (_ : x ≠ y) (_ : x ≠ z) (_ : y ≠ z), circumradius x y z\n\n/-- The **ropelength** of a curve `K ⊆ ℝ³`: its length (one-dimensional Hausdorff measure)\ndivided by its thickness. -/\nnoncomputable def ropelength (K : Set ℝ³) : ℝ≥0∞ :=\n  μH[1] K / thickness K\n\n/-- The **minimum ropelength** $\\operatorname{Rop}(K)$ of the knot type of `K`: the infimum of the\nropelength over all curves ambient isotopic to `K`. Curves of thickness `0` have infinite\nropelength and are omitted from the infimum. -/\nnoncomputable def minRopelength (K : Set ℝ³) : ℝ≥0∞ :=\n  ⨅ (K' : Set ℝ³) (_ : AmbientIsotopic K K') (_ : 0 < thickness K'), ropelength K'\n\n/- ### Crossing number -/\n\n/-- Orthogonal projection of `ℝ³` onto the `xy`-plane. -/\ndef proj (x : ℝ³) : ℝ² :=\n  !₂[x 0, x 1]\n\n/-- The **double points** of the projection of `K ⊆ ℝ³` onto the `xy`-plane: points of the\nplane with at least two preimages in `K`. -/\ndef doublePoints (K : Set ℝ³) : Set ℝ² :=\n  {p | ∃ x ∈ K, ∃ y ∈ K, x ≠ y ∧ proj x = p ∧ proj y = p}\n\n/-- The projection of the closed polygon with vertices `v` onto the `xy`-plane is **regular**\n(i.e. is a knot diagram) if it has only finitely many multiple points, all of which are double\npoints, and no vertex projects onto a double point. -/\nstructure IsRegularProjection {n : ℕ} (v : Fin n → ℝ³) : Prop where\n  finite : (doublePoints (closedPolygon v)).Finite\n  encard_le : ∀ p : ℝ², (closedPolygon v ∩ proj ⁻¹' {p}).encard ≤ 2\n  vertex_notMem : ∀ i, proj (v i) ∉ doublePoints (closedPolygon v)\n\n/-- The **crossing number** $\\operatorname{Cr}(K)$ of the knot type of `K`: the least number of\ndouble points in a regular projection of a closed polygon ambient isotopic to `K`. Since\nrotations of `ℝ³` are ambient isotopies, it suffices to project onto the `xy`-plane. This is\n`⊤` when `K` is not tame. -/\nnoncomputable def crossingNumber (K : Set ℝ³) : ℕ∞ :=\n  ⨅ (n : ℕ) (v : Fin n → ℝ³) (_ : AmbientIsotopic K (closedPolygon v))\n    (_ : IsRegularProjection v), ((doublePoints (closedPolygon v)).ncard : ℕ∞)\n\n/- ### Basic API -/\n\n/-- Ambient isotopy is reflexive. -/\n@[category API, AMS 57]\ntheorem AmbientIsotopic.refl (K : Set ℝ³) : AmbientIsotopic K K :=\n  ⟨fun _ => Homeomorph.refl ℝ³, continuous_snd, rfl, Set.image_id K⟩\n\n/-- The thickness of a curve is at most the radius of any circle through three of its points. -/\n@[category API, AMS 57]\ntheorem thickness_le_circumradius {K : Set ℝ³} {x y z : ℝ³} (hx : x ∈ K) (hy : y ∈ K)\n    (hz : z ∈ K) (hxy : x ≠ y) (hxz : x ≠ z) (hyz : y ≠ z) :\n    thickness K ≤ circumradius x y z :=\n  iInf₂_le_of_le x hx <| iInf₂_le_of_le y hy <| iInf₂_le_of_le z hz <|\n    iInf_le_of_le hxy <| iInf_le_of_le hxz <| iInf_le _ hyz\n\n/-- The minimum ropelength of a knot type is at most the ropelength of any of its realizations of\npositive thickness. -/\n@[category API, AMS 57]\ntheorem minRopelength_le {K K' : Set ℝ³} (h : AmbientIsotopic K K') (h' : 0 < thickness K') :\n    minRopelength K ≤ ropelength K' :=\n  iInf₂_le_of_le K' h <| iInf_le _ h'\n\n/-- The crossing number of a knot type is at most the number of double points of any regular\nprojection of a closed polygon realizing it. -/\n@[category API, AMS 57]\ntheorem crossingNumber_le {K : Set ℝ³} {n : ℕ} {v : Fin n → ℝ³}\n    (h : AmbientIsotopic K (closedPolygon v)) (hv : IsRegularProjection v) :\n    crossingNumber K ≤ (doublePoints (closedPolygon v)).ncard :=\n  iInf₂_le_of_le n v <| iInf₂_le h hv\n\n/- ### The conjecture -/\n\n/--\n**Is the upper bound of a closed knot's minimum ropelength linear to its crossing number?**\n\nIs there a constant $c$ such that every nontrivial tame knot $K$ satisfies\n$$\\operatorname{Rop}(K) \\le c \\cdot \\operatorname{Cr}(K),$$\ni.e. is $\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K))$? Here $\\operatorname{Rop}(K)$ is the\nminimum ropelength of $K$ and $\\operatorname{Cr}(K)$ its crossing number. The best known bound is\n$\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$ [DEPZ19].\n\nThe unknot is excluded since it has crossing number $0$ but ropelength $2\\pi$.\n-/\n@[category research open, AMS 51 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ≥0, ∀ K : Set ℝ³,\n      IsKnot K → IsTame K → ¬ AmbientIsotopic K unknot →\n        minRopelength K ≤ c * (crossingNumber K : ℝ≥0∞) := by\n  sorry\n\nend IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot table is correct; both suggested handlings of the unknot are equivalent and the 'restrict to nontrivial knots' option was used.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Knots are modelled as subsets of ℝ³ homeomorphic to `Circle` (unoriented, unparametrized); knot type = ambient isotopy class, with ambient isotopy defined as a jointly continuous family `I → ℝ³ ≃ₜ ℝ³` starting at the identity whose final map carries K₀ onto K₁ (image equality).",
+    "The terse Wikipedia question 'is the upper bound ... linear' was read, following the Ropelength article (`L(K) = O(Cr(K) log^5 Cr(K))` proven, 'conjectured that the tight upper bound should be linear'), as: ∃ universal constant c with Rop(K) ≤ c·Cr(K) for every nontrivial tame knot K. The 'tightness' half (knot families with Rop ≥ c'·Cr) is already known, so only the O(Cr) upper bound is stated.",
+    "The unknot (Cr = 0, Rop = 2π) is excluded via `¬ AmbientIsotopic K unknot` with `unknot` the round unit circle in the xy-plane, as suggested in the decomposition notes; since nontrivial knots have Cr ≥ 3 this is equivalent to the alternative 'Rop ≤ a·Cr + b for all tame knots' formulation.",
+    "Only tame knots are quantified over (`IsTame` = ambient isotopic to a closed polygon), because crossing number is classically defined only for tame knots (wild knots would give Cr = ⊤ and Rop = ⊤ under the definitions, and are outside the intended scope).",
+    "Thickness follows Gonzalez–Maddocks / Cantarella–Kusner–Sullivan: infimum over triples of distinct points of the circumradius (∞ for collinear triples), valued in ℝ≥0∞. This is the tube *radius* convention (the Wikipedia article's convention, unknot ropelength 2π); the radius-vs-diameter factor 2 is irrelevant to linearity. For C¹ curves it coincides with the normal injectivity radius (CKS Lemma 2).",
+    "Length is the 1-dimensional Hausdorff measure `μH[1] K` of the set (Mathlib normalization agrees with Lebesgue measure on ℝ, so it is arclength for rectifiable simple curves).",
+    "`minRopelength` is an ℝ≥0∞-infimum over all sets ambient isotopic to K with positive thickness of `μH[1] K' / thickness K'`; the `0 < thickness K'` restriction only omits curves whose ropelength is infinite anyway (CKS: finite ropelength forces C^{1,1}) and avoids reliance on ENNReal division-by-zero conventions.",
+    "Crossing number is defined textbook-style (Crowell–Fox / Burde–Zieschang): least number of double points of a regular projection (finitely many multiple points, all double, no vertex over a double point) of a closed polygon ambient isotopic to K, valued in ℕ∞ (⊤ if no such polygon). Only the projection onto the xy-plane is used: since rotations of ℝ³ are ambient isotopies this loses no generality. Double points are counted at the level of the set `closedPolygon v` (points of the plane with ≥ 2 preimages).",
+    "The constant c is taken in ℝ≥0 and coerced to ℝ≥0∞; the crossing number is coerced ℕ∞ → ℝ≥0∞. For nontrivial tame knots both sides are finite and positive, so the statement is neither vacuous nor trivially true for either answer.",
+    "AMS tags 51 (geometry, per the Wikipedia tags) and 57 (knot theory)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`IsEmbedding γ` for `γ : Circle → ℝ²` as used in Wikipedia/InscribedSquare.lean (parametrized); a set-based version was chosen to avoid reparametrization issues in isotopy classes.",
+     "name": "IsKnot",
+     "why_needed": "Mathlib has no notion of a knot; a closed knot is a subset of ℝ³ homeomorphic to a circle."
+    },
+    {
+     "closest_existing_considered": "`ContinuousMap.Homotopy`, `Homeomorph`; MovingSofa.lean's continuous family of rigid motions `I → E(2)` was the model.",
+     "name": "AmbientIsotopic",
+     "why_needed": "Knot types are ambient isotopy classes; Mathlib has homotopies (`ContinuousMap.Homotopy`) but no ambient isotopy of subsets of a space by homeomorphisms."
+    },
+    {
+     "closest_existing_considered": "`segment ℝ`, `finRotate` (used as building blocks); no closed-polygon primitive exists.",
+     "name": "closedPolygon",
+     "why_needed": "Needed to define tame knots and polygonal representatives for the crossing number."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsTame",
+     "why_needed": "Crossing number only makes sense for tame knots; tame = ambient isotopic to a closed polygon."
+    },
+    {
+     "closest_existing_considered": "`Metric.sphere` (used in the definition).",
+     "name": "unknot",
+     "why_needed": "To exclude the trivial knot (Cr = 0, Rop = 2π) from the linear bound."
+    },
+    {
+     "closest_existing_considered": "`Affine.Simplex.circumradius` (used inside; it requires an affinely independent simplex, so a wrapper handling the collinear case is needed).",
+     "name": "circumradius",
+     "why_needed": "Radius of the circle through three points, ∞ when collinear, as an ℝ≥0∞ value for the Gonzalez–Maddocks thickness."
+    },
+    {
+     "closest_existing_considered": "`Metric.infDist`, `Manifold` reach — none exist for this notion.",
+     "name": "thickness",
+     "why_needed": "Thickness (normal injectivity radius / global radius of curvature) of a curve is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "`MeasureTheory.Measure.hausdorffMeasure` `μH[1]` for length (used), `eVariationOn` for parametrized curves (not applicable to sets).",
+     "name": "ropelength",
+     "why_needed": "Length divided by thickness of a curve."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "minRopelength",
+     "why_needed": "The knot invariant: infimum of ropelength over the ambient isotopy class."
+    },
+    {
+     "closest_existing_considered": "`EuclideanSpace.proj` (coordinate projections to ℝ), `Submodule.orthogonalProjection`; a direct `!₂[x 0, x 1]` is simpler.",
+     "name": "proj",
+     "why_needed": "Orthogonal projection ℝ³ → ℝ² onto the xy-plane, to define knot diagrams."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "doublePoints",
+     "why_needed": "Points of the plane with at least two preimages in the projected curve (the crossings of a diagram)."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "IsRegularProjection",
+     "why_needed": "Crowell–Fox regular projection of a polygonal knot: finitely many multiple points, all double, no vertex over a double point."
+    },
+    {
+     "closest_existing_considered": "None (graph crossing numbers are also absent).",
+     "name": "crossingNumber",
+     "why_needed": "Crossing number of a knot type is not in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ c : ℝ≥0, ∀ K, IsKnot K → IsTame K → ¬ AmbientIsotopic K unknot → minRopelength K ≤ c * crossingNumber K`, i.e. Rop(K) = O(Cr(K)) uniformly over nontrivial tame knots. Mathlib has no knots, ambient isotopy, thickness/ropelength or crossing number, so all of these are defined bespoke in the file from Mathlib primitives (Homeomorph, Hausdorff measure, Affine.Simplex.circumradius, segments, encard/ncard)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": "/--\n**Is the upper bound of a closed knot's minimum ropelength linear to its crossing number?**\n\nIs there a constant $c$ such that every nontrivial tame knot $K$ satisfies\n$$\\operatorname{Rop}(K) \\le c \\cdot \\operatorname{Cr}(K),$$\ni.e. is $\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K))$? Here $\\operatorname{Rop}(K)$ is the\nminimum ropelength of $K$ and $\\operatorname{Cr}(K)$ its crossing number. The best known bound is\n$\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$ [DEPZ19].\n\nThe unknot is excluded since it has crossing number $0$ but ropelength $2\\pi$.\n-/\n@[category research open, AMS 51 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ≥0, ∀ K : Set ℝ³,\n      IsKnot K → IsTame K → ¬ AmbientIsotopic K unknot →\n        minRopelength K ≤ c * (crossingNumber K : ℝ≥0∞) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Is the minimum ropelength of a knot linear in its crossing number?\n\nThe *ropelength* of a closed curve $C$ in $\\mathbb{R}^3$ is the scale-invariant ratio\n$\\operatorname{Len}(C) / \\tau(C)$ of its length to its *thickness*. Following Gonzalez–Maddocks and\nCantarella–Kusner–Sullivan, the thickness $\\tau(C)$ is the infimum of the circumradius\n$r(x, y, z)$ over all triples of distinct points of $C$; for smooth curves this is the radius of\nthe largest embedded normal tube around $C$. The *ropelength* $\\operatorname{Rop}(K)$ of a knot\ntype $K$ is the infimum of the ropelength over all curves realizing $K$.\n\nFor every nontrivial knot $K$ one has $\\operatorname{Rop}(K) \\geq c \\operatorname{Cr}(K)^{3/4}$,\nand Diao, Ernst, Por and Ziegler proved the near-linear upper bound\n$\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K) \\log^5 \\operatorname{Cr}(K))$, where\n$\\operatorname{Cr}(K)$ is the crossing number. It is conjectured that the tight upper bound is\nlinear, i.e. that there is a universal constant $c$ with\n$\\operatorname{Rop}(K) \\leq c \\operatorname{Cr}(K)$ for every nontrivial knot $K$.\n\n*References:*\n- [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [J. Cantarella, R. B. Kusner, J. M. Sullivan, *On the minimum ropelength of knots and links*,\n  Invent. Math. 150 (2002)](https://arxiv.org/abs/math/0103224)\n- [Y. Diao, C. Ernst, A. Por, U. Ziegler, *The ropelengths of knots are almost linear in terms of\n  their crossing numbers*, J. Knot Theory Ramifications 28 (2019)](https://doi.org/10.1142/S0218216519500858)\n-/\n\nopen Set\nopen scoped EuclideanGeometry ENNReal NNReal\n\nnamespace IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n\n/-- A (tame) knot in $\\mathbb{R}^3$: a $C^1$ embedding of the circle, given as a $1$-periodic\n$C^1$ map `γ : ℝ → ℝ³` with nowhere-vanishing derivative that is injective on a period `[0, 1)`.\nEvery $C^1$ immersed embedded circle is a tame knot. -/\nstructure Knot where\n  /-- The parametrization of the knot. -/\n  toFun : ℝ → ℝ³\n  periodic : Function.Periodic toFun 1\n  contDiff : ContDiff ℝ 1 toFun\n  deriv_ne_zero : ∀ t, deriv toFun t ≠ 0\n  injOn : InjOn toFun (Ico 0 1)\n\ninstance : CoeFun Knot (fun _ ↦ ℝ → ℝ³) := ⟨Knot.toFun⟩\n\n/-- Two knots `K₀` and `K₁` are *ambient isotopic* (have the same knot type) if there is a\ncontinuous family `H t` (`t ∈ [0, 1]`) of homeomorphisms of `ℝ³` with `H 0 = id` and\n`H 1` mapping the image of `K₀` onto the image of `K₁`. -/\ndef AmbientIsotopic (K₀ K₁ : Knot) : Prop :=\n  ∃ H : C(unitInterval × ℝ³, ℝ³), (∀ x, H (0, x) = x) ∧ (∀ t, IsHomeomorph fun x ↦ H (t, x)) ∧\n    (fun x ↦ H (1, x)) '' range K₀ = range K₁\n\n@[category API, AMS 51 57]\nlemma AmbientIsotopic.refl (K : Knot) : AmbientIsotopic K K :=\n  ⟨⟨fun p ↦ p.2, continuous_snd⟩, fun _ ↦ rfl, fun _ ↦ IsHomeomorph.id, image_id _⟩\n\n/-- The *thickness* of a knot `K`, in the sense of Gonzalez–Maddocks: the infimum of the\ncircumradius $r(x, y, z)$ over all triples of (non-collinear) distinct points `x y z` on `K`.\nCollinear triples have infinite circumradius and hence do not contribute to the infimum.\nFor a $C^1$ curve this equals the radius of the largest embedded normal tube around `K`. -/\nnoncomputable def Knot.thickness (K : Knot) : ℝ≥0∞ :=\n  ⨅ (s : Affine.Simplex ℝ ℝ³ 2) (_ : ∀ i, s.points i ∈ range K), ENNReal.ofReal s.circumradius\n\n/-- The length of a knot `K`, i.e. the total variation of its parametrization over one period. -/\nnoncomputable def Knot.length (K : Knot) : ℝ≥0∞ :=\n  eVariationOn K (Icc 0 1)\n\n/-- The *ropelength* of the curve `K`, i.e. the ratio of its length to its thickness\n(measured in units of the tube radius). It is `∞` if the thickness is `0`. -/\nnoncomputable def Knot.curveRopelength (K : Knot) : ℝ≥0∞ :=\n  K.length / K.thickness\n\n/-- The *ropelength* $\\operatorname{Rop}(K)$ of the knot type of `K`: the infimum of the\nropelength over all knots ambient isotopic to `K`. -/\nnoncomputable def Knot.ropelength (K : Knot) : ℝ≥0∞ :=\n  ⨅ (K' : Knot) (_ : AmbientIsotopic K K'), K'.curveRopelength\n\n@[category API, AMS 51 57]\nlemma Knot.ropelength_le_curveRopelength (K : Knot) : K.ropelength ≤ K.curveRopelength :=\n  iInf₂_le K (AmbientIsotopic.refl K)\n\n/-- A nonzero vector `v` is a *regular direction* for the knot `K` if the orthogonal projection\nof `K` along `v` is a regular knot diagram: the projected curve is an immersion (no tangent of `K`\nis parallel to `v`), no point of the plane is the projection of three distinct points of `K`, and\nat every double point the two projected tangents are transverse. Here two points `K s` and `K t`\nhave the same projection if and only if `K s - K t ∈ ℝ ∙ v`. -/\nstructure IsRegularDirection (K : Knot) (v : ℝ³) : Prop where\n  ne_zero : v ≠ 0\n  deriv_notMem : ∀ t, deriv K t ∉ ℝ ∙ v\n  no_triple_point : ∀ s ∈ Ico (0 : ℝ) 1, ∀ t ∈ Ico (0 : ℝ) 1, ∀ u ∈ Ico (0 : ℝ) 1,\n    s ≠ t → s ≠ u → t ≠ u → K s - K t ∈ ℝ ∙ v → K s - K u ∉ ℝ ∙ v\n  transverse : ∀ s ∈ Ico (0 : ℝ) 1, ∀ t ∈ Ico (0 : ℝ) 1, s ≠ t → K s - K t ∈ ℝ ∙ v →\n    LinearIndependent ℝ ![deriv K s, deriv K t, v]\n\n/-- The crossings of the projection of the knot `K` along the direction `v`: the pairs of\nparameters `s < t` in `[0, 1)` whose images have the same projection. -/\ndef crossings (K : Knot) (v : ℝ³) : Set (ℝ × ℝ) :=\n  {p | p.1 ∈ Ico 0 1 ∧ p.2 ∈ Ico 0 1 ∧ p.1 < p.2 ∧ K p.1 - K p.2 ∈ ℝ ∙ v}\n\n/-- The *crossing number* $\\operatorname{Cr}(K)$ of the knot type of `K`: the minimum number of\ncrossings of a regular diagram of a knot ambient isotopic to `K`. -/\nnoncomputable def Knot.crossingNumber (K : Knot) : ℕ :=\n  sInf {n | ∃ K' : Knot, AmbientIsotopic K K' ∧\n    ∃ v, IsRegularDirection K' v ∧ (crossings K' v).encard = n}\n\n/-- **Ropelength and crossing number.**\nIs the minimum ropelength of a knot bounded above by a linear function of its crossing number?\nThat is, is there a universal constant $c$ such that\n$\\operatorname{Rop}(K) \\leq c \\operatorname{Cr}(K)$ for every nontrivial knot type $K$\n(equivalently, $\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K))$)?\n\nThe best known upper bound is $\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K) \\log^5\n\\operatorname{Cr}(K))$, due to Diao, Ernst, Por and Ziegler. The unknot, which has crossing number\n$0$ and ropelength $2\\pi$, is excluded by the hypothesis $0 < \\operatorname{Cr}(K)$. -/\n@[category research open, AMS 51 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ≥0, ∀ K : Knot, 0 < K.crossingNumber →\n      K.ropelength ≤ c * K.crossingNumber := by\n  sorry\n\nend IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's single slot and its notes (universal constant, tame closed knots, inf over realizations, exclusion of the unknot, radius-vs-diameter irrelevance) match the formalization.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Knots are modelled as C^1 immersed embeddings of the circle: 1-periodic C^1 maps ℝ → ℝ³ with nowhere-vanishing derivative, injective on [0,1). Every such curve is a tame knot and every tame knot type has such a representative, so quantifying over these curves is the same as quantifying over tame knot types (both invariants are defined as infima over the ambient isotopy class, so they only depend on the type).",
+    "Knot type is defined by ambient isotopy: a continuous H : [0,1] × ℝ³ → ℝ³ with H_0 = id, every H_t a homeomorphism (`IsHomeomorph`), and H_1 carrying the image of K₀ onto the image of K₁ (image equality, so knots are unoriented and reparametrization is irrelevant).",
+    "Thickness is the Gonzalez–Maddocks / Cantarella–Kusner–Sullivan definition: infimum over all triangles (`Affine.Simplex ℝ ℝ³ 2`, i.e. non-collinear triples) with vertices on the curve of the circumradius, in ℝ≥0∞. Collinear triples (radius ∞) are correctly omitted; the inf is never over an empty family for an embedded circle. This equals the normal injectivity radius (tube radius) for C^1 curves (CKS Lemma 2). Ropelength is measured in units of tube *radius*, as in CKS and the Wikipedia article ('measured in radii'); the diameter convention differs by the factor 2, which is irrelevant to the linearity question.",
+    "Length is `eVariationOn K (Icc 0 1)` (total variation over one period, ℝ≥0∞). Curve ropelength is `length / thickness` in ℝ≥0∞: thickness 0 gives ropelength ⊤ (length is positive since the curve is non-constant), matching the convention that non-C^{1,1} curves have infinite ropelength, so no side condition τ > 0 is needed. Rop(K) is the ⨅ over the isotopy class (the 'minimum' of the article; minimizers exist by CKS but we do not rely on this).",
+    "Crossing number: minimum over knots K' isotopic to K and regular projection directions v of the number of double points. A direction v ≠ 0 is regular if no tangent is parallel to v (projection is an immersion), no three distinct points project to the same point, and at each double point the projected tangents are transverse (encoded as `LinearIndependent ℝ ![K' s, K' t, v]` for the derivatives). Two points project equally iff their difference lies in `ℝ ∙ v`. Crossings are pairs s < t in [0,1) with equal projections; counted with `encard = n` (n : ℕ), which automatically excludes infinite crossing sets. The set of achievable counts is nonempty for every C^1 knot (smooth representatives have generic regular projections), so `sInf` never hits the empty-set default.",
+    "Handling of the unknot (Cr = 0, Rop = 2π): the conjecture is restricted to nontrivial knots via the hypothesis `0 < K.crossingNumber` (a knot has crossing number 0 iff it is the unknot). This 'linear for nontrivial knots' form is equivalent to the affine form Rop ≤ c·Cr + d and to Rop = O(Cr), since Cr ≥ 3 for nontrivial knots and there are finitely many knot types per crossing number, all with finite ropelength.",
+    "The constant is `c : ℝ≥0` (coerced to ℝ≥0∞), so it is automatically finite and nonnegative; c = 0 cannot make the statement trivially true because ropelength is positive.",
+    "Two small proved `category API` lemmas (`AmbientIsotopic.refl`, `Knot.ropelength_le_curveRopelength`) are included as basic tests of the new definitions, per CONTRIBUTING."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`IsEmbedding (γ : Circle → ℝ³)` as in Wikipedia/InscribedSquare.lean; rejected because derivatives (needed for regular projections) are much easier on a periodic map ℝ → ℝ³ than on `Circle`, and an immersion condition is needed to guarantee tameness.",
+     "name": "Knot",
+     "why_needed": "Mathlib has no notion of a knot (embedded circle in ℝ³); needed as the domain of both invariants."
+    },
+    {
+     "closest_existing_considered": "`ContinuousMap.Homotopy`, `Homeomorph`, `IsHomeomorph` (used as building blocks); no isotopy notion exists.",
+     "name": "AmbientIsotopic",
+     "why_needed": "Knot equivalence (knot type) is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "`Affine.Simplex.circumradius` (used); `Metric.infDist`/reach (absent).",
+     "name": "Knot.thickness",
+     "why_needed": "Thickness / global radius of curvature / reach of a curve is not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "`eVariationOn` (used directly).",
+     "name": "Knot.length",
+     "why_needed": "Length of a closed curve as an ℝ≥0∞ quantity, specialised to one period."
+    },
+    {
+     "closest_existing_considered": "none in Mathlib or the repo.",
+     "name": "Knot.curveRopelength",
+     "why_needed": "Ropelength of a single curve: length divided by thickness."
+    },
+    {
+     "closest_existing_considered": "none.",
+     "name": "Knot.ropelength",
+     "why_needed": "Ropelength invariant of a knot type (infimum over the isotopy class)."
+    },
+    {
+     "closest_existing_considered": "`Submodule.orthogonalProjection`; instead equal projections are expressed via `K s - K t ∈ ℝ ∙ v`, and transversality via `LinearIndependent`.",
+     "name": "IsRegularDirection",
+     "why_needed": "Regular knot projections/diagrams are not in Mathlib; needed to define crossing number."
+    },
+    {
+     "closest_existing_considered": "none.",
+     "name": "crossings",
+     "why_needed": "The set of double points of a projection, whose cardinality is the crossing count of the diagram."
+    },
+    {
+     "closest_existing_considered": "none.",
+     "name": "Knot.crossingNumber",
+     "why_needed": "Crossing number of a knot type is not in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ c : ℝ≥0, ∀ K : Knot, 0 < K.crossingNumber → K.ropelength ≤ c * K.crossingNumber`, with bespoke (problem-local) definitions of tame knots, ambient isotopy, Gonzalez–Maddocks thickness, length, ropelength (curve and knot-type), regular projections and crossing number, since Mathlib and the repo have no knot theory at all."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": "/-- **Ropelength and crossing number.**\nIs the minimum ropelength of a knot bounded above by a linear function of its crossing number?\nThat is, is there a universal constant $c$ such that\n$\\operatorname{Rop}(K) \\leq c \\operatorname{Cr}(K)$ for every nontrivial knot type $K$\n(equivalently, $\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K))$)?\n\nThe best known upper bound is $\\operatorname{Rop}(K) = O(\\operatorname{Cr}(K) \\log^5\n\\operatorname{Cr}(K))$, due to Diao, Ernst, Por and Ziegler. The unknot, which has crossing number\n$0$ and ropelength $2\\pi$, is excluded by the hypothesis $0 < \\operatorname{Cr}(K)$. -/\n@[category research open, AMS 51 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ c : ℝ≥0, ∀ K : Knot, 0 < K.crossingNumber →\n      K.ropelength ≤ c * K.crossingNumber := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Ropelength and crossing number\n\nThis file asks whether the minimum ropelength of a nontrivial closed knot is bounded above by a\nuniversal constant times its crossing number.\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Ropelength](https://en.wikipedia.org/wiki/Ropelength)\n-/\n\nnamespace IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n\nopen Set MeasureTheory\nopen scoped RealInnerProductSpace\n\nprivate abbrev E := EuclideanSpace ℝ (Fin 3)\n\n/-- The image of one period of a closed parametrized curve. -/\ndef curveImage (γ : ℝ → E) : Set E := γ '' Ico 0 1\n\n/-- The thickness of a closed curve, defined as the reach of its image: the supremum of the\nradii for which every point at distance less than the radius has a unique nearest point on the\ncurve. -/\nnoncomputable def thickness (γ : ℝ → E) : ℝ :=\n  sSup {r : ℝ | 0 ≤ r ∧ ∀ x : E, Metric.infDist x (curveImage γ) < r →\n    ∃! p : E, p ∈ curveImage γ ∧ dist x p = Metric.infDist x (curveImage γ)}\n\n/-- A tame closed knot realization is a regular, `C¹`, one-periodic embedded curve with positive\nthickness. Restricting to positive thickness prevents division by zero in ropelength. -/\nstructure Knot where\n  toFun : ℝ → E\n  contDiff : ContDiff ℝ 1 toFun\n  periodic : Function.Periodic toFun 1\n  injOn : Set.InjOn toFun (Ico 0 1)\n  regular : ∀ t, fderiv ℝ toFun t 1 ≠ 0\n  positive_thickness : 0 < thickness toFun\n\ninstance : FunLike Knot ℝ E where\n  coe K := K.toFun\n  coe_injective' K L h := by cases K; cases L; simp_all\n\n/-- The length of one period of a knot realization. -/\nnoncomputable def knotLength (K : Knot) : ℝ :=\n  ∫ t in (0 : ℝ)..1, ‖fderiv ℝ K t 1‖\n\n/-- Two knot realizations are ambient isotopic. The maps `H t` are ambient homeomorphisms,\nwitnessed by the continuously varying inverses `G t`; `H 0` is the identity and `H 1` carries\nthe first knot image onto the second. -/\ndef AmbientIsotopic (K L : Knot) : Prop :=\n  ∃ H G : ℝ → E → E,\n    Continuous (Function.uncurry H) ∧ Continuous (Function.uncurry G) ∧\n    (∀ t x, G t (H t x) = x) ∧ (∀ t x, H t (G t x) = x) ∧\n    (∀ x, H 0 x = x) ∧ H 1 '' curveImage K = curveImage L\n\n/-- The ropelength of a knot type is the infimum of length divided by thickness over all\nambient-isotopic positive-thickness `C¹` realizations. -/\nnoncomputable def ropelength (K : Knot) : ℝ :=\n  sInf {r : ℝ | ∃ L : Knot, AmbientIsotopic K L ∧ r = knotLength L / thickness L}\n\n/-- Orthogonal projection onto the plane perpendicular to `v` (when `v` is a unit vector). -/\nnoncomputable def planeProjection (v x : E) : E := x - (inner ℝ x v) • v\n\n/-- Parameter pairs giving the double points of the projection of `K` in direction `v`. -/\nnoncomputable def projectionDoublePoints (K : Knot) (v : E) : Set (ℝ × ℝ) :=\n  {p | p.1 ∈ Ico 0 1 ∧ p.2 ∈ Ico 0 1 ∧ p.1 < p.2 ∧\n    planeProjection v (K p.1) = planeProjection v (K p.2)}\n\n/-- A projection is regular when its direction is a unit vector, it has finitely many double\npoints, every projected fiber has at most two points, the projected curve is regular, and all\ndouble points are transverse. -/\nnoncomputable def IsRegularProjection (K : Knot) (v : E) : Prop :=\n  ‖v‖ = 1 ∧\n  (projectionDoublePoints K v).Finite ∧\n  (∀ y : E, {t : ℝ | t ∈ Ico 0 1 ∧ planeProjection v (K t) = y}.Finite ∧\n    {t : ℝ | t ∈ Ico 0 1 ∧ planeProjection v (K t) = y}.ncard ≤ 2) ∧\n  (∀ t, planeProjection v (fderiv ℝ K t 1) ≠ 0) ∧\n  (∀ p ∈ projectionDoublePoints K v,\n    LinearIndependent ℝ (fun i : Fin 2 ↦\n      if i = 0 then planeProjection v (fderiv ℝ K p.1 1)\n      else planeProjection v (fderiv ℝ K p.2 1)))\n\n/-- The crossing number is the least number of crossings in a regular projection of any\nambient-isotopic realization. -/\nnoncomputable def crossingNumber (K : Knot) : ℕ :=\n  sInf {n : ℕ | ∃ (L : Knot) (v : E), AmbientIsotopic K L ∧ IsRegularProjection L v ∧\n    n = (projectionDoublePoints L v).ncard}\n\n/-- A knot is an unknot when it is ambient isotopic to some planar round circle. -/\nnoncomputable def IsUnknot (K : Knot) : Prop :=\n  ∃ L : Knot, AmbientIsotopic K L ∧ ∃ c : E, ∃ u w : E,\n    LinearIndependent ℝ ![u, w] ∧ ‖u‖ = 1 ∧ ‖w‖ = 1 ∧ (inner ℝ u w) = 0 ∧\n    ∀ t, L t = c + Real.cos (2 * Real.pi * t) • u + Real.sin (2 * Real.pi * t) • w\n\n/--\nIs the upper bound for the minimum ropelength of a closed knot linear in its crossing number?\nPrecisely: is there a universal positive constant $C$ such that every nontrivial tame closed knot\ntype $K$ satisfies $\\operatorname{Rop}(K) \\le C\\operatorname{Cr}(K)$? Here ropelength is the\ninfimum of length divided by thickness over positive-thickness $C^1$ realizations, and crossing\nnumber is minimized over regular projections. Nontrivial knots are used because the unknot has\ncrossing number zero but positive minimum ropelength.\n-/\n@[category research open, AMS 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ C : ℝ, 0 < C ∧ ∀ K : Knot, ¬ IsUnknot K →\n      ropelength K ≤ C * crossingNumber K := by\n  sorry\n\nend IsTheUpperBoundOfAClosedKnotsMinimumRopelengthLinearToItsCrossing\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.88,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “linear upper bound” as the positive yes/no assertion that there is a universal constant C > 0 with Rop(K) ≤ C · Cr(K) for every nontrivial tame closed knot type.",
+    "Excluded the unknot rather than adding an additive constant, because the unknot has crossing number 0 and positive ropelength; this is one of the two boundary-case resolutions explicitly identified in the decomposition notes.",
+    "Represented tame knot types through regular one-periodic C¹ embeddings of the circle into Euclidean 3-space having positive thickness. Quantifying over representatives is equivalent to quantifying over represented knot types because ropelength and crossing number are minimized over the ambient-isotopy class.",
+    "Defined thickness as the reach of the curve image: the supremal radius within which every nearby ambient point has a unique nearest point on the curve. For regular closed curves this is the standard geometric thickness, equivalently the radius of the largest embedded normal tube.",
+    "Restricted admissible ropelength representatives to positive-thickness C¹ curves. This expresses the physical rope domain and prevents Lean’s totalized real division from assigning thickness-zero curves the spurious ratio Len/0 = 0.",
+    "Defined length as the integral over one period of the norm of the Fréchet derivative.",
+    "Defined ambient isotopy using jointly continuous families H and G of mutually inverse ambient maps, starting at the identity, with the endpoint carrying one curve image onto the other.",
+    "Defined crossing number by minimizing over ambient-isotopic realizations and regular orthogonal projections. Regularity requires a unit projection direction, finitely many crossings, no triple projected fibers, nonvanishing projected velocity, and transverse double points; each crossing is counted once by an ordered parameter pair t₁ < t₂.",
+    "Defined nontriviality geometrically: an unknot is ambient isotopic to an orthonormally parametrized planar round circle.",
+    "Used the radius convention for thickness. Changing to a diameter convention only rescales ropelength by a universal factor and does not change the linearity question."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `EuclideanSpace ℝ (Fin 3)` is used directly through this abbreviation.",
+     "name": "E",
+     "why_needed": "Local abbreviation for Euclidean 3-space, the ambient space of knots."
+    },
+    {
+     "closest_existing_considered": "Uses Mathlib `Set.image` and `Set.Ico`; no closed-periodic-curve image helper exists.",
+     "name": "curveImage",
+     "why_needed": "Extracts the geometric image of one half-open period of a periodic parametrization without duplicating the endpoint."
+    },
+    {
+     "closest_existing_considered": "Built from Mathlib `Metric.infDist`, unique existence, and `sSup`; searches for thickness, reach, and normal injectivity radius found no suitable primitive.",
+     "name": "thickness",
+     "why_needed": "Mathlib and the repository have no knot thickness or reach definition."
+    },
+    {
+     "closest_existing_considered": "Uses existing `ContDiff`, `Function.Periodic`, `Set.InjOn`, `fderiv`, and the bespoke thickness definition.",
+     "name": "Knot",
+     "why_needed": "No type of tame closed knots or regular embedded closed curves exists in Mathlib or the helper library."
+    },
+    {
+     "closest_existing_considered": "Uses Mathlib's interval integral and Fréchet derivative. The existing bounded-variation API is designed for linearly ordered parameter intervals and does not directly package periodic closed-curve length.",
+     "name": "knotLength",
+     "why_needed": "Packages the geometric length of one period of a C¹ knot parametrization."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Homeomorph`, paths, and homotopies, but no ready ambient isotopy notion; the definition explicitly gives continuous mutually inverse ambient families.",
+     "name": "AmbientIsotopic",
+     "why_needed": "Knot type is ambient-isotopy class, and no ambient-isotopy predicate for Euclidean embeddings exists."
+    },
+    {
+     "closest_existing_considered": "Uses Mathlib `sInf`, real division, and the locally defined length, thickness, and isotopy notions.",
+     "name": "ropelength",
+     "why_needed": "No ropelength invariant exists; it must be the infimum of length/thickness across an ambient-isotopy class."
+    },
+    {
+     "closest_existing_considered": "Defined from Mathlib's real inner product and scalar operations; the generic orthogonal-projection API does not provide this direction-parametrized formula as the needed simple function.",
+     "name": "planeProjection",
+     "why_needed": "Expresses the orthogonal projection used to form knot diagrams."
+    },
+    {
+     "closest_existing_considered": "Uses Mathlib sets and the half-open period; no knot-diagram or crossing set API exists.",
+     "name": "projectionDoublePoints",
+     "why_needed": "Identifies and counts crossings of a projected parametrized knot without double-counting parameter pairs."
+    },
+    {
+     "closest_existing_considered": "Uses Mathlib `Set.Finite`, `Set.ncard`, derivatives, and `LinearIndependent`; no regular knot projection predicate exists.",
+     "name": "IsRegularProjection",
+     "why_needed": "Crossing number must exclude nongeneric projections with tangencies, cusps, triple points, or infinite overlap."
+    },
+    {
+     "closest_existing_considered": "Defined as `sInf` in `ℕ` of crossing counts over ambient-isotopic realizations and regular projections.",
+     "name": "crossingNumber",
+     "why_needed": "No knot crossing-number invariant exists in Mathlib or the repository."
+    },
+    {
+     "closest_existing_considered": "No unknot predicate exists; the definition uses ambient isotopy to an explicitly parametrized planar round circle.",
+     "name": "IsUnknot",
+     "why_needed": "The pure multiplicative inequality must exclude the crossing-number-zero unknot."
+    }
+   ],
+   "per_slot": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": "/--\nIs the upper bound for the minimum ropelength of a closed knot linear in its crossing number?\nPrecisely: is there a universal positive constant $C$ such that every nontrivial tame closed knot\ntype $K$ satisfies $\\operatorname{Rop}(K) \\le C\\operatorname{Cr}(K)$? Here ropelength is the\ninfimum of length divided by thickness over positive-thickness $C^1$ realizations, and crossing\nnumber is minimized over regular projections. Nontrivial knots are used because the unknot has\ncrossing number zero but positive minimum ropelength.\n-/\n@[category research open, AMS 53 57]\ntheorem is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing :\n    answer(sorry) ↔ ∃ C : ℝ, 0 < C ∧ ∀ K : Knot, ¬ IsUnknot K →\n      ropelength K ≤ C * crossingNumber K := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "is_the_upper_bound_of_a_closed_knots_minimum_ropelength_linear_to_its_crossing": "c01"
+ },
+ "id": "wp-is-the-upper-bound-of-a-closed-knots-minimum-ropelength-linear-to-its-crossing",
+ "main_attempt": "c01"
+}

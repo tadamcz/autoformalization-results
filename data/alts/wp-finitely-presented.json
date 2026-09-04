@@ -1,0 +1,287 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2025 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Finitely presented periodic groups\n\nA group is *periodic* (or a *torsion group*) if every element has finite order. No uniform\nbound on the orders is assumed. A group is *finitely presented* if it has a presentation\n$\\langle S \\mid R \\rangle$ with a finite set of generators $S$ and a finite set of relators $R$.\n\nThe general Burnside problem asked whether every finitely generated periodic group is finite.\nGolod and Shafarevich answered it negatively in 1964. It is open whether the answer becomes\npositive when \"finitely generated\" is strengthened to \"finitely presented\".\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics#Group_theory)\n- [Wikipedia, Presentation of a group](https://en.wikipedia.org/wiki/finitely_presented_group)\n- [Wikipedia, Burnside problem](https://en.wikipedia.org/wiki/Burnside_problem)\n-/\n\nnamespace FinitelyPresented\n\n/-- A group `G` is *finitely presented* if it is isomorphic to `PresentedGroup rels` for some\nfinite type of generators `α` and some finite set of relators `rels : Set (FreeGroup α)`. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (α : Type) (_ : Finite α) (rels : Set (FreeGroup α)),\n    rels.Finite ∧ Nonempty (PresentedGroup rels ≃* G)\n\n/-- A group presented by finitely many generators and finitely many relators is finitely\npresented. -/\n@[category API, AMS 20]\ntheorem isFinitelyPresented_presentedGroup {α : Type} [Finite α] {rels : Set (FreeGroup α)}\n    (hrels : rels.Finite) : IsFinitelyPresented (PresentedGroup rels) :=\n  ⟨α, inferInstance, rels, hrels, ⟨MulEquiv.refl _⟩⟩\n\n/-- Being finitely presented is invariant under group isomorphism. -/\n@[category API, AMS 20]\ntheorem IsFinitelyPresented.of_mulEquiv {G H : Type*} [Group G] [Group H]\n    (hG : IsFinitelyPresented G) (e : G ≃* H) : IsFinitelyPresented H := by\n  obtain ⟨α, hα, rels, hrels, ⟨f⟩⟩ := hG\n  exact ⟨α, hα, rels, hrels, ⟨f.trans e⟩⟩\n\n/-- A finitely presented group is finitely generated. -/\n@[category API, AMS 20]\ntheorem IsFinitelyPresented.fg {G : Type*} [Group G] (hG : IsFinitelyPresented G) :\n    Group.FG G := by\n  obtain ⟨α, hα, rels, -, ⟨e⟩⟩ := hG\n  have : Group.FG (PresentedGroup rels) :=\n    Group.fg_iff.mpr ⟨Set.range PresentedGroup.of, PresentedGroup.closure_range_of rels,\n      Set.finite_range _⟩\n  exact Group.fg_of_surjective (f := e.toMonoidHom) e.surjective\n\n/-- The free group on a finite type is finitely presented (with no relators). -/\n@[category test, AMS 20]\ntheorem isFinitelyPresented_freeGroup (α : Type) [Finite α] :\n    IsFinitelyPresented (FreeGroup α) := by\n  have h : Subgroup.normalClosure (∅ : Set (FreeGroup α)) = ⊥ :=\n    le_bot_iff.mp <| Subgroup.normalClosure_le_normal (Set.empty_subset _)\n  exact (isFinitelyPresented_presentedGroup Set.finite_empty).of_mulEquiv\n    ((QuotientGroup.quotientMulEquivOfEq h).trans QuotientGroup.quotientBot)\n\n/--\nIs every finitely presented periodic group finite?\n\nThat is, if a group $G$ has a finite presentation $\\langle S \\mid R \\rangle$ and every element\nof $G$ has finite order (with no uniform bound on the orders assumed), must $G$ be finite?\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type*) [Group G], IsFinitelyPresented G → Monoid.IsTorsion G →\n      Finite G := by\n  sorry\n\nend FinitelyPresented\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (unbounded periodicity via `Monoid.IsTorsion`, need for a bespoke finitely-presented predicate built from `PresentedGroup` over a `Finite` generator type with `Set.Finite` relators) match what I found in Mathlib and the repository.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Periodic' is formalized as `Monoid.IsTorsion G` (every element has finite order) with no uniform bound on orders, as the list entry and the Burnside-problem article intend; this is deliberately different from the bounded Burnside problem (`∀ g, g^n = 1` for a fixed n) already in `BoundedBurnsideProblem.lean`.",
+    "'Finitely presented' is formalized by the new predicate `IsFinitelyPresented G := ∃ (α : Type) (_ : Finite α) (rels : Set (FreeGroup α)), rels.Finite ∧ Nonempty (PresentedGroup rels ≃* G)`. The generator type lives in `Type` (universe 0) while `G : Type*`; this loses no generality since any finite generating set can be re-indexed by `Fin n`, and `MulEquiv` works across universes.",
+    "The question is stated with `answer(sorry) ↔ ...` per CONTRIBUTING.md; `answer(True)` means every finitely presented periodic group is finite, `answer(False)` means an infinite finitely presented periodic group exists.",
+    "The group is quantified as `G : Type*` (universe-polymorphic), matching e.g. `ErdosProblems/274.lean`, rather than `Type` as in `BoundedBurnsideProblem.lean`; the truth value does not depend on the universe since finitely presented groups are countable.",
+    "The bespoke definition was placed in the problem file (not `FormalConjecturesForMathlib/`) because the task restricts output to the single candidate file; a reviewer may prefer moving `IsFinitelyPresented` and its API lemmas to `FormalConjecturesForMathlib/GroupTheory/`.",
+    "Extra declarations are all `@[category API]`/`@[category test]` with complete proofs: `isFinitelyPresented_presentedGroup`, `IsFinitelyPresented.of_mulEquiv`, `IsFinitelyPresented.fg` (finitely presented ⇒ `Group.FG`), and `isFinitelyPresented_freeGroup` (free group on a finite type is finitely presented). The (true) fact that every finite group is finitely presented was not included because its proof is not short."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Group.FG` (finitely generated only; too weak, since the general Burnside problem for finitely generated groups is solved negatively), `PresentedGroup` (a construction, not a predicate on groups), `Module.FinitePresentation`/`Algebra.FinitePresentation` (module/algebra analogues, not applicable to groups), and `Group.fg_iff_exists_freeGroup_hom_surjective` (only gives finite generation).",
+     "name": "FinitelyPresented.IsFinitelyPresented",
+     "why_needed": "Mathlib has `PresentedGroup rels` (a concrete quotient of a free group) and `Group.FG`, but no predicate saying that an abstract group admits a finite presentation. The conjecture quantifies over all finitely presented groups, so such a predicate is required."
+    }
+   ],
+   "per_slot": {
+    "finitely_presented": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type*) [Group G], IsFinitelyPresented G → Monoid.IsTorsion G → Finite G`, following the repository's question style. `Monoid.IsTorsion` is Mathlib's 'every element has finite order' (periodic, no uniform exponent). Mathlib has no finitely-presented-group predicate, so a bespoke `IsFinitelyPresented` was added in the problem file (isomorphism to `PresentedGroup rels` over a `Finite` generator type with `rels.Finite`), with proved API/test lemmas."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "finitely_presented": "/--\nIs every finitely presented periodic group finite?\n\nThat is, if a group $G$ has a finite presentation $\\langle S \\mid R \\rangle$ and every element\nof $G$ has finite order (with no uniform bound on the orders assumed), must $G$ be finite?\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type*) [Group G], IsFinitelyPresented G → Monoid.IsTorsion G →\n      Finite G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Finitely presented periodic groups\n\nIs every finitely presented periodic group finite?\n\nThis is a Burnside-type problem. A group is *periodic* (or *torsion*) if every element has\nfinite order; no common bound on the orders is assumed. A group is *finitely presented* if it\nhas a presentation $\\langle S \\mid R \\rangle$ with both $S$ and $R$ finite.\n\n*References:*\n* [Wikipedia, Presentation of a group](https://en.wikipedia.org/wiki/finitely_presented_group)\n* [Wikipedia, List of unsolved problems](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n* [Wikipedia, Burnside problem](https://en.wikipedia.org/wiki/Burnside_problem)\n-/\n\nnamespace FinitelyPresented\n\n/--\nA group `G` is *finitely presented* if it has a presentation $\\langle S \\mid R \\rangle$ with\nfinitely many generators and finitely many relators, i.e. if `G` is isomorphic to\n`PresentedGroup rels` for some finite set `rels` of relators in the free group on `Fin n`.\n-/\ndef Group.IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (n : ℕ) (rels : Set (FreeGroup (Fin n))),\n    rels.Finite ∧ Nonempty (G ≃* PresentedGroup rels)\n\n/-- A group given by finitely many generators and finitely many relators is finitely presented. -/\n@[category API, AMS 20]\ntheorem Group.isFinitelyPresented_presentedGroup {n : ℕ} {rels : Set (FreeGroup (Fin n))}\n    (hrels : rels.Finite) : Group.IsFinitelyPresented (PresentedGroup rels) :=\n  ⟨n, rels, hrels, ⟨MulEquiv.refl _⟩⟩\n\n/-- A finitely presented group is finitely generated. -/\n@[category API, AMS 20]\ntheorem Group.IsFinitelyPresented.fg {G : Type*} [Group G] (hG : Group.IsFinitelyPresented G) :\n    Group.FG G := by\n  obtain ⟨n, rels, -, ⟨e⟩⟩ := hG\n  have : Group.FG (PresentedGroup rels) :=\n    Group.fg_iff.mpr ⟨_, PresentedGroup.closure_range_of rels, Set.finite_range _⟩\n  exact Group.fg_of_surjective (f := e.symm.toMonoidHom) e.symm.surjective\n\n/--\n**Finitely presented periodic groups**\n\nIs every finitely presented periodic group finite?\n\nHere a group is *periodic* if every element has finite order (`Monoid.IsTorsion`); no uniform\nbound on the orders is assumed, so this is distinct from the bounded Burnside problem.\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔\n      ∀ (G : Type) [Group G], Group.IsFinitelyPresented G → Monoid.IsTorsion G →\n        Finite G := by\n  sorry\n\nend FinitelyPresented\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "None. The single-slot table matches the statement, which is one yes/no question.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Periodic' is formalized as `Monoid.IsTorsion G` (every element has finite order), with no uniform exponent bound — this is the unbounded (general) Burnside-type problem, as the list entry says 'periodic', not 'of bounded exponent'.",
+    "'Finitely presented' uses generator type `Fin n` rather than an arbitrary `Finite` type; this is without loss of generality since `PresentedGroup.equivPresentedGroup` reindexes along any bijection S ≃ Fin n, and it avoids universe bookkeeping in the definition.",
+    "The group is quantified over `Type` (universe 0), matching the neighbouring `BoundedBurnsideProblem.lean`. This is without loss of generality: a finitely presented group is countable, hence isomorphic to a group in `Type`, and both `IsTorsion` and `Finite` are invariant under isomorphism.",
+    "The statement is a yes/no question, so it uses `answer(sorry) ↔ ...` per CONTRIBUTING.md; `answer(True)` corresponds to 'yes, every finitely presented periodic group is finite'.",
+    "The definition is placed in the problem file (not FormalConjecturesForMathlib) because the task restricts writes to the candidate file; a reviewer may prefer moving `Group.IsFinitelyPresented` and its API lemmas to `FormalConjecturesForMathlib/GroupTheory/` for reuse."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`PresentedGroup` (Mathlib.GroupTheory.PresentedGroup) is a construction, not a predicate on groups; `Group.FG` only captures finite generation; `Algebra.FinitePresentation` / `Module.FinitePresentation` are for rings/modules, not groups.",
+     "name": "FinitelyPresented.Group.IsFinitelyPresented",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib has a predicate for a group being finitely presented (only `PresentedGroup rels` as a construction, `Group.FG` for finite generation, and ring/module `FinitePresentation`). Defined as `∃ (n : ℕ) (rels : Set (FreeGroup (Fin n))), rels.Finite ∧ Nonempty (G ≃* PresentedGroup rels)`, matching the Wikipedia definition (G ≅ ⟨S | R⟩ with S, R finite). Two provable API lemmas are included: `Group.isFinitelyPresented_presentedGroup` (a `PresentedGroup` with finitely many relators over `Fin n` is finitely presented) and `Group.IsFinitelyPresented.fg` (finitely presented implies `Group.FG`)."
+    }
+   ],
+   "per_slot": {
+    "finitely_presented": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type) [Group G], Group.IsFinitelyPresented G → Monoid.IsTorsion G → Finite G`. Mathlib has `PresentedGroup` and `Monoid.IsTorsion` but no finitely-presented-group predicate, so a bespoke `Group.IsFinitelyPresented` (isomorphism to `PresentedGroup rels` over `Fin n` with `rels` a `Set.Finite`) was added in the problem file, following the decomposition note."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "finitely_presented": "/--\n**Finitely presented periodic groups**\n\nIs every finitely presented periodic group finite?\n\nHere a group is *periodic* if every element has finite order (`Monoid.IsTorsion`); no uniform\nbound on the orders is assumed, so this is distinct from the bounded Burnside problem.\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔\n      ∀ (G : Type) [Group G], Group.IsFinitelyPresented G → Monoid.IsTorsion G →\n        Finite G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Finitely presented periodic groups\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Presentation of a group](https://en.wikipedia.org/wiki/finitely_presented_group)\n-/\n\nnamespace FinitelyPresented\n\n/-- A group is finitely presented if it is isomorphic to a group presented using finitely many\ngenerators and finitely many relators. -/\ndef IsFinitelyPresentedGroup (G : Type*) [Group G] : Prop :=\n  ∃ n : ℕ, ∃ rels : Set (FreeGroup (Fin n)), rels.Finite ∧\n    Nonempty (G ≃* PresentedGroup rels)\n\n/-- Is every finitely presented periodic group finite? Here periodic means that every element has\nfinite order; no uniform bound on the orders is assumed. -/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type*) [Group G],\n      IsFinitelyPresentedGroup G → Monoid.IsTorsion G → Finite G := by\n  sorry\n\nend FinitelyPresented\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “periodic” as `Monoid.IsTorsion G`, meaning every element individually has finite order, with no common exponent.",
+    "Modeled a finite presentation as an isomorphism to `PresentedGroup rels` with generators indexed by `Fin n` and `rels.Finite`; indexing by `Fin n` is equivalent to choosing an arbitrary finite generator type.",
+    "Used `Finite G` for the conclusion, matching finiteness of the underlying group without requiring chosen enumeration data.",
+    "Used `answer(sorry) ↔ ...` because the source is a yes/no question, following the repository convention; `answer(True)` gives the positive assertion that every such group is finite."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup rels`, which constructs a group from a generator type and relator set but does not encode finiteness or existence of such a presentation for an arbitrary group.",
+     "name": "FinitelyPresented.IsFinitelyPresentedGroup",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have `PresentedGroup` but no predicate asserting that a group admits a presentation with finitely many generators and finitely many relators."
+    }
+   ],
+   "per_slot": {
+    "finitely_presented": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "finitely_presented": "/-- Is every finitely presented periodic group finite? Here periodic means that every element has\nfinite order; no uniform bound on the orders is assumed. -/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type*) [Group G],\n      IsFinitelyPresentedGroup G → Monoid.IsTorsion G → Finite G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Finitely presented periodic groups\n\n*References:*\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, *Presentation of a group*](https://en.wikipedia.org/wiki/finitely_presented_group)\n-/\n\nnamespace FinitelyPresented\n\n/-- A group is finitely presented if it is isomorphic to a group given by finitely many\ngenerators and finitely many relators. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (n : ℕ) (rels : Set (FreeGroup (Fin n))), rels.Finite ∧\n    Nonempty (G ≃* PresentedGroup rels)\n\n/--\nIs every group that has a presentation with finitely many generators and finitely many relators,\nand in which every element has finite order, necessarily finite? No uniform bound on the orders of\nthe elements is assumed.\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type*) [Group G],\n      IsFinitelyPresented G → Monoid.IsTorsion G → Finite G := by\n  sorry\n\nend FinitelyPresented\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “periodic group” as `Monoid.IsTorsion G`, which means every element has finite order and does not impose a uniform exponent.",
+    "Represented a finite generator type canonically by `Fin n` for some `n : ℕ`; relators are a `Set (FreeGroup (Fin n))` required to satisfy `Set.Finite`.",
+    "Expressed that `G` has the resulting presentation by `Nonempty (G ≃* PresentedGroup rels)`.",
+    "Preserved the source's yes/no wording using `answer(sorry) ↔` followed by the universally quantified positive assertion."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup rels` constructs a group from relators but does not package existence of a presentation with finitely many generators and relators; unrelated `Module.FinitePresentation` and algebra finite-presentation predicates do not apply to groups.",
+     "name": "FinitelyPresented.IsFinitelyPresented",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no predicate for a finitely presented group."
+    }
+   ],
+   "per_slot": {
+    "finitely_presented": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "finitely_presented": "/--\nIs every group that has a presentation with finitely many generators and finitely many relators,\nand in which every element has finite order, necessarily finite? No uniform bound on the orders of\nthe elements is assumed.\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type*) [Group G],\n      IsFinitelyPresented G → Monoid.IsTorsion G → Finite G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Finitely presented periodic groups\n\nA group is *finitely presented* if it has a presentation $\\langle S \\mid R \\rangle$ with\nfinitely many generators $S$ and finitely many relators $R$, i.e. it is isomorphic to the\nquotient of the free group on $S$ by the normal closure of $R$. A group is *periodic*\n(or *torsion*) if every element has finite order; no uniform bound on the orders is assumed.\n\nThe Burnside problem for finitely presented groups asks whether every finitely presented\nperiodic group is finite.\n\n*References:*\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, Presentation of a group](https://en.wikipedia.org/wiki/finitely_presented_group)\n- [Wikipedia, Burnside problem](https://en.wikipedia.org/wiki/Burnside_problem)\n-/\n\nnamespace FinitelyPresented\n\n/-- A group `G` is *finitely presented* if it is isomorphic to a presented group\n`PresentedGroup rels` whose generator type `α` is finite and whose set of relators\n`rels : Set (FreeGroup α)` is finite. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (α : Type) (_ : Finite α) (rels : Set (FreeGroup α)),\n    rels.Finite ∧ Nonempty (PresentedGroup rels ≃* G)\n\n/-- A presented group with finitely many generators and finitely many relators is\nfinitely presented. -/\n@[category API, AMS 20]\ntheorem isFinitelyPresented_presentedGroup {α : Type} [Finite α] {rels : Set (FreeGroup α)}\n    (hrels : rels.Finite) : IsFinitelyPresented (PresentedGroup rels) :=\n  ⟨α, inferInstance, rels, hrels, ⟨MulEquiv.refl _⟩⟩\n\n/-- Being finitely presented is invariant under group isomorphism. -/\n@[category API, AMS 20]\ntheorem IsFinitelyPresented.of_mulEquiv {G H : Type*} [Group G] [Group H]\n    (hG : IsFinitelyPresented G) (e : G ≃* H) : IsFinitelyPresented H := by\n  obtain ⟨α, hα, rels, hrels, ⟨f⟩⟩ := hG\n  exact ⟨α, hα, rels, hrels, ⟨f.trans e⟩⟩\n\n/-- A finitely presented group is finitely generated. -/\n@[category API, AMS 20]\ntheorem IsFinitelyPresented.fg {G : Type*} [Group G] (hG : IsFinitelyPresented G) : Group.FG G := by\n  obtain ⟨α, hα, rels, -, ⟨e⟩⟩ := hG\n  have : Group.FG (PresentedGroup rels) :=\n    Group.fg_iff.mpr ⟨_, PresentedGroup.closure_range_of rels, Set.finite_range _⟩\n  exact Group.fg_of_surjective (f := e.toMonoidHom) e.surjective\n\n/--\n**Burnside problem for finitely presented groups.**\n\nIs every finitely presented periodic group finite?\n\nHere a group is *periodic* if every element has finite order (`Monoid.IsTorsion`); no uniform\nbound on the orders of elements is assumed, so this is distinct from the bounded Burnside problem.\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type*) [Group G], IsFinitelyPresented G → Monoid.IsTorsion G →\n      Finite G := by\n  sorry\n\nend FinitelyPresented\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "None. The single-slot decomposition is correct: the entry is one yes/no Burnside-type question, and the suggested shape `∀ G, finitely presented → IsTorsion → Finite` is exactly what was formalized.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Periodic group' is formalized as `Monoid.IsTorsion G` (every element has finite order) with no uniform bound on orders, per the decomposition notes and the Wikipedia Burnside-problem article; this distinguishes the statement from the bounded Burnside problem already in the repo.",
+    "The generator type in `IsFinitelyPresented` is quantified over `Type` (universe 0) with a `Finite` instance, rather than `Fin n` or a universe-polymorphic type; since any finite type is equivalent to some `Fin n` and presented groups over equivalent generator types are isomorphic, this is equivalent to the informal notion while avoiding a spurious universe parameter on the definition. Relators are a `Set (FreeGroup α)` with `Set.Finite`, as suggested in the decomposition notes.",
+    "The theorem quantifies over `G : Type*` (universe-polymorphic), following e.g. `ErdosProblems/274.lean`; the statements for different universes are mathematically equivalent (finitely presented groups are countable, and `Finite`/`IsTorsion`/`IsFinitelyPresented` transfer along isomorphisms).",
+    "Per the task constraints, the bespoke definition lives in the problem file (inside `namespace FinitelyPresented`) instead of `FormalConjecturesForMathlib/`; a reviewer may wish to move it there (with its API lemmas) as the reusable notion `Group.IsFinitelyPresented`.",
+    "Isomorphism is expressed as `Nonempty (PresentedGroup rels ≃* G)`, the standard Mathlib idiom for 'is isomorphic to'.",
+    "Copyright year set to 2026, matching the majority of files in the checkout and the repo's latest commit date."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Group.FG` (finite generation only; strictly weaker, e.g. ℤ ≀ ℤ is FG but not FP), `PresentedGroup` (the raw construction, no finiteness predicate), `Module.FinitePresentation` (modules, not groups).",
+     "name": "FinitelyPresented.IsFinitelyPresented",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines 'finitely presented group' (grepped for FinitePresentation/FinitelyPresented/Group.FP etc.; only `Module.FinitePresentation`/`Algebra.FinitePresentation` exist, and `Group.FG` covers finite generation only). Defined as `∃ (α : Type) (_ : Finite α) (rels : Set (FreeGroup α)), rels.Finite ∧ Nonempty (PresentedGroup rels ≃* G)`, matching the article's definition (isomorphic to the quotient of the free group on a finite generating set by the normal closure of a finite set of relators). Three provable `category API` lemmas are included as tests: presented groups with finite data are finitely presented, invariance under `MulEquiv`, and finitely presented implies `Group.FG`."
+    }
+   ],
+   "per_slot": {
+    "finitely_presented": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type*) [Group G], IsFinitelyPresented G → Monoid.IsTorsion G → Finite G`. 'Periodic' is `Monoid.IsTorsion` (every element of finite order, no uniform exponent). Mathlib and FormalConjecturesForMathlib have no finitely-presented-group predicate, so `IsFinitelyPresented` is introduced in the file following the Wikipedia definition (isomorphic to `PresentedGroup rels` with finite generator type and finite relator set)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "finitely_presented": "/--\n**Burnside problem for finitely presented groups.**\n\nIs every finitely presented periodic group finite?\n\nHere a group is *periodic* if every element has finite order (`Monoid.IsTorsion`); no uniform\nbound on the orders of elements is assumed, so this is distinct from the bounded Burnside problem.\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type*) [Group G], IsFinitelyPresented G → Monoid.IsTorsion G →\n      Finite G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Finitely presented periodic groups\n\n*References:*\n- [Wikipedia, *List of unsolved problems in mathematics*](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n- [Wikipedia, *Presentation of a group*](https://en.wikipedia.org/wiki/finitely_presented_group)\n-/\n\nnamespace FinitelyPresented\n\n/-- A group is finitely presented if it is isomorphic to a group presented using a finite type of\n generators and a finite set of relators. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (α : Type) (_ : Finite α) (rels : Set (FreeGroup α)),\n    rels.Finite ∧ Nonempty (G ≃* PresentedGroup rels)\n\n/-- Is every finitely presented periodic group finite? Here periodic means that every element has\nfinite order; no uniform bound on their orders is assumed. -/\n@[category research open, AMS 20]\ntheorem finitely_presented : answer(sorry) ↔ ∀ (G : Type) [Group G],\n    IsFinitelyPresented G → Monoid.IsTorsion G → Finite G := by\n  sorry\n\nend FinitelyPresented\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Following the repository convention for an open yes/no question, the statement is `answer(sorry) ↔ P`, where `P` is the universal assertion that every finitely presented periodic group is finite.",
+    "A group is modeled as finitely presented when there exist a finite generator type `α`, a finite set `rels : Set (FreeGroup α)`, and a multiplicative equivalence between the group and `PresentedGroup rels`. Relations written as equations are faithfully represented by relators equal to the identity, as described by the cited background article.",
+    "“Periodic” is modeled by `Monoid.IsTorsion G`, which says each element has finite order. No single exponent is quantified or assumed, distinguishing this statement from the bounded Burnside problem.",
+    "The conclusion uses the proposition `Finite G`, matching finiteness of the underlying group type without requiring chosen `Fintype` data."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup rels` constructs a group from generators and relators but does not package existence of a presentation with both a finite generator type and a finite relator set. Ring/module finite-presentation predicates are unrelated.",
+     "name": "FinitelyPresented.IsFinitelyPresented",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no predicate expressing that a group admits a finite presentation."
+    }
+   ],
+   "per_slot": {
+    "finitely_presented": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "finitely_presented": "/-- Is every finitely presented periodic group finite? Here periodic means that every element has\nfinite order; no uniform bound on their orders is assumed. -/\n@[category research open, AMS 20]\ntheorem finitely_presented : answer(sorry) ↔ ∀ (G : Type) [Group G],\n    IsFinitelyPresented G → Monoid.IsTorsion G → Finite G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Finitely presented periodic groups\n\n*References:*\n- [Wikipedia, Finitely presented group](https://en.wikipedia.org/wiki/finitely_presented_group)\n- [Wikipedia, List of unsolved problems in mathematics](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics)\n-/\n\nnamespace FinitelyPresented\n\n/-- A group is finitely presented if it is isomorphic to a presented group with finitely many\nformal generators and finitely many relators. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ n : ℕ, ∃ rels : Set (FreeGroup (Fin n)),\n    rels.Finite ∧ Nonempty (G ≃* PresentedGroup rels)\n\n/--\nIs every finitely presented periodic group finite? Here periodic means that every element has\nfinite order; no uniform bound on the orders is assumed.\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type*) [Group G],\n      IsFinitelyPresented G → Monoid.IsTorsion G → Finite G := by\n  sorry\n\nend FinitelyPresented\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “periodic” as `Monoid.IsTorsion G`, meaning every group element has finite order independently; no uniform exponent is assumed.",
+    "Defined finite presentability using a canonical finite generator type `Fin n`: there must be a finite set `rels : Set (FreeGroup (Fin n))` such that `G` is multiplicatively equivalent to `PresentedGroup rels`. This is equivalent to allowing an arbitrary finite generator type and avoids unnecessary universe-sensitive type quantification.",
+    "Preserved the source's yes/no wording using `answer(sorry) ↔` the positive universal statement."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup rels` constructs a group from generators and relators, but does not package existence of a finite generator set, a finite relator set, and an isomorphism to the given group. Ring-theoretic finite-presentation predicates are not applicable.",
+     "name": "FinitelyPresented.IsFinitelyPresented",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have `PresentedGroup` but no predicate expressing that an abstract group admits a finite presentation."
+    }
+   ],
+   "per_slot": {
+    "finitely_presented": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "finitely_presented": "/--\nIs every finitely presented periodic group finite? Here periodic means that every element has\nfinite order; no uniform bound on the orders is assumed.\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type*) [Group G],\n      IsFinitelyPresented G → Monoid.IsTorsion G → Finite G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Finitely presented periodic groups\n\nIs every finitely presented periodic group finite?\n\n*References:*\n- [Wikipedia](https://en.wikipedia.org/wiki/finitely_presented_group)\n- [Wikipedia](https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics#Algebra)\n-/\n\nnamespace FinitelyPresented\n\n/--\nA group `G` is *finitely presented* if it is isomorphic to `PresentedGroup rels` for some finite\ntype `α` of generators and some finite set `rels` of relations in the free group on `α`.\n-/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (α : Type) (_ : Finite α) (rels : Set (FreeGroup α)),\n    rels.Finite ∧ Nonempty (PresentedGroup rels ≃* G)\n\n/-- A group given by finitely many generators and finitely many relations is finitely presented. -/\n@[category API, AMS 20]\ntheorem isFinitelyPresented_presentedGroup {α : Type} [Finite α] {rels : Set (FreeGroup α)}\n    (hrels : rels.Finite) : IsFinitelyPresented (PresentedGroup rels) :=\n  ⟨α, ‹_›, rels, hrels, ⟨MulEquiv.refl _⟩⟩\n\n/-- A finitely presented group is finitely generated. -/\n@[category API, AMS 20]\ntheorem IsFinitelyPresented.fg {G : Type*} [Group G] (hG : IsFinitelyPresented G) : Group.FG G := by\n  obtain ⟨α, _, rels, -, ⟨e⟩⟩ := hG\n  have : Group.FG (PresentedGroup rels) :=\n    Group.fg_iff.mpr ⟨Set.range PresentedGroup.of, PresentedGroup.closure_range_of rels,\n      Set.finite_range _⟩\n  exact Group.fg_of_surjective (f := e.toMonoidHom) e.surjective\n\n/-- The trivial group is finitely presented. -/\n@[category test, AMS 20]\ntheorem isFinitelyPresented_punit : IsFinitelyPresented PUnit := by\n  haveI : Subsingleton (PresentedGroup (∅ : Set (FreeGroup Empty))) :=\n    (PresentedGroup.mk_surjective _).subsingleton\n  haveI : Unique (PresentedGroup (∅ : Set (FreeGroup Empty))) := Unique.mk' _\n  exact ⟨Empty, inferInstance, ∅, Set.finite_empty, ⟨MulEquiv.ofUnique⟩⟩\n\n/--\nIs every finitely presented periodic group finite?\n\nHere a group is *periodic* (or *torsion*) if every element has finite order; no uniform bound on\nthe orders is assumed, so this is a finitely presented variant of the general (unbounded) Burnside\nproblem rather than of the bounded one.\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type) [Group G], IsFinitelyPresented G → Monoid.IsTorsion G →\n      Finite G := by\n  sorry\n\nend FinitelyPresented\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "None. The single slot matches the source entry, and the suggested shape (`∀ G, finitely presented → Monoid.IsTorsion G → Finite G`, with a bespoke finitely-presented predicate via `PresentedGroup` over a `Finite` type with `Set.Finite` relations) was followed, wrapped in the repository's `answer(sorry) ↔` form since the source is phrased as a question.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Question form: the Wikipedia entry is a yes/no question, so the repository's `answer(sorry) ↔ P` style is used; `answer(True)` means every finitely presented periodic group is finite, `answer(False)` means an infinite finitely presented periodic group exists.",
+    "'Periodic' is modeled as `Monoid.IsTorsion G` (every element has finite order) with no uniform bound on orders, following the Wikipedia 'periodic group' meaning; this makes the statement a finitely presented variant of the general Burnside problem, not the bounded one (which is separately in `BoundedBurnsideProblem.lean`).",
+    "The generator type in `IsFinitelyPresented` is quantified over `Type` (universe 0) while `G : Type*`; this loses nothing since finite generator types are equivalent to some `Fin n`, and the presented group transports along that equivalence.",
+    "The conjecture quantifies over `G : Type` (universe 0), following the idiom of `BoundedBurnsideProblem.lean` and `GapConjecture.lean`; finitely presented groups are countable so this is no restriction.",
+    "Isomorphism is expressed as `Nonempty (PresentedGroup rels ≃* G)` rather than a surjective hom with a specified kernel; this is the standard 'has a finite presentation' meaning from the finitely presented group article.",
+    "The bespoke definition is kept in the problem file (inside `namespace FinitelyPresented`) because the task restricts writes to the candidate file; a reviewer may prefer to move it to `FormalConjecturesForMathlib/GroupTheory/` as a reusable definition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Group.FG` (finitely generated only, no finiteness of relations), `PresentedGroup` (the quotient construction, not a predicate on abstract groups), `Module.FinitePresentation` / `Algebra.FinitePresentation` (rings/modules, not groups). Searched Mathlib and FormalConjecturesForMathlib for `FinitelyPresented`, `FinitePresentation`, `PresentedGroup`, `normalClosure`; nothing applicable to groups found.",
+     "name": "FinitelyPresented.IsFinitelyPresented",
+     "why_needed": "Mathlib has no predicate for a group being finitely presented. Defined as `∃ (α : Type) (_ : Finite α) (rels : Set (FreeGroup α)), rels.Finite ∧ Nonempty (PresentedGroup rels ≃* G)`, i.e. G ≅ ⟨S | R⟩ with S and R finite. Accompanied by API lemmas: `PresentedGroup rels` with finite α and finite rels is finitely presented; finitely presented implies `Group.FG`; and a test that the trivial group `PUnit` is finitely presented."
+    }
+   ],
+   "per_slot": {
+    "finitely_presented": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type) [Group G], IsFinitelyPresented G → Monoid.IsTorsion G → Finite G`. Mathlib has no finitely-presented-group predicate (only `Group.FG`, `PresentedGroup`, and ring/module `FinitePresentation`), so a bespoke `IsFinitelyPresented` was introduced in the problem file. `Monoid.IsTorsion G` is `∀ g, IsOfFinOrder g`, i.e. periodic with no uniform exponent, as required by the decomposition notes."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "finitely_presented": "/--\nIs every finitely presented periodic group finite?\n\nHere a group is *periodic* (or *torsion*) if every element has finite order; no uniform bound on\nthe orders is assumed, so this is a finitely presented variant of the general (unbounded) Burnside\nproblem rather than of the bounded one.\n-/\n@[category research open, AMS 20]\ntheorem finitely_presented :\n    answer(sorry) ↔ ∀ (G : Type) [Group G], IsFinitelyPresented G → Monoid.IsTorsion G →\n      Finite G := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "finitely_presented": "c01"
+ },
+ "id": "wp-finitely-presented",
+ "main_attempt": "c01"
+}
