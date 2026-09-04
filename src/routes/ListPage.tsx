@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { AreaSelect, AreaSidebar, orderedSources } from "../components/AreaSidebar";
 import { CountsLine, EntryChips } from "../components/Chips";
@@ -17,29 +17,48 @@ import {
   type ListState,
 } from "../data/filters";
 import { useFcStatus, useIndex } from "../data/load";
-import type { FcStatusEntry, IndexEntry, Meta } from "../data/schema";
+import type { FcStatusEntry, IndexEntry } from "../data/schema";
 
 export function ListPage() {
   const index = useIndex();
   const fc = useFcStatus();
   const [params, setParams] = useSearchParams();
   const state = useMemo(() => parseState(params), [params]);
-  const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const update = (patch: Partial<ListState>) => {
-    setParams(serializeState({ ...state, ...patch }), { replace: true });
-  };
+  // derived from the URL as it is when the update lands, not from the render
+  // that scheduled it (the search debounce fires later)
+  const update = useCallback(
+    (patch: Partial<ListState>) => {
+      setParams((prev) => serializeState({ ...parseState(prev), ...patch }), { replace: true });
+    },
+    [setParams],
+  );
 
-  // the search box keeps its own immediate value; the URL follows with a short delay
+  // The search box keeps its own immediate value; the URL follows with a short
+  // delay. The URL is copied back into the box only when it changed elsewhere
+  // (back/forward, Clear) — never when it merely caught up with the box, which
+  // would overwrite what was typed in the meantime.
   const [q, setQ] = useState(state.q);
+  const pushed = useRef(state.q);
   const debounce = useRef<number | null>(null);
-  useEffect(() => setQ(state.q), [state.q]);
+  useEffect(() => {
+    if (state.q !== pushed.current) {
+      pushed.current = state.q;
+      setQ(state.q);
+    }
+  }, [state.q]);
+  useEffect(() => () => window.clearTimeout(debounce.current ?? undefined), []);
   const onSearch = (value: string) => {
     setQ(value);
     if (debounce.current) window.clearTimeout(debounce.current);
-    debounce.current = window.setTimeout(() => update({ q: value }), 150);
+    debounce.current = window.setTimeout(() => {
+      pushed.current = value;
+      update({ q: value });
+    }, 150);
   };
+  // filtering follows the box at low priority so typing never waits for the list
+  const deferredQ = useDeferredValue(q);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -60,7 +79,7 @@ export function ListPage() {
   if (index.status === "error") return <Shell><p className="error">Could not load the index: {index.error}</p></Shell>;
   const { meta, entries } = index.data;
   const fcData = fc.status === "ok" ? fc.data : null;
-  const visible = applyFilters(entries, { ...state, q }, fcData);
+  const visible = applyFilters(entries, { ...state, q: deferredQ }, fcData);
   const nFc = fcData ? entries.filter((e) => fcData.entries[e.id]).length : 0;
   const grouped = state.sort === "area" && !q;
   const select = (source: string | null, area: string | null, subarea: string | null) => update({ source, area, subarea });
@@ -68,7 +87,7 @@ export function ListPage() {
   const where = (e: IndexEntry) =>
     (state.source ? "" : `${meta.sources[e.source]?.short_name ?? e.source} › `) + capitalize(e.area) + (e.subarea ? ` › ${e.subarea}` : "");
 
-  const open = (id: string) => navigate({ pathname: `/p/${id}`, search: params.toString() });
+  const search = params.toString();
 
   return (
     <Shell>
@@ -121,7 +140,7 @@ export function ListPage() {
                       </span>
                     </li>
                   )}
-                  <Row entry={e} meta={meta} fc={fcData?.entries[e.id]} where={grouped ? null : where(e)} onOpen={() => open(e.id)} search={params.toString()} />
+                  <Row entry={e} fc={fcData?.entries[e.id]} where={grouped ? null : where(e)} search={search} />
                 </Fragment>
               );
             })}
@@ -213,14 +232,17 @@ function Bound({
   );
 }
 
-function Row({ entry, fc, where, onOpen, search }: { entry: IndexEntry; meta: Meta; fc: FcStatusEntry | undefined; where: string | null; onOpen: () => void; search: string }) {
+// Memoised: a keystroke re-filters the list, and rows whose props did not
+// change (same entry object, FC status, label and URL) must not re-render.
+const Row = memo(function Row({ entry, fc, where, search }: { entry: IndexEntry; fc: FcStatusEntry | undefined; where: string | null; search: string }) {
+  const navigate = useNavigate();
   const statement = entry.statement !== entry.title ? entry.statement : "";
   return (
     <li
       className="row"
       onClick={(e) => {
         if ((e.target as HTMLElement).closest("a")) return;
-        onOpen();
+        navigate({ pathname: `/p/${entry.id}`, search });
       }}
     >
       <div className="row-line1">
@@ -243,7 +265,7 @@ function Row({ entry, fc, where, onOpen, search }: { entry: IndexEntry; meta: Me
       </div>
     </li>
   );
-}
+});
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (

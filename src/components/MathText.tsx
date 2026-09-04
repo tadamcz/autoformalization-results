@@ -7,11 +7,27 @@ import { Fragment, useMemo } from "react";
 // \geq -> \geqslant …); set from index.json's meta before anything renders
 let katexMacros: Record<string, string> = {};
 
+// KaTeX output by (mode, expression): the list re-renders hundreds of rows per
+// keystroke, and each formula's HTML never changes for given macros
+const cache = new Map<string, string>();
+const CACHE_MAX = 20000;
+
 export function setKatexMacros(macros: Record<string, string>): void {
   katexMacros = macros;
+  cache.clear();
 }
 
 function render(expr: string, display: boolean): string {
+  const key = (display ? "D" : "I") + expr;
+  const hit = cache.get(key);
+  if (hit !== undefined) return hit;
+  const html = renderUncached(expr, display);
+  if (cache.size >= CACHE_MAX) cache.clear();
+  cache.set(key, html);
+  return html;
+}
+
+function renderUncached(expr: string, display: boolean): string {
   return katex.renderToString(expr, {
     displayMode: display,
     throwOnError: false,
@@ -56,18 +72,17 @@ export function splitMath(text: string): Array<{ kind: "text" | "inline" | "disp
 }
 
 export function MathText({ text, className }: { text: string; className?: string }) {
-  const parts = useMemo(() => splitMath(text), [text]);
+  const parts = useMemo(
+    () => splitMath(text).map((p) => ({ ...p, html: p.kind === "text" ? null : render(p.value, p.kind === "display") })),
+    [text],
+  );
   return (
     <span className={className}>
       {parts.map((p, k) =>
-        p.kind === "text" ? (
+        p.html === null ? (
           <Fragment key={k}>{p.value}</Fragment>
         ) : (
-          <span
-            key={k}
-            className={p.kind === "display" ? "math-display" : "math-inline"}
-            dangerouslySetInnerHTML={{ __html: render(p.value, p.kind === "display") }}
-          />
+          <span key={k} className={p.kind === "display" ? "math-display" : "math-inline"} dangerouslySetInnerHTML={{ __html: p.html }} />
         ),
       )}
     </span>
