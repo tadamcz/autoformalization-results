@@ -115,9 +115,6 @@ export const Block = z.object({
   justification: Justification.nullable().optional(),
   uses: z.array(z.number()).optional(),
   used_by: z.array(z.number()).optional(),
-  // added by scripts/highlight.mjs
-  code_html: z.string().optional(),
-  prefix_html: z.string().optional(),
 });
 
 export const Location = z.object({
@@ -232,8 +229,6 @@ export const AltAttempt = z.object({
   decomposition_objections: z.string(),
   statement_blocks: z.record(z.string(), z.string()),
   split_error: nullableString,
-  // added by scripts/highlight.mjs
-  statement_blocks_html: z.record(z.string(), z.string()).optional(),
 });
 
 export const Alts = z.object({

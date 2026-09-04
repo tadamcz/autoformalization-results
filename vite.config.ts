@@ -3,9 +3,10 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   base: "./",
+  // the exporter's output is served as-is: data/index.json -> /index.json, etc.
+  publicDir: "data",
   plugins: [react()],
   build: {
-    // entry pages are fetched as JSON at runtime; the bundle itself stays small
     chunkSizeWarningLimit: 1500,
   },
 });

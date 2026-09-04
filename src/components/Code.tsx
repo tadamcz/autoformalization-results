@@ -1,13 +1,16 @@
-// A highlighted code block (Shiki HTML from scripts/highlight.mjs) with the
-// file's own line numbers, or a plain <pre> when no HTML is available.
+// A Lean code block with the file's own line numbers: highlighted once the
+// client-side highlighter is ready, plain text until then.
 import { useMemo } from "react";
+import { highlightLean, useHighlighter } from "../highlight";
 
-export function Code({ html, code, startLine, className }: { html?: string | null; code: string; startLine?: number | null; className?: string }) {
+export function Code({ code, startLine, className }: { code: string; startLine?: number | null; className?: string }) {
+  const ready = useHighlighter();
+  const html = useMemo(() => (ready ? highlightLean(code) : null), [ready, code]);
   const style = useMemo(
     () => (startLine ? ({ counterReset: `line ${startLine - 1}` } as React.CSSProperties) : undefined),
     [startLine],
   );
-  if (html) {
+  if (html !== null) {
     return (
       <pre className={`code shiki ${startLine ? "numbered" : ""} ${className ?? ""}`} style={style}>
         <code dangerouslySetInnerHTML={{ __html: html }} />

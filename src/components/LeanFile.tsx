@@ -183,7 +183,7 @@ function Checks({ blocks }: { blocks: Block[] }) {
               <span className="muted kind">{b.decl_kind}</span>
             </div>
             {b.docstring && <Markdown text={b.docstring} className="docstring" />}
-            <Code html={b.code_html} code={b.code ?? ""} startLine={b.code_line} />
+            <Code code={b.code ?? ""} startLine={b.code_line} />
           </div>
         ))}
       </div>
@@ -232,9 +232,9 @@ function DeclBlock({ block: b, entry, claim, alts, requestAlts, altsLoading }: D
         </div>
       )}
       {b.leading_comment && <Code code={b.leading_comment} className="leading-comment" />}
-      {b.prefix && <Code html={b.prefix_html} code={b.prefix} className="prefix" />}
+      {b.prefix && <Code code={b.prefix} className="prefix" />}
       {b.docstring && <Markdown text={b.docstring} className="docstring" />}
-      <Code html={b.code_html} code={b.code ?? ""} startLine={b.code_line} />
+      <Code code={b.code ?? ""} startLine={b.code_line} />
       {(kept || additional || known) && uses.length > 0 && (
         <p className="uses muted">
           uses:{" "}
@@ -339,7 +339,7 @@ function OtherFormulations({ entry, claim, alts, requestAlts, loading }: { entry
             <div className="alt-head muted">
               <code>{a.cid}</code> · {a.model_name}
             </div>
-            <Code html={a.statement_blocks_html?.[slot]} code={a.statement_blocks[slot]} />
+            <Code code={a.statement_blocks[slot]} />
           </div>
         ))}
         {others && others.length === 0 && <p className="muted">No other compiling attempt states this claim under its name.</p>}
