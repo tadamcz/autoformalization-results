@@ -1,0 +1,421 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.57\n\nby V. A. Churkin\n\nA set of generators of a finitely generated group $G$ consisting of the least possible\nnumber $d(G)$ of elements is called a *basis of $G$*. Let $r_M(G)$ be the least number of\nrelations necessary to define $G$ in the basis $M$ and let $r(G)$ be the minimum of the\nnumbers $r_M(G)$ over all bases $M$ of $G$. It is known that $r_M(G) \\leq d(G) + r(G)$ for\nany basis $M$. Does there exist a finitely presented group $G$ for which the inequality\nbecomes equality for some basis $M$?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.57»\n\nvariable {G : Type*} [Group G]\n\n/-- A group $G$ is *finitely presented* if it is isomorphic to a group given by finitely many\ngenerators and finitely many relations, i.e. $G \\cong \\langle x_1, \\dots, x_n \\mid R \\rangle$\nwith $R$ a finite subset of the free group on $x_1, \\dots, x_n$. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (n : ℕ) (rels : Finset (FreeGroup (Fin n))),\n    Nonempty (G ≃* PresentedGroup (rels : Set (FreeGroup (Fin n))))\n\n/-- A *basis* of a finitely generated group $G$ is a generating set $M$ of $G$ consisting of the\nleast possible number $d(G)$ of elements; here $d(G)$ is `Group.rank G`. -/\ndef IsBasis [Group.FG G] (M : Finset G) : Prop :=\n  Subgroup.closure (M : Set G) = ⊤ ∧ M.card = Group.rank G\n\n/-- The least number $r_M(G)$ of relations necessary to define $G$ on the generating set $M$:\nthe least cardinality of a set $R$ of elements of the free group $F(M)$ on $M$ whose normal closure\nis the kernel of the natural homomorphism $F(M) \\to G$, $m \\mapsto m$; equivalently, the least\n$|R|$ such that the natural map $\\langle M \\mid R \\rangle \\to G$ is an isomorphism.\nThis is $\\infty$ if $G$ has no finite presentation on the generators $M$. -/\nnoncomputable def relationRank (M : Finset G) : ℕ∞ :=\n  ⨅ (R : Finset (FreeGroup M))\n    (_ : Subgroup.normalClosure (R : Set (FreeGroup M)) =\n      (FreeGroup.lift (Subtype.val : M → G)).ker),\n    (R.card : ℕ∞)\n\n/-- The number $r(G)$: the minimum of $r_M(G)$ over all bases $M$ of the finitely generated group\n$G$. -/\nnoncomputable def minRelationRank (G : Type*) [Group G] [Group.FG G] : ℕ∞ :=\n  ⨅ (M : Finset G) (_ : IsBasis M), relationRank M\n\n/-- A group given by finitely many generators and relations is finitely presented. -/\n@[category test, AMS 20]\ntheorem isFinitelyPresented_presentedGroup (n : ℕ) (rels : Finset (FreeGroup (Fin n))) :\n    IsFinitelyPresented (PresentedGroup (rels : Set (FreeGroup (Fin n)))) :=\n  ⟨n, rels, ⟨MulEquiv.refl _⟩⟩\n\n/-- The empty set is a basis of the trivial group, i.e. $d(1) = 0$. -/\n@[category test, AMS 20]\ntheorem isBasis_empty_unit : IsBasis (∅ : Finset Unit) := by\n  refine ⟨Subsingleton.elim _ _, ?_⟩\n  simp only [Finset.card_empty]\n  exact le_antisymm (Nat.zero_le _) (Group.rank_le (S := ∅) (Subsingleton.elim _ _))\n\n/-- The trivial group needs no relations in its empty basis, i.e. $r_\\varnothing(1) = 0$. -/\n@[category test, AMS 20]\ntheorem relationRank_empty_unit : relationRank (∅ : Finset Unit) = 0 := by\n  refine le_antisymm ?_ (zero_le _)\n  have : Subgroup.normalClosure ((∅ : Finset (FreeGroup (∅ : Finset Unit))) : Set _) =\n      (FreeGroup.lift (Subtype.val : (∅ : Finset Unit) → Unit)).ker := Subsingleton.elim _ _\n  unfold relationRank\n  exact iInf_le_of_le ∅ (iInf_le_of_le this (by simp))\n\n/-- The trivial group has $r(1) = 0$. -/\n@[category test, AMS 20]\ntheorem minRelationRank_unit : minRelationRank Unit = 0 := by\n  refine le_antisymm ?_ (zero_le _)\n  unfold minRelationRank\n  exact iInf_le_of_le ∅ (iInf_le_of_le isBasis_empty_unit relationRank_empty_unit.le)\n\n/-- It is known that $r_M(G) \\leq d(G) + r(G)$ for any basis $M$ of a finitely generated group\n$G$: adjoin the $d(G)$ elements of $M$ to a presentation on a basis realising $r(G)$ and\neliminate the old generators by Tietze transformations. -/\n@[category textbook, AMS 20]\ntheorem relationRank_le_rank_add_minRelationRank [Group.FG G] (M : Finset G) (hM : IsBasis M) :\n    relationRank M ≤ Group.rank G + minRelationRank G := by\n  sorry\n\n/--\nDoes there exist a finitely presented group $G$ for which the inequality\n$r_M(G) \\leq d(G) + r(G)$ becomes the equality $r_M(G) = d(G) + r(G)$ for some basis $M$?\n\nHere $d(G)$ is the least number of generators of $G$, a basis of $G$ is a generating set with\n$d(G)$ elements, $r_M(G)$ is the least number of relations necessary to define $G$ in the basis\n$M$, and $r(G)$ is the minimum of $r_M(G)$ over all bases $M$ of $G$.\n\nThe trivial group is excluded: it has $d(G) = r(G) = r_\\varnothing(G) = 0$, so the equality would\nhold for it vacuously.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.57».parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G), Nontrivial G ∧ IsFinitelyPresented G ∧\n      ∃ M : Finset G, IsBasis M ∧ relationRank M = Group.rank G + minRelationRank G := by\n  sorry\n\nend Kourovka.«7.57»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's single slot for part a), its reading of r_M(G) as the least number of normal generators of the kernel of the free group on M → G, and its instruction to exclude the trivial group are all consistent with the source; the test theorems in the file confirm the trivial group would otherwise satisfy the equality vacuously.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "r_M(G) and r(G) are ℕ∞-valued infima rather than ℕ-valued sInf, so that a generating set admitting no finite relator set gives ⊤ instead of the junk value 0. For finitely presented G all these values are finite (every finite generating set of a finitely presented group carries a finite presentation, B. H. Neumann), so the ℕ∞ equality relationRank M = Group.rank G + minRelationRank G is exactly the notebook's equality of natural numbers; the degenerate case ⊤ = ⊤ is unreachable under IsFinitelyPresented G.",
+    "The trivial group is excluded with `Nontrivial G` (equivalent to d(G) ≥ 1), following the decomposition notes; the file's test theorems verify that the trivial group indeed has d = r = r_∅ = 0 so the equality would otherwise hold vacuously.",
+    "A basis is modelled as a `Finset G` (a set, as in the notebook), not as an indexed family or list; relators are counted as a `Finset (FreeGroup M)` since duplicates never lower the minimum.",
+    "'Define G in the basis M' is read as: the normal closure of the relator set equals the kernel of the natural map FreeGroup ↥M →* G sending m ↦ m (equivalently, the natural map ⟨M | R⟩ → G is an isomorphism), not merely that G is abstractly isomorphic to some presented group with |M| generators.",
+    "IsFinitelyPresented uses generators indexed by Fin n and a Finset of relators, up to MulEquiv; G is quantified over Type (universe 0), which loses nothing since finitely presented groups are countable and all quantities are isomorphism invariants.",
+    "The existential includes a redundant `Group.FG G` witness (needed as an instance for Group.rank); it is implied by IsFinitelyPresented G so it does not restrict the statement.",
+    "The 'known' inequality r_M(G) ≤ d(G) + r(G) is included as an extra @[category textbook] theorem (with sorry) for all finitely generated G and bases M; it is background, not a slot, and is true with the ℕ∞ definitions (Tietze-transformation argument; trivially true when r(G) = ⊤)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "PresentedGroup, Group.FG, Group.fg_iff_exists_freeGroup_hom_surjective (none expresses finitely many relations).",
+     "name": "Kourovka.«7.57».IsFinitelyPresented",
+     "why_needed": "Mathlib has no notion of a finitely presented group (only PresentedGroup, Group.FG). Defined as ∃ n (rels : Finset (FreeGroup (Fin n))), Nonempty (G ≃* PresentedGroup rels)."
+    },
+    {
+     "closest_existing_considered": "Group.rank / Group.rank_spec (give existence of a minimal generating Finset but no predicate on a given set).",
+     "name": "Kourovka.«7.57».IsBasis",
+     "why_needed": "The notebook's 'basis' = generating set of size d(G). Defined for M : Finset G as Subgroup.closure ↑M = ⊤ ∧ M.card = Group.rank G."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalClosure, MonoidHom.ker, PresentedGroup (no 'minimal number of relators' notion anywhere).",
+     "name": "Kourovka.«7.57».relationRank",
+     "why_needed": "r_M(G): least number of relators in F(M) whose normal closure is the kernel of the natural map FreeGroup M →* G (FreeGroup.lift Subtype.val). ℕ∞-valued infimum (⊤ if no finite relator set exists) to avoid the sInf ∅ = 0 junk value."
+    },
+    {
+     "closest_existing_considered": "None; built on the bespoke relationRank and IsBasis.",
+     "name": "Kourovka.«7.57».minRelationRank",
+     "why_needed": "r(G) = minimum of r_M(G) over all bases M; defined as ⨅ (M : Finset G) (_ : IsBasis M), relationRank M in ℕ∞."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.57».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∃ (G : Type) (_ : Group G) (_ : Group.FG G), Nontrivial G ∧ IsFinitelyPresented G ∧ ∃ M : Finset G, IsBasis M ∧ relationRank M = Group.rank G + minRelationRank G. d(G) is Mathlib's Group.rank; the notions 'finitely presented', 'basis', r_M(G) and r(G) do not exist in Mathlib or FormalConjecturesForMathlib and are defined bespoke in the file. The trivial group is excluded via Nontrivial G, as required by the decomposition notes (it has d = r = r_∅ = 0, verified by the test theorems in the file)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.57».parts.a": "/--\nDoes there exist a finitely presented group $G$ for which the inequality\n$r_M(G) \\leq d(G) + r(G)$ becomes the equality $r_M(G) = d(G) + r(G)$ for some basis $M$?\n\nHere $d(G)$ is the least number of generators of $G$, a basis of $G$ is a generating set with\n$d(G)$ elements, $r_M(G)$ is the least number of relations necessary to define $G$ in the basis\n$M$, and $r(G)$ is the minimum of $r_M(G)$ over all bases $M$ of $G$.\n\nThe trivial group is excluded: it has $d(G) = r(G) = r_\\varnothing(G) = 0$, so the equality would\nhold for it vacuously.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.57».parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G), Nontrivial G ∧ IsFinitelyPresented G ∧\n      ∃ M : Finset G, IsBasis M ∧ relationRank M = Group.rank G + minRelationRank G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.57\n\nby V. A. Churkin\n\nA set of generators of a finitely generated group $G$ consisting of the least possible number\n$d(G)$ of elements is called a *basis of $G$*. Let $r_M(G)$ be the least number of relations\nnecessary to define $G$ in the basis $M$ and let $r(G)$ be the minimum of the numbers $r_M(G)$\nover all bases $M$ of $G$. It is known that $r_M(G) \\leq d(G) + r(G)$ for any basis $M$.\nDoes there exist a finitely presented group $G$ for which the inequality becomes equality for\nsome basis $M$?\n\nHere $d(G)$ is `Group.rank G`. For a finite subset $M$ of $G$, \"$G$ is defined in $M$ by the\nrelations $R$\" means that $R$ is a set of words in the free group on $M$ whose normal closure is\nthe kernel of the canonical homomorphism from the free group on $M$ to $G$, i.e.\n$G \\cong \\langle M \\mid R \\rangle$ via the map sending each generator to itself.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Subgroup\n\nnamespace Kourovka.«7.57»\n\nvariable {G : Type*} [Group G]\n\n/-- A group $G$ is finitely presented if it is isomorphic to a group\n$\\langle x_1, \\dots, x_n \\mid r_1, \\dots, r_m \\rangle$ given by finitely many generators and\nfinitely many relations. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (n : ℕ) (rels : Finset (FreeGroup (Fin n))),\n    Nonempty (G ≃* PresentedGroup (rels : Set (FreeGroup (Fin n))))\n\n/-- A finite subset $M$ of a finitely generated group $G$ is a *basis* of $G$ if it generates $G$\nand has the least possible number $d(G)$ of elements. -/\ndef IsBasis [Group.FG G] (M : Finset G) : Prop :=\n  closure (M : Set G) = ⊤ ∧ M.card = Group.rank G\n\n/-- The canonical homomorphism from the free group on a finite subset $M$ of $G$ to $G$, sending\neach generator to itself. -/\nnoncomputable def canonicalHom (M : Finset G) : FreeGroup M →* G :=\n  FreeGroup.lift Subtype.val\n\n/-- $r_M(G)$: the least number of relations necessary to define $G$ in the generators $M$, i.e.\nthe least cardinality of a finite set $R$ of words in the free group on $M$ whose normal closure\nis the kernel of the canonical homomorphism from the free group on $M$ to $G$. It is $\\infty$ if\nno finite set of relations suffices. -/\nnoncomputable def relationRank (M : Finset G) : ℕ∞ :=\n  ⨅ (R : Finset (FreeGroup M))\n    (_ : normalClosure (R : Set (FreeGroup M)) = (canonicalHom M).ker), (R.card : ℕ∞)\n\n/-- $r(G)$: the minimum of the numbers $r_M(G)$ over all bases $M$ of $G$. -/\nnoncomputable def minRelationRank (G : Type*) [Group G] [Group.FG G] : ℕ∞ :=\n  ⨅ (M : Finset G) (_ : IsBasis M), relationRank M\n\n/-- It is known that $r_M(G) \\leq d(G) + r(G)$ for any basis $M$ of a finitely generated\ngroup $G$. -/\n@[category textbook, AMS 20]\ntheorem relationRank_le_rank_add_minRelationRank [Group.FG G] (M : Finset G) (hM : IsBasis M) :\n    relationRank M ≤ Group.rank G + minRelationRank G := by\n  sorry\n\n/--\nDoes there exist a finitely presented group $G$ for which the inequality\n$r_M(G) \\leq d(G) + r(G)$ becomes equality $r_M(G) = d(G) + r(G)$ for some basis $M$?\n\nThe trivial group is excluded: it has the empty set as its only basis and\n$d(G) = r(G) = r_\\varnothing(G) = 0$, so the equality holds for it for trivial reasons.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.57».parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G), IsFinitelyPresented G ∧ Nontrivial G ∧\n      ∃ M : Finset G, IsBasis M ∧ relationRank M = Group.rank G + minRelationRank G := by\n  sorry\n\nend Kourovka.«7.57»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.88,
+   "decomposition_objections": "None. The table's single slot (part a) and its notes (background definitions and known inequality are not questions; exclude the trivial group) are followed exactly.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "r_M(G) and r(G) are valued in ℕ∞ (infimum of an empty family is ⊤). For a finitely presented group the kernel of FreeGroup M → G is finitely normally generated for every finite generating set M (standard theorem), so all values in the statement are finite and equality in ℕ∞ agrees with equality in ℕ; this relies on that standard theorem rather than being definitional.",
+    "Finitely presented is defined via an isomorphism G ≃* PresentedGroup rels with generators Fin n and a finite rels, the textbook definition; the equivalence with 'r_M(G) < ∞ for a basis M' is a theorem, not built in.",
+    "The existential carries a separate `Group.FG G` binder (redundant with IsFinitelyPresented G, but needed as an instance for Group.rank).",
+    "Following the decomposition notes, `Nontrivial G` (equivalently d(G) ≥ 1) excludes the trivial group, for which the empty basis gives r_∅ = d + r = 0 trivially. This restriction is explained in the theorem docstring.",
+    "A basis is modelled as a Finset G (a set, no repetitions) generating G with cardinality Group.rank G; the free group on M is FreeGroup ↥M and 'relations' are relators (elements of the free group), counted as a Finset — counting relations w = v and relators w v⁻¹ agree.",
+    "The 'known' inequality r_M(G) ≤ d(G) + r(G) for any basis M of a finitely generated group is included as an extra `@[category textbook]` statement (relationRank_le_rank_add_minRelationRank) as a consistency check of the definitions; it is background, not part of the slot."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "PresentedGroup (Mathlib), Group.FG (only finite generation); Algebra.FinitePresentation is for commutative algebras, not groups.",
+     "name": "Kourovka.«7.57».IsFinitelyPresented",
+     "why_needed": "Mathlib has no predicate for finitely presented groups. Defined as ∃ n (rels : Finset (FreeGroup (Fin n))), Nonempty (G ≃* PresentedGroup ↑rels)."
+    },
+    {
+     "closest_existing_considered": "Group.rank / Group.rank_spec (Mathlib) give the number d(G) and existence of such a set but no predicate naming such sets.",
+     "name": "Kourovka.«7.57».IsBasis",
+     "why_needed": "The notebook's notion of basis: a generating set of minimal size d(G). Defined as closure ↑M = ⊤ ∧ M.card = Group.rank G for M : Finset G."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift (Mathlib) — used directly; the def is just a named abbreviation for readability.",
+     "name": "Kourovka.«7.57».canonicalHom",
+     "why_needed": "The canonical hom FreeGroup M →* G (FreeGroup.lift Subtype.val) for a finite subset M, whose kernel is the set of relations holding among M in G."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalClosure, MonoidHom.ker, PresentedGroup (Mathlib); no existing 'number of relators' or 'relation rank' notion exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«7.57».relationRank",
+     "why_needed": "r_M(G): least number of relations needed to define G in generators M. Defined as ⨅ over Finsets R ⊆ FreeGroup M with normalClosure ↑R = (canonicalHom M).ker of (R.card : ℕ∞)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or the repo.",
+     "name": "Kourovka.«7.57».minRelationRank",
+     "why_needed": "r(G): the minimum of r_M(G) over all bases M; defined as ⨅ (M : Finset G) (_ : IsBasis M), relationRank M."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.57».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∃ (G : Type) [Group G] [Group.FG G], IsFinitelyPresented G ∧ Nontrivial G ∧ ∃ M : Finset G, IsBasis M ∧ relationRank M = Group.rank G + minRelationRank G. d(G) is Mathlib's Group.rank; a basis is a generating Finset of cardinality Group.rank G; r_M(G) is the least cardinality of a finite set R of words in FreeGroup M whose normal closure is the kernel of the canonical hom FreeGroup M →* G (valued in ℕ∞, ⊤ if no finite R exists); r(G) is the infimum of r_M(G) over bases. Nontrivial G excludes the degenerate trivial group per the decomposition notes. Mathlib has no notion of finitely presented group or of the number of relations of a presentation, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.57».parts.a": "/--\nDoes there exist a finitely presented group $G$ for which the inequality\n$r_M(G) \\leq d(G) + r(G)$ becomes equality $r_M(G) = d(G) + r(G)$ for some basis $M$?\n\nThe trivial group is excluded: it has the empty set as its only basis and\n$d(G) = r(G) = r_\\varnothing(G) = 0$, so the equality holds for it for trivial reasons.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.57».parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G), IsFinitelyPresented G ∧ Nontrivial G ∧\n      ∃ M : Finset G, IsBasis M ∧ relationRank M = Group.rank G + minRelationRank G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.57\n\nby V. A. Churkin\n\nFor a finitely generated group $G$, a basis is a generating set with the least\npossible number $d(G)$ of elements. Let $r_M(G)$ be the least number of\nrelations needed to define $G$ using a basis $M$, and let $r(G)$ be the minimum\nof $r_M(G)$ over all bases. It is known that\n$r_M(G) \\leq d(G) + r(G)$ for every basis $M$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.57»\n\n/-- A basis of a finitely generated group is a finite generating set whose\ncardinality is the rank of the group. -/\ndef IsBasis {G : Type*} [Group G] [Group.FG G] (M : Finset G) : Prop :=\n  Subgroup.closure (M : Set G) = ⊤ ∧ M.card = Group.rank G\n\n/-- The least number $r_M(G)$ of relators needed to define $G$ using the finite\ngenerating set $M$. The relators normally generate the kernel of the canonical\nmap from the free group on $M$ to $G$. -/\nnoncomputable def relationRank {G : Type*} [Group G] (M : Finset G) : ℕ :=\n  sInf {n : ℕ | ∃ R : Finset (FreeGroup M), R.card = n ∧\n    Subgroup.normalClosure (R : Set (FreeGroup M)) =\n      MonoidHom.ker (FreeGroup.lift ((↑) : M → G))}\n\n/-- The minimum $r(G)$ of $r_M(G)$ over all bases $M$ of a finitely generated\ngroup $G$. -/\nnoncomputable def minimumRelationRank (G : Type*) [Group G] [Group.FG G] : ℕ :=\n  sInf {n : ℕ | ∃ M : Finset G, IsBasis M ∧ relationRank M = n}\n\n/-- A group is finitely presented if some finite generating set has a finite\nset of relators normally generating the kernel of its canonical free-group\nmap. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (M : Finset G) (R : Finset (FreeGroup M)),\n    Subgroup.closure (M : Set G) = ⊤ ∧\n    Subgroup.normalClosure (R : Set (FreeGroup M)) =\n      MonoidHom.ker (FreeGroup.lift ((↑) : M → G))\n\n/--\nDoes there exist a nontrivial finitely presented group $G$ and a basis $M$ for\nwhich\n$$\n  r_M(G) = d(G) + r(G)?\n$$\nHere $r_M(G)$ is the least number of normal generators of the kernel of the\nmap from the free group on $M$ to $G$, and $r(G)$ is its minimum over all\nbases. The condition $d(G) > 0$ excludes the vacuous example of the trivial\ngroup with its empty basis.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G),\n      IsFinitelyPresented G ∧ 0 < Group.rank G ∧\n      ∃ M : Finset G, IsBasis M ∧\n        relationRank M = Group.rank G + minimumRelationRank G := by\n  sorry\n\nend Kourovka.«7.57»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A basis is represented by a `Finset G` that generates `G` and whose cardinality equals Mathlib's `Group.rank G`.",
+    "For a fixed finite generating set `M`, `r_M(G)` is the infimum in `ℕ` of the cardinalities of finite subsets of `FreeGroup M` whose normal closure is the kernel of the canonical homomorphism `FreeGroup M →* G`.",
+    "The invariant `r(G)` is the infimum of these fixed-basis relator counts over all bases.",
+    "Finite presentability is expressed by the existence of a finite generating set and a finite set normally generating the kernel of its canonical free-group map.",
+    "The theorem requires `0 < Group.rank G`, following the decomposition note, to exclude the trivial group and its empty basis."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Group.rank`, `Group.rank_spec`, `Group.rank_le`, and `Group.FG` in `Mathlib.GroupTheory.Rank` and `Mathlib.GroupTheory.Finiteness`.",
+     "name": "Kourovka.«7.57».IsBasis",
+     "why_needed": "Mathlib has group rank and finite generation, but no predicate packaging a finite generating set of minimum cardinality as a group basis."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`, `MonoidHom.ker`, `Subgroup.normalClosure`, and `PresentedGroup`.",
+     "name": "Kourovka.«7.57».relationRank",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines the minimum number of normal generators of the kernel associated to a fixed group generating set."
+    },
+    {
+     "closest_existing_considered": "`Group.rank` and the newly introduced fixed-basis `relationRank`.",
+     "name": "Kourovka.«7.57».minimumRelationRank",
+     "why_needed": "No existing invariant gives the minimum fixed-basis relator count over all minimum-cardinality generating sets."
+    },
+    {
+     "closest_existing_considered": "`PresentedGroup`, `FreeGroup.lift`, `Subgroup.normalClosure`, and `Group.FG`.",
+     "name": "Kourovka.«7.57».IsFinitelyPresented",
+     "why_needed": "Mathlib has presented groups but no predicate asserting that an arbitrary group is finitely presented."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.57».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.57».parts.a": "/--\nDoes there exist a nontrivial finitely presented group $G$ and a basis $M$ for\nwhich\n$$\n  r_M(G) = d(G) + r(G)?\n$$\nHere $r_M(G)$ is the least number of normal generators of the kernel of the\nmap from the free group on $M$ to $G$, and $r(G)$ is its minimum over all\nbases. The condition $d(G) > 0$ excludes the vacuous example of the trivial\ngroup with its empty basis.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G),\n      IsFinitelyPresented G ∧ 0 < Group.rank G ∧\n      ∃ M : Finset G, IsBasis M ∧\n        relationRank M = Group.rank G + minimumRelationRank G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.57\n\nby V. A. Churkin\n\nFor a finitely generated group $G$, let $d(G)$ be the least number of generators. A generating\nset of size $d(G)$ is called a basis. For a basis $M$, let $r_M(G)$ be the least number of\nrelations in a presentation of $G$ on $M$, and let $r(G)$ be the minimum of $r_M(G)$ over all\nbases $M$. Is there a nontrivial finitely presented group $G$ with a basis $M$ such that\n$r_M(G) = d(G) + r(G)$?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.57»\n\n/-- A basis of a finitely generated group is a generating finset of minimum cardinality. -/\ndef IsBasis (G : Type*) [Group G] [Group.FG G] (M : Finset G) : Prop :=\n  Subgroup.closure (M : Set G) = ⊤ ∧ M.card = Group.rank G\n\n/-- The least number of relators needed to present `G` on the marked generating set `M`.\nRelators are elements of the free group on `M` and normally generate the kernel of evaluation. -/\nnoncomputable def relationRank {G : Type*} [Group G] (M : Finset G) : ℕ :=\n  sInf {n : ℕ | ∃ R : Finset (FreeGroup M), R.card = n ∧\n    Subgroup.normalClosure (R : Set (FreeGroup M)) =\n      MonoidHom.ker (FreeGroup.lift fun m : M ↦ (m : G))}\n\n/-- The minimum relation rank over all bases of a finitely generated group. -/\nnoncomputable def minimumRelationRank (G : Type*) [Group G] [Group.FG G] : ℕ :=\n  sInf {n : ℕ | ∃ M : Finset G, IsBasis G M ∧ relationRank M = n}\n\n/-- A group is finitely presented if it has a finite generating set for which the kernel of the\nassociated evaluation map from the free group is normally generated by finitely many relators. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ M : Finset G, Subgroup.closure (M : Set G) = ⊤ ∧\n    ∃ R : Finset (FreeGroup M),\n      Subgroup.normalClosure (R : Set (FreeGroup M)) =\n        MonoidHom.ker (FreeGroup.lift fun m : M ↦ (m : G))\n\n/--\nDoes there exist a nontrivial finitely presented group $G$ and a basis $M$ of $G$ for which\n$r_M(G) = d(G) + r(G)$? Here $d(G)$ is the minimum number of generators, $r_M(G)$ is the least\nnumber of relators in a presentation on the marked basis $M$, and $r(G)$ is the minimum of\n$r_M(G)$ over all bases. The condition $1 \\le d(G)$ excludes the vacuous trivial-group case.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G),\n      1 ≤ Group.rank G ∧ IsFinitelyPresented G ∧\n        ∃ M : Finset G, IsBasis G M ∧\n          relationRank M = Group.rank G + minimumRelationRank G := by\n  sorry\n\nend Kourovka.«7.57»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A basis is represented by a `Finset G` whose subgroup closure is top and whose cardinality equals Mathlib's `Group.rank G`.",
+    "Relations on a marked basis `M` are words in `FreeGroup M`; a relator finset presents `G` precisely when its normal closure equals the kernel of evaluation `FreeGroup M →* G`.",
+    "Finite presentability is encoded by the standard finite-generating-set/evaluation-kernel characterization.",
+    "The theorem requires `1 ≤ Group.rank G`, as directed by the decomposition, to exclude the trivial group and its empty basis.",
+    "The yes/no question is represented by `answer(sorry) ↔` the positive existential statement."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib provides `Group.rank`, `Group.rank_spec`, and `Subgroup.closure`, but no predicate bundling a particular finset as a minimum generating set.",
+     "name": "Kourovka.«7.57».IsBasis",
+     "why_needed": "The statement uses a minimum-cardinality generating set as a marked basis."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `FreeGroup.lift`, `MonoidHom.ker`, `Subgroup.normalClosure`, and `PresentedGroup`, but no marked relation-rank invariant.",
+     "name": "Kourovka.«7.57».relationRank",
+     "why_needed": "The conjecture needs the least number of relators for a fixed marked basis."
+    },
+    {
+     "closest_existing_considered": "No group relation-rank invariant was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«7.57».minimumRelationRank",
+     "why_needed": "The statement defines `r(G)` as the minimum marked relation rank over all bases."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup` constructs a group from arbitrary generators and relations, but does not provide a predicate asserting finite presentability of an existing group.",
+     "name": "Kourovka.«7.57».IsFinitelyPresented",
+     "why_needed": "The existential is restricted to finitely presented groups, and no group finite-presentation predicate was found."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.57».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.57».parts.a": "/--\nDoes there exist a nontrivial finitely presented group $G$ and a basis $M$ of $G$ for which\n$r_M(G) = d(G) + r(G)$? Here $d(G)$ is the minimum number of generators, $r_M(G)$ is the least\nnumber of relators in a presentation on the marked basis $M$, and $r(G)$ is the minimum of\n$r_M(G)$ over all bases. The condition $1 \\le d(G)$ excludes the vacuous trivial-group case.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G),\n      1 ≤ Group.rank G ∧ IsFinitelyPresented G ∧\n        ∃ M : Finset G, IsBasis G M ∧\n          relationRank M = Group.rank G + minimumRelationRank G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.57\n\nby V. A. Churkin\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.57»\n\nvariable {G : Type*} [Group G]\n\n/-- A basis of a finitely generated group is a generating set having the least\npossible number of elements. -/\ndef IsBasis [Group.FG G] (M : Finset G) : Prop :=\n  Subgroup.closure (M : Set G) = ⊤ ∧ M.card = Group.rank G\n\n/-- The least number of relations defining `G` with the generators `M`. Relations\nare words in the free group on `M`, and they must normally generate the kernel\nof the canonical map from that free group to `G`. -/\nnoncomputable def relationRankInBasis (M : Finset G) : ℕ :=\n  sInf {n : ℕ | ∃ R : Finset (FreeGroup M), R.card = n ∧\n    Subgroup.normalClosure (R : Set (FreeGroup M)) =\n      MonoidHom.ker (FreeGroup.lift ((↑) : M → G))}\n\n/-- A group is finitely presented if it is isomorphic to a group given by\nfinitely many generators and finitely many relations. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (X : Type) (_ : Fintype X) (R : Finset (FreeGroup X)),\n    Nonempty (PresentedGroup (R : Set (FreeGroup X)) ≃* G)\n\n/-- The minimum, over all bases of `G`, of the number of relations needed in\nthat basis. -/\nnoncomputable def relationRank (G : Type*) [Group G] [Group.FG G] : ℕ :=\n  sInf {n : ℕ | ∃ M : Finset G, IsBasis M ∧ relationRankInBasis M = n}\n\n/--\nDoes there exist a nontrivial finitely presented group $G$ and a basis $M$ of\n$G$ such that\n$$r_M(G) = d(G) + r(G)?$$\nHere $d(G)$ is the minimum number of generators, $r_M(G)$ is the minimum\nnumber of relators in the basis $M$, and $r(G)$ is the minimum of $r_M(G)$\nover all bases. The condition $1 \\le d(G)$ excludes the trivial group, for\nwhich the equality holds vacuously with the empty basis.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G),\n      IsFinitelyPresented G ∧ 1 ≤ Group.rank G ∧\n      ∃ M : Finset G, IsBasis M ∧\n        relationRankInBasis M = Group.rank G + relationRank G := by\n  sorry\n\nend Kourovka.«7.57»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Mathlib's `Group.rank G` for the minimum number `d(G)` of generators.",
+    "Represented a basis by a `Finset G` whose subgroup closure is top and whose cardinality equals `Group.rank G`.",
+    "Represented relations in a basis `M` as words in `FreeGroup M`; a relator finset defines `G` in that basis exactly when its normal closure is the kernel of `FreeGroup.lift ((↑) : M → G)`.",
+    "Defined minima with `sInf` on natural-number cardinalities.",
+    "Modeled finite presentability as being nonemptily isomorphic to `PresentedGroup R` for a finite generator type and a finite relator set.",
+    "Included `1 ≤ Group.rank G` to exclude the trivial group, as required by the fixed decomposition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Group.rank`, `Group.rank_le`, and `Subgroup.closure`",
+     "name": "Kourovka.«7.57».IsBasis",
+     "why_needed": "The problem's basis means a generating set of globally minimum cardinality; no existing predicate packages this notion."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`, `MonoidHom.ker`, `Subgroup.normalClosure`, and `PresentedGroup`",
+     "name": "Kourovka.«7.57».relationRankInBasis",
+     "why_needed": "Mathlib has free groups and normal closure but no invariant giving the minimum number of relators for a fixed generating basis."
+    },
+    {
+     "closest_existing_considered": "`PresentedGroup` and `Group.FG`",
+     "name": "Kourovka.«7.57».IsFinitelyPresented",
+     "why_needed": "Mathlib's `PresentedGroup` constructs a group from generators and relations, but there is no predicate for a group to admit a finite presentation."
+    },
+    {
+     "closest_existing_considered": "`Group.rank` and the bespoke `relationRankInBasis`",
+     "name": "Kourovka.«7.57».relationRank",
+     "why_needed": "No existing invariant minimizes fixed-basis relation rank over all minimum-cardinality generating sets."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.57».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.57».parts.a": "/--\nDoes there exist a nontrivial finitely presented group $G$ and a basis $M$ of\n$G$ such that\n$$r_M(G) = d(G) + r(G)?$$\nHere $d(G)$ is the minimum number of generators, $r_M(G)$ is the minimum\nnumber of relators in the basis $M$, and $r(G)$ is the minimum of $r_M(G)$\nover all bases. The condition $1 \\le d(G)$ excludes the trivial group, for\nwhich the equality holds vacuously with the empty basis.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G),\n      IsFinitelyPresented G ∧ 1 ≤ Group.rank G ∧\n      ∃ M : Finset G, IsBasis M ∧\n        relationRankInBasis M = Group.rank G + relationRank G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.57\n\nby V. A. Churkin\n\nFor a finitely generated group $G$, a basis is a generating set of the least\npossible cardinality $d(G)$. If $M$ is a basis, let $r_M(G)$ be the least\nnumber of relations needed to present $G$ on $M$, and let $r(G)$ be the\nminimum of $r_M(G)$ over all bases. Does a nontrivial finitely presented group\nhave a basis $M$ for which $r_M(G) = d(G) + r(G)$?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46),\nProblem 7.57(a)\n-/\n\nnamespace Kourovka.«7.57»\n\nvariable {G : Type*} [Group G]\n\n/-- A basis of a finitely generated group is a finite generating set whose\ncardinality is the rank of the group. -/\ndef IsBasis [Group.FG G] (M : Finset G) : Prop :=\n  Subgroup.closure (M : Set G) = ⊤ ∧ M.card = Group.rank G\n\n/-- A basis $M$ has relator number $r$ if $r$ is the least cardinality of a\nfinite set that normally generates the kernel of the canonical map from the\nfree group on $M$ to $G$. -/\ndef HasRelatorNumber (M : Finset G) (r : ℕ) : Prop :=\n  IsLeast {n : ℕ | ∃ R : Finset (FreeGroup M), R.card = n ∧\n    Subgroup.normalClosure (R : Set (FreeGroup M)) =\n      MonoidHom.ker (FreeGroup.lift ((↑) : M → G))} r\n\n/-- The number $r$ is $r(G)$ if it is the least relator number attained among\nall bases of $G$. -/\ndef HasGroupRelatorNumber [Group.FG G] (r : ℕ) : Prop :=\n  IsLeast {n : ℕ | ∃ M : Finset G, IsBasis M ∧ HasRelatorNumber M n} r\n\n/-- A group is finitely presented if it has a finite generating set for which\nthe kernel of the associated map from a free group is finitely normally\ngenerated. -/\ndef IsFinitelyPresentedGroup : Prop :=\n  ∃ (M : Finset G) (R : Finset (FreeGroup M)),\n    Subgroup.closure (M : Set G) = ⊤ ∧\n    Subgroup.normalClosure (R : Set (FreeGroup M)) =\n      MonoidHom.ker (FreeGroup.lift ((↑) : M → G))\n\nnamespace parts\n\n/--\nDoes there exist a nontrivial finitely presented group $G$ with a basis $M$\nsuch that\n$$r_M(G) = d(G) + r(G),$$\nwhere $r_M(G)$ is the least number of normal generators of the kernel of the\ncanonical map from the free group on $M$ to $G$, and $r(G)$ is the minimum of\n$r_N(G)$ over all bases $N$? Here nontriviality is imposed as $d(G) \\geq 1$ to\nexclude the vacuous equality for the trivial group and its empty basis.\n-/\n@[category research open, AMS 20]\ntheorem a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G),\n      IsFinitelyPresentedGroup (G := G) ∧ 1 ≤ Group.rank G ∧\n      ∃ (M : Finset G) (rM r : ℕ),\n        IsBasis M ∧ HasRelatorNumber M rM ∧ HasGroupRelatorNumber (G := G) r ∧\n        rM = Group.rank G + r := by\n  sorry\n\nend parts\n\nend Kourovka.«7.57»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Mathlib's `Group.rank` for d(G), and represented a basis as a finite generating subset whose cardinality equals this rank.",
+    "Represented relations on a basis M as words in `FreeGroup M`; they define G exactly when their normal closure is the kernel of the canonical evaluation homomorphism `FreeGroup M →* G`.",
+    "Used `IsLeast` predicates for r_M(G) and r(G), rather than a natural-valued infimum with a default value on an empty candidate set.",
+    "Defined finite presentability by the existence of a finite generating subset and a finite set normally generating the corresponding kernel.",
+    "Required `1 ≤ Group.rank G` as directed by the decomposition, excluding the trivial group and the vacuous empty-basis equality."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Group.rank`, `Group.rank_spec`, and `Group.rank_le` in Mathlib.GroupTheory.Rank",
+     "name": "Kourovka.«7.57».IsBasis",
+     "why_needed": "The statement quantifies over minimum-cardinality finite generating sets; Mathlib provides `Group.rank` but no predicate identifying such a basis."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`, `MonoidHom.ker`, `Subgroup.normalClosure`, and `PresentedGroup`",
+     "name": "Kourovka.«7.57».HasRelatorNumber",
+     "why_needed": "No existing primitive states that a natural number is the minimum number of normal generators of the kernel associated to a fixed group basis."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsLeast` together with `Group.rank`; no packaged relator-rank invariant was found",
+     "name": "Kourovka.«7.57».HasGroupRelatorNumber",
+     "why_needed": "The problem requires r(G), the minimum fixed-basis relator number over all bases."
+    },
+    {
+     "closest_existing_considered": "`PresentedGroup`, `Group.FG`, and `Group.fg_iff_exists_freeGroup_hom_surjective`",
+     "name": "Kourovka.«7.57».IsFinitelyPresentedGroup",
+     "why_needed": "Mathlib has `PresentedGroup` but no predicate asserting that an arbitrary group is finitely presented."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.57».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.57».parts.a": "/--\nDoes there exist a nontrivial finitely presented group $G$ with a basis $M$\nsuch that\n$$r_M(G) = d(G) + r(G),$$\nwhere $r_M(G)$ is the least number of normal generators of the kernel of the\ncanonical map from the free group on $M$ to $G$, and $r(G)$ is the minimum of\n$r_N(G)$ over all bases $N$? Here nontriviality is imposed as $d(G) \\geq 1$ to\nexclude the vacuous equality for the trivial group and its empty basis.\n-/\n@[category research open, AMS 20]\ntheorem a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G),\n      IsFinitelyPresentedGroup (G := G) ∧ 1 ≤ Group.rank G ∧\n      ∃ (M : Finset G) (rM r : ℕ),\n        IsBasis M ∧ HasRelatorNumber M rM ∧ HasGroupRelatorNumber (G := G) r ∧\n        rM = Group.rank G + r := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.57\n\nby V. A. Churkin\n\nA set of generators of a finitely generated group $G$ consisting of the least\npossible number $d(G)$ of elements is called a *basis of $G$*. Let $r_M(G)$ be\nthe least number of relations necessary to define $G$ in the basis $M$ and let\n$r(G)$ be the minimum of the numbers $r_M(G)$ over all bases $M$ of $G$. It is\nknown that $r_M(G) \\leq d(G) + r(G)$ for any basis $M$. Does there exist a\nfinitely presented group $G$ for which the inequality becomes equality for some\nbasis $M$?\n\nHere $d(G)$ is `Group.rank G`. For a finite generating set $M$ of $G$, the\ngroup $G$ is *defined in $M$ by the relations $R$* when $R$ is a set of words in\nthe free group $F(M)$ on $M$ whose normal closure is the kernel of the canonical\nhomomorphism $F(M) \\to G$, i.e. $G \\cong \\langle M \\mid R \\rangle$ with the\ngenerators corresponding to the elements of $M$. So $r_M(G)$ is the least\ncardinality of such an $R$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.57»\n\nvariable {G : Type*} [Group G]\n\n/-- A group $G$ is *finitely presented* if it is isomorphic to a group\n$\\langle x_1, \\dots, x_n \\mid R \\rangle$ given by finitely many generators and\nfinitely many relations. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (n : ℕ) (rels : Finset (FreeGroup (Fin n))),\n    Nonempty (G ≃* PresentedGroup (rels : Set (FreeGroup (Fin n))))\n\n/-- A finite subset $M$ of a finitely generated group $G$ is a *basis of $G$* if it\ngenerates $G$ and has the least possible number $d(G)$ of elements among all\ngenerating sets of $G$. -/\ndef IsBasis [Group.FG G] (M : Finset G) : Prop :=\n  Subgroup.closure (M : Set G) = ⊤ ∧ M.card = Group.rank G\n\n/-- The number $r_M(G)$: the least number of relations necessary to define $G$ in\nthe generating set $M$. That is, the least cardinality of a set $R$ of words in the\nfree group $F(M)$ on $M$ whose normal closure is the kernel of the canonical\nhomomorphism $F(M) \\to G$ sending each generator to the corresponding element of $M$.\nThe value is $\\infty$ if no finite such $R$ exists. -/\nnoncomputable def relationNumber (M : Finset G) : ℕ∞ :=\n  ⨅ (R : Set (FreeGroup M))\n    (_ : Subgroup.normalClosure R = (FreeGroup.lift (Subtype.val : M → G)).ker), R.encard\n\n/-- The number $r(G)$: the minimum of the numbers $r_M(G)$ over all bases $M$ of $G$. -/\nnoncomputable def minRelationNumber (G : Type*) [Group G] [Group.FG G] : ℕ∞ :=\n  ⨅ (M : Finset G) (_ : IsBasis M), relationNumber M\n\n/-- If $G$ is defined in $M$ by a finite set of relations $R$, then $r_M(G) \\leq |R|$. -/\n@[category API, AMS 20]\ntheorem relationNumber_le (M : Finset G) (R : Finset (FreeGroup M))\n    (h : Subgroup.normalClosure (R : Set (FreeGroup M)) =\n      (FreeGroup.lift (Subtype.val : M → G)).ker) : relationNumber M ≤ R.card := by\n  refine (iInf₂_le (R : Set (FreeGroup M)) h).trans_eq ?_\n  simp\n\n/-- If $M$ is a free basis of $G$, then $r_M(G) = 0$. -/\n@[category API, AMS 20]\ntheorem relationNumber_eq_zero_of_ker_eq_bot (M : Finset G)\n    (h : (FreeGroup.lift (Subtype.val : M → G)).ker = ⊥) : relationNumber M = 0 := by\n  refine le_antisymm ?_ bot_le\n  refine (iInf₂_le (∅ : Set (FreeGroup M)) ?_).trans_eq Set.encard_empty\n  rw [h, eq_bot_iff]\n  exact Subgroup.normalClosure_le_normal (Set.empty_subset _)\n\n/-- The empty set is a basis of the trivial group. -/\n@[category test, AMS 20]\ntheorem isBasis_empty_unit : IsBasis (∅ : Finset Unit) :=\n  have h : Subgroup.closure ((∅ : Finset Unit) : Set Unit) = ⊤ := Subsingleton.elim _ _\n  ⟨h, (Nat.eq_zero_of_le_zero (Group.rank_le h)).symm⟩\n\n/-- The trivial group satisfies $r_M(G) = d(G) + r(G)$ for its only basis $M = \\varnothing$,\nsince all three numbers vanish. This is why `Nontrivial G` is required in\n`kourovka.«7.57».parts.a`. -/\n@[category test, AMS 20]\ntheorem relationNumber_empty_unit :\n    relationNumber (∅ : Finset Unit) = Group.rank Unit + minRelationNumber Unit := by\n  have h0 : relationNumber (∅ : Finset Unit) = 0 :=\n    relationNumber_eq_zero_of_ker_eq_bot _ (Subsingleton.elim _ _)\n  have h1 : minRelationNumber Unit = 0 :=\n    le_antisymm ((iInf₂_le _ isBasis_empty_unit).trans_eq h0) bot_le\n  rw [h0, h1, ← isBasis_empty_unit.2]\n  simp\n\n/--\nA set of generators of a finitely generated group $G$ consisting of the least possible\nnumber $d(G)$ of elements is called a basis of $G$. Let $r_M(G)$ be the least number of\nrelations necessary to define $G$ in the basis $M$ and let $r(G)$ be the minimum of the\nnumbers $r_M(G)$ over all bases $M$ of $G$. It is known that $r_M(G) \\leq d(G) + r(G)$\nfor any basis $M$. Does there exist a finitely presented group $G$ for which the\ninequality becomes equality for some basis $M$?\n\nThe trivial group is excluded: for it the empty set is the only basis and\n$d(G) = r(G) = r_\\varnothing(G) = 0$, so the equality holds trivially.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.57».parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G) (M : Finset G),\n      IsFinitelyPresented G ∧ Nontrivial G ∧ IsBasis M ∧\n      relationNumber M = Group.rank G + minRelationNumber G := by\n  sorry\n\nend Kourovka.«7.57»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single slot for part a) is appropriate: the definitions and the 'known' inequality r_M(G) ≤ d(G) + r(G) are background, and the only question is the existence of a finitely presented G and basis M attaining equality. I agree with the note that the trivial group must be excluded.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The trivial group is excluded via `Nontrivial G` (equivalent to d(G) ≥ 1 for finitely generated groups), as the decomposition notes require; a `test` lemma `relationNumber_empty_unit` proves the trivial group would otherwise satisfy the equality.",
+    "r_M(G) and r(G) are valued in ℕ∞ rather than ℕ so that no `sInf ∅ = 0` default is reachable; for a finitely presented group every finite generating set admits a finite relator set, so all values in the statement are finite and equality in ℕ∞ coincides with equality of natural numbers.",
+    "'Relations defining G in the basis M' are modelled as a set R of relators in the free group on the subtype ↥M whose normal closure equals the kernel of the canonical map FreeGroup M →* G sending each generator to itself; this is exactly G ≅ ⟨M | R⟩ with generators corresponding to the elements of M. Relators form a Set (not a multiset), which does not affect the minimum.",
+    "A basis is a Finset M of elements of G (a 'set of generators'), not an indexed family; d(G) is Mathlib's `Group.rank G`.",
+    "`IsFinitelyPresented` uses generators indexed by `Fin n` and a `Finset` of relators; G is quantified over `Type` (finitely presented groups are countable, so no generality is lost).",
+    "The existential `(_ : Group.FG G)` is redundant given `IsFinitelyPresented G` but is needed to give `Group.rank G` and `IsBasis` their instance; since `Group.FG` is a Prop this is harmless.",
+    "Two short `API` lemmas (`relationNumber_le`, `relationNumber_eq_zero_of_ker_eq_bot`) and two `test` lemmas on the trivial group were added, all fully proved, to sanity-check the bespoke definitions as CONTRIBUTING.md recommends."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "PresentedGroup, Group.FG (finite generation only), Module.FinitePresentation (modules, not groups)",
+     "name": "Kourovka.«7.57».IsFinitelyPresented",
+     "why_needed": "Mathlib has PresentedGroup but no predicate 'G is finitely presented'. Defined as ∃ n and a Finset of relators in FreeGroup (Fin n) with G ≃* PresentedGroup rels."
+    },
+    {
+     "closest_existing_considered": "Group.rank / Group.rank_spec (give existence of such a set but not a predicate on M); Basis (linear algebra, wrong notion)",
+     "name": "Kourovka.«7.57».IsBasis",
+     "why_needed": "The notebook's 'basis' = generating set of minimal size d(G). Defined as Subgroup.closure ↑M = ⊤ ∧ M.card = Group.rank G for M : Finset G."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalClosure, PresentedGroup, MonoidHom.ker — no Mathlib notion of minimal number of normal generators / relators",
+     "name": "Kourovka.«7.57».relationNumber",
+     "why_needed": "r_M(G): least number of relations defining G in the generating set M. Defined as ⨅ over sets R ⊆ FreeGroup M with Subgroup.normalClosure R = (FreeGroup.lift Subtype.val).ker of R.encard, valued in ℕ∞ (⊤ if no finite relator set exists, which cannot happen for a basis of a finitely presented group)."
+    },
+    {
+     "closest_existing_considered": "none (no Mathlib notion of deficiency / relation rank of a group)",
+     "name": "Kourovka.«7.57».minRelationNumber",
+     "why_needed": "r(G): minimum of r_M(G) over all bases M. Defined as ⨅ over M : Finset G with IsBasis M of relationNumber M."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.57».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∃ (G : Type) [Group G] [Group.FG G] (M : Finset G), IsFinitelyPresented G ∧ Nontrivial G ∧ IsBasis M ∧ relationNumber M = Group.rank G + minRelationNumber G. Here d(G) = Group.rank G (Mathlib), a basis is a generating Finset of cardinality d(G), r_M(G) is the least cardinality (in ℕ∞) of a set R of words in FreeGroup M whose normal closure is the kernel of the canonical map FreeGroup M →* G, and r(G) is the infimum of r_M(G) over bases M. Mathlib has no notion of finitely presented group or of the number of relators, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.57».parts.a": "/--\nA set of generators of a finitely generated group $G$ consisting of the least possible\nnumber $d(G)$ of elements is called a basis of $G$. Let $r_M(G)$ be the least number of\nrelations necessary to define $G$ in the basis $M$ and let $r(G)$ be the minimum of the\nnumbers $r_M(G)$ over all bases $M$ of $G$. It is known that $r_M(G) \\leq d(G) + r(G)$\nfor any basis $M$. Does there exist a finitely presented group $G$ for which the\ninequality becomes equality for some basis $M$?\n\nThe trivial group is excluded: for it the empty set is the only basis and\n$d(G) = r(G) = r_\\varnothing(G) = 0$, so the equality holds trivially.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.57».parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G) (M : Finset G),\n      IsFinitelyPresented G ∧ Nontrivial G ∧ IsBasis M ∧\n      relationNumber M = Group.rank G + minRelationNumber G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.57\n\nby V. A. Churkin\n\nA set of generators of a finitely generated group $G$ consisting of the least possible number\n$d(G)$ of elements is called a *basis of $G$*. Let $r_M(G)$ be the least number of relations\nnecessary to define $G$ in the basis $M$ and let $r(G)$ be the minimum of the numbers $r_M(G)$\nover all bases $M$ of $G$. It is known that $r_M(G) \\leq d(G) + r(G)$ for any basis $M$.\nDoes there exist a finitely presented group $G$ for which the inequality becomes equality for\nsome basis $M$?\n\nHere $d(G)$ is `Group.rank G`, and \"$G$ is defined in the basis $M$ by the relations $R$\" means\nthat $R$ is a set of words in the free group on $M$ whose normal closure is the kernel of the\nnatural map from the free group on $M$ to $G$, i.e. $G = \\langle M \\mid R \\rangle$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.57»\n\nvariable {G : Type*} [Group G]\n\n/-- A group $G$ is *finitely presented* if it is isomorphic to a group\n$\\langle x_1, \\dots, x_n \\mid R \\rangle$ given by finitely many generators and finitely many\nrelations. -/\ndef IsFinitelyPresented (G : Type*) [Group G] : Prop :=\n  ∃ (n : ℕ) (R : Finset (FreeGroup (Fin n))),\n    Nonempty (PresentedGroup (R : Set (FreeGroup (Fin n))) ≃* G)\n\n/-- A finite subset $M$ of a finitely generated group $G$ is a *basis* of $G$ if it generates $G$\nand has the least possible number $d(G)$ of elements, where $d(G)$ is `Group.rank G`. -/\ndef IsBasis [Group.FG G] (M : Finset G) : Prop :=\n  Subgroup.closure (M : Set G) = ⊤ ∧ M.card = Group.rank G\n\n/-- `numRelations M` is $r_M(G)$: the least number of relations necessary to define $G$ in the\ngenerating set $M$. That is, it is the least cardinality of a finite set $R$ of words in the free\ngroup on $M$ whose normal closure is the kernel of the natural map from the free group on $M$\nto $G$, so that $G = \\langle M \\mid R \\rangle$.\n\nIf no such finite $R$ exists this is `0` by the convention `sInf ∅ = 0`; this cannot happen when\n$G$ is finitely presented and $M$ generates $G$. -/\nnoncomputable def numRelations (M : Finset G) : ℕ :=\n  sInf {n | ∃ R : Finset (FreeGroup M), R.card = n ∧\n    Subgroup.normalClosure (R : Set (FreeGroup M)) = (FreeGroup.lift (Subtype.val : M → G)).ker}\n\n/-- `minNumRelations G` is $r(G)$: the minimum of the numbers $r_M(G)$ over all bases $M$\nof $G$. -/\nnoncomputable def minNumRelations (G : Type*) [Group G] [Group.FG G] : ℕ :=\n  sInf {n | ∃ M : Finset G, IsBasis M ∧ numRelations M = n}\n\n/-- The empty set is a basis of the trivial group. -/\n@[category test, AMS 20]\ntheorem isBasis_empty [Subsingleton G] : IsBasis (∅ : Finset G) := by\n  refine ⟨Subsingleton.elim _ _, ?_⟩\n  simpa using ((Group.rank_le (G := G) (S := ∅) (Subsingleton.elim _ _)).antisymm\n    (Nat.zero_le _)).symm\n\n/-- The trivial group needs no relations in its empty basis. -/\n@[category test, AMS 20]\ntheorem numRelations_empty [Subsingleton G] : numRelations (∅ : Finset G) = 0 := by\n  refine Nat.eq_zero_of_le_zero (Nat.sInf_le ⟨∅, Finset.card_empty, ?_⟩)\n  exact Subsingleton.elim _ _\n\n/-- The trivial group needs no relations in any basis. -/\n@[category test, AMS 20]\ntheorem minNumRelations_eq_zero [Subsingleton G] : minNumRelations G = 0 :=\n  Nat.eq_zero_of_le_zero (Nat.sInf_le ⟨∅, isBasis_empty, numRelations_empty⟩)\n\n/-- The trivial group attains the equality $r_M(G) = d(G) + r(G)$ for its empty basis $M$: all\nthree quantities are $0$. This is the degenerate case excluded in `kourovka.«7.57».parts.a`. -/\n@[category test, AMS 20]\ntheorem trivial_group_eq [Subsingleton G] :\n    ∃ M : Finset G, IsBasis M ∧ numRelations M = Group.rank G + minNumRelations G := by\n  refine ⟨∅, isBasis_empty, ?_⟩\n  rw [numRelations_empty, minNumRelations_eq_zero, add_zero]\n  exact (isBasis_empty (G := G)).2.trans (by simp)\n\n/-- It is known that $r_M(G) \\leq d(G) + r(G)$ for any basis $M$ of a finitely presented\ngroup $G$. -/\n@[category textbook, AMS 20]\ntheorem numRelations_le [Group.FG G] (hG : IsFinitelyPresented G) {M : Finset G}\n    (hM : IsBasis M) : numRelations M ≤ Group.rank G + minNumRelations G := by\n  sorry\n\n/--\nDoes there exist a finitely presented group $G$ for which the inequality\n$r_M(G) \\leq d(G) + r(G)$ becomes an equality for some basis $M$?\n\nThe trivial group satisfies $r_M(G) = d(G) + r(G) = 0$ for its empty basis\n(see `trivial_group_eq`), so we require $G$ to be nontrivial, i.e. $d(G) \\geq 1$, to exclude\nthis degenerate case.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.57».parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G), IsFinitelyPresented G ∧ Nontrivial G ∧\n      ∃ M : Finset G, IsBasis M ∧ numRelations M = Group.rank G + minNumRelations G := by\n  sorry\n\nend Kourovka.«7.57»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single slot for part a) is appropriate; the definitions and the 'known' inequality are background.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Nontriviality: the trivial group attains r_M = d + r = 0 with the empty basis (proved as @[category test] theorem trivial_group_eq), so the slot requires Nontrivial G (equivalent to d(G) ≥ 1 for finitely generated groups), as directed by the decomposition notes.",
+    "Finitely presented is defined via an isomorphism with PresentedGroup of a Finset of relators on Fin n; the redundant (_ : Group.FG G) binder is kept in the existential because Group.rank needs the instance (Group.FG is a Prop so no instance ambiguity).",
+    "r_M(G) is defined with sInf over ℕ; the empty-set junk value 0 is unreachable in the slot since G is finitely presented (every finite generating set of a finitely presented group admits a finite relator set), and this is documented in the docstring.",
+    "A 'relation' is counted as a relator (element of the free group on M); a Finset is used so relators are counted without multiplicity, which does not affect the minimum.",
+    "The 'known' inequality r_M(G) ≤ d(G) + r(G) (background, not a slot) is included as a sorry'd @[category textbook] theorem numRelations_le with hypotheses IsFinitelyPresented G and IsBasis M; three small provable @[category test] lemmas about the trivial group exercise the definitions.",
+    "The bespoke definitions live in the problem file because the deliverable is a single file; IsFinitelyPresented is generic and could be moved to FormalConjecturesForMathlib by a reviewer."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "PresentedGroup, Group.FG, Module.FinitePresentation, Algebra.FinitePresentation (searched Mathlib and FormalConjecturesForMathlib; none applies to groups)",
+     "name": "Kourovka.«7.57».IsFinitelyPresented",
+     "why_needed": "Mathlib has no notion of a finitely presented group (only finitely presented modules/algebras). Defined as: ∃ n and a Finset R of relators in FreeGroup (Fin n) with PresentedGroup R ≃* G."
+    },
+    {
+     "closest_existing_considered": "Group.rank / Group.rank_spec (gives existence of such a set but no predicate)",
+     "name": "Kourovka.«7.57».IsBasis",
+     "why_needed": "The notebook's 'basis': a generating set with the least possible number d(G) of elements. Defined as Subgroup.closure M = ⊤ ∧ M.card = Group.rank G for M : Finset G."
+    },
+    {
+     "closest_existing_considered": "PresentedGroup, Subgroup.normalClosure, MonoidHom.ker, Group.rank (no relator-count analogue exists)",
+     "name": "Kourovka.«7.57».numRelations",
+     "why_needed": "r_M(G): least number of relations defining G on generating set M; sInf of cardinalities of Finsets R ⊆ FreeGroup M with normalClosure R = (FreeGroup.lift Subtype.val).ker. Value 0 by sInf ∅ convention when no finite R exists, which cannot occur for finitely presented G and generating M (documented)."
+    },
+    {
+     "closest_existing_considered": "Group.rank (analogous minimum for generators, none for relations)",
+     "name": "Kourovka.«7.57».minNumRelations",
+     "why_needed": "r(G): minimum of r_M(G) over all bases M; sInf over bases (nonempty for FG groups by Group.rank_spec)."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.57».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∃ (G : Type) (_ : Group G) (_ : Group.FG G), IsFinitelyPresented G ∧ Nontrivial G ∧ ∃ M : Finset G, IsBasis M ∧ numRelations M = Group.rank G + minNumRelations G. d(G) is Mathlib's Group.rank; basis = finite generating set of size Group.rank G; r_M(G) = least cardinality of a finite relator set R ⊆ FreeGroup M whose normal closure is the kernel of FreeGroup M →* G (lift of Subtype.val); r(G) = min of r_M(G) over bases. Nontrivial G excludes the trivial group as the decomposition notes require (a test theorem shows it attains the equality). Mathlib has no notion of finitely presented group, so IsFinitelyPresented, IsBasis, numRelations, minNumRelations are bespoke."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.57».parts.a": "/--\nDoes there exist a finitely presented group $G$ for which the inequality\n$r_M(G) \\leq d(G) + r(G)$ becomes an equality for some basis $M$?\n\nThe trivial group satisfies $r_M(G) = d(G) + r(G) = 0$ for its empty basis\n(see `trivial_group_eq`), so we require $G$ to be nontrivial, i.e. $d(G) \\geq 1$, to exclude\nthis degenerate case.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.57».parts.a : answer(sorry) ↔\n    ∃ (G : Type) (_ : Group G) (_ : Group.FG G), IsFinitelyPresented G ∧ Nontrivial G ∧\n      ∃ M : Finset G, IsBasis M ∧ numRelations M = Group.rank G + minNumRelations G := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«7.57».parts.a": "c01"
+ },
+ "id": "kourovka-7.57",
+ "main_attempt": "c01"
+}

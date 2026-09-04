@@ -1,0 +1,402 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 4.75\n\nby V. P. Shunkov\n\nLet $G$ be a periodic group containing an involution $i$ and suppose that the\nSylow $2$-subgroups of $G$ are either locally cyclic or generalized quaternion.\nDoes the element $iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in\nits centre?\n\nHere a Sylow $2$-subgroup of the (possibly infinite) group $G$ is a maximal\n$2$-subgroup, and $O_{2'}(G)$ is the largest normal subgroup of $G$ all of whose\nelements have odd order. Following the usage in the theory of periodic groups,\n\"generalized quaternion\" is taken to include, besides the finite groups\n$Q_{2^n}$ ($n \\geq 3$), their union: the infinite locally quaternion group\n$Q_{2^\\infty}$. For finite $G$ the answer is positive by Burnside's transfer\ntheorem (cyclic case) and the Brauer–Suzuki theorem (quaternion case).\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«4.75»\n\nvariable (G : Type*) [Group G]\n\n/-- A group is *locally cyclic* if every finitely generated subgroup is cyclic.\nA locally cyclic $2$-group is either cyclic or quasicyclic ($\\mathbb{Z}_{2^\\infty}$). -/\ndef IsLocallyCyclic : Prop :=\n  ∀ H : Subgroup G, H.FG → IsCyclic H\n\n/-- A group is a *generalized quaternion group* if it is isomorphic to\n$Q_{2^n} = \\langle a, x \\mid a^{2^{n-1}} = 1,\\ x^2 = a^{2^{n-2}},\\ x^{-1} a x = a^{-1} \\rangle$\nfor some $n \\geq 3$. In Mathlib's indexing `QuaternionGroup m` has order $4m$, so\n$Q_{2^n}$ is `QuaternionGroup (2 ^ (n - 2))`, and the condition $n \\geq 3$ becomes $k \\geq 1$\nfor `QuaternionGroup (2 ^ k)`. -/\ndef IsGeneralizedQuaternion : Prop :=\n  ∃ k : ℕ, 1 ≤ k ∧ Nonempty (G ≃* QuaternionGroup (2 ^ k))\n\n/-- A group is *locally generalized quaternion* if every finitely generated subgroup is contained\nin a generalized quaternion subgroup. The groups with this property are exactly the finite\ngeneralized quaternion groups $Q_{2^n}$ ($n \\geq 3$) and the infinite locally quaternion group\n$Q_{2^\\infty} = \\bigcup_n Q_{2^n}$. -/\ndef IsLocallyGeneralizedQuaternion : Prop :=\n  ∀ H : Subgroup G, H.FG → ∃ Q : Subgroup G, H ≤ Q ∧ IsGeneralizedQuaternion Q\n\n/-- The subgroup $O_{2'}(G)$: the join of all normal subgroups of $G$ all of whose elements have\n(finite) odd order. It is the largest normal subgroup of $G$ all of whose elements have odd\norder. -/\ndef oddCore : Subgroup G :=\n  ⨆ N : {N : Subgroup G // N.Normal ∧ ∀ x ∈ N, Odd (orderOf x)}, (N : Subgroup G)\n\n/-- $O_{2'}(G)$ is a normal subgroup of $G$. -/\n@[category API, AMS 20]\ninstance oddCore_normal : (oddCore G).Normal := by\n  open scoped Pointwise in\n  refine Subgroup.Normal.of_conjugate_fixed fun g => ?_\n  simp only [oddCore, Subgroup.pointwise_smul_def, Subgroup.map_iSup]\n  refine iSup_congr fun N => ?_\n  rw [← Subgroup.pointwise_smul_def]\n  exact N.2.1.conj_smul_eq_self g _\n\n/-- Every normal subgroup of $G$ all of whose elements have odd order is contained in\n$O_{2'}(G)$. -/\n@[category API, AMS 20]\ntheorem le_oddCore (N : Subgroup G) [N.Normal] (h : ∀ x ∈ N, Odd (orderOf x)) :\n    N ≤ oddCore G :=\n  le_iSup_of_le ⟨N, inferInstance, h⟩ le_rfl\n\n/-- If every element of $G$ has odd order then $O_{2'}(G) = G$. -/\n@[category test, AMS 20]\ntheorem oddCore_eq_top_of_odd (h : ∀ x : G, Odd (orderOf x)) : oddCore G = ⊤ :=\n  top_le_iff.mp <| le_oddCore G ⊤ fun x _ => h x\n\n/-- The quaternion group $Q_8$ (`QuaternionGroup 2` in Mathlib) is generalized quaternion. -/\n@[category test, AMS 20]\ntheorem isGeneralizedQuaternion_quaternionGroup_two :\n    IsGeneralizedQuaternion (QuaternionGroup 2) :=\n  ⟨1, le_rfl, ⟨MulEquiv.refl _⟩⟩\n\n/-- The cyclic group of order $4$ (`QuaternionGroup 1` in Mathlib) is not generalized\nquaternion. -/\n@[category test, AMS 20]\ntheorem not_isGeneralizedQuaternion_quaternionGroup_one :\n    ¬ IsGeneralizedQuaternion (QuaternionGroup 1) := by\n  rintro ⟨k, hk, ⟨e⟩⟩\n  have h := Fintype.card_congr e.toEquiv\n  simp only [QuaternionGroup.card] at h\n  have h2 : 2 ^ 1 ≤ 2 ^ k := Nat.pow_le_pow_right (by norm_num) hk\n  omega\n\n/-- A (finite) generalized quaternion group is locally generalized quaternion. -/\n@[category test, AMS 20]\ntheorem IsGeneralizedQuaternion.isLocallyGeneralizedQuaternion (h : IsGeneralizedQuaternion G) :\n    IsLocallyGeneralizedQuaternion G := by\n  obtain ⟨k, hk, ⟨e⟩⟩ := h\n  exact fun _ _ => ⟨⊤, le_top, k, hk, ⟨Subgroup.topEquiv.trans e⟩⟩\n\n/--\nLet $G$ be a periodic group containing an involution $i$ and suppose that the\nSylow $2$-subgroups of $G$ are either locally cyclic or generalized quaternion\n(finite $Q_{2^n}$, $n \\geq 3$, or the infinite locally quaternion group $Q_{2^\\infty}$).\nDoes the element $iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in\nits centre?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G] (i : G), Monoid.IsTorsion G → orderOf i = 2 →\n      (∀ S : Sylow 2 G, IsLocallyCyclic S ∨ IsLocallyGeneralizedQuaternion S) →\n      (i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G) := by\n  sorry\n\nend Kourovka.«4.75»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None substantive. One caveat: the notes instruct that 'generalized quaternion' include the infinite locally quaternion group Q_{2^∞}; the verbatim text says only 'generalized quaternion', which in standard (Western) terminology denotes the finite groups Q_{2^n}. The inclusion is consistent with Shunkov's periodic-group setting (where the natural hypothesis is that Sylow 2-subgroups have a unique involution, i.e. are cyclic, quasicyclic, generalized quaternion or locally quaternion) and I followed the notes, but it is a reading choice a reviewer should be aware of; it yields the stronger (broader-hypothesis) form of the conjecture.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "\"Generalized quaternion\" is read, per the decomposition notes, as including the infinite locally quaternion group Q_{2^∞} besides the finite Q_{2^n} (n ≥ 3). This is encoded by `IsLocallyGeneralizedQuaternion` (every finitely generated subgroup lies in a finite generalized quaternion subgroup), whose models are exactly the finite Q_{2^n} (n ≥ 3) and Q_{2^∞}. If a reviewer prefers the strictly finite reading, replace `IsLocallyGeneralizedQuaternion S` by `IsGeneralizedQuaternion S` (a strictly stronger hypothesis, hence a weaker conjecture).",
+    "`IsGeneralizedQuaternion G` is `∃ k ≥ 1, Nonempty (G ≃* QuaternionGroup (2 ^ k))`; Mathlib's `QuaternionGroup m` has order 4m, so k ≥ 1 corresponds to Q_{2^n} with n ≥ 3 (excluding `QuaternionGroup 1 ≅ C₄`; tested in-file).",
+    "\"Sylow 2-subgroups are either locally cyclic or generalized quaternion\" is read per subgroup: every maximal 2-subgroup `S : Sylow 2 G` individually satisfies one of the two alternatives (in infinite groups Sylow 2-subgroups need not be isomorphic). Since G has an involution, no Sylow 2-subgroup is trivial.",
+    "`IsLocallyCyclic` is \"every finitely generated subgroup is cyclic\" (`∀ H : Subgroup G, H.FG → IsCyclic H`); for a 2-group this means cyclic or quasicyclic Z_{2^∞}.",
+    "`oddCore G` (= O_{2'}(G)) is defined as the join `⨆` of all normal subgroups N with `∀ x ∈ N, Odd (orderOf x)` (note `Odd (orderOf x)` also forces finite order). Its normality is proved in-file; that it is itself a 2'-group (hence the largest normal 2'-subgroup) is a true fact in any group but is not proved in the file. The conclusion is stated literally as `QuotientGroup.mk i ∈ Subgroup.center (G ⧸ oddCore G)` rather than the equivalent `∀ g, ⁅i, g⁆ ∈ oddCore G`.",
+    "Periodic group = `Monoid.IsTorsion G`; involution = `orderOf i = 2`; G ranges over `Type` (universe 0), following the other Kourovka files.",
+    "The file also contains short proved `category API`/`category test` lemmas for the bespoke definitions (normality of `oddCore`, `le_oddCore`, `oddCore_eq_top_of_odd`, Q₈ is generalized quaternion, C₄ is not, finite generalized quaternion ⇒ locally generalized quaternion), as CONTRIBUTING.md requests basic API tests for bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`IsCyclic` (too strong: excludes Z_{2^∞}); searched Mathlib and FormalConjecturesForMathlib for `LocallyCyclic`/`locally cyclic` with no hits.",
+     "name": "Kourovka.«4.75».IsLocallyCyclic",
+     "why_needed": "Mathlib has `IsCyclic` but no notion of locally cyclic group (every finitely generated subgroup cyclic), which is needed to allow the quasicyclic Sylow 2-subgroup Z_{2^∞}."
+    },
+    {
+     "closest_existing_considered": "`QuaternionGroup (2 ^ k)` (used inside the definition via `Nonempty (G ≃* QuaternionGroup (2 ^ k))` with `1 ≤ k`).",
+     "name": "Kourovka.«4.75».IsGeneralizedQuaternion",
+     "why_needed": "Mathlib provides the concrete groups `QuaternionGroup n` (order 4n) but no predicate 'G is isomorphic to a generalized quaternion group Q_{2^n}, n ≥ 3'."
+    },
+    {
+     "closest_existing_considered": "`IsGeneralizedQuaternion` alone (finite only); `QuaternionGroup 0` (infinite dihedral, not the right group).",
+     "name": "Kourovka.«4.75».IsLocallyGeneralizedQuaternion",
+     "why_needed": "The infinite locally quaternion group Q_{2^∞} (union of the Q_{2^n}) does not exist in Mathlib; the local definition 'every finitely generated subgroup lies in a generalized quaternion subgroup' captures exactly the finite Q_{2^n} (n ≥ 3) together with Q_{2^∞}."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.normalCore` (different notion: largest normal subgroup inside a given subgroup); `Monoid.IsTorsion`/`IsPGroup` (no π'-analogue); searched for `pCore`, `p-core`, `O_p` with no hits.",
+     "name": "Kourovka.«4.75».oddCore",
+     "why_needed": "Mathlib has no O_p(G)/O_{p'}(G) (p-core or p'-core); O_{2'}(G) is defined as the join of all normal subgroups all of whose elements have odd order, with a proved `Normal` instance so that `G ⧸ oddCore G` is a group."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«4.75»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type) [Group G] (i : G), Monoid.IsTorsion G → orderOf i = 2 → (∀ S : Sylow 2 G, IsLocallyCyclic S ∨ IsLocallyGeneralizedQuaternion S) → (i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G)`. Periodic = Monoid.IsTorsion, involution = orderOf i = 2, Sylow 2-subgroups = Mathlib's `Sylow 2 G` (maximal 2-subgroups, valid for infinite groups), each individually locally cyclic or generalized quaternion (finite Q_{2^n}, n ≥ 3, or the infinite locally quaternion group, as the table's notes prescribe), O_{2'}(G) = join of all normal subgroups all of whose elements have odd order, conclusion = the image of i is central in the quotient. Mathlib lacks locally cyclic groups, a predicate for generalized quaternion groups, the locally quaternion group, and O_{p'}(G), so four bespoke definitions were added (with API/test lemmas proved in-file)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«4.75»": "/--\nLet $G$ be a periodic group containing an involution $i$ and suppose that the\nSylow $2$-subgroups of $G$ are either locally cyclic or generalized quaternion\n(finite $Q_{2^n}$, $n \\geq 3$, or the infinite locally quaternion group $Q_{2^\\infty}$).\nDoes the element $iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in\nits centre?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G] (i : G), Monoid.IsTorsion G → orderOf i = 2 →\n      (∀ S : Sylow 2 G, IsLocallyCyclic S ∨ IsLocallyGeneralizedQuaternion S) →\n      (i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 4.75\n\nby V. P. Shunkov\n\nLet $G$ be a periodic group containing an involution $i$. Suppose that every\nSylow $2$-subgroup of $G$ is either locally cyclic or generalized quaternion.\nDoes $iO_{2'}(G)$ always lie in the centre of $G/O_{2'}(G)$?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«4.75»\n\n/-- A group is locally cyclic if every finite subset is contained in a cyclic subgroup. -/\ndef IsLocallyCyclic (H : Type*) [Group H] : Prop :=\n  ∀ S : Set H, S.Finite → ∃ K : Subgroup H, S ⊆ K ∧ IsCyclic K\n\n/--\nA group is generalized quaternion in the sense used for periodic groups if every finite subset is\ncontained in a finite generalized quaternion subgroup. The subgroup with parameter $k$ below is\n$Q_{2^{k+2}}$. Thus this includes the finite generalized quaternion groups, starting with $Q_8$,\nand the infinite locally quaternion group.\n-/\ndef IsGeneralizedQuaternion (H : Type*) [Group H] : Prop :=\n  ∀ S : Set H, S.Finite →\n    ∃ (k : ℕ) (K : Subgroup H), 1 ≤ k ∧ S ⊆ K ∧ Nonempty (K ≃* QuaternionGroup (2 ^ k))\n\n/--\nThe odd core $O_{2'}(G)$ is the supremum of the normal subgroups all of whose elements have finite\nodd order.\n-/\ndef oddCore (G : Type*) [Group G] : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ ∀ x : N, Odd (orderOf x)}\n\n/--\nLet $G$ be a periodic group containing an involution $i$, and suppose that every Sylow\n$2$-subgroup of $G$ is either locally cyclic or generalized quaternion. Does the element\n$iO_{2'}(G)$ of $G/O_{2'}(G)$ always lie in its centre?\n\nCentrality is expressed equivalently by requiring $[i,g] \\in O_{2'}(G)$ for every $g \\in G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], Monoid.IsTorsion G →\n      ∀ i : G, orderOf i = 2 →\n        (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n          ∀ g : G, ⁅i, g⁆ ∈ oddCore G := by\n  sorry\n\nend Kourovka.«4.75»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Mathlib's `Monoid.IsTorsion G` for periodicity and its infinite-group `Sylow 2 G`, whose definition is a maximal 2-subgroup.",
+    "Represented an involution by `orderOf i = 2`.",
+    "Defined the generalized quaternion condition locally: every finite subset is contained in a subgroup isomorphic to `QuaternionGroup (2 ^ k)` for some `k ≥ 1`. This captures finite generalized quaternion groups of order `2^(k+2)` and the infinite locally quaternion group intended in Shunkov's periodic setting.",
+    "Defined `O_{2'}(G)` as the supremum of all normal subgroups whose elements have finite odd order.",
+    "Expressed centrality of the coset equivalently as `⁅i, g⁆ ∈ oddCore G` for every `g : G`, as specified in the decomposition notes."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `IsCyclic`, which describes globally cyclic groups and is used on the containing subgroups in this definition.",
+     "name": "Kourovka.«4.75».IsLocallyCyclic",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no group-theoretic locally cyclic predicate."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `QuaternionGroup n`; the new predicate requires finite subsets to lie in subgroups isomorphic to `QuaternionGroup (2 ^ k)` with `k ≥ 1`.",
+     "name": "Kourovka.«4.75».IsGeneralizedQuaternion",
+     "why_needed": "Mathlib provides the finite family `QuaternionGroup n` but no predicate encompassing both finite generalized quaternion groups and the infinite locally quaternion group."
+    },
+    {
+     "closest_existing_considered": "Mathlib's complete lattice of `Subgroup G`, `Subgroup.Normal`, `Odd`, and `orderOf`; the definition takes the subgroup supremum of all normal odd-torsion subgroups.",
+     "name": "Kourovka.«4.75».oddCore",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides the odd core `O_{2'}(G)` for possibly infinite groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«4.75»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«4.75»": "/--\nLet $G$ be a periodic group containing an involution $i$, and suppose that every Sylow\n$2$-subgroup of $G$ is either locally cyclic or generalized quaternion. Does the element\n$iO_{2'}(G)$ of $G/O_{2'}(G)$ always lie in its centre?\n\nCentrality is expressed equivalently by requiring $[i,g] \\in O_{2'}(G)$ for every $g \\in G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], Monoid.IsTorsion G →\n      ∀ i : G, orderOf i = 2 →\n        (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n          ∀ g : G, ⁅i, g⁆ ∈ oddCore G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 4.75\n\nby V. P. Shunkov\n\nLet $G$ be a periodic group containing an involution $i$ and suppose that the\nSylow $2$-subgroups of $G$ are either locally cyclic or generalized quaternion.\nDoes the element $iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in\nits centre?\n\nHere $G$ may be infinite. A Sylow $2$-subgroup of $G$ is a maximal $2$-subgroup\n(`Sylow 2 G`). A group is locally cyclic if all its finitely generated subgroups\nare cyclic; this includes the finite cyclic groups and the quasicyclic group\n$\\mathbb{Z}_{2^\\infty}$. The generalized quaternion groups are the finite groups\n$Q_{2^n}$, $n \\geq 3$, and (in Shunkov's setting of periodic groups) the infinite\nlocally quaternion group $Q_{2^\\infty} = \\bigcup_n Q_{2^n}$. $O_{2'}(G)$ is the\nlargest normal subgroup of $G$ all of whose elements have odd order.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«4.75»\n\n/-- A group is locally cyclic if every finitely generated subgroup is cyclic. The locally\ncyclic $2$-groups are the cyclic groups of order $2^n$ and the quasicyclic (Prüfer) group\n$\\mathbb{Z}_{2^\\infty}$. -/\ndef IsLocallyCyclic (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → IsCyclic H\n\n/-- A group $Q$ is generalized quaternion if every finite subset of $Q$ is contained in a\nsubgroup isomorphic to a finite generalized quaternion group $Q_{2^n}$, $n \\geq 3$\n(`QuaternionGroup (2 ^ k)` has order $2^{k+2}$, so it is $Q_{2^{k+2}}$).\n\nIf $Q$ is finite this says (take the whole of $Q$) that $Q \\cong Q_{2^n}$ for some\n$n \\geq 3$. If $Q$ is infinite this says that $Q$ is locally quaternion, i.e. $Q$ is the\ninfinite generalized quaternion group $Q_{2^\\infty} = \\bigcup_{n \\geq 3} Q_{2^n}$. -/\ndef IsGeneralizedQuaternion (Q : Type*) [Group Q] : Prop :=\n  ∀ S : Finset Q, ∃ H : Subgroup Q, ↑S ⊆ (H : Set Q) ∧\n    ∃ k : ℕ, 1 ≤ k ∧ Nonempty (H ≃* QuaternionGroup (2 ^ k))\n\n/-- `oddCore G` is $O_{2'}(G)$, the largest normal subgroup of `G` all of whose elements\nhave (finite) odd order. It is defined as the join of all normal subgroups of `G` whose\nelements all have odd order; this join is again such a subgroup, so it is the largest one. -/\ndef oddCore (G : Type*) [Group G] : Subgroup G :=\n  ⨆ N : {N : Subgroup G // N.Normal ∧ ∀ x ∈ N, Odd (orderOf x)}, (N : Subgroup G)\n\n/-- $O_{2'}(G)$ is a normal subgroup of $G$. -/\ninstance oddCore_normal (G : Type*) [Group G] : (oddCore G).Normal where\n  conj_mem x hx g := by\n    refine Subgroup.iSup_induction (C := fun y => g * y * g⁻¹ ∈ oddCore G) _ hx ?_ ?_ ?_\n    · intro N y hy\n      exact Subgroup.mem_iSup_of_mem N (N.2.1.conj_mem y hy g)\n    · simp\n    · intro y z hy hz\n      have := Subgroup.mul_mem _ hy hz\n      simpa [mul_assoc] using this\n\n/-- Every normal subgroup of `G` all of whose elements have odd order is contained in\n$O_{2'}(G)$. -/\n@[category API, AMS 20]\ntheorem le_oddCore {G : Type*} [Group G] (N : Subgroup G) (hN : N.Normal)\n    (h : ∀ x ∈ N, Odd (orderOf x)) : N ≤ oddCore G :=\n  le_iSup (fun N : {N : Subgroup G // N.Normal ∧ ∀ x ∈ N, Odd (orderOf x)} =>\n    (N : Subgroup G)) ⟨N, hN, h⟩\n\n/-- Cyclic groups are locally cyclic. -/\n@[category test, AMS 20]\ntheorem IsLocallyCyclic.of_isCyclic (G : Type*) [Group G] [IsCyclic G] : IsLocallyCyclic G :=\n  fun _ _ => inferInstance\n\n/-- The quaternion group $Q_8$ is a generalized quaternion group. -/\n@[category test, AMS 20]\ntheorem isGeneralizedQuaternion_quaternionGroup_two :\n    IsGeneralizedQuaternion (QuaternionGroup 2) :=\n  fun _ => ⟨⊤, by simp, 1, le_rfl, ⟨Subgroup.topEquiv⟩⟩\n\n/--\nLet $G$ be a periodic group containing an involution $i$ and suppose that the Sylow\n$2$-subgroups of $G$ are either locally cyclic or generalized quaternion. Does the element\n$iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in its centre?\n\nFormalisation: for every torsion group $G$ (`Monoid.IsTorsion G`) each of whose maximal\n$2$-subgroups (`Sylow 2 G`) is locally cyclic or generalized quaternion, and every\n$i \\in G$ of order $2$, is the image of $i$ in $G/O_{2'}(G)$ central?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], Monoid.IsTorsion G →\n      (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n      ∀ i : G, orderOf i = 2 →\n        (i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G) := by\n  sorry\n\nend Kourovka.«4.75»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot table matches the statement; I followed its reading (individual Sylow condition, generalized quaternion including Q_{2^∞}, O_{2'}(G) as largest normal odd-order subgroup, answer(True) = always central).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Generalized quaternion' is read to include the infinite locally quaternion group Q_{2^∞} as well as the finite Q_{2^n} (n ≥ 3), following the decomposition notes and Shunkov's own terminology; excluding Q_{2^∞} would give a weaker (less demanding) hypothesis class. The chosen definition is 'every finite subset lies in a subgroup ≅ QuaternionGroup (2^k), k ≥ 1'; the reviewer should confirm they accept that this characterizes exactly {Q_{2^n} : n ≥ 3} ∪ {Q_{2^∞}} (finite case is immediate; infinite case is the standard fact that an infinite locally quaternion 2-group is Q_{2^∞}).",
+    "Each Sylow 2-subgroup is required individually to be locally cyclic or generalized quaternion (∀ P, LC P ∨ GQ P), as the notes prescribe; in infinite groups Sylow 2-subgroups need not be isomorphic, so this is the weaker hypothesis / stronger claim compared with '(all LC) ∨ (all GQ)'.",
+    "O_{2'}(G) is formalized as the join of all normal subgroups whose elements all have odd order (`Odd (orderOf x)`, which also forces finite order — irrelevant in a torsion group). This join is itself a normal 2'-subgroup, so it coincides with 'the largest normal subgroup all of whose elements have odd order'.",
+    "Centrality is stated literally as membership of QuotientGroup.mk i in Subgroup.center (G ⧸ oddCore G), rather than the equivalent ∀ g, ⁅i, g⁆ ∈ oddCore G.",
+    "Sylow 2-subgroups are Mathlib's `Sylow 2 G` (maximal 2-subgroups, defined for arbitrary groups), which is the standard meaning for infinite periodic groups.",
+    "Quantification over `G : Type` (universe 0), following the convention of the existing Kourovka files.",
+    "Involution formalized as orderOf i = 2, and the question is universally quantified over all such i (as well as all G), per the notes."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "IsCyclic (too strong: excludes Z_{2^∞}); grepped Mathlib and FormalConjecturesForMathlib for LocallyCyclic/Prufer/quasicyclic with no hits.",
+     "name": "Kourovka.«4.75».IsLocallyCyclic",
+     "why_needed": "Mathlib has IsCyclic but no notion of a locally cyclic group (needed to include the quasicyclic group Z_{2^∞}). Defined as: every finitely generated subgroup (Subgroup.FG) is cyclic."
+    },
+    {
+     "closest_existing_considered": "QuaternionGroup (2^k) via Nonempty (Q ≃* QuaternionGroup (2^k)) — covers only the finite case.",
+     "name": "Kourovka.«4.75».IsGeneralizedQuaternion",
+     "why_needed": "Mathlib's QuaternionGroup n only gives the finite dicyclic groups; the statement (per the decomposition notes and Shunkov's usage) also covers the infinite locally quaternion group Q_{2^∞}. Defined as: every finite subset lies in a subgroup isomorphic to QuaternionGroup (2^k), k ≥ 1 (order 2^{k+2} ≥ 8). For finite Q this is exactly Q ≅ Q_{2^n}, n ≥ 3 (take the whole group); for infinite Q it is exactly Q_{2^∞} = ⋃ Q_{2^n}."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalCore, Sylow/IsPGroup, CommMonoid.primaryComponent (only for commutative monoids and p-primary parts, not the 2'-core).",
+     "name": "Kourovka.«4.75».oddCore (with instance oddCore_normal and API lemma le_oddCore)",
+     "why_needed": "O_{2'}(G), the largest normal subgroup all of whose elements have odd order, does not exist in Mathlib. Defined as the join ⨆ of all normal subgroups N with ∀ x ∈ N, Odd (orderOf x). This join is again a normal subgroup of odd-order elements (if x ∈ NM then x^k ∈ N for k = odd order of its image in G/N, so x has odd order), hence is the largest such subgroup. A short proof of normality is included so that the quotient G ⧸ oddCore G can be formed literally."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«4.75»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ torsion group G (Monoid.IsTorsion), if every Sylow 2-subgroup (Mathlib `Sylow 2 G`, i.e. maximal 2-subgroup) is locally cyclic or generalized quaternion, then for every i with orderOf i = 2 the image of i in G ⧸ O_{2'}(G) lies in Subgroup.center. Needed bespoke definitions for 'locally cyclic', 'generalized quaternion (finite Q_{2^n} or infinite Q_{2^∞})' and O_{2'}(G), none of which exist in Mathlib or FormalConjecturesForMathlib."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«4.75»": "/--\nLet $G$ be a periodic group containing an involution $i$ and suppose that the Sylow\n$2$-subgroups of $G$ are either locally cyclic or generalized quaternion. Does the element\n$iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in its centre?\n\nFormalisation: for every torsion group $G$ (`Monoid.IsTorsion G`) each of whose maximal\n$2$-subgroups (`Sylow 2 G`) is locally cyclic or generalized quaternion, and every\n$i \\in G$ of order $2$, is the image of $i$ in $G/O_{2'}(G)$ central?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], Monoid.IsTorsion G →\n      (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n      ∀ i : G, orderOf i = 2 →\n        (i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 4.75\n\nby V. P. Shunkov\n\nLet $G$ be a periodic group containing an involution $i$. Suppose that every\nSylow $2$-subgroup of $G$ is either locally cyclic or generalized quaternion.\nDoes $iO_{2'}(G)$ always lie in the centre of $G/O_{2'}(G)$?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«4.75»\n\n/-- A group is locally cyclic if every finite subset is contained in a cyclic subgroup. -/\ndef IsLocallyCyclic (G : Type*) [Group G] : Prop :=\n  ∀ s : Finset G, ∃ C : Subgroup G, IsCyclic C ∧ ∀ x ∈ s, x ∈ C\n\n/--\nA $2$-group is generalized quaternion, allowing the infinite locally quaternion\ncase, if every finite subset is contained in a subgroup isomorphic to a finite\ngeneralized quaternion group $Q_{2^m}$ for some $m \\geq 3$.\n-/\ndef IsGeneralizedQuaternion (G : Type*) [Group G] : Prop :=\n  ∀ s : Finset G, ∃ (k : ℕ) (Q : Subgroup G),\n    0 < k ∧ (∀ x ∈ s, x ∈ Q) ∧ Nonempty (Q ≃* QuaternionGroup (2 ^ k))\n\n/--\nThe odd-order core $O_{2'}(G)$: the supremum of the normal subgroups all of\nwhose elements have finite odd order.\n-/\ndef oddOrderCore (G : Type*) [Group G] : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ ∀ x ∈ N, Odd (orderOf x)}\n\n/--\nLet $G$ be a periodic group containing an involution $i$, and suppose that each\nSylow $2$-subgroup of $G$ is either locally cyclic or generalized quaternion.\nDoes the element $iO_{2'}(G)$ of $G/O_{2'}(G)$ always lie in its centre?\n\nCentrality is expressed equivalently by requiring $[i,g] \\in O_{2'}(G)$ for\nevery $g \\in G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G] (i : G),\n      Monoid.IsTorsion G → orderOf i = 2 →\n      (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n      ∀ g : G, ⁅i, g⁆ ∈ oddOrderCore G := by\n  sorry\n\nend Kourovka.«4.75»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Mathlib's `Monoid.IsTorsion G` for periodicity and its arbitrary-group `Sylow 2 G` structure, whose members are maximal 2-subgroups.",
+    "Expressed an involution by `orderOf i = 2`.",
+    "Defined local cyclicity by requiring every finite subset to lie in a cyclic subgroup; this includes cyclic and quasicyclic 2-groups.",
+    "Defined generalized quaternionity in the periodic infinite-group sense by requiring every finite subset to lie in a subgroup isomorphic to `QuaternionGroup (2 ^ k)` for some positive `k`; these have orders 2^(k+2), covering finite generalized quaternion groups from Q8 onward and the infinite locally quaternion case.",
+    "Defined O_{2'}(G) as the supremum of all normal subgroups whose elements have finite odd order.",
+    "Expressed centrality of iO_{2'}(G) equivalently as membership of every commutator [i,g] in O_{2'}(G), avoiding the need to construct a quotient normality instance in the statement."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `IsCyclic`, which describes a cyclic group but not a group whose finitely generated subgroups are cyclic.",
+     "name": "Kourovka.«4.75».IsLocallyCyclic",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides a predicate for locally cyclic groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib's concrete finite family `QuaternionGroup n`; the new predicate uses isomorphisms to `QuaternionGroup (2 ^ k)` locally.",
+     "name": "Kourovka.«4.75».IsGeneralizedQuaternion",
+     "why_needed": "No existing predicate covers generalized quaternion groups as a class, especially the infinite locally quaternion group relevant to this problem."
+    },
+    {
+     "closest_existing_considered": "The complete lattice structure on `Subgroup G`; the definition takes `sSup` of all normal odd-order subgroups.",
+     "name": "Kourovka.«4.75».oddOrderCore",
+     "why_needed": "No existing Mathlib or repository definition of the odd-order core O_{2'}(G) was found."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«4.75»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«4.75»": "/--\nLet $G$ be a periodic group containing an involution $i$, and suppose that each\nSylow $2$-subgroup of $G$ is either locally cyclic or generalized quaternion.\nDoes the element $iO_{2'}(G)$ of $G/O_{2'}(G)$ always lie in its centre?\n\nCentrality is expressed equivalently by requiring $[i,g] \\in O_{2'}(G)$ for\nevery $g \\in G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G] (i : G),\n      Monoid.IsTorsion G → orderOf i = 2 →\n      (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n      ∀ g : G, ⁅i, g⁆ ∈ oddOrderCore G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 4.75\n\nby V. P. Shunkov\n\nLet $G$ be a periodic group containing an involution $i$ and suppose that the Sylow\n$2$-subgroups of $G$ are either locally cyclic or generalized quaternion. Does the element\n$iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in its centre?\n\nHere $G$ may be infinite. A Sylow $2$-subgroup of $G$ is a maximal $2$-subgroup of $G$. A group\nis locally cyclic if all of its finitely generated subgroups are cyclic (for $2$-groups: cyclic or\nquasicyclic $\\mathbb{Z}_{2^\\infty}$). The generalized quaternion groups are the finite groups\n$Q_{2^n}$, $n \\geq 3$, together with the infinite locally quaternion group\n$\\mathbb{Z}_{2^\\infty}\\langle b \\rangle$ of Shunkov's periodic setting. $O_{2'}(G)$ is the\nlargest normal subgroup of $G$ all of whose elements have odd order.\n\nFor finite $G$ the answer is positive: by Burnside's transfer theorem in the cyclic case and by\nthe Brauer–Suzuki theorem in the generalized quaternion case.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«4.75»\n\nvariable (G : Type*) [Group G]\n\n/-- A group is *locally cyclic* if every finitely generated subgroup is cyclic. -/\ndef IsLocallyCyclic : Prop :=\n  ∀ H : Subgroup G, H.FG → IsCyclic H\n\n/-- A cyclic group is locally cyclic. -/\n@[category API, AMS 20]\ntheorem isLocallyCyclic_of_isCyclic [IsCyclic G] : IsLocallyCyclic G :=\n  fun _ _ => inferInstance\n\n/-- A group $Q$ is a *generalized quaternion group* if it is a $2$-group having a locally cyclic\nsubgroup $A$ of index $2$ that contains an element of order $4$, together with an element\n$b \\notin A$ of order $4$ inverting $A$. Then $b^2$ is the unique involution of $A$ and\n$Q = A \\cup Ab$. If $Q$ is finite, then $A$ is cyclic of order $2^{n-1} \\geq 4$ and $Q$ is the\ngeneralized quaternion group $Q_{2^n}$ of order $2^n \\geq 8$ (Mathlib's\n`QuaternionGroup (2 ^ (n - 2))`). If $Q$ is infinite, then $A \\cong \\mathbb{Z}_{2^\\infty}$ and\n$Q$ is the infinite (locally) generalized quaternion group. -/\ndef IsGeneralizedQuaternion : Prop :=\n  IsPGroup 2 G ∧ ∃ (A : Subgroup G) (b : G), IsLocallyCyclic A ∧ (∃ a ∈ A, orderOf a = 4) ∧\n    A.index = 2 ∧ b ∉ A ∧ orderOf b = 4 ∧ ∀ a ∈ A, b * a * b⁻¹ = a⁻¹\n\n/-- The quaternion group $Q_8$ is a generalized quaternion group. -/\n@[category test, AMS 20]\ntheorem isGeneralizedQuaternion_quaternionGroup_two :\n    IsGeneralizedQuaternion (QuaternionGroup 2) := by\n  open QuaternionGroup in\n  have hcard : Nat.card (QuaternionGroup 2) = 2 ^ 3 := by\n    rw [Nat.card_eq_fintype_card, QuaternionGroup.card]; norm_num\n  have ha : orderOf (a 1 : QuaternionGroup 2) = 4 := orderOf_a_one\n  have hmem : ∀ x : QuaternionGroup 2, x ∈ Subgroup.zpowers (a 1) ↔\n      x ∈ (Finset.range 4).image ((a 1 : QuaternionGroup 2) ^ ·) := by\n    intro x\n    rw [mem_zpowers_iff_mem_range_orderOf, ha]\n  refine ⟨IsPGroup.of_card hcard, Subgroup.zpowers (a 1), xa 0,\n    fun _ _ => inferInstance, ⟨a 1, Subgroup.mem_zpowers _, ha⟩, ?_, ?_, orderOf_xa 0, ?_⟩\n  · have := Subgroup.card_mul_index (Subgroup.zpowers (a 1 : QuaternionGroup 2))\n    rw [Nat.card_zpowers, ha, hcard] at this\n    omega\n  · rw [hmem]\n    decide\n  · intro x hx\n    rw [hmem] at hx\n    revert x\n    decide\n\n/-- `oddCore G` is $O_{2'}(G)$, the largest normal subgroup of `G` all of whose elements have\n(finite) odd order, i.e. the largest normal $2'$-subgroup of `G`. It is defined as the join of\nall normal subgroups of `G` whose elements all have odd order; see `odd_orderOf_of_mem_oddCore`. -/\ndef oddCore : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ ∀ x ∈ N, Odd (orderOf x)}\n\n/-- $O_{2'}(G)$ is a normal subgroup of $G$. -/\n@[category API, AMS 20]\ninstance oddCore_normal : (oddCore G).Normal := by\n  have h : oddCore G = (oddCore G).normalCore :=\n    le_antisymm\n      (sSup_le fun N hN => haveI := hN.1; Subgroup.normal_le_normalCore.mpr (le_sSup hN))\n      (Subgroup.normalCore_le _)\n  rw [h]\n  infer_instance\n\n/-- Every element of $O_{2'}(G)$ has odd order. Hence `oddCore G` is the largest normal subgroup\nof `G` all of whose elements have odd order. -/\n@[category API, AMS 20]\ntheorem odd_orderOf_of_mem_oddCore {x : G} (hx : x ∈ oddCore G) : Odd (orderOf x) := by\n  have hdir : DirectedOn (· ≤ ·) {N : Subgroup G | N.Normal ∧ ∀ x ∈ N, Odd (orderOf x)} := by\n    rintro N ⟨hN, hN'⟩ M ⟨hM, hM'⟩\n    refine ⟨N ⊔ M, ⟨inferInstance, fun x hx => ?_⟩, le_sup_left, le_sup_right⟩\n    obtain ⟨n, hn, m, hm, rfl⟩ := Subgroup.mem_sup_of_normal_left.mp hx\n    have hk : Odd (orderOf (m : G ⧸ N)) :=\n      (hM' m hm).of_dvd_nat (orderOf_map_dvd (QuotientGroup.mk' N) m)\n    have h1 : (n * m) ^ orderOf (m : G ⧸ N) ∈ N := by\n      rw [← QuotientGroup.eq_one_iff, QuotientGroup.mk_pow, QuotientGroup.mk_mul,\n        (QuotientGroup.eq_one_iff n).mpr hn, one_mul, pow_orderOf_eq_one]\n    refine (hk.mul (hN' _ h1)).of_dvd_nat (orderOf_dvd_of_pow_eq_one ?_)\n    rw [pow_mul, pow_orderOf_eq_one]\n  have hne : {N : Subgroup G | N.Normal ∧ ∀ x ∈ N, Odd (orderOf x)}.Nonempty :=\n    ⟨⊥, inferInstance, fun x hx => by simp [Subgroup.mem_bot.mp hx]⟩\n  obtain ⟨N, hN, hxN⟩ := (Subgroup.mem_sSup_of_directedOn hne hdir).mp hx\n  exact hN.2 x hxN\n\n/--\nLet $G$ be a periodic group containing an involution $i$ and suppose that the Sylow\n$2$-subgroups of $G$ are either locally cyclic or generalized quaternion. Does the element\n$iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in its centre?\n\nEvery Sylow $2$-subgroup (maximal $2$-subgroup) of $G$ is required to be locally cyclic or\ngeneralized quaternion; the involution $i$ ranges over all elements of order $2$ of $G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], Monoid.IsTorsion G →\n      (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n      ∀ i : G, orderOf i = 2 →\n        (i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G) := by\n  sorry\n\nend Kourovka.«4.75»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition is appropriate. The only point a reviewer may wish to double-check is the notes' instruction to include the infinite locally quaternion group under 'generalized quaternion'; I followed the notes (which agree with Shunkov's usage and with the explicitly infinite flavour of 'locally cyclic' in the statement) and flagged it as a modeling decision.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Generalized quaternion' is taken, following the decomposition notes and Shunkov's periodic setting, to mean the finite groups Q_{2^n} (n ≥ 3) together with the infinite locally quaternion group Z_{2^∞}⟨b⟩. `IsGeneralizedQuaternion Q` is defined structurally: Q is a 2-group with a locally cyclic subgroup A of index 2 containing an element of order 4, and an element b ∉ A of order 4 inverting A. Since a locally cyclic 2-group is cyclic or quasicyclic, this is exactly that class (Q_8 is included, as is standard in the Brauer–Suzuki context). A reviewer who believes Shunkov meant only finite generalized quaternion groups would want to add `Finite Q` to this definition; the notes say otherwise.",
+    "'The Sylow 2-subgroups are either locally cyclic or generalized quaternion' is read as each maximal 2-subgroup individually being of one of the two kinds (`∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P`), as prescribed by the notes; in infinite periodic groups Sylow 2-subgroups need not be conjugate/isomorphic, so this is the weaker hypothesis (stronger question).",
+    "Sylow 2-subgroups of the possibly infinite group G are Mathlib's `Sylow 2 G`, i.e. maximal 2-subgroups (IsPGroup 2 means every element has 2-power order), which matches the standard definition for infinite groups.",
+    "O_{2'}(G) is defined as `oddCore G := sSup {N | N.Normal ∧ ∀ x ∈ N, Odd (orderOf x)}`; `Odd (orderOf x)` forces finite odd order (orderOf x = 0 for infinite order is not odd). The file proves this subgroup is normal and consists of odd-order elements, hence is the largest normal 2'-subgroup in any group, so the definition is faithful even without periodicity.",
+    "Centrality of iO_{2'}(G) is stated literally in the quotient: `(i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G)`, rather than via the equivalent `∀ g, ⁅i, g⁆ ∈ oddCore G`.",
+    "An involution is an element with `orderOf i = 2`; the statement quantifies over all such i in G (the question asks whether this 'always' holds). Groups without involutions satisfy the statement vacuously, matching 'containing an involution i'.",
+    "Groups are quantified over `Type` (universe 0), following the repository's other Kourovka files."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`IsCyclic` (too strong: excludes Z_{2^∞}); `Subgroup.FG` and `IsCyclic` are used as the building blocks.",
+     "name": "Kourovka.«4.75».IsLocallyCyclic",
+     "why_needed": "The statement requires 'locally cyclic' (every finitely generated subgroup is cyclic), which is needed to allow quasicyclic Z_{2^∞} Sylow 2-subgroups; no such predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`QuaternionGroup n` (Mathlib.GroupTheory.SpecificGroups.Quaternion): `∃ n ≥ 1, Nonempty (Q ≃* QuaternionGroup (2 ^ n))` would capture only the finite case; the file includes a test that `QuaternionGroup 2` satisfies the new predicate.",
+     "name": "Kourovka.«4.75».IsGeneralizedQuaternion",
+     "why_needed": "Need a predicate 'Q is a generalized quaternion group' covering the finite Q_{2^n} (n ≥ 3) and, in Shunkov's periodic setting, the infinite locally quaternion group. Mathlib only has the concrete finite family `QuaternionGroup n` (dicyclic groups of order 4n, including non-2-groups), no predicate, and no infinite version."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.normalCore` (different concept: largest normal subgroup inside a given subgroup); `Sylow`/`IsPGroup` (p-subgroups, not p'-cores).",
+     "name": "Kourovka.«4.75».oddCore",
+     "why_needed": "O_{2'}(G), the largest normal subgroup all of whose elements have odd order, does not exist in Mathlib (no O_p(G) / O_{p'}(G) / p-core definitions). Defined as the sSup of all normal subgroups whose elements have odd order, with a `Normal` instance and a lemma that all its elements have odd order."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«4.75»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type) [Group G], Monoid.IsTorsion G → (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) → ∀ i : G, orderOf i = 2 → (i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G)`. Mathlib supplies periodic groups (`Monoid.IsTorsion`), Sylow 2-subgroups of arbitrary (infinite) groups as maximal 2-subgroups (`Sylow 2 G`), involutions (`orderOf i = 2`), quotients and centres. Mathlib lacks 'locally cyclic', the (finite-or-infinite) generalized quaternion groups as a predicate, and O_{2'}(G); these three are defined in the file, with API lemmas (oddCore is normal; every element of oddCore has odd order, so it is the largest normal 2'-subgroup) and a test that `QuaternionGroup 2` (Q_8) is generalized quaternion."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«4.75»": "/--\nLet $G$ be a periodic group containing an involution $i$ and suppose that the Sylow\n$2$-subgroups of $G$ are either locally cyclic or generalized quaternion. Does the element\n$iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in its centre?\n\nEvery Sylow $2$-subgroup (maximal $2$-subgroup) of $G$ is required to be locally cyclic or\ngeneralized quaternion; the involution $i$ ranges over all elements of order $2$ of $G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], Monoid.IsTorsion G →\n      (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n      ∀ i : G, orderOf i = 2 →\n        (i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 4.75\n\nby V. P. Shunkov\n\nLet $G$ be a periodic group containing an involution $i$. Suppose that every\nSylow $2$-subgroup of $G$ is either locally cyclic or generalized quaternion.\nMust the coset $iO_{2'}(G)$ be central in $G/O_{2'}(G)$?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«4.75»\n\nvariable {G : Type*} [Group G]\n\n/-- A group is locally cyclic if each subgroup generated by a finite set is cyclic. -/\ndef IsLocallyCyclic (G : Type*) [Group G] : Prop :=\n  ∀ s : Finset G, IsCyclic (Subgroup.closure (s : Set G))\n\n/-- A finite generalized quaternion group is a group isomorphic to\n$Q_{2^{k+2}}$ for some $k \\geq 1$. -/\ndef IsFiniteGeneralizedQuaternion (G : Type*) [Group G] : Prop :=\n  ∃ k : ℕ, 0 < k ∧ Nonempty (G ≃* QuaternionGroup (2 ^ k))\n\n/-- A generalized quaternion group is either a finite generalized quaternion\ngroup, or an infinite locally quaternion group: every finite set of its\nelements is contained in a finite generalized quaternion subgroup. -/\ndef IsGeneralizedQuaternion (G : Type*) [Group G] : Prop :=\n  IsFiniteGeneralizedQuaternion G ∨\n    (Infinite G ∧ ∀ s : Finset G, ∃ Q : Subgroup G,\n      (∀ x ∈ s, x ∈ Q) ∧ IsFiniteGeneralizedQuaternion Q)\n\n/-- An element belongs to $O_{2'}(G)$ if it belongs to a normal subgroup all\nof whose elements have finite odd order. This is the elementwise\ncharacterization of the largest normal odd-order subgroup. -/\ndef IsInOddCore (x : G) : Prop :=\n  ∃ N : Subgroup G, N.Normal ∧ (∀ y : N, Odd (orderOf y)) ∧ x ∈ N\n\n/--\nLet $G$ be a periodic group containing an involution $i$, and suppose every\nSylow $2$-subgroup of $G$ is either locally cyclic or generalized quaternion.\nDoes $iO_{2'}(G)$ always lie in the centre of $G/O_{2'}(G)$? Equivalently,\ndoes $[i,g]$ belong to $O_{2'}(G)$ for every $g \\in G$?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G] (i : G), Monoid.IsTorsion G → orderOf i = 2 →\n      (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n      ∀ g : G, IsInOddCore ⁅i, g⁆ := by\n  sorry\n\nend Kourovka.«4.75»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Mathlib's `Monoid.IsTorsion G` for periodicity and its infinite-capable `Sylow 2 G`, which is defined as a maximal 2-subgroup.",
+    "Formalized an involution by `orderOf i = 2`.",
+    "Interpreted the Sylow hypothesis individually: every Sylow 2-subgroup may satisfy either the locally cyclic predicate or the generalized quaternion predicate.",
+    "Included both finite generalized quaternion groups `Q_{2^n}` for `n ≥ 3` and the infinite locally quaternion group, characterized by every finite subset lying in a finite generalized quaternion subgroup.",
+    "Expressed centrality of `i O_{2'}(G)` by the equivalent condition that every commutator `⁅i, g⁆` belongs to the odd core.",
+    "Characterized membership in `O_{2'}(G)` by membership in some normal subgroup all of whose elements have odd order; this is the elementwise characterization of the largest normal odd-order subgroup."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `IsCyclic`, applied to `Subgroup.closure` of each finite set.",
+     "name": "Kourovka.«4.75».IsLocallyCyclic",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib do not provide a predicate for groups whose finitely generated subgroups are cyclic."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `QuaternionGroup n`; the definition restricts its parameter to positive powers of two, yielding exactly orders 8, 16, 32, and so on.",
+     "name": "Kourovka.«4.75».IsFiniteGeneralizedQuaternion",
+     "why_needed": "Mathlib provides concrete `QuaternionGroup n` types but no predicate recognizing precisely the generalized quaternion 2-groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib's finite `QuaternionGroup n`; extended by the standard local characterization that every finite subset is contained in a finite generalized quaternion subgroup.",
+     "name": "Kourovka.«4.75».IsGeneralizedQuaternion",
+     "why_needed": "The statement's periodic-group setting includes the infinite locally quaternion group, for which no Mathlib primitive exists."
+    },
+    {
+     "closest_existing_considered": "Normal Mathlib `Subgroup`s together with `Odd (orderOf y)`; elementwise membership in some normal odd-order subgroup characterizes membership in the largest such subgroup.",
+     "name": "Kourovka.«4.75».IsInOddCore",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines the odd core `O_{2'}(G)` for arbitrary periodic groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«4.75»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«4.75»": "/--\nLet $G$ be a periodic group containing an involution $i$, and suppose every\nSylow $2$-subgroup of $G$ is either locally cyclic or generalized quaternion.\nDoes $iO_{2'}(G)$ always lie in the centre of $G/O_{2'}(G)$? Equivalently,\ndoes $[i,g]$ belong to $O_{2'}(G)$ for every $g \\in G$?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G] (i : G), Monoid.IsTorsion G → orderOf i = 2 →\n      (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n      ∀ g : G, IsInOddCore ⁅i, g⁆ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 4.75\n\nby V. P. Shunkov\n\nLet $G$ be a periodic group containing an involution $i$ and suppose that the\nSylow $2$-subgroups of $G$ are either locally cyclic or generalized quaternion.\nDoes the element $iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in\nits centre?\n\nHere $G$ is an arbitrary (possibly infinite) periodic group, so a Sylow\n$2$-subgroup of $G$ is a maximal $2$-subgroup (`Sylow 2 G`), and $O_{2'}(G)$ is\nthe largest normal subgroup of $G$ all of whose elements have odd order. In this\nperiodic setting \"generalized quaternion\" covers the finite generalized\nquaternion groups $Q_{2^n}$ ($n \\geq 3$) together with their infinite locally\nfinite analogue, the locally quaternion group $Q_{2^\\infty}$ (the union of an\nascending chain $Q_8 < Q_{16} < Q_{32} < \\dotsb$), just as \"locally cyclic\"\ncovers both the finite cyclic $2$-groups and the quasicyclic group\n$\\mathbb{Z}_{2^\\infty}$.\n\nFor finite $G$ the answer is positive: this is the Burnside transfer theorem for\ncyclic Sylow $2$-subgroups and the Brauer–Suzuki theorem for generalized\nquaternion Sylow $2$-subgroups.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«4.75»\n\n/-- A group is *locally cyclic* if every finitely generated subgroup is cyclic. -/\ndef IsLocallyCyclic (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → IsCyclic H\n\n/-- A group is a (finite) *generalized quaternion group* if it is isomorphic to\n$Q_{2^n}$ for some $n \\geq 3$. Mathlib's `QuaternionGroup m` has order $4m$, so\n`QuaternionGroup (2 ^ k)` with $k \\geq 1$ is exactly $Q_{2^{k+2}}$; the excluded\ncase $k = 0$ is the cyclic group of order $4$. -/\ndef IsGeneralizedQuaternion (G : Type*) [Group G] : Prop :=\n  ∃ k : ℕ, 1 ≤ k ∧ Nonempty (G ≃* QuaternionGroup (2 ^ k))\n\n/-- A group is *locally generalized quaternion* if every finite subset is contained in a\nfinite generalized quaternion subgroup. These groups are exactly the finite generalized\nquaternion groups $Q_{2^n}$ ($n \\geq 3$) and the infinite locally quaternion group\n$Q_{2^\\infty} = \\bigcup_n Q_{2^n}$. -/\ndef IsLocallyGeneralizedQuaternion (G : Type*) [Group G] : Prop :=\n  ∀ S : Finset G, ∃ H : Subgroup G, IsGeneralizedQuaternion H ∧ (S : Set G) ⊆ H\n\n/-- The subgroup $O_{2'}(G)$: the join of all normal subgroups of $G$ all of whose elements\nhave (finite) odd order. Since the join of normal subgroups of this kind is again of this\nkind, this is the largest normal subgroup of $G$ all of whose elements have odd order. -/\ndef oddCore (G : Type*) [Group G] : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ ∀ x ∈ N, Odd (orderOf x)}\n\nvariable {G : Type*} [Group G]\n\ninstance oddCore_normal : (oddCore G).Normal where\n  conj_mem x hx g := by\n    have h : oddCore G ≤ (oddCore G).comap (MulAut.conj g).toMonoidHom :=\n      sSup_le fun N hN y hy =>\n        Subgroup.mem_sSup_of_mem hN (hN.1.conj_mem y hy g)\n    exact h hx\n\n@[category API, AMS 20]\ntheorem IsCyclic.isLocallyCyclic [IsCyclic G] : IsLocallyCyclic G :=\n  fun _ _ => inferInstance\n\n@[category API, AMS 20]\ntheorem IsGeneralizedQuaternion.isLocallyGeneralizedQuaternion (h : IsGeneralizedQuaternion G) :\n    IsLocallyGeneralizedQuaternion G := by\n  obtain ⟨k, hk, ⟨e⟩⟩ := h\n  exact fun S => ⟨⊤, ⟨k, hk, ⟨Subgroup.topEquiv.trans e⟩⟩, fun _ _ => Subgroup.mem_top _⟩\n\n@[category test, AMS 20]\ntheorem isGeneralizedQuaternion_quaternionGroup_two :\n    IsGeneralizedQuaternion (QuaternionGroup 2) :=\n  ⟨1, le_rfl, ⟨MulEquiv.refl _⟩⟩\n\n/--\nLet $G$ be a periodic group containing an involution $i$ and suppose that the\nSylow $2$-subgroups of $G$ are either locally cyclic or generalized quaternion\n(finite $Q_{2^n}$, $n \\geq 3$, or the infinite locally quaternion group).\nDoes the element $iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in\nits centre?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], Monoid.IsTorsion G →\n      ∀ i : G, orderOf i = 2 →\n        (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsLocallyGeneralizedQuaternion P) →\n        (i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G) := by\n  sorry\n\nend Kourovka.«4.75»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot table and its notes match the notebook text; I followed the note's inclusion of the infinite locally quaternion group under 'generalized quaternion' and recorded it as a modeling decision for review.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Generalized quaternion' is formalized as `IsLocallyGeneralizedQuaternion`, which includes both the finite Q_{2^n} (n ≥ 3) and the infinite locally quaternion group Q_{2^∞}, following the decomposition notes (Shunkov's periodic setting). If the intended reading were finite generalized quaternion groups only, the hypothesis class would be smaller and the universal statement weaker; a reviewer should confirm the intended reading. Since Q_{2^∞} is locally finite with a unique involution, the reading adopted is the one under which the hypothesis means 'Sylow 2-subgroups are locally finite with a unique involution', which is the standard motivation for the problem.",
+    "'Sylow 2-subgroups' of the possibly infinite group G are taken as Mathlib's `Sylow 2 G`, i.e. maximal 2-subgroups (`IsPGroup 2` plus maximality), and the disjunction 'locally cyclic or generalized quaternion' is required of each Sylow 2-subgroup individually (they need not be conjugate in an infinite group).",
+    "Periodic group = `Monoid.IsTorsion G`; involution = `orderOf i = 2`.",
+    "O_{2'}(G) is defined as the join (sSup) of all normal subgroups whose elements all have odd (finite) order, rather than by an explicit maximality property; mathematically this join is itself such a subgroup, hence the largest. `Odd (orderOf x)` excludes elements of infinite order (orderOf = 0), which is irrelevant in a periodic group.",
+    "The conclusion is stated literally as `(↑i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G)` (equivalently ⁅i, g⁆ ∈ O_{2'}(G) for all g), using a `Normal` instance for `oddCore G` proved in the file.",
+    "The group G is quantified over `Type` (universe 0), following the existing Kourovka files.",
+    "Three short auxiliary declarations (two `category API`, one `category test`) are included to sanity-check the bespoke definitions, as CONTRIBUTING.md asks; they are fully proved (no extra sorry)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`IsCyclic` (too strong: excludes Z_{2^∞}); rg for `IsLocallyCyclic|LocallyCyclic` in Mathlib and FormalConjecturesForMathlib found nothing.",
+     "name": "Kourovka.«4.75».IsLocallyCyclic",
+     "why_needed": "Mathlib has `IsCyclic` but no notion of locally cyclic group; defined as 'every finitely generated subgroup (`Subgroup.FG`) is cyclic'. For a torsion 2-group this is exactly: finite cyclic or quasicyclic Z_{2^∞}."
+    },
+    {
+     "closest_existing_considered": "`QuaternionGroup n` (a type, not a predicate on abstract groups).",
+     "name": "Kourovka.«4.75».IsGeneralizedQuaternion",
+     "why_needed": "Mathlib has the concrete type `QuaternionGroup n` (order 4n) but no predicate 'G is a generalized quaternion group'. Defined as ∃ k ≥ 1, Nonempty (G ≃* QuaternionGroup (2 ^ k)), i.e. G ≅ Q_{2^n} with n = k+2 ≥ 3 (k = 0 would be the cyclic group of order 4, so it is excluded)."
+    },
+    {
+     "closest_existing_considered": "`IsGeneralizedQuaternion` alone (finite only, would omit Q_{2^∞}); no Mathlib notion of locally quaternion groups exists.",
+     "name": "Kourovka.«4.75».IsLocallyGeneralizedQuaternion",
+     "why_needed": "The decomposition notes require 'generalized quaternion' to cover both the finite Q_{2^n} and the infinite locally quaternion group Q_{2^∞} (Shunkov's usage for periodic groups). Defined as 'every finite subset lies in a finite generalized quaternion subgroup'; this class is exactly {Q_{2^n} : n ≥ 3} ∪ {Q_{2^∞}} (finite case via H = ⊤, proved as an API lemma; the infinite case is the ascending union of Q_{2^n}'s, unique up to isomorphism). It excludes cyclic/quasicyclic groups, which have no quaternion subgroups."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.normalCore`, `Sylow`, `IsPGroup` — none gives O_{p'}; rg for `pCore|Opprime|oddCore` found nothing.",
+     "name": "Kourovka.«4.75».oddCore",
+     "why_needed": "O_{2'}(G), the largest normal subgroup all of whose elements have odd order, is not in Mathlib (no p-core / p'-core). Defined as sSup {N : Subgroup G | N.Normal ∧ ∀ x ∈ N, Odd (orderOf x)}; the join of such normal subgroups is again normal with all elements of finite odd order (product of two such normal subgroups is 2', then directed union), so this is the largest one. A `Normal` instance is proved in the file so that G ⧸ oddCore G is a group."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«4.75»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ (G : Type) [Group G], Monoid.IsTorsion G → ∀ i, orderOf i = 2 → (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsLocallyGeneralizedQuaternion P) → (↑i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G). Mathlib's `Sylow p G` is the structure of maximal p-subgroups (valid for infinite groups), `Monoid.IsTorsion` is periodicity, `orderOf i = 2` is an involution, and the conclusion is literally 'iO_{2'}(G) lies in the centre of G/O_{2'}(G)'. Mathlib lacks 'locally cyclic', 'generalized quaternion' as a predicate, and the p'-core, so these are bespoke definitions in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«4.75»": "/--\nLet $G$ be a periodic group containing an involution $i$ and suppose that the\nSylow $2$-subgroups of $G$ are either locally cyclic or generalized quaternion\n(finite $Q_{2^n}$, $n \\geq 3$, or the infinite locally quaternion group).\nDoes the element $iO_{2'}(G)$ of the factor-group $G/O_{2'}(G)$ always lie in\nits centre?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], Monoid.IsTorsion G →\n      ∀ i : G, orderOf i = 2 →\n        (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsLocallyGeneralizedQuaternion P) →\n        (i : G ⧸ oddCore G) ∈ Subgroup.center (G ⧸ oddCore G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 4.75\n\nby V. P. Shunkov\n\nLet $G$ be a periodic group containing an involution $i$. Suppose that every\nSylow $2$-subgroup of $G$ is either locally cyclic or generalized quaternion.\nMust $iO_{2'}(G)$ lie in the centre of $G/O_{2'}(G)$?\n\nHere $O_{2'}(G)$ is the largest normal subgroup of $G$ all of whose elements\nhave odd order. Generalized quaternion includes both the finite generalized\nquaternion $2$-groups and the infinite locally quaternion group.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«4.75»\n\n/-- A group is locally cyclic if each finite subset is contained in a cyclic subgroup. -/\ndef IsLocallyCyclic (G : Type*) [Group G] : Prop :=\n  ∀ s : Set G, s.Finite → ∃ C : Subgroup G, IsCyclic C ∧ s ⊆ C\n\n/-- A finite generalized quaternion group is a finite noncyclic $2$-group with a unique\ninvolution. -/\ndef IsFiniteGeneralizedQuaternion (G : Type*) [Group G] : Prop :=\n  Finite G ∧ IsPGroup 2 G ∧ ¬ IsCyclic G ∧\n    ∃! z : G, z ≠ 1 ∧ z ^ 2 = 1\n\n/-- A generalized quaternion group is a group in which every finite subset is contained in a\nfinite generalized quaternion subgroup. This includes the finite generalized quaternion groups\nand the infinite locally quaternion group. -/\ndef IsGeneralizedQuaternion (G : Type*) [Group G] : Prop :=\n  ∀ s : Set G, s.Finite →\n    ∃ Q : Subgroup G, IsFiniteGeneralizedQuaternion Q ∧ s ⊆ Q\n\n/-- The odd-order radical $O_{2'}(G)$: the largest normal subgroup built from normal subgroups\nall of whose elements have odd order. -/\ndef oddOrderRadical (G : Type*) [Group G] : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ ∀ x : N, Odd (orderOf x)}\n\n/--\nLet $G$ be a periodic group containing an involution $i$, and suppose every Sylow $2$-subgroup\nof $G$ is either locally cyclic or generalized quaternion. Does the element $iO_{2'}(G)$ of\n$G/O_{2'}(G)$ always lie in its centre?\n\nThe conclusion is written equivalently as $[i,g] \\in O_{2'}(G)$ for every $g \\in G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], Monoid.IsTorsion G →\n      ∀ i : G, orderOf i = 2 →\n        (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n          ∀ g : G, ⁅i, g⁆ ∈ oddOrderRadical G := by\n  sorry\n\nend Kourovka.«4.75»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Mathlib's `Monoid.IsTorsion` for a periodic group and its arbitrary-group `Sylow 2 G`, whose elements are maximal elementwise 2-power-order subgroups.",
+    "Formalized “each Sylow 2-subgroup is either locally cyclic or generalized quaternion” with the disjunction inside the universal quantifier over Sylow subgroups, so the alternatives may vary by subgroup.",
+    "Characterized a finite generalized quaternion group intrinsically as a finite noncyclic 2-group with a unique involution; by the standard classification of finite 2-groups with a unique involution, this picks out exactly Q_{2^n} for n ≥ 3.",
+    "Included the infinite locally quaternion group by defining generalized quaternion groups through containment of every finite subset in a finite generalized quaternion subgroup. This also includes every finite generalized quaternion group.",
+    "Defined O_{2'}(G) as the supremum of all normal subgroups whose elements have odd order.",
+    "Expressed centrality of iO_{2'}(G) equivalently by requiring the commutator ⁅i,g⁆ to lie in O_{2'}(G) for every g, avoiding quotient normal-instance plumbing without changing the mathematical assertion.",
+    "Expressed that i is an involution by `orderOf i = 2`.",
+    "Used `answer(sorry) ↔ ...`, with the right side being the universally quantified positive answer to the yes/no question."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `IsCyclic`, which describes globally cyclic groups rather than groups whose finite subsets lie in cyclic subgroups.",
+     "name": "Kourovka.«4.75».IsLocallyCyclic",
+     "why_needed": "The statement requires locally cyclic possibly infinite Sylow subgroups; no matching Mathlib or FormalConjecturesForMathlib predicate was found."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsPGroup` and `IsCyclic`; these provide components of the intrinsic characterization but not generalized quaternion groups themselves.",
+     "name": "Kourovka.«4.75».IsFiniteGeneralizedQuaternion",
+     "why_needed": "The statement requires finite generalized quaternion 2-groups, for which no Mathlib or repository predicate/type was found."
+    },
+    {
+     "closest_existing_considered": "The bespoke `IsFiniteGeneralizedQuaternion` predicate and Mathlib's general finite-subset/subgroup APIs; neither alone captures the infinite locally quaternion case.",
+     "name": "Kourovka.«4.75».IsGeneralizedQuaternion",
+     "why_needed": "The intended periodic-group terminology includes both finite generalized quaternion groups and the infinite locally quaternion group, with no existing predicate found."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `sSup` on the complete lattice of subgroups, `Subgroup.Normal`, and `Odd (orderOf x)`; these were combined directly to construct the radical.",
+     "name": "Kourovka.«4.75».oddOrderRadical",
+     "why_needed": "No existing Mathlib or FormalConjecturesForMathlib construction for O_{2'}(G), the largest normal odd-order subgroup, was found."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«4.75»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«4.75»": "/--\nLet $G$ be a periodic group containing an involution $i$, and suppose every Sylow $2$-subgroup\nof $G$ is either locally cyclic or generalized quaternion. Does the element $iO_{2'}(G)$ of\n$G/O_{2'}(G)$ always lie in its centre?\n\nThe conclusion is written equivalently as $[i,g] \\in O_{2'}(G)$ for every $g \\in G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«4.75» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], Monoid.IsTorsion G →\n      ∀ i : G, orderOf i = 2 →\n        (∀ P : Sylow 2 G, IsLocallyCyclic P ∨ IsGeneralizedQuaternion P) →\n          ∀ g : G, ⁅i, g⁆ ∈ oddOrderRadical G := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«4.75»": "c05"
+ },
+ "id": "kourovka-4.75",
+ "main_attempt": "c05"
+}

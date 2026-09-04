@@ -1,0 +1,363 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.25\n\nby A. V. Kuznetsov\n\nDoes there exist an algorithm which recognizes by an identity whether it defines a\nvariety of groups that has at most countably many subvarieties?\n\nAn identity (law) is a word $w$ in the free group on the letters $x_0, x_1, \\ldots$;\na group $G$ satisfies it if $w = 1$ holds for every substitution of elements of $G$ for\nthe letters. The variety defined by $w$ is the class of all groups satisfying $w = 1$,\nand its subvarieties are the varieties (classes of groups defined by a set of identities)\ncontained in it.\n\nThe algorithm receives the identity as a word, i.e. a list of letters $x_i^{\\pm 1}$,\nencoded as `List (ℕ × Bool)`, and `FreeGroup.mk` sends such a word to the element of\nthe free group it represents. The classes of groups range over groups in `Type`; since a\nvariety is determined by its laws, and a law fails in some group of a variety if and only\nif it fails in a countable group of that variety, this loses nothing.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.25»\n\n/-- A word `w` in the free group on the countably many letters $x_0, x_1, \\ldots$ is a\n*law* (identity) of the group `G` if $w = 1$ holds identically in `G`, i.e. every\nhomomorphism `FreeGroup ℕ →* G` (every substitution of elements of `G` for the letters)\nsends `w` to `1`. -/\ndef IsLaw (w : FreeGroup ℕ) (G : Type*) [Group G] : Prop :=\n  ∀ f : FreeGroup ℕ →* G, f w = 1\n\n/-- A class of groups `𝒞` is a *variety of groups* if it is the class of all groups\nsatisfying some set `S` of laws. -/\ndef IsVariety (𝒞 : (G : Type) → [Group G] → Prop) : Prop :=\n  ∃ S : Set (FreeGroup ℕ), ∀ (G : Type) [Group G], 𝒞 G ↔ ∀ w ∈ S, IsLaw w G\n\n/-- The variety of groups defined by the identity $w = 1$: the class of all groups in\nwhich `w` is a law. -/\ndef varietyOfLaw (w : FreeGroup ℕ) : (G : Type) → [Group G] → Prop :=\n  fun G _ => IsLaw w G\n\n/-- The set of subvarieties of the variety defined by the identity $w = 1$, i.e. the\nvarieties of groups contained in it. -/\ndef subvarietiesOfLaw (w : FreeGroup ℕ) : Set ((G : Type) → [Group G] → Prop) :=\n  {𝒰 | IsVariety 𝒰 ∧ ∀ (G : Type) [Group G], 𝒰 G → varietyOfLaw w G}\n\n/-- Every abelian group satisfies the commutator identity $[x_0, x_1] = 1$. -/\n@[category test, AMS 8 20]\ntheorem isLaw_commutator (G : Type*) [CommGroup G] :\n    IsLaw ⁅FreeGroup.of 0, FreeGroup.of 1⁆ G := fun f => by\n  rw [map_commutatorElement, commutatorElement_eq_one_iff_mul_comm]\n  exact mul_comm _ _\n\n/-- The variety defined by an identity is a variety. -/\n@[category API, AMS 8 20]\ntheorem isVariety_varietyOfLaw (w : FreeGroup ℕ) : IsVariety (varietyOfLaw w) :=\n  ⟨{w}, fun _ _ => by simp [varietyOfLaw]⟩\n\n/-- The variety defined by an identity is a subvariety of itself. -/\n@[category API, AMS 8 20]\ntheorem varietyOfLaw_mem_subvarietiesOfLaw (w : FreeGroup ℕ) :\n    varietyOfLaw w ∈ subvarietiesOfLaw w :=\n  ⟨isVariety_varietyOfLaw w, fun _ _ h => h⟩\n\n/--\nDoes there exist an algorithm which recognizes by an identity whether it defines a\nvariety of groups that has at most countably many subvarieties?\n\nThat is, is the predicate on words `w` (over the letters $x_i^{\\pm 1}$, given as\n`List (ℕ × Bool)`) \"the variety of groups defined by the identity $w = 1$ has at most\ncountably many subvarieties\" a computable predicate?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : List (ℕ × Bool) =>\n      (subvarietiesOfLaw (FreeGroup.mk w)).Countable := by\n  sorry\n\nend Kourovka.«8.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The single-slot decomposition is correct; the file follows the note's reading (one group word, ComputablePred, varieties determined by their laws, cardinality ≤ ℵ₀, answer(True) = algorithm exists).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Input encoding: the identity is presented as a word `List (ℕ × Bool)` (letter `(i, true)` = x_i, `(i, false)` = x_i⁻¹) sent to `FreeGroup ℕ` by `FreeGroup.mk`, rather than as an element of `FreeGroup ℕ` directly, because Mathlib has no `Primcodable (FreeGroup ℕ)` instance (constructing one would require proving primitive recursiveness of word reduction). Since word reduction is computable and the predicate factors through `FreeGroup.mk`, this is equivalent to decidability on (reduced) free-group elements.",
+    "A law is defined as `∀ f : FreeGroup ℕ →* G, f w = 1` (every substitution of elements of G for the letters kills w); this is the standard notion of a group satisfying the identity w = 1.",
+    "A variety is defined as a class of groups that is exactly the class of all groups satisfying some set of laws (the equational definition; equivalent to Birkhoff's HSP characterisation). Classes of groups are predicates `(G : Type) → [Group G] → Prop`, i.e. they range over groups in universe `Type` only. This does not change the number of subvarieties: a variety is determined by its set of laws, and a law fails in some group of a variety iff it fails in a countable (hence `Type`-sized) group of the variety, so the correspondence between varieties over all universes and `Type`-level varieties is bijective.",
+    "Subvarieties of V(w) are all varieties 𝒰 with 𝒰 ⊆ V(w), including V(w) itself and the trivial variety; this does not affect countability.",
+    "'At most countably many' is `Set.Countable`, i.e. cardinality ≤ ℵ₀ (finite or countably infinite).",
+    "AMS tags 3 (logic/decidability), 8 (general algebraic systems/varieties), 20 (group theory)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FreeGroup.lift` / `MonoidHom` on `FreeGroup ℕ` (used in the definition); no existing predicate for 'w = 1 holds identically in G'.",
+     "name": "Kourovka.«8.25».IsLaw",
+     "why_needed": "Mathlib has no notion of a group word being a law/identity of a group; needed to say what 'an identity defines a variety' means."
+    },
+    {
+     "closest_existing_considered": "Fully invariant subgroups (`Submodule.IsFullyInvariant` exists only for modules, not subgroups); varieties correspond bijectively to fully invariant subgroups of `FreeGroup ℕ`, but the class-of-groups definition is the literal one and avoids relying on that theorem.",
+     "name": "Kourovka.«8.25».IsVariety",
+     "why_needed": "Mathlib has no notion of a variety of groups (class of all groups satisfying a set of laws); needed to define 'subvarieties'."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "Kourovka.«8.25».varietyOfLaw",
+     "why_needed": "The variety defined by the identity w = 1, i.e. the class of all groups in which w is a law."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "Kourovka.«8.25».subvarietiesOfLaw",
+     "why_needed": "The set of subvarieties of the variety defined by w (varieties contained in it), whose countability the problem asks to decide."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.25»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun w : List (ℕ × Bool) => (subvarietiesOfLaw (FreeGroup.mk w)).Countable`. Mathlib has no notion of group laws or varieties of groups, so bespoke definitions IsLaw / IsVariety / varietyOfLaw / subvarietiesOfLaw were added (all in the problem file, in the problem namespace). The identity is given to the algorithm as a word over the letters x_i^{±1} (a Primcodable type), since Mathlib has no `Primcodable (FreeGroup ℕ)` instance; the predicate depends only on the free-group element `FreeGroup.mk w`, so it is well defined on identities and decidability is equivalent to decidability on reduced words."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.25»": "/--\nDoes there exist an algorithm which recognizes by an identity whether it defines a\nvariety of groups that has at most countably many subvarieties?\n\nThat is, is the predicate on words `w` (over the letters $x_i^{\\pm 1}$, given as\n`List (ℕ × Bool)`) \"the variety of groups defined by the identity $w = 1$ has at most\ncountably many subvarieties\" a computable predicate?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : List (ℕ × Bool) =>\n      (subvarietiesOfLaw (FreeGroup.mk w)).Countable := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.25\n\nby A. V. Kuznetsov\n\nDoes there exist an algorithm which recognizes by an identity whether it defines a\nvariety of groups that has at most countably many subvarieties?\n\nAn identity (law) is an equation $w = 1$, where $w$ is a word in the variables\n$x_0, x_1, x_2, \\dots$, i.e. an element of the free group $F_\\infty$ of countably infinite rank.\nA group $G$ satisfies $w = 1$ if $w$ evaluates to $1$ under every substitution of elements\nof $G$ for the variables. The variety of groups defined by $w = 1$ is the class of all groups\nsatisfying it, and a subvariety is a variety of groups contained in it.\n\nA variety of groups is determined by its set of laws, and the sets of words that arise as the\nset of all laws of a variety are exactly the sets closed under taking consequences. Hence the\nsubvarieties of the variety defined by $w = 1$ correspond bijectively to the closed sets of words\ncontaining $w$, and it is these sets that are counted below.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.25»\n\n/-- A group `G` satisfies the identity (law) $w = 1$, where `w` is a word in the variables\n$x_0, x_1, x_2, \\dots$ (an element of the free group `FreeGroup ℕ`), if `w` evaluates to `1`\nunder every substitution `f : ℕ → G` of elements of `G` for the variables. -/\ndef SatisfiesLaw (G : Type*) [Group G] (w : FreeGroup ℕ) : Prop :=\n  ∀ f : ℕ → G, FreeGroup.lift f w = 1\n\n/-- The set of all consequences of a set `S` of laws: the words `w` such that every group\nsatisfying all the identities $v = 1$, $v \\in S$, also satisfies $w = 1$. This is the set of\nall laws of the variety of groups defined by `S`. -/\ndef lawClosure (S : Set (FreeGroup ℕ)) : Set (FreeGroup ℕ) :=\n  {w | ∀ (G : Type) [Group G], (∀ v ∈ S, SatisfiesLaw G v) → SatisfiesLaw G w}\n\n/-- A set of words `S` is the set of all laws of some variety of groups iff it is closed under\ntaking consequences. Varieties of groups correspond bijectively to such sets. -/\ndef IsVarietyLaws (S : Set (FreeGroup ℕ)) : Prop :=\n  lawClosure S = S\n\n/-- The subvarieties of the variety of groups defined by the identity $w = 1$, each represented\nby its set of laws. A variety is contained in the variety defined by $w = 1$ iff `w` is one of\nits laws, so these are the closed sets of words containing `w`. -/\ndef subvarietiesOfLaw (w : FreeGroup ℕ) : Set (Set (FreeGroup ℕ)) :=\n  {S | IsVarietyLaws S ∧ w ∈ S}\n\n/--\nDoes there exist an algorithm which recognizes by an identity whether it defines a variety of\ngroups that has at most countably many subvarieties?\n\nThe input of the algorithm is an identity $w = 1$, given by a word `L : List (ℕ × Bool)` in the\nletters $x_i^{\\pm 1}$ (`(i, true)` is $x_i$ and `(i, false)` is $x_i^{-1}$); the corresponding\nelement of the free group on the variables $x_0, x_1, \\dots$ is `FreeGroup.mk L`, and two words\nwith the same image define the same identity. The algorithm has to decide whether the variety of\ngroups defined by $w = 1$ has at most countably many subvarieties, i.e. whether the set of its\nsubvarieties is countable (finite or countably infinite).\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun L : List (ℕ × Bool) =>\n      (subvarietiesOfLaw (FreeGroup.mk L)).Countable := by\n  sorry\n\n/-- Every group satisfies the trivial identity $1 = 1$. -/\n@[category test, AMS 20]\ntheorem satisfiesLaw_one (G : Type*) [Group G] : SatisfiesLaw G 1 := by\n  simp [SatisfiesLaw]\n\n/-- The trivial group satisfies every identity. -/\n@[category test, AMS 20]\ntheorem satisfiesLaw_of_subsingleton (G : Type*) [Group G] [Subsingleton G] (w : FreeGroup ℕ) :\n    SatisfiesLaw G w :=\n  fun _ => Subsingleton.elim _ _\n\n/-- Abelian groups satisfy the commutator identity $[x_0, x_1] = 1$. -/\n@[category test, AMS 20]\ntheorem satisfiesLaw_commutator (G : Type*) [CommGroup G] :\n    SatisfiesLaw G ⁅FreeGroup.of 0, FreeGroup.of 1⁆ := by\n  intro f\n  simp [commutatorElement_def, mul_right_comm]\n\n/-- Every law in `S` is a consequence of `S`. -/\n@[category test, AMS 8 20]\ntheorem subset_lawClosure (S : Set (FreeGroup ℕ)) : S ⊆ lawClosure S :=\n  fun _ hw _ _ hS => hS _ hw\n\n/-- Taking consequences is idempotent. -/\n@[category test, AMS 8 20]\ntheorem lawClosure_lawClosure (S : Set (FreeGroup ℕ)) :\n    lawClosure (lawClosure S) = lawClosure S :=\n  Set.Subset.antisymm (fun _ hw G _ hS => hw G fun _ hv => hv G hS) (subset_lawClosure _)\n\n/-- The set of consequences of any set of laws is the set of laws of a variety. -/\n@[category test, AMS 8 20]\ntheorem isVarietyLaws_lawClosure (S : Set (FreeGroup ℕ)) : IsVarietyLaws (lawClosure S) :=\n  lawClosure_lawClosure S\n\n/-- The set of all words is the set of laws of the trivial variety. -/\n@[category test, AMS 8 20]\ntheorem isVarietyLaws_univ : IsVarietyLaws Set.univ :=\n  Set.Subset.antisymm (Set.subset_univ _) (subset_lawClosure _)\n\n/-- The trivial variety is a subvariety of every variety. -/\n@[category test, AMS 8 20]\ntheorem univ_mem_subvarietiesOfLaw (w : FreeGroup ℕ) : Set.univ ∈ subvarietiesOfLaw w :=\n  ⟨isVarietyLaws_univ, Set.mem_univ w⟩\n\n/-- The variety defined by $w = 1$ is a subvariety of itself. -/\n@[category test, AMS 8 20]\ntheorem lawClosure_singleton_mem_subvarietiesOfLaw (w : FreeGroup ℕ) :\n    lawClosure {w} ∈ subvarietiesOfLaw w :=\n  ⟨isVarietyLaws_lawClosure _, subset_lawClosure _ rfl⟩\n\nend Kourovka.«8.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The single-slot decomposition is correct. Minor remark: the note calls the free group of countable rank 'an encodable type'; Mathlib has no (computable) `Encodable`/`Primcodable` instance for `FreeGroup ℕ`, so the algorithm's input is taken to be the word as a list of letters (`List (ℕ × Bool)`), mapped to `FreeGroup ℕ` via `FreeGroup.mk`, which is equivalent for decidability purposes.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Input of the algorithm: an identity w = 1 is given as a word `L : List (ℕ × Bool)` in the letters x_i^{±1} (the natural syntactic encoding; `List (ℕ × Bool)` is `Primcodable`), interpreted in the free group of countably infinite rank as `FreeGroup.mk L`. The predicate depends only on `FreeGroup.mk L`. Mathlib has no computable `Primcodable (FreeGroup ℕ)` instance; deciding the predicate on arbitrary words is equivalent to deciding it on reduced words because free reduction is computable, so this is faithful to 'recognizes by an identity'. Building a `Primcodable (FreeGroup ℕ)` instance (via reduced words) would have required a nontrivial `Primrec FreeGroup.reduce` proof.",
+    "Identity as a single word w = 1 (any identity u = v is equivalent to u v⁻¹ = 1 in groups); variables indexed by ℕ (countably many variables), following the decomposition note.",
+    "A group satisfies the law w if `∀ f : ℕ → G, FreeGroup.lift f w = 1` (every substitution of group elements for the variables gives 1).",
+    "Varieties are represented by their sets of laws. `lawClosure S` is the set of consequences of S (laws of the variety defined by S), quantifying over groups `G : Type` (universe 0). Varieties correspond bijectively to closed sets (`lawClosure S = S`), and a variety is contained in the variety defined by w = 1 iff w is one of its laws; hence `subvarietiesOfLaw w = {S | lawClosure S = S ∧ w ∈ S}` is in bijection with the subvarieties. This uses only the Galois-connection formalism (no theorem such as 'varieties ↔ fully invariant subgroups of F_∞'). Restricting to universe-0 groups does not change the lattice of varieties, since the laws of a variety are determined by its countable-rank relatively free group, which lives in `Type`.",
+    "'At most countably many' is `Set.Countable` (cardinality ≤ ℵ₀, finite allowed). The variety itself and the trivial variety are counted as subvarieties (irrelevant to countability).",
+    "AMS tags 3 (logic/decidability), 8 (general algebraic systems / varieties), 20 (group theory)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FreeGroup.lift` (used to define it); no existing law/identity predicate in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«8.25».SatisfiesLaw",
+     "why_needed": "Mathlib has no notion of a group satisfying a law/identity w = 1 for w in a free group."
+    },
+    {
+     "closest_existing_considered": "Fully invariant / verbal subgroups of the free group (not in Mathlib; `Subgroup.map` under all endomorphisms would need the theorem identifying them with law sets); Mathlib's `GaloisConnection`/closure operators were considered but a direct definition is simpler.",
+     "name": "Kourovka.«8.25».lawClosure",
+     "why_needed": "The set of consequences of a set of laws (laws of the variety it defines); needed to characterize which sets of words are the law sets of varieties."
+    },
+    {
+     "closest_existing_considered": "No variety-of-groups notion exists in Mathlib or the repository.",
+     "name": "Kourovka.«8.25».IsVarietyLaws",
+     "why_needed": "Identifies the sets of words that are the set of all laws of a variety of groups (closed sets), so that varieties can be counted as sets."
+    },
+    {
+     "closest_existing_considered": "None; would otherwise be a class of classes of groups, which has no cardinality in Lean.",
+     "name": "Kourovka.«8.25».subvarietiesOfLaw",
+     "why_needed": "The set of subvarieties (as law sets) of the variety defined by w = 1, whose cardinality is the object of the question."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.25»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun L : List (ℕ × Bool) => (subvarietiesOfLaw (FreeGroup.mk L)).Countable`. Mathlib has no notion of group laws/varieties, so bespoke definitions (SatisfiesLaw, lawClosure, IsVarietyLaws, subvarietiesOfLaw) were added in the problem file; the modeling of varieties via closed sets of laws uses only the (definitional) Galois-connection correspondence between varieties and their sets of laws."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.25»": "/--\nDoes there exist an algorithm which recognizes by an identity whether it defines a variety of\ngroups that has at most countably many subvarieties?\n\nThe input of the algorithm is an identity $w = 1$, given by a word `L : List (ℕ × Bool)` in the\nletters $x_i^{\\pm 1}$ (`(i, true)` is $x_i$ and `(i, false)` is $x_i^{-1}$); the corresponding\nelement of the free group on the variables $x_0, x_1, \\dots$ is `FreeGroup.mk L`, and two words\nwith the same image define the same identity. The algorithm has to decide whether the variety of\ngroups defined by $w = 1$ has at most countably many subvarieties, i.e. whether the set of its\nsubvarieties is countable (finite or countably infinite).\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun L : List (ℕ × Bool) =>\n      (subvarietiesOfLaw (FreeGroup.mk L)).Countable := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.25\n\nby A. V. Kuznetsov\n\nDoes there exist an algorithm which recognizes by an identity whether it defines a\nvariety of groups that has at most countably many subvarieties?\n\nAn identity (law) is a word $w$ in the free group on the countably many variables\n$x_0, x_1, \\dots$; a group $G$ satisfies the identity $w = 1$ if $w$ evaluates to $1$\nunder every substitution of elements of $G$ for the variables. A variety of groups is\nthe class of all groups satisfying each identity in some set of identities, and the\nvariety defined by $w$ is the class of all groups satisfying $w = 1$. A subvariety of a\nvariety $\\mathfrak{V}$ is a variety contained in $\\mathfrak{V}$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.25»\n\n/-- A group `G` satisfies the identity (law) `w = 1`, where `w` is a word in the free group\non the countably many variables `x₀, x₁, …`, if `w` evaluates to `1` under every substitution\nof elements of `G` for the variables, i.e. under every homomorphism `FreeGroup ℕ →* G`. -/\ndef SatisfiesLaw (G : Type*) [Group G] (w : FreeGroup ℕ) : Prop :=\n  ∀ φ : FreeGroup ℕ →* G, φ w = 1\n\n/-- A class of groups, i.e. a property of groups. Groups are taken in the universe `Type`; since\nevery variety is determined by its relatively free group of countable rank, which is countable,\nthis does not change the collection of subvarieties of a variety. -/\nabbrev GroupClass : Type 1 := ∀ (G : Type) [Group G], Prop\n\n/-- The variety of groups defined by a set `S` of identities: the class of all groups\nsatisfying every identity `w = 1` with `w ∈ S`. -/\ndef varietyOf (S : Set (FreeGroup ℕ)) : GroupClass :=\n  fun G _ => ∀ w ∈ S, SatisfiesLaw G w\n\n/-- A class of groups is a variety if it is the class of all groups satisfying each\nidentity in some set of identities. -/\ndef IsVariety (𝒱 : GroupClass) : Prop :=\n  ∃ S : Set (FreeGroup ℕ), 𝒱 = varietyOf S\n\n/-- The subvarieties of a class of groups `𝒱`: the varieties of groups contained in `𝒱`. -/\ndef subvarieties (𝒱 : GroupClass) : Set GroupClass :=\n  {𝒲 | IsVariety 𝒲 ∧ ∀ (G : Type) [Group G], 𝒲 G → 𝒱 G}\n\n/--\nDoes there exist an algorithm which recognizes by an identity whether it defines a\nvariety of groups that has at most countably many subvarieties?\n\nAn identity is given to the algorithm as a word `l : List (ℕ × Bool)` in the variables\n`x₀, x₁, …` and their inverses, representing the element `FreeGroup.mk l` of the free group\nof countable rank. The variety it defines is the class of all groups `G` satisfying\n`FreeGroup.mk l = 1`, and the question asks whether the set of its subvarieties is\ncountable (finite or countably infinite) for the given identity, decided by an\nalgorithm, i.e. whether this predicate on words is a `ComputablePred`.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun l : List (ℕ × Bool) =>\n      (subvarieties (varietyOf {FreeGroup.mk l})).Countable := by\n  sorry\n\n/-- Every group satisfies the trivial identity `1 = 1`. -/\n@[category test, AMS 20]\ntheorem satisfiesLaw_one (G : Type*) [Group G] : SatisfiesLaw G 1 :=\n  fun φ => map_one φ\n\n/-- The class of groups defined by a set of identities is a variety. -/\n@[category test, AMS 20]\ntheorem isVariety_varietyOf (S : Set (FreeGroup ℕ)) : IsVariety (varietyOf S) :=\n  ⟨S, rfl⟩\n\n/-- The variety defined by the empty set of identities is the class of all groups. -/\n@[category test, AMS 20]\ntheorem varietyOf_empty (G : Type) [Group G] : varietyOf ∅ G :=\n  fun _ h => h.elim\n\n/-- Every variety is a subvariety of itself. -/\n@[category test, AMS 20]\ntheorem mem_subvarieties_self (S : Set (FreeGroup ℕ)) :\n    varietyOf S ∈ subvarieties (varietyOf S) :=\n  ⟨isVariety_varietyOf S, fun _ _ h => h⟩\n\n/-- A group satisfies the identity `[x₀, x₁] = 1` if and only if it is commutative. -/\n@[category test, AMS 20]\ntheorem satisfiesLaw_commutator_iff (G : Type) [Group G] :\n    SatisfiesLaw G ⁅FreeGroup.of 0, FreeGroup.of 1⁆ ↔ IsMulCommutative G := by\n  constructor\n  · intro h\n    refine ⟨⟨fun a b => ?_⟩⟩\n    have := h (FreeGroup.lift fun n : ℕ => if n = 0 then a else b)\n    rwa [map_commutatorElement, commutatorElement_eq_one_iff_mul_comm, FreeGroup.lift_apply_of,\n      FreeGroup.lift_apply_of, if_pos rfl, if_neg one_ne_zero] at this\n  · rintro ⟨⟨h⟩⟩ φ\n    rw [map_commutatorElement, commutatorElement_eq_one_iff_mul_comm]\n    exact h _ _\n\nend Kourovka.«8.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition is correct; the file conforms to it, with the identity presented to the algorithm as a word (the encodable input) rather than as an element of `FreeGroup ℕ`, since Mathlib has no `Primcodable (FreeGroup ℕ)` instance.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Algorithm' is modelled as `ComputablePred` (Mathlib's decidable-by-a-computable-function notion). Since Mathlib has no `Primcodable (FreeGroup ℕ)`, the identity is fed to the algorithm as a word `l : List (ℕ × Bool)` in the variables x₀, x₁, … and their inverses, standing for `FreeGroup.mk l`. Every element of the free group of countable rank is of this form and the predicate factors through `FreeGroup.mk`, so decidability on words is exactly decidability on identities (reduction of words is computable, so allowing unreduced words changes nothing).",
+    "'Identity' = a single element of `FreeGroup ℕ` (free group of countable rank), i.e. a law w = 1; an identity u = v is equivalent to uv⁻¹ = 1. A group satisfies it iff every homomorphism `FreeGroup ℕ →* G` kills w (`SatisfiesLaw`).",
+    "'Variety of groups' is defined equationally (H. Neumann's definition): a class of groups equal to the class of all groups satisfying some set of laws (`IsVariety`). By Birkhoff's theorem this coincides with classes closed under subgroups, quotients and direct products.",
+    "'Subvarieties' are the varieties contained (pointwise) in the given variety, collected as a `Set GroupClass` (in `Type 1`); 'at most countably many' is `Set.Countable` (finite or countably infinite).",
+    "Classes of groups are restricted to groups in universe `Type` (`GroupClass := ∀ (G : Type) [Group G], Prop`), as is standard in this repository. This does not change the count: subvarieties are in bijection with fully invariant subgroups V of `FreeGroup ℕ` containing w, and distinct such V are separated by the countable (hence `Type`-level) relatively free groups `FreeGroup ℕ ⧸ V`, so the lattice of subvarieties of `Type`-groups is the usual one. An equivalent formulation would count fully invariant subgroups of `FreeGroup ℕ` containing w; the class-of-groups formulation was chosen because it follows the informal definitions literally.",
+    "The trivial identity (empty word) defines the variety of all groups, which has 2^ℵ₀ subvarieties, so the predicate is false there; no degenerate boundary case makes the statement trivial.",
+    "AMS tags 3 (logic/computability) and 20 (group theory); test lemmas are tagged AMS 20."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FreeGroup.lift / MonoidHom evaluation (used in the definition); Mathlib.ModelTheory has languages for rings and fields but no group language or equational theories.",
+     "name": "Kourovka.«8.25».SatisfiesLaw",
+     "why_needed": "Mathlib has no notion of a group satisfying a law/identity w = 1 (∀ φ : FreeGroup ℕ →* G, φ w = 1)."
+    },
+    {
+     "closest_existing_considered": "No class-of-groups notion in Mathlib; bare Pi type would be less readable.",
+     "name": "Kourovka.«8.25».GroupClass",
+     "why_needed": "Type alias `∀ (G : Type) [Group G], Prop` for a class of groups, so varieties and their subvarieties can be collected in a `Set` and counted."
+    },
+    {
+     "closest_existing_considered": "Nothing; Mathlib has no varieties of groups (only algebraic varieties).",
+     "name": "Kourovka.«8.25».varietyOf",
+     "why_needed": "The variety defined by a set of identities: the class of all groups satisfying each of them. Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«8.25».IsVariety",
+     "why_needed": "A class of groups is a variety iff it is `varietyOf S` for some set of laws S (Neumann's definition; equivalent to Birkhoff's HSP characterisation)."
+    },
+    {
+     "closest_existing_considered": "Alternative: the set of fully invariant subgroups of `FreeGroup ℕ` containing w (Subgroup + Subgroup.map under all endomorphisms); rejected in favour of the literal class-of-groups reading, though it gives the same cardinality.",
+     "name": "Kourovka.«8.25».subvarieties",
+     "why_needed": "The set of varieties contained in a given class, whose countability is the property to be decided."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.25»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun l : List (ℕ × Bool) => (subvarieties (varietyOf {FreeGroup.mk l})).Countable`. Mathlib has no notion of group laws/identities or varieties of groups (nor a Primcodable instance on FreeGroup), so bespoke definitions SatisfiesLaw, GroupClass, varietyOf, IsVariety, subvarieties were added in the problem file, with `@[category test]` API lemmas."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.25»": "/--\nDoes there exist an algorithm which recognizes by an identity whether it defines a\nvariety of groups that has at most countably many subvarieties?\n\nAn identity is given to the algorithm as a word `l : List (ℕ × Bool)` in the variables\n`x₀, x₁, …` and their inverses, representing the element `FreeGroup.mk l` of the free group\nof countable rank. The variety it defines is the class of all groups `G` satisfying\n`FreeGroup.mk l = 1`, and the question asks whether the set of its subvarieties is\ncountable (finite or countably infinite) for the given identity, decided by an\nalgorithm, i.e. whether this predicate on words is a `ComputablePred`.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun l : List (ℕ × Bool) =>\n      (subvarieties (varietyOf {FreeGroup.mk l})).Countable := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.25\n\nby A. V. Kuznetsov\n\nDoes there exist an algorithm which recognizes from an identity whether the variety of groups it\ndefines has at most countably many subvarieties?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 8.25.\n-/\n\nnamespace Kourovka.«8.25»\n\n/-- A subgroup of a group is fully invariant if every endomorphism maps it into itself. -/\ndef IsFullyInvariant {G : Type*} [Group G] (N : Subgroup G) : Prop :=\n  ∀ f : G →* G, N.map f ≤ N\n\n/--\nA variety of groups, represented by its subgroup of laws in the free group on countably many\ngenerators. Such law subgroups are precisely the fully invariant subgroups.\n-/\ndef GroupVariety :=\n  {N : Subgroup (FreeGroup ℕ) // IsFullyInvariant N}\n\n/--\nDoes there exist an algorithm which recognizes from an identity whether the variety of groups it\ndefines has at most countably many subvarieties?\n\nAn identity is encoded as a finite word `w : List (ℕ × Bool)` and denotes the law\n`FreeGroup.mk w = 1`. A variety is represented by its fully invariant subgroup of laws in the free\ngroup on countably many generators. Under this representation, the subvarieties of the variety\ndefined by `w` correspond to the fully invariant subgroups containing `FreeGroup.mk w`.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : List (ℕ × Bool) ↦\n      Cardinal.mk {V : GroupVariety // FreeGroup.mk w ∈ V.1} ≤ Cardinal.aleph0 := by\n  sorry\n\nend Kourovka.«8.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Encoded an input identity by a finite word `List (ℕ × Bool)` and interpreted it as the law `FreeGroup.mk w = 1`. This is an effective presentation and avoids assigning an arbitrary noncomputable `Primcodable` instance to Mathlib's quotient type `FreeGroup ℕ`.",
+    "Represented a group variety by its fully invariant subgroup of laws in the free group on countably many generators. Under the standard law-subgroup correspondence, subvarieties of the variety defined by `w` are exactly the fully invariant subgroups containing `FreeGroup.mk w`.",
+    "Expressed 'at most countably many' as a cardinal bound by `Cardinal.aleph0`, and existence of an algorithm as `ComputablePred`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `Submodule.IsFullyInvariant` for modules, but no group/subgroup analogue.",
+     "name": "Kourovka.«8.25».IsFullyInvariant",
+     "why_needed": "The statement needs fully invariant subgroups to represent sets of group laws, and Mathlib has no corresponding predicate for subgroups."
+    },
+    {
+     "closest_existing_considered": "No existing group-variety or verbal-subgroup primitive was found; this subtype bundles fully invariant subgroups of `FreeGroup ℕ`.",
+     "name": "Kourovka.«8.25».GroupVariety",
+     "why_needed": "A universe-safe, extensional representation of group varieties is required to count their subvarieties; Mathlib and FormalConjecturesForMathlib have no group-variety type."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.25»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.25»": "/--\nDoes there exist an algorithm which recognizes from an identity whether the variety of groups it\ndefines has at most countably many subvarieties?\n\nAn identity is encoded as a finite word `w : List (ℕ × Bool)` and denotes the law\n`FreeGroup.mk w = 1`. A variety is represented by its fully invariant subgroup of laws in the free\ngroup on countably many generators. Under this representation, the subvarieties of the variety\ndefined by `w` correspond to the fully invariant subgroups containing `FreeGroup.mk w`.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : List (ℕ × Bool) ↦\n      Cardinal.mk {V : GroupVariety // FreeGroup.mk w ∈ V.1} ≤ Cardinal.aleph0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.25\n\nby A. V. Kuznetsov\n\nDoes there exist an algorithm which recognizes from an identity whether the\nvariety of groups defined by that identity has at most countably many\nsubvarieties?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.25»\n\n/-- A subgroup of the free group of countable rank is fully invariant if it is\npreserved by every endomorphism. -/\ndef IsFullyInvariant (N : Subgroup (FreeGroup ℕ)) : Prop :=\n  ∀ f : FreeGroup ℕ →* FreeGroup ℕ, N.map f ≤ N\n\n/--\nDoes there exist an algorithm which recognizes from a group identity whether\nit defines a variety of groups with at most countably many subvarieties?\n\nAn identity is encoded as a finite word in generators indexed by $\\mathbb{N}$,\nwith the Boolean component recording the sign of each letter. It is interpreted\nas an element of the free group by `FreeGroup.mk`. By the standard\ncorrespondence between varieties of groups and fully invariant subgroups of\nthe free group of countable rank, the subvarieties of the variety defined by\n$w = 1$ correspond to the fully invariant subgroups containing $w$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : List (ℕ × Bool) ↦\n      Countable {N : Subgroup (FreeGroup ℕ) // IsFullyInvariant N ∧ FreeGroup.mk w ∈ N} := by\n  sorry\n\nend Kourovka.«8.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "An input identity is represented by a finite signed word `List (ℕ × Bool)` and interpreted as an element of the free group of countable rank using `FreeGroup.mk`; this gives the required `Primcodable` syntax for `ComputablePred`.",
+    "Group varieties are represented through the standard anti-correspondence with fully invariant subgroups of `FreeGroup ℕ`. Thus subvarieties of the variety defined by `w = 1` are represented by fully invariant subgroups containing `FreeGroup.mk w`.",
+    "“At most countably many” is expressed by `Countable` on the subtype of such fully invariant subgroups, which includes both finite and countably infinite cases."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `Subgroup.Characteristic`, which only expresses invariance under automorphisms; searches of Mathlib and FormalConjecturesForMathlib found no fully invariant subgroup predicate.",
+     "name": "Kourovka.«8.25».IsFullyInvariant",
+     "why_needed": "The statement needs the law-subgroup representation of group varieties, and hence the predicate that a subgroup of the countably generated free group is preserved by every endomorphism."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.25»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.25»": "/--\nDoes there exist an algorithm which recognizes from a group identity whether\nit defines a variety of groups with at most countably many subvarieties?\n\nAn identity is encoded as a finite word in generators indexed by $\\mathbb{N}$,\nwith the Boolean component recording the sign of each letter. It is interpreted\nas an element of the free group by `FreeGroup.mk`. By the standard\ncorrespondence between varieties of groups and fully invariant subgroups of\nthe free group of countable rank, the subvarieties of the variety defined by\n$w = 1$ correspond to the fully invariant subgroups containing $w$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : List (ℕ × Bool) ↦\n      Countable {N : Subgroup (FreeGroup ℕ) // IsFullyInvariant N ∧ FreeGroup.mk w ∈ N} := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.25\n\nby A. V. Kuznetsov\n\nDoes there exist an algorithm which recognizes by an identity whether it defines a\nvariety of groups that has at most countably many subvarieties?\n\nAn identity (law) is a word $w$ in the free group $F_\\infty$ on the countably many letters\n$x_0, x_1, \\dots$; a group $G$ satisfies it if every substitution of elements of $G$ for the\nletters sends $w$ to $1$. (An identity $u = v$ is equivalent to $u v^{-1} = 1$.) The variety\nof groups defined by $w$ is the class of all groups satisfying $w = 1$. A subvariety of it is a\nvariety of groups (a class of groups defined by a set of identities) contained in it.\n\nA variety is determined by its set of laws, so the subvarieties of the variety defined by $w$\ncorrespond bijectively to the closed sets of laws $L \\subseteq F_\\infty$ containing $w$, where\n$L$ is closed if every law holding in all groups satisfying $L$ already lies in $L$. Hence the\nvariety defined by $w$ has at most countably many subvarieties iff the set of closed sets of\nlaws containing $w$ is countable. The question asks whether this property of $w$ is decidable.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.25»\n\nopen FreeGroup\n\nsection Primcodable\n\nvariable {α : Type*} [Primcodable α] [DecidableEq α]\n\n/-- Free reduction of words is primitive recursive. -/\n@[category API, AMS 3 20]\ntheorem primrec_reduce : Primrec (reduce : List (α × Bool) → List (α × Bool)) := by\n  have hh : Primrec fun x : ((α × Bool) × List (α × Bool) × List (α × Bool)) ×\n      (α × Bool) × List (α × Bool) =>\n      if x.1.1.1 = x.2.1.1 ∧ x.1.1.2 = !x.2.1.2 then x.2.2 else x.1.1 :: x.2.1 :: x.2.2 := by\n    refine Primrec.ite (PrimrecPred.and ?_ ?_) ?_ ?_\n    · exact Primrec.eq.comp (Primrec.fst.comp (Primrec.fst.comp Primrec.fst))\n        (Primrec.fst.comp (Primrec.fst.comp Primrec.snd))\n    · exact Primrec.eq.comp (Primrec.snd.comp (Primrec.fst.comp Primrec.fst))\n        (Primrec.not.comp (Primrec.snd.comp (Primrec.fst.comp Primrec.snd)))\n    · exact Primrec.snd.comp Primrec.snd\n    · exact Primrec.list_cons.comp (Primrec.fst.comp Primrec.fst)\n        (Primrec.list_cons.comp (Primrec.fst.comp Primrec.snd) (Primrec.snd.comp Primrec.snd))\n  have hstep : Primrec fun p : (α × Bool) × List (α × Bool) × List (α × Bool) =>\n      List.casesOn (motive := fun _ => List (α × Bool)) p.2.2 [p.1] fun hd tl =>\n        if p.1.1 = hd.1 ∧ p.1.2 = !hd.2 then tl else p.1 :: hd :: tl :=\n    Primrec.list_casesOn (Primrec.snd.comp Primrec.snd)\n      (Primrec.list_cons.comp Primrec.fst (Primrec.const [])) hh.to₂\n  exact (Primrec.list_rec Primrec.id (Primrec.const []) (hstep.comp Primrec.snd).to₂).of_eq\n    fun L => rfl\n\n/-- The free group on a `Primcodable` type is `Primcodable`, via reduced words. -/\ninstance : Primcodable (FreeGroup α) :=\n  haveI : Primcodable {L : List (α × Bool) // reduce L = L} :=\n    Primcodable.subtype (Primrec.eq.comp primrec_reduce Primrec.id)\n  Primcodable.ofEquiv {L : List (α × Bool) // reduce L = L}\n    { toFun := fun w => ⟨toWord w, reduce_toWord w⟩\n      invFun := fun L => mk L.1\n      left_inv := fun _ => mk_toWord\n      right_inv := fun L => Subtype.ext (toWord_mk.trans L.2) }\n\nend Primcodable\n\n/-- A group `G` satisfies the identity (law) `w = 1`, where `w` is a word in the free group on\nthe countably many letters `x₀, x₁, …`, if every substitution of elements of `G` for the letters\nsends `w` to `1`. -/\ndef SatisfiesLaw (G : Type*) [Group G] (w : FreeGroup ℕ) : Prop :=\n  ∀ f : ℕ → G, lift f w = 1\n\n/-- The set of all laws of the variety of groups defined by a set `S` of identities: the words\n`u` such that `u = 1` holds in every group satisfying all identities in `S`.\n\nQuantifying only over groups in `Type` loses no generality: laws pass to subgroups, and a\ncountably generated group in any universe is isomorphic to a group in `Type`. -/\ndef lawsOfVariety (S : Set (FreeGroup ℕ)) : Set (FreeGroup ℕ) :=\n  {u | ∀ (G : Type) [Group G], (∀ v ∈ S, SatisfiesLaw G v) → SatisfiesLaw G u}\n\n/-- `L` is the full set of laws of some variety of groups, i.e. `L` is closed under consequence.\nSince a variety of groups is determined by its set of laws, the varieties of groups correspond\nbijectively to the sets `L` with `IsLawsOfVariety L`, and the subvarieties of the variety\ndefined by `w` correspond to those with `w ∈ L`. -/\ndef IsLawsOfVariety (L : Set (FreeGroup ℕ)) : Prop :=\n  lawsOfVariety L = L\n\n/--\nDoes there exist an algorithm which recognizes by an identity whether it defines a\nvariety of groups that has at most countably many subvarieties?\n\nHere the identity is `w = 1` for a word `w` in the free group on countably many letters. The\nsubvarieties of the variety defined by `w` correspond bijectively to the closed sets of laws\n`L` with `w ∈ L`, so the variety has at most countably many subvarieties iff the set of such\n`L` is countable. The answer is \"yes\" iff this predicate on `w` is computable.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : FreeGroup ℕ =>\n      {L : Set (FreeGroup ℕ) | IsLawsOfVariety L ∧ w ∈ L}.Countable := by\n  sorry\n\n/-- Every group satisfies the trivial law `1 = 1`. -/\n@[category test, AMS 20]\ntheorem satisfiesLaw_one (G : Type*) [Group G] : SatisfiesLaw G 1 := by\n  simp [SatisfiesLaw]\n\n/-- Commutative groups satisfy the commutator law `[x₀, x₁] = 1`. -/\n@[category test, AMS 20]\ntheorem satisfiesLaw_commutator (G : Type*) [CommGroup G] : SatisfiesLaw G ⁅of 0, of 1⁆ := by\n  intro f\n  rw [map_commutatorElement, commutatorElement_eq_one_iff_mul_comm]\n  exact mul_comm _ _\n\n/-- Every identity in `S` is a law of the variety defined by `S`. -/\n@[category test, AMS 20]\ntheorem subset_lawsOfVariety (S : Set (FreeGroup ℕ)) : S ⊆ lawsOfVariety S :=\n  fun _ hu _ _ hG => hG _ hu\n\n/-- The set of laws of the variety defined by `S` is closed under consequence. -/\n@[category test, AMS 20]\ntheorem isLawsOfVariety_lawsOfVariety (S : Set (FreeGroup ℕ)) :\n    IsLawsOfVariety (lawsOfVariety S) := by\n  refine Set.Subset.antisymm (fun u hu G _ hG => hu G ?_) (subset_lawsOfVariety _)\n  exact fun v hv => hv G hG\n\n/-- The set of all words is the set of laws of the trivial variety. -/\n@[category test, AMS 20]\ntheorem isLawsOfVariety_univ : IsLawsOfVariety Set.univ :=\n  Set.eq_univ_of_univ_subset (subset_lawsOfVariety _)\n\nend Kourovka.«8.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition matches the statement; I followed its reading (identity = one word of the countable-rank free group, algorithm = ComputablePred on that word, subvarieties counted via their sets of laws, 'at most countably many' = countable).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "An identity is a single word w ∈ FreeGroup ℕ (identity w = 1). An identity u = v is equivalent to uv⁻¹ = 1, and any identity uses finitely many variables, so free group of countable rank covers all identities.",
+    "Varieties are handled through their sets of laws (Hanna Neumann's definition of a variety as the class of all groups satisfying a set of laws): the subvarieties of var(w) are in bijection with closed law sets L (lawsOfVariety L = L) containing w. This uses only the trivial Galois-connection facts var(laws(var S)) = var S and var(S) ⊆ var(w) ⇔ w ∈ laws(var S); no appeal to Birkhoff's HSP theorem or to the fully-invariant-subgroup correspondence.",
+    "`lawsOfVariety` quantifies over groups `G : Type` (universe 0), following repository convention (e.g. Kourovka 1.40). This is equivalent to quantifying over all universes: laws are inherited by subgroups and a witness to failure of a law lives in a countably generated subgroup, which is isomorphic to a group in `Type`. Noted in the docstring.",
+    "'At most countably many subvarieties' is `Set.Countable` of the set of closed law sets containing w (finite or countably infinite). The trivial variety (L = Set.univ) and var(w) itself are counted, as is standard; this does not affect countability.",
+    "'Algorithm' is `ComputablePred` (Mathlib's notion of a decidable-by-total-computable-function predicate) on `FreeGroup ℕ`, using a bespoke `Primcodable (FreeGroup α)` instance via reduced words. Any computably equivalent encoding gives the same notion; the instance is declared globally in the problem file (would belong in FormalConjecturesForMathlib in a real PR).",
+    "AMS tags: 3 (mathematical logic/computability) and 20 (group theory); the helper `primrec_reduce` is tagged `category API` and the sanity lemmas `category test`, as required by the AMS/category linters (verified by compiling with the lakefile's CI linter options)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `FreeGroup.reduce`, `Primrec.list_rec`, `Primrec.list_casesOn` but no primrec/computability lemma about `reduce`.",
+     "name": "Kourovka.«8.25».primrec_reduce",
+     "why_needed": "Proof that `FreeGroup.reduce` is primitive recursive; needed to build the `Primcodable (FreeGroup α)` instance (tagged `category API`)."
+    },
+    {
+     "closest_existing_considered": "`Primcodable.ofEquiv`, `Primcodable.subtype`, `Primcodable.ofDenumerable`; no existing instance for `FreeGroup`. Alternative considered: taking the algorithm's input as an unreduced word `List (ℕ × Bool)` (already Primcodable) — equivalent, but less direct than a predicate on `FreeGroup ℕ` as the decomposition table prescribes.",
+     "name": "Kourovka.«8.25».instPrimcodableFreeGroup (instance : Primcodable (FreeGroup α) for [Primcodable α] [DecidableEq α])",
+     "why_needed": "`ComputablePred` requires a `Primcodable` instance on the input type `FreeGroup ℕ`; Mathlib has no `Encodable`/`Primcodable` instance for `FreeGroup`. Built via `Primcodable.ofEquiv` with the subtype of reduced words (`toWord`/`mk`). Arguably belongs in FormalConjecturesForMathlib, but the task restricts output to the single problem file."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`; searched Mathlib GroupTheory/Algebra for 'law', 'variety', 'verbal', 'fully invariant' — nothing.",
+     "name": "Kourovka.«8.25».SatisfiesLaw",
+     "why_needed": "'Group G satisfies the identity w = 1': ∀ f : ℕ → G, FreeGroup.lift f w = 1. No notion of a group law/identity exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib; a verbal-subgroup/fully-invariant-subgroup formulation was considered but that correspondence is a theorem rather than the definition of 'variety defined by identities'.",
+     "name": "Kourovka.«8.25».lawsOfVariety",
+     "why_needed": "Set of all laws of the variety defined by a set S of identities (consequence closure): {u | ∀ (G : Type) [Group G], (∀ v ∈ S, SatisfiesLaw G v) → SatisfiesLaw G u}."
+    },
+    {
+     "closest_existing_considered": "None; Mathlib has no notion of varieties of groups or of equational classes.",
+     "name": "Kourovka.«8.25».IsLawsOfVariety",
+     "why_needed": "L is the full set of laws of some variety (lawsOfVariety L = L). Used to count subvarieties: varieties ↔ closed law sets, subvarieties of var(w) ↔ closed L with w ∈ L."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.25»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun w : FreeGroup ℕ => {L : Set (FreeGroup ℕ) | IsLawsOfVariety L ∧ w ∈ L}.Countable`. An identity is a word w in the free group on countably many letters (identity w = 1; u = v is equivalent to uv⁻¹ = 1). A group satisfies w if every substitution ℕ → G sends w to 1. `lawsOfVariety S` is the set of consequences of S (laws holding in every group satisfying S) and `IsLawsOfVariety L` means L is closed (L = lawsOfVariety L). Varieties (equational classes) are determined by their sets of laws, and var(S) ⊆ var(w) iff w ∈ lawsOfVariety S, so subvarieties of the variety defined by w correspond bijectively to closed L containing w; 'at most countably many' is `Set.Countable`. 'Algorithm' is `ComputablePred` on `FreeGroup ℕ`, for which a `Primcodable` instance (via reduced words) is constructed and proved in the file. answer(True) means the algorithm exists."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.25»": "/--\nDoes there exist an algorithm which recognizes by an identity whether it defines a\nvariety of groups that has at most countably many subvarieties?\n\nHere the identity is `w = 1` for a word `w` in the free group on countably many letters. The\nsubvarieties of the variety defined by `w` correspond bijectively to the closed sets of laws\n`L` with `w ∈ L`, so the variety has at most countably many subvarieties iff the set of such\n`L` is countable. The answer is \"yes\" iff this predicate on `w` is computable.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : FreeGroup ℕ =>\n      {L : Set (FreeGroup ℕ) | IsLawsOfVariety L ∧ w ∈ L}.Countable := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.25\n\nby A. V. Kuznetsov\n\nDoes there exist an algorithm which recognizes from an identity whether it defines a variety of\ngroups with at most countably many subvarieties?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.25»\n\n/-- A subgroup of the free group of countable rank is fully invariant if every endomorphism maps\nit into itself. -/\ndef IsFullyInvariant (N : Subgroup (FreeGroup ℕ)) : Prop :=\n  ∀ f : FreeGroup ℕ →* FreeGroup ℕ, N ≤ N.comap f\n\n/--\nDoes there exist an algorithm which, given a group identity, recognizes whether the variety of\ngroups defined by that identity has at most countably many subvarieties?\n\nAn identity is encoded by a finite word `w` in countably many variables, and `FreeGroup.mk w` is\nthe corresponding element of the free group. By the correspondence between varieties of groups\nand fully invariant subgroups of the free group of countable rank, the subvarieties of the variety\ndefined by $w = 1$ correspond to the fully invariant subgroups containing `FreeGroup.mk w`.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : List (ℕ × Bool) ↦\n      Cardinal.mk {N : Subgroup (FreeGroup ℕ) //\n        IsFullyInvariant N ∧ FreeGroup.mk w ∈ N} ≤ Cardinal.aleph0 := by\n  sorry\n\nend Kourovka.«8.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A group identity is represented by a primitively codable finite word `List (ℕ × Bool)` in countably many variables; `FreeGroup.mk` sends this code to the corresponding element of the free group. The predicate depends only on that element, not on the chosen word representative.",
+    "Subvarieties are counted through Birkhoff's correspondence: they correspond bijectively to fully invariant subgroups of `FreeGroup ℕ` containing the given identity.",
+    "“At most countably many” is expressed by `Cardinal.mk … ≤ Cardinal.aleph0`, including finite cardinalities.",
+    "Existence of an algorithm is expressed by Mathlib's `ComputablePred`; consequently `answer(True)` denotes a positive answer."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `Submodule.IsFullyInvariant` for submodules, but no corresponding definition for subgroups; the submodule definition is not applicable to the free group.",
+     "name": "Kourovka.«8.25».IsFullyInvariant",
+     "why_needed": "The statement needs the group-theoretic notion of a subgroup stable under every endomorphism in order to represent sets of laws and hence subvarieties."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.25»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.25»": "/--\nDoes there exist an algorithm which, given a group identity, recognizes whether the variety of\ngroups defined by that identity has at most countably many subvarieties?\n\nAn identity is encoded by a finite word `w` in countably many variables, and `FreeGroup.mk w` is\nthe corresponding element of the free group. By the correspondence between varieties of groups\nand fully invariant subgroups of the free group of countable rank, the subvarieties of the variety\ndefined by $w = 1$ correspond to the fully invariant subgroups containing `FreeGroup.mk w`.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : List (ℕ × Bool) ↦\n      Cardinal.mk {N : Subgroup (FreeGroup ℕ) //\n        IsFullyInvariant N ∧ FreeGroup.mk w ∈ N} ≤ Cardinal.aleph0 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.25\n\nby A. V. Kuznetsov\n\nDoes there exist an algorithm which recognizes from an identity whether the\nvariety of groups that it defines has at most countably many subvarieties?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.25»\n\n/-- A subgroup of a group is fully invariant if every endomorphism maps it\ninto itself. -/\ndef IsFullyInvariant {G : Type*} [Group G] (N : Subgroup G) : Prop :=\n  ∀ f : G →* G, N.map f ≤ N\n\n/--\nDoes there exist an algorithm which recognizes, given a group identity,\nwhether the variety of groups defined by that identity has at most countably\nmany subvarieties?\n\nAn identity is encoded by a finite word in countably many variables and is\ninterpreted as an element of `FreeGroup ℕ`. By the correspondence between\ngroup varieties and fully invariant subgroups of the countably generated free\ngroup, the subvarieties of the variety defined by $w = 1$ correspond to the\nfully invariant subgroups that contain $w$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : List (ℕ × Bool) =>\n      Set.Countable {N : Subgroup (FreeGroup ℕ) |\n        IsFullyInvariant N ∧ FreeGroup.mk w ∈ N} := by\n  sorry\n\nend Kourovka.«8.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Encoded an input identity as a finite word `List (ℕ × Bool)` and interpreted it using `FreeGroup.mk`; this gives the standard computable presentation of elements of the countably generated free group without requiring a missing `Primcodable (FreeGroup ℕ)` instance.",
+    "Used the Birkhoff correspondence: subvarieties of the variety defined by `w = 1` correspond to fully invariant subgroups of `FreeGroup ℕ` containing `w`.",
+    "Used `Set.Countable` for “at most countably many,” so finite collections are included.",
+    "Used `ComputablePred` to express existence of an algorithm deciding the property from the encoded identity."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `Submodule.IsFullyInvariant` for modules and `Subgroup.Characteristic` for invariance under automorphisms, but no fully invariant subgroup predicate; characteristic is too weak.",
+     "name": "Kourovka.«8.25».IsFullyInvariant",
+     "why_needed": "The statement is represented through the standard correspondence between group varieties and fully invariant subgroups, requiring invariance under every group endomorphism."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.25»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.25»": "/--\nDoes there exist an algorithm which recognizes, given a group identity,\nwhether the variety of groups defined by that identity has at most countably\nmany subvarieties?\n\nAn identity is encoded by a finite word in countably many variables and is\ninterpreted as an element of `FreeGroup ℕ`. By the correspondence between\ngroup varieties and fully invariant subgroups of the countably generated free\ngroup, the subvarieties of the variety defined by $w = 1$ correspond to the\nfully invariant subgroups that contain $w$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.25» : answer(sorry) ↔\n    ComputablePred fun w : List (ℕ × Bool) =>\n      Set.Countable {N : Subgroup (FreeGroup ℕ) |\n        IsFullyInvariant N ∧ FreeGroup.mk w ∈ N} := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«8.25»": "c03"
+ },
+ "id": "kourovka-8.25",
+ "main_attempt": "c03"
+}

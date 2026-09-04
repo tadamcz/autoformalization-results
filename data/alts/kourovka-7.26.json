@@ -1,0 +1,394 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.26\n\nby A. V. Kuznetsov\n\nThe *ordinal height* of a variety of groups is, by definition, the supremum of the\norder types (ordinals) of all chains of its proper subvarieties that are well-ordered\nby inclusion. It is clear that its cardinality is either finite or countably infinite,\nor equal to $\\omega_1$. Is every countable ordinal number the ordinal height of some\nvariety?\n\nA variety of groups is understood in the sense of Birkhoff and Neumann: a class of\ngroups closed under homomorphic images, subgroups and (unrestricted) direct products,\nor equivalently the class of all groups satisfying a given set of laws (words in the\nfree group on countably many generators). Groups are taken with underlying type in\n`Type`, so classes of groups live in `Type 1` and ordinal heights in `Ordinal.{1}`.\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n- H. Neumann, *Varieties of Groups*, Springer, 1967.\n-/\n\nopen Cardinal\n\nnamespace Kourovka.«7.26»\n\n/-- A class of groups: a predicate on groups whose underlying type lives in `Type`.\nClasses are ordered by inclusion, so `W < V` means that `W` is a proper subclass of `V`. -/\nabbrev GroupClass : Type 1 := ∀ (G : Type) [Group G], Prop\n\n/-- A class of groups `V` is a *variety* if it is closed under homomorphic images\n(in particular under isomorphism), under subgroups and under unrestricted direct\nproducts (including the empty product, so `V` contains the trivial group).\nBy Birkhoff's theorem these are exactly the classes of groups defined by a set of laws. -/\nstructure IsVariety (V : GroupClass) : Prop where\n  /-- `V` is closed under homomorphic images. -/\n  of_surjective : ∀ {G H : Type} [Group G] [Group H] (f : G →* H),\n    Function.Surjective f → V G → V H\n  /-- `V` is closed under subgroups. -/\n  subgroup : ∀ {G : Type} [Group G] (H : Subgroup G), V G → V H\n  /-- `V` is closed under unrestricted direct products. -/\n  pi : ∀ {ι : Type} {G : ι → Type} [∀ i, Group (G i)], (∀ i, V (G i)) → V (∀ i, G i)\n\n/-- A chain of proper subvarieties of the class `V` that is well-ordered by inclusion:\na set of varieties, each strictly contained in `V`, on which strict inclusion is a\nwell-order. -/\nstructure WellOrderedChain (V : GroupClass) where\n  /-- The members of the chain. -/\n  carrier : Set GroupClass\n  /-- Every member of the chain is a variety. -/\n  isVariety : ∀ W ∈ carrier, IsVariety W\n  /-- Every member of the chain is a proper subclass of `V`. -/\n  lt : ∀ W ∈ carrier, W < V\n  /-- The chain is well-ordered by inclusion. -/\n  isWellOrder : IsWellOrder carrier (· < ·)\n\n/-- The *ordinal height* of a class of groups `V`: the supremum of the order types of all\nchains of proper subvarieties of `V` that are well-ordered by inclusion. -/\nnoncomputable def ordinalHeight (V : GroupClass) : Ordinal.{1} :=\n  ⨆ c : WellOrderedChain V, @Ordinal.type c.carrier (· < ·) c.isWellOrder\n\n/-- The class of all groups is a variety. -/\n@[category API, AMS 20]\ntheorem isVariety_top : IsVariety ⊤ where\n  of_surjective _ _ _ := trivial\n  subgroup _ _ := trivial\n  pi _ := trivial\n\n/-- The class of trivial groups is a variety. -/\n@[category API, AMS 20]\ntheorem isVariety_subsingleton : IsVariety fun G _ => Subsingleton G where\n  of_surjective _ hf _ := hf.subsingleton\n  subgroup _ _ := inferInstance\n  pi _ := inferInstance\n\n/-- Every variety contains all trivial groups. -/\n@[category API, AMS 20]\ntheorem IsVariety.subsingleton_le {V : GroupClass} (hV : IsVariety V) :\n    (fun G _ => Subsingleton G) ≤ V := by\n  intro G _ hG\n  have h : V (∀ i : Empty, (fun _ => G) i) := hV.pi fun i => i.elim\n  exact hV.of_surjective (1 : (∀ i : Empty, (fun _ => G) i) →* G)\n    (fun g => ⟨fun i => i.elim, Subsingleton.elim _ _⟩) h\n\n/-- The trivial variety has no proper subvarieties, so its ordinal height is `0`. -/\n@[category API, AMS 20]\ntheorem ordinalHeight_subsingleton : ordinalHeight (fun G _ => Subsingleton G) = 0 := by\n  refine le_antisymm (Ordinal.iSup_le fun c => ?_) (zero_le _)\n  have hempty : IsEmpty c.carrier := ⟨fun ⟨W, hW⟩ =>\n    (c.lt W hW).not_ge ((c.isVariety W hW).subsingleton_le)⟩\n  exact le_of_eq ((@Ordinal.type_eq_zero_iff_isEmpty c.carrier (· < ·) c.isWellOrder).2 hempty)\n\n/--\nIs every countable ordinal number the ordinal height of some variety of groups?\n\nHere the *ordinal height* of a variety is the supremum of the order types of all chains of\nits proper subvarieties that are well-ordered by inclusion. A countable ordinal is one whose\ncardinality is finite or countably infinite; in particular `0` is realised by the trivial\nvariety, whose only chain of proper subvarieties is the empty chain.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal.{1}, α.card ≤ ℵ₀ →\n      ∃ V : GroupClass, IsVariety V ∧ ordinalHeight V = α := by\n  sorry\n\nend Kourovka.«7.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's single slot and its notes (include finite ordinals and 0; the preceding sentences are a definition and a remark, not questions) match my reading of the statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "A variety is defined via Birkhoff closure (homomorphic images, subgroups, unrestricted direct products) on classes of groups whose carrier type lives in `Type`; by Birkhoff's HSP theorem (valid within the universe `Type`, since free groups on sets in `Type` and all needed products stay in `Type`) this coincides with the class of groups satisfying a set of laws in `FreeGroup ℕ`, the alternative reading mentioned in the decomposition notes.",
+    "Closure under 'quotients' is stated as closure under surjective homomorphisms (homomorphic images), which also gives closure under isomorphism; closure under subgroups is stated literally with `Subgroup G`. The empty product is included, so every variety contains the trivial group and the empty class is not a variety (as in H. Neumann's book).",
+    "Classes of groups are `∀ (G : Type) [Group G], Prop`, so they carry the Pi order; `W < V` is strict inclusion, i.e. `W` is a proper subclass. 'Well-ordered by inclusion' is `IsWellOrder carrier (· < ·)` (linear + well-founded strict inclusion), and the order type is `Ordinal.type` of that relation.",
+    "Because classes of groups live in `Type 1`, the ordinal height is an `Ordinal.{1}` and the quantified ordinal α is in `Ordinal.{1}`; the supremum `⨆` over `WellOrderedChain V : Type 1` into `Ordinal.{1}` is bounded (`Ordinal.bddAbove_range`), hence a genuine least upper bound. The universe choice is cosmetic and does not change the mathematics.",
+    "'Countable ordinal' is rendered as `α.card ≤ ℵ₀`, which includes 0 and all finite ordinals (as the decomposition notes require) and is equivalent to `α < ω₁`.",
+    "The chain members are required to be varieties (`IsVariety W`) and proper subclasses of `V`; `V` itself is required to be a variety in the theorem, not in `ordinalHeight`.",
+    "AMS tags 3 (logic/set theory, for ordinals) and 20 (group theory) were used."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Set Grp` (bundled groups in Mathlib's category library) — rejected as heavier and requiring `Grp.of`/`Grp.ofHom` bookkeeping; no notion of class of groups exists in the repo.",
+     "name": "Kourovka.«7.26».GroupClass",
+     "why_needed": "A type for classes of groups (predicates on groups with carrier in `Type`) so that inclusion, strict inclusion and sets of classes are available."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and the repo for 'variety', 'law', `FreeGroup`-based identities; only algebraic-geometry varieties exist.",
+     "name": "Kourovka.«7.26».IsVariety",
+     "why_needed": "Varieties of groups (Birkhoff/Neumann) do not exist in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`IsChain`/`IsWellOrder` on a subtype of `Set GroupClass` — the structure just bundles these with the properness and variety conditions.",
+     "name": "Kourovka.«7.26».WellOrderedChain",
+     "why_needed": "Packages a set of proper subvarieties of `V` together with the fact that it is well-ordered by inclusion, so that `Ordinal.type` can be applied to it."
+    },
+    {
+     "closest_existing_considered": "`Order.krullDim`/`Order.height` (Mathlib/Order/KrullDimension.lean) — these measure finite chain lengths in `ℕ∞`/`WithBot ℕ∞`, not ordinal order types of well-ordered chains.",
+     "name": "Kourovka.«7.26».ordinalHeight",
+     "why_needed": "The notebook's 'ordinal height' (supremum of order types of well-ordered chains of proper subvarieties) has no counterpart in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.26»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ α : Ordinal.{1}, α.card ≤ ℵ₀ → ∃ V : GroupClass, IsVariety V ∧ ordinalHeight V = α. Neither Mathlib nor FormalConjecturesForMathlib has a notion of variety of groups or of the ordinal height of a lattice element, so bespoke definitions (GroupClass, IsVariety, WellOrderedChain, ordinalHeight) were added in the problem file, with API lemmas checking that the class of all groups and the class of trivial groups are varieties, that every variety contains the trivial groups, and that the trivial variety has ordinal height 0 (the boundary case in the decomposition notes)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.26»": "/--\nIs every countable ordinal number the ordinal height of some variety of groups?\n\nHere the *ordinal height* of a variety is the supremum of the order types of all chains of\nits proper subvarieties that are well-ordered by inclusion. A countable ordinal is one whose\ncardinality is finite or countably infinite; in particular `0` is realised by the trivial\nvariety, whose only chain of proper subvarieties is the empty chain.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal.{1}, α.card ≤ ℵ₀ →\n      ∃ V : GroupClass, IsVariety V ∧ ordinalHeight V = α := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.26\n\nby A. V. Kuznetsov\n\nThe ordinal height of a variety of groups is the supremum of the order types of\nall chains of its proper subvarieties that are well-ordered by inclusion. Is\nevery countable ordinal the ordinal height of some variety?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.26»\n\n/--\nA variety of groups, represented by its identities in the free group on\ncountably many variables. The identities form a subgroup invariant under every\nsubstitution of words for variables. Inclusion of varieties is reverse\ninclusion of their identity subgroups.\n-/\nstructure GroupVariety where\n  identities : Subgroup (FreeGroup ℕ)\n  substitution_closed : ∀ f : FreeGroup ℕ →* FreeGroup ℕ, identities.map f ≤ identities\n\n@[ext]\ntheorem GroupVariety.ext {V W : GroupVariety} (h : V.identities = W.identities) : V = W := by\n  cases V\n  cases W\n  simp_all\n\ninstance : PartialOrder GroupVariety where\n  le V W := W.identities ≤ V.identities\n  le_refl _ := le_rfl\n  le_trans _ _ _ hVW hWU := hWU.trans hVW\n  le_antisymm V W hVW hWV := GroupVariety.ext (le_antisymm hWV hVW)\n\n/--\nThe ordinal height of a group variety: the supremum of the order types of all\nwell-ordered chains of its proper subvarieties. An order embedding from the\ncanonical type of an ordinal into the strict lower interval represents such a\nchain.\n-/\nnoncomputable def ordinalHeight (V : GroupVariety) : Ordinal :=\n  sSup {α : Ordinal | Nonempty (α.ToType ↪o Set.Iio V)}\n\n/--\nIs every countable ordinal number, including every finite ordinal and zero, the\nordinal height of some variety of groups? Here a variety is understood in the\nBirkhoff--Neumann sense, and `ordinalHeight` is the supremum of the order types\nof all inclusion-well-ordered chains of proper subvarieties.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal, α.card ≤ Cardinal.aleph0 →\n      ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry\n\nend Kourovka.«7.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A group variety is represented by its identity subgroup in `FreeGroup ℕ`. Closure under every endomorphism expresses closure of identities under substitutions; the order is reversed identity-subgroup inclusion, matching inclusion of the corresponding classes of groups.",
+    "A well-ordered chain of proper subvarieties is represented by an order embedding from an ordinal's canonical `ToType` into `Set.Iio V`. The height is the `sSup` of all such ordinals, so the supremum need not itself be attained by a chain.",
+    "Countable ordinals are expressed by `α.card ≤ Cardinal.aleph0`, which includes zero and all finite ordinals."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `FreeGroup`, `Subgroup`, and subgroup map operations provide the ingredients, but searches found no existing group-variety or fully invariant subgroup structure.",
+     "name": "Kourovka.«7.26».GroupVariety",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides Birkhoff/Neumann varieties of groups. A small identity-theoretic representation is needed so the collection of subvarieties forms a Lean type whose well-ordered chains can have ordinal order types."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `Ordinal`, `Ordinal.ToType`, `OrderEmbedding`, strict lower intervals, and conditional `sSup`; these are composed directly in the new definition.",
+     "name": "Kourovka.«7.26».ordinalHeight",
+     "why_needed": "No existing primitive defines the ordinal height of a variety or, more generally, the supremum of order types of well-ordered chains in a strict lower interval."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.26»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.26»": "/--\nIs every countable ordinal number, including every finite ordinal and zero, the\nordinal height of some variety of groups? Here a variety is understood in the\nBirkhoff--Neumann sense, and `ordinalHeight` is the supremum of the order types\nof all inclusion-well-ordered chains of proper subvarieties.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal, α.card ≤ Cardinal.aleph0 →\n      ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.26\n\nby A. V. Kuznetsov\n\nThe ordinal height of a variety of groups is the supremum of the order types\nof all its chains of proper subvarieties that are well-ordered by inclusion.\nIs every countable ordinal the ordinal height of some variety?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.26»\n\n/-- A group satisfies a law when the corresponding word in the free group on\ncountably many variables evaluates to the identity under every assignment. -/\ndef SatisfiesLaw (G : Type) [Group G] (w : FreeGroup ℕ) : Prop :=\n  ∀ f : ℕ → G, FreeGroup.lift f w = 1\n\n/-- A variety of groups, represented canonically by its full equational theory\nin the free group on countably many variables. -/\nstructure GroupVariety where\n  laws : Set (FreeGroup ℕ)\n  isFullTheory : ∀ w, w ∈ laws ↔\n    ∀ (G : Type) [Group G], (∀ v ∈ laws, SatisfiesLaw G v) → SatisfiesLaw G w\n\n/-- Inclusion of group varieties. Since a smaller variety satisfies more laws,\nthis is reverse inclusion of their full equational theories. -/\ninstance : PartialOrder GroupVariety where\n  le V W := W.laws ⊆ V.laws\n  le_refl _ := Set.Subset.rfl\n  le_trans _ _ _ h₁ h₂ := h₂.trans h₁\n  le_antisymm V W h₁ h₂ := by\n    cases V\n    cases W\n    simp_all only [GroupVariety.mk.injEq]\n    exact Set.Subset.antisymm h₂ h₁\n\n/-- The ordinal height of a group variety is the supremum of the order types of\nits inclusion-well-ordered chains of proper subvarieties. -/\nnoncomputable def ordinalHeight (V : GroupVariety) : Ordinal :=\n  sSup {α | ∃ C : α.ToType → GroupVariety, StrictMono C ∧ ∀ i, C i < V}\n\n/--\nIs every countable ordinal number the ordinal height of some variety of groups?\nHere countable ordinals are precisely the ordinals below $\\omega_1$, and the\nordinal height is the supremum of the order types of all chains of proper\nsubvarieties that are well-ordered by inclusion.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal, α < Ordinal.omega 1 →\n      ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry\n\nend Kourovka.«7.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A group identity is represented by a word in `FreeGroup ℕ` required to evaluate to the identity under every assignment; this captures arbitrary group equations because an equation `u = v` is equivalent to the law `u * v⁻¹ = 1`.",
+    "A group variety is represented canonically by its full semantically closed equational theory, rather than by an arbitrary presentation of laws. This identifies different presentations defining the same class of groups.",
+    "Variety inclusion is reverse inclusion of full law theories: a smaller class of groups satisfies more identities.",
+    "A well-ordered inclusion chain of order type `α` is represented by a `StrictMono` map from `α.ToType` into the proper subvarieties. The empty domain represents the empty chain, allowing ordinal height zero.",
+    "Countable ordinals are expressed as ordinals strictly below `Ordinal.omega 1`, Mathlib's first uncountable ordinal."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FreeGroup.lift`, which supplies evaluation of a free-group word but not universal satisfaction.",
+     "name": "SatisfiesLaw",
+     "why_needed": "Mathlib has free groups but no predicate expressing satisfaction of a group identity under every assignment."
+    },
+    {
+     "closest_existing_considered": "Mathlib model-theory syntax and generic closure notions; no existing abstraction matched group varieties or their equational theories.",
+     "name": "GroupVariety",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides Birkhoff varieties of groups. The structure stores the canonical full semantic theory of a variety."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Ordinal.type`, `Ordinal.ToType`, `StrictMono`, and ordinal `sSup`; these provide the ingredients but not this specialized height.",
+     "name": "ordinalHeight",
+     "why_needed": "No existing definition gives the supremum of order types of inclusion-well-ordered chains of proper subvarieties."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.26»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.26»": "/--\nIs every countable ordinal number the ordinal height of some variety of groups?\nHere countable ordinals are precisely the ordinals below $\\omega_1$, and the\nordinal height is the supremum of the order types of all chains of proper\nsubvarieties that are well-ordered by inclusion.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal, α < Ordinal.omega 1 →\n      ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.26\n\nby A. V. Kuznetsov\n\nThe *ordinal height* of a variety of groups is, by definition, the supremum of the order\ntypes (ordinals) of all chains of its proper subvarieties that are well-ordered by inclusion.\nIt is clear that its cardinality is either finite or countably infinite, or equal to\n$\\omega_1$. Is every countable ordinal number the ordinal height of some variety?\n\nA variety of groups (in the sense of Birkhoff and H. Neumann) is a class of groups closed\nunder taking subgroups, homomorphic images and cartesian products; equivalently, it is the\nclass of all groups satisfying some set of laws. Here a variety is modelled as such a class\nof groups in `Type`, and varieties are ordered by inclusion.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Cardinal\n\nnamespace Kourovka.«7.26»\n\n/-- A variety of groups: a class of groups (here, of groups in `Type`) that is closed under\ntaking subgroups, homomorphic images and cartesian products. -/\n@[ext]\nstructure GroupVariety where\n  /-- The class of groups belonging to the variety. -/\n  Mem : (G : Type) → [Group G] → Prop\n  /-- A variety is closed under taking subgroups (up to isomorphism). -/\n  mem_of_injective {G H : Type} [Group G] [Group H] (f : H →* G) :\n    Function.Injective f → Mem G → Mem H\n  /-- A variety is closed under taking homomorphic images. -/\n  mem_of_surjective {G H : Type} [Group G] [Group H] (f : G →* H) :\n    Function.Surjective f → Mem G → Mem H\n  /-- A variety is closed under taking cartesian products. -/\n  mem_pi {ι : Type} {G : ι → Type} [∀ i, Group (G i)] :\n    (∀ i, Mem (G i)) → Mem (∀ i, G i)\n\n/-- Varieties are ordered by inclusion: `V ≤ W` iff every group in `V` lies in `W`. -/\ninstance : PartialOrder GroupVariety where\n  le V W := ∀ (G : Type) [Group G], V.Mem G → W.Mem G\n  le_refl _ _ _ := id\n  le_trans _ _ _ h₁ h₂ G _ hG := h₂ G (h₁ G hG)\n  le_antisymm V W h₁ h₂ :=\n    GroupVariety.ext (funext fun G => funext fun _ => propext ⟨h₁ G, h₂ G⟩)\n\n/-- The set of order types of the chains of proper subvarieties of `V` that are well-ordered\nby inclusion. -/\ndef chainOrderTypes (V : GroupVariety) : Set Ordinal.{1} :=\n  {o | ∃ (C : Set GroupVariety) (_ : IsWellOrder C (· < ·)),\n    (∀ W ∈ C, W < V) ∧ Ordinal.type (α := C) (· < ·) = o}\n\n/-- The ordinal height of a variety `V`: the supremum of the order types of all chains of\nproper subvarieties of `V` that are well-ordered by inclusion. -/\nnoncomputable def ordinalHeight (V : GroupVariety) : Ordinal.{1} :=\n  sSup (chainOrderTypes V)\n\n/-- The empty chain contributes the order type `0`. -/\n@[category API, AMS 8 20]\ntheorem zero_mem_chainOrderTypes (V : GroupVariety) : 0 ∈ chainOrderTypes V :=\n  ⟨∅, inferInstance, fun _ h => h.elim, Ordinal.type_eq_zero_of_empty _⟩\n\n/-- The order types of well-ordered chains of subvarieties are bounded, so `ordinalHeight` is a\ngenuine supremum. -/\n@[category API, AMS 8 20]\ntheorem bddAbove_chainOrderTypes (V : GroupVariety) : BddAbove (chainOrderTypes V) := by\n  refine ⟨(Order.succ #GroupVariety).ord, ?_⟩\n  rintro o ⟨C, _, -, rfl⟩\n  exact (lt_ord.2 (Order.lt_succ_iff.2 ((Ordinal.card_type _).le.trans (mk_set_le C)))).le\n\n/-- `ordinalHeight V` is the least upper bound of the order types of the well-ordered chains of\nproper subvarieties of `V`. -/\n@[category API, AMS 8 20]\ntheorem isLUB_ordinalHeight (V : GroupVariety) : IsLUB (chainOrderTypes V) (ordinalHeight V) :=\n  isLUB_csSup ⟨0, zero_mem_chainOrderTypes V⟩ (bddAbove_chainOrderTypes V)\n\n/-- The trivial variety, consisting of the trivial groups. -/\ndef trivialVariety : GroupVariety where\n  Mem G _ := Subsingleton G\n  mem_of_injective _ hf _ := hf.subsingleton\n  mem_of_surjective _ hf _ := hf.subsingleton\n  mem_pi h := by\n    haveI := h\n    infer_instance\n\n/-- Every variety contains the trivial groups, so the trivial variety is the smallest variety. -/\n@[category API, AMS 8 20]\ntheorem trivialVariety_le (V : GroupVariety) : trivialVariety ≤ V := by\n  intro G _ hG\n  haveI : Subsingleton G := hG\n  exact V.mem_of_surjective (1 : (∀ _ : Empty, Unit) →* G)\n    (fun g => ⟨1, Subsingleton.elim _ _⟩) (V.mem_pi fun i => i.elim)\n\n/-- The trivial variety has no proper subvarieties, so its ordinal height is `0`. -/\n@[category test, AMS 8 20]\ntheorem ordinalHeight_trivialVariety : ordinalHeight trivialVariety = 0 := by\n  have h : chainOrderTypes trivialVariety = {0} := by\n    refine Set.eq_singleton_iff_unique_mem.2 ⟨zero_mem_chainOrderTypes _, ?_⟩\n    rintro o ⟨C, _, hC, rfl⟩\n    haveI : IsEmpty C := ⟨fun W => ((hC W W.2).trans_le (trivialVariety_le W)).false⟩\n    exact Ordinal.type_eq_zero_of_empty _\n  rw [ordinalHeight, h, csSup_singleton]\n\n/--\nThe *ordinal height* of a variety of groups is the supremum of the order types (ordinals) of all\nchains of its proper subvarieties that are well-ordered by inclusion. Is every countable ordinal\nnumber the ordinal height of some variety?\n\nHere a countable ordinal is an ordinal $\\alpha$ with $|\\alpha| \\le \\aleph_0$; in particular the\nfinite ordinals are included.\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal.{1}, α.card ≤ ℵ₀ → ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry\n\nend Kourovka.«7.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's single slot and its notes (HSP/laws definition of variety, height as supremum over well-ordered chains of proper subvarieties, countable ordinals including finite ones and 0) match my reading of the statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Varieties are modelled as classes of groups living in `Type` (universe 0), closed under cartesian products indexed by types in `Type`, following the Kourovka files' convention of quantifying over `Type`. Birkhoff's theorem goes through inside a fixed universe, so the lattice of such varieties is isomorphic to the lattice of all varieties (equivalently, anti-isomorphic to fully invariant subgroups of the free group of countably infinite rank); hence ordinal heights are unchanged.",
+    "Closure under subgroups and homomorphic images is phrased via injective and surjective `MonoidHom`s, which builds in closure under isomorphism (standard for HSP classes).",
+    "Closure under cartesian products includes the empty product, so every variety contains the trivial groups and the class of trivial groups is the least variety (Neumann's convention; the empty class is not a variety). Consequently the trivial variety has ordinal height 0, as the decomposition notes expect (proved as a `test` lemma).",
+    "'Chain of proper subvarieties well-ordered by inclusion' is `C : Set GroupVariety` with `∀ W ∈ C, W < V` and `IsWellOrder C (· < ·)` (trichotomy gives the chain condition, well-foundedness gives well-ordering); its order type is `Ordinal.type (α := C) (· < ·)`. The empty chain is allowed (order type 0).",
+    "The supremum is `sSup` on `Ordinal.{1}` (ordinals live in universe 1 because `GroupVariety : Type 1`); API lemmas show the set of order types is nonempty and bounded above, so `sSup` is the true least upper bound and no junk value is involved.",
+    "'Countable ordinal' is rendered as `α.card ≤ ℵ₀` (as in ErdosProblems/592), which includes 0 and all finite ordinals; this is equivalent to `α < ω₁`.",
+    "The sentence 'It is clear that its cardinality is either finite or countably infinite, or equal to ω₁' is a remark, not a question, and is not formalized (consistent with the decomposition table)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `FreeGroup` (could encode varieties as fully invariant subgroups of `FreeGroup ℕ`, but that is an anti-isomorphic encoding, less transparent); `Subgroup`/`QuotientGroup` closure conditions were used indirectly via injective/surjective `MonoidHom`s.",
+     "name": "Kourovka.«7.26».GroupVariety",
+     "why_needed": "No notion of a variety of groups (class closed under subgroups, homomorphic images and cartesian products / defined by laws) exists in Mathlib or FormalConjecturesForMathlib (searched for 'variet', 'laws', 'FreeGroup', 'fully invariant')."
+    },
+    {
+     "closest_existing_considered": "`SetLike` (not applicable: the carrier is a class of groups, not a set of elements of a fixed type); `PartialOrder.lift` via `Prop` order (less readable).",
+     "name": "instance : PartialOrder Kourovka.«7.26».GroupVariety",
+     "why_needed": "Subvariety inclusion (`V ≤ W` iff every group of `V` lies in `W`), needed to speak of proper subvarieties (`W < V`) and chains well-ordered by inclusion."
+    },
+    {
+     "closest_existing_considered": "`Set.chainHeight` / `Order.height` (ℕ∞-valued, only finite chains, so cannot express ordinal-valued height); `Ordinal.type` and `IsWellOrder` from Mathlib are used directly.",
+     "name": "Kourovka.«7.26».chainOrderTypes",
+     "why_needed": "The set of order types (`Ordinal.type`) of all chains of proper subvarieties of `V` that are well-ordered by inclusion (`IsWellOrder C (· < ·)`); the object whose supremum is the ordinal height. API lemmas prove it contains 0 and is bounded above."
+    },
+    {
+     "closest_existing_considered": "`Order.height`, `Order.krullDim` (ℕ∞ / WithBot ℕ∞ valued, not ordinals); `iSup` over a subtype of chains (equivalent, but `sSup` of an explicit set is cleaner).",
+     "name": "Kourovka.«7.26».ordinalHeight",
+     "why_needed": "The notebook's 'ordinal height' = supremum of the order types in `chainOrderTypes V`; defined as `sSup`, with an API lemma `isLUB_ordinalHeight` showing it is a genuine least upper bound (set nonempty and bounded, so no junk value)."
+    },
+    {
+     "closest_existing_considered": "None (bottom element of the lattice of varieties; a `OrderBot` instance was not needed for the statement).",
+     "name": "Kourovka.«7.26».trivialVariety",
+     "why_needed": "Only used for API/test lemmas: it is the least variety (`trivialVariety_le`) and has ordinal height 0 (`ordinalHeight_trivialVariety`), checking the boundary case mentioned in the decomposition notes."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.26»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ α : Ordinal.{1}, α.card ≤ ℵ₀ → ∃ V : GroupVariety, ordinalHeight V = α`. Needed bespoke definitions of a variety of groups (Birkhoff HSP closure), the inclusion order on varieties, and the ordinal height (sSup of order types of well-ordered chains of proper subvarieties), since neither Mathlib nor FormalConjecturesForMathlib has varieties of groups or an ordinal-valued chain height."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.26»": "/--\nThe *ordinal height* of a variety of groups is the supremum of the order types (ordinals) of all\nchains of its proper subvarieties that are well-ordered by inclusion. Is every countable ordinal\nnumber the ordinal height of some variety?\n\nHere a countable ordinal is an ordinal $\\alpha$ with $|\\alpha| \\le \\aleph_0$; in particular the\nfinite ordinals are included.\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal.{1}, α.card ≤ ℵ₀ → ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.26\n\nby A. V. Kuznetsov\n\nThe *ordinal height* of a variety of groups is, by definition, the supremum of\nthe order types (ordinals) of all chains of its proper subvarieties that are\nwell-ordered by inclusion. It is clear that its cardinality is either finite or\ncountably infinite, or equal to $\\omega_1$. Is every countable ordinal number\nthe ordinal height of some variety?\n\nHere a variety of groups is a class of groups closed under taking subgroups,\nhomomorphic images and arbitrary direct products. By Birkhoff's theorem these\nare exactly the classes of groups defined by a set of laws (identities).\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Ordinal\n\nnamespace Kourovka.«7.26»\n\n/-- A variety of groups: a class of groups closed under subgroups (stated as closure under\ninjective homomorphic preimages, which also gives closure under isomorphism), under\nhomomorphic images and under arbitrary direct products (including the empty product, so\nthat every variety contains the trivial group). -/\nstructure GroupVariety where\n  /-- The class of groups belonging to the variety. -/\n  Mem : ∀ (G : Type) [Group G], Prop\n  mem_of_injective : ∀ {G H : Type} [Group G] [Group H] (f : H →* G),\n    Function.Injective f → Mem G → Mem H\n  mem_of_surjective : ∀ {G H : Type} [Group G] [Group H] (f : G →* H),\n    Function.Surjective f → Mem G → Mem H\n  mem_pi : ∀ {ι : Type} {G : ι → Type} [∀ i, Group (G i)],\n    (∀ i, Mem (G i)) → Mem (∀ i, G i)\n\nnamespace GroupVariety\n\n/-- Varieties of groups are ordered by inclusion: `V ≤ W` means that every group in `V`\nbelongs to `W`, i.e. `V` is a subvariety of `W`. -/\ninstance : PartialOrder GroupVariety where\n  le V W := ∀ (G : Type) [Group G], V.Mem G → W.Mem G\n  le_refl _ _ _ h := h\n  le_trans _ _ _ hVW hWU G _ h := hWU G (hVW G h)\n  le_antisymm V W hVW hWV := by\n    obtain ⟨V, _, _, _⟩ := V\n    obtain ⟨W, _, _, _⟩ := W\n    have : V = W := by\n      funext G _\n      exact propext ⟨hVW G, hWV G⟩\n    subst this\n    rfl\n\n/-- The trivial variety, consisting of the one-element groups, is the least variety. -/\ninstance : OrderBot GroupVariety where\n  bot :=\n    { Mem := fun G _ => Subsingleton G\n      mem_of_injective := fun _ hf _ => hf.subsingleton\n      mem_of_surjective := fun _ hf _ => hf.subsingleton\n      mem_pi := fun _ => inferInstance }\n  bot_le V G _ hG :=\n    V.mem_of_surjective (1 : (Empty → PUnit) →* G)\n      (fun _ => ⟨fun _ => .unit, @Subsingleton.elim G hG _ _⟩)\n      (V.mem_pi (ι := Empty) (G := fun _ => PUnit) fun i => i.elim)\n\n/-- The ordinal height of a variety of groups `V`: the supremum of the order types of all\nchains of proper subvarieties of `V` that are well-ordered by inclusion. -/\nnoncomputable def ordinalHeight (V : GroupVariety) : Ordinal.{1} :=\n  sSup {o | ∃ (C : Set GroupVariety) (_ : IsWellOrder C (· < ·)),\n    (∀ W ∈ C, W < V) ∧ Ordinal.type (α := C) (· < ·) = o}\n\n/-- The trivial variety has no proper subvarieties, so its ordinal height is `0`. -/\n@[category test, AMS 20]\ntheorem ordinalHeight_bot : ordinalHeight ⊥ = 0 := by\n  have : {o | ∃ (C : Set GroupVariety) (_ : IsWellOrder C (· < ·)),\n      (∀ W ∈ C, W < ⊥) ∧ Ordinal.type (α := C) (· < ·) = o} = {0} := by\n    ext o\n    simp only [Set.mem_setOf_eq, Set.mem_singleton_iff]\n    constructor\n    · rintro ⟨C, _, hC, rfl⟩\n      have : IsEmpty C := ⟨fun W => not_lt_bot (hC W.1 W.2)⟩\n      exact type_eq_zero_of_empty _\n    · rintro rfl\n      exact ⟨∅, inferInstance, fun W hW => hW.elim, type_eq_zero_of_empty _⟩\n  rw [ordinalHeight, this, csSup_singleton]\n\nend GroupVariety\n\n/--\nIs every countable ordinal number the ordinal height of some variety of groups?\n\nHere the ordinal height of a variety is the supremum of the order types of all chains of\nits proper subvarieties that are well-ordered by inclusion, and an ordinal is countable if\nit is smaller than $\\omega_1$ (so all finite ordinals, including $0$, are allowed).\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal.{1}, α < ω₁ → ∃ V : GroupVariety, V.ordinalHeight = α := by\n  sorry\n\nend Kourovka.«7.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The table's single slot (the yes/no question) and its notes (Birkhoff/Neumann varieties, proper = ≠ V, chains well-ordered by inclusion, supremum of order types, countable ordinals including finite ones and 0) match my reading of the statement; the first two sentences are a definition and an \"it is clear\" remark and were not made into slots.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Varieties are modeled as classes of groups whose carriers live in `Type` (universe 0), closed under injective homomorphic preimages (subgroups + isomorphism), surjective homomorphic images (quotients) and `Type`-indexed direct products. Birkhoff's theorem holds inside universe 0 (the laws live in `FreeGroup ℕ`, the relatively free groups and the needed products are all in `Type`), so these classes correspond bijectively and order-isomorphically to varieties of groups; a reviewer may want to confirm they are happy with this universe restriction.",
+    "Closure under the empty direct product is included, so every `GroupVariety` contains the trivial group; this excludes the empty class, matching the standard convention (the trivial variety is the smallest variety, realized as `⊥`).",
+    "Because `GroupVariety : Type 1`, order types of chains and hence `ordinalHeight` live in `Ordinal.{1}`; the statement therefore quantifies over `α : Ordinal.{1}` with `α < ω₁` (scoped `Ordinal` notation for `(Cardinal.aleph 1).ord`). `α < ω₁` is the standard meaning of 'countable ordinal' and includes 0 and all finite ordinals.",
+    "'Well-ordered by inclusion chain of proper subvarieties' is encoded as `C : Set GroupVariety` with `IsWellOrder ↥C (· < ·)` (which includes trichotomy, i.e. `C` is a chain, and well-foundedness) and `∀ W ∈ C, W < V` (strict, i.e. proper). The order type is `Ordinal.type (α := ↥C) (· < ·)`, i.e. under strict inclusion increasing.",
+    "The supremum is `sSup` on `Ordinal`; the set of order types always contains 0 (empty chain) and is bounded above (chains are subsets of `GroupVariety : Type 1`), so `sSup` is the genuine supremum with no junk-value issues.",
+    "Included an `OrderBot` instance (trivial variety) and a proved `@[category test]` lemma `ordinalHeight_bot : ordinalHeight ⊥ = 0`, exercising the boundary case; the repository asks for basic API tests for bespoke definitions. The bespoke definitions are kept in the problem file (per the task's single-file constraint); a repo maintainer might prefer moving `GroupVariety` to FormalConjecturesForMathlib.",
+    "AMS tags `3 20` (logic/ordinals and group theory)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Encoding a variety as a fully invariant subgroup of `FreeGroup ℕ` (its set of laws) — equivalent, but less transparent than the class-based Birkhoff definition named in the decomposition notes; `CategoryTheory.MorphismProperty`/`ObjectProperty` on `Grp` were considered but do not carry the closure conditions.",
+     "name": "Kourovka.«7.26».GroupVariety",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib has a notion of a variety of groups (a class of groups closed under subgroups, homomorphic images and direct products / defined by laws). Searched for variety/Birkhoff/laws/FreeGroup usages; only unrelated hits (Pierce–Birkhoff, Birkhoff representation, Birkhoff sums)."
+    },
+    {
+     "closest_existing_considered": "`Pi.partialOrder` on the `Mem` field (works up to an injectivity argument, but an explicit instance is clearer); `SetLike` is inapplicable since members are types, not elements.",
+     "name": "Kourovka.«7.26».GroupVariety.instPartialOrder / instOrderBot",
+     "why_needed": "Order by inclusion, needed to express 'proper subvariety' (`W < V`) and the induced strict order on chains; `⊥` is the trivial variety used in the boundary test."
+    },
+    {
+     "closest_existing_considered": "`Order.height`, `Order.krullDim` (ℕ∞-valued); `Ordinal.type` and `sSup` on `Ordinal` are the existing primitives used to build it.",
+     "name": "Kourovka.«7.26».GroupVariety.ordinalHeight",
+     "why_needed": "The notebook's 'ordinal height' (supremum of order types of well-ordered-by-inclusion chains of proper subvarieties) has no Mathlib counterpart: `Order.height`/`Order.krullDim` are `ℕ∞`-valued and count finite chains only."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.26»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ α : Ordinal.{1}, α < ω₁ → ∃ V : GroupVariety, V.ordinalHeight = α`, with `GroupVariety` (Birkhoff-closed class of groups) and `ordinalHeight` (sSup of `Ordinal.type` over chains `C` of proper subvarieties with `IsWellOrder ↥C (· < ·)`) defined in the file; countable ordinals include 0 and the finite ordinals, and the test `ordinalHeight ⊥ = 0` is proved."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.26»": "/--\nIs every countable ordinal number the ordinal height of some variety of groups?\n\nHere the ordinal height of a variety is the supremum of the order types of all chains of\nits proper subvarieties that are well-ordered by inclusion, and an ordinal is countable if\nit is smaller than $\\omega_1$ (so all finite ordinals, including $0$, are allowed).\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal.{1}, α < ω₁ → ∃ V : GroupVariety, V.ordinalHeight = α := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.26\n\nby A. V. Kuznetsov\n\nThe *ordinal height* of a variety of groups is, by definition, the supremum of\norder types (ordinals) of all well-ordered by inclusion chains of its proper\nsubvarieties. It is clear that its cardinality is either finite or countably\ninfinite, or equal to $\\omega_1$. Is every countable ordinal number the ordinal\nheight of some variety?\n\nA variety of groups is a class of groups closed under taking subgroups,\nhomomorphic images and (unrestricted) cartesian products; equivalently, the class\nof all groups satisfying some set of laws. A subvariety of a variety $\\mathfrak{V}$\nis a variety contained in $\\mathfrak{V}$; it is proper if it differs from\n$\\mathfrak{V}$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen scoped Ordinal\n\nnamespace Kourovka.«7.26»\n\n/--\nA variety of groups: a class of groups (in universe `Type`) closed under taking\nsubgroups (more precisely, closed under injective homomorphisms, which also makes the\nclass closed under isomorphism), homomorphic images and arbitrary cartesian products.\n\nClosure under the cartesian product over the empty index type forces every variety to\ncontain the trivial groups, so the empty class is not a variety.\n-/\nstructure GroupVariety where\n  /-- The class of groups belonging to the variety. -/\n  Mem : ∀ (G : Type) [Group G], Prop\n  /-- Closure under subgroups (and isomorphic copies). -/\n  mem_of_injective : ∀ {G H : Type} [Group G] [Group H] (f : H →* G),\n    Function.Injective f → Mem G → Mem H\n  /-- Closure under homomorphic images. -/\n  mem_of_surjective : ∀ {G H : Type} [Group G] [Group H] (f : G →* H),\n    Function.Surjective f → Mem G → Mem H\n  /-- Closure under arbitrary cartesian products. -/\n  mem_pi : ∀ {ι : Type} {G : ι → Type} [∀ i, Group (G i)],\n    (∀ i, Mem (G i)) → Mem (∀ i, G i)\n\nnamespace GroupVariety\n\n@[ext]\ntheorem ext {V W : GroupVariety} (h : ∀ (G : Type) [Group G], V.Mem G ↔ W.Mem G) : V = W := by\n  obtain ⟨V, _, _, _⟩ := V\n  obtain ⟨W, _, _, _⟩ := W\n  have : V = W := funext fun G => funext fun _ => propext (h G)\n  subst this\n  rfl\n\n/-- Varieties are ordered by inclusion of the underlying classes of groups, so that\n`W ≤ V` means that `W` is a subvariety of `V`. -/\ninstance : PartialOrder GroupVariety where\n  le V W := ∀ (G : Type) [Group G], V.Mem G → W.Mem G\n  le_refl _ _ _ h := h\n  le_trans _ _ _ h₁ h₂ G _ h := h₂ G (h₁ G h)\n  le_antisymm _ _ h₁ h₂ := ext fun G _ => ⟨h₁ G, h₂ G⟩\n\n/-- The variety of all groups is the largest variety. -/\ninstance : OrderTop GroupVariety where\n  top :=\n    { Mem := fun _ _ => True\n      mem_of_injective := fun _ _ _ => trivial\n      mem_of_surjective := fun _ _ _ => trivial\n      mem_pi := fun _ => trivial }\n  le_top _ _ _ _ := trivial\n\n/-- The trivial variety, consisting of the trivial groups, is the smallest variety: every\nvariety contains the cartesian product over the empty index type, which is trivial. -/\ninstance : OrderBot GroupVariety where\n  bot :=\n    { Mem := fun G _ => Subsingleton G\n      mem_of_injective := fun _ hf _ => hf.subsingleton\n      mem_of_surjective := fun _ hf _ => hf.subsingleton\n      mem_pi := fun _ => inferInstance }\n  bot_le V G _ hG := by\n    haveI : Subsingleton G := hG\n    have h : V.Mem (∀ _ : Empty, Unit) := V.mem_pi fun i => i.elim\n    exact V.mem_of_injective (1 : G →* (∀ _ : Empty, Unit))\n      (Function.injective_of_subsingleton _) h\n\n@[category test, AMS 20]\ntheorem mem_top (G : Type) [Group G] : (⊤ : GroupVariety).Mem G := trivial\n\n@[category test, AMS 20]\ntheorem mem_bot_iff (G : Type) [Group G] : (⊥ : GroupVariety).Mem G ↔ Subsingleton G := Iff.rfl\n\n/--\nThe ordinal height of a variety `V`: the supremum of the order types of all chains\nof proper subvarieties of `V` which are well-ordered by inclusion.\n\nA chain of proper subvarieties well-ordered by inclusion is a set `C` of subvarieties\n`W < V` such that `<` (strict inclusion) is a well-order on `C`; its order type is\n`Ordinal.type` of this well-order.\n-/\nnoncomputable def ordinalHeight (V : GroupVariety) : Ordinal.{1} :=\n  ⨆ C : {C : Set GroupVariety // C ⊆ Set.Iio V ∧ IsWellOrder C (· < ·)},\n    @Ordinal.type C.1 (· < ·) C.2.2\n\n/-- The trivial variety has no proper subvarieties, so its only chain is empty and its\nordinal height is `0`. -/\n@[category test, AMS 20]\ntheorem ordinalHeight_bot : ordinalHeight ⊥ = 0 := by\n  refine le_antisymm (ciSup_le' fun C => ?_) (zero_le _)\n  have : IsEmpty C.1 := ⟨fun W => not_lt_bot (Set.mem_Iio.1 (C.2.1 W.2))⟩\n  exact (@Ordinal.type_eq_zero_of_empty _ _ C.2.2 this).le\n\nend GroupVariety\n\nopen GroupVariety\n\n/--\nIs every countable ordinal number the ordinal height of some variety of groups?\n\nHere the ordinal height of a variety is the supremum of the order types of all\nchains of its proper subvarieties which are well-ordered by inclusion, and a\ncountable ordinal is an ordinal $\\alpha < \\omega_1$ (finite ordinals included).\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal.{1}, α < ω₁ → ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry\n\nend Kourovka.«7.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's single slot and its notes (varieties in the Birkhoff/Neumann sense, height as the supremum of order types of well-ordered-by-inclusion chains of proper subvarieties, countable ordinals including finite ones and 0) match my reading of the statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Groups are taken in universe `Type` (as in the other Kourovka files); a variety is therefore a predicate on `Type`-groups and index types of cartesian products are in `Type`. This loses nothing since a variety is determined by its laws / its countable members, but it means `GroupVariety : Type 1` and hence `ordinalHeight : Ordinal.{1}` and `α : Ordinal.{1}`.",
+    "Closure under subgroups is expressed as closure under injective homomorphisms (which also makes the class abstract, i.e. closed under isomorphism), and closure under homomorphic images as closure under surjective homomorphisms; closure under products includes the empty product, so every variety contains the trivial groups and the empty class is not a variety (this matters: an empty 'variety' would shift all heights by one). The `OrderBot` instance proves this consequence.",
+    "'Chain of proper subvarieties well-ordered by inclusion' is read as a set `C` of varieties `W < V` on which strict inclusion `<` is a well-order (`IsWellOrder`, whose trichotomy makes `C` a chain); its order type is `Ordinal.type`. The supremum is `⨆` in `Ordinal.{1}` over a `Type 1`-indexed family, hence a genuine (bounded) supremum; the empty chain contributes `0`, giving `ordinalHeight ⊥ = 0` (proved as a test).",
+    "'Countable ordinal' is formalized as `α < ω₁` (Mathlib's first uncountable ordinal, checked equal to `(aleph 1).ord`), which includes all finite ordinals and `0`, per the decomposition notes.",
+    "Only the final question is formalized; the preceding definition and the 'it is clear' remark about the cardinality of the height are not stated as theorems.",
+    "AMS tags `3 20` (ordinals; group theory)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Representing a variety by a verbal/fully invariant subgroup of `FreeGroup ℕ` (Neumann's anti-isomorphism of lattices) — rejected as less faithful and requiring a non-trivial theorem to justify; `Subgroup`, `QuotientGroup`, `MonoidHom` were used as building blocks. Nothing like `IsVariety`/`GroupVariety` exists in Mathlib (grepped).",
+     "name": "Kourovka.«7.26».GroupVariety",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no notion of a variety of groups (Birkhoff/Neumann: class closed under subgroups, homomorphic images, cartesian products). Structure with a membership predicate on groups in `Type` and the three closure axioms (closure under injective homs, surjective homs, arbitrary Pi types), together with a `PartialOrder` (inclusion), `OrderTop` (all groups) and `OrderBot` (trivial groups) instances and an `ext` lemma."
+    },
+    {
+     "closest_existing_considered": "`Order.height` (ℕ∞-valued, finite chains only), `WellFounded.rank`/`IsWellFounded.rank` (requires a well-founded ambient order, which the lattice of varieties is not), `Ordinal.type` (used as the building block).",
+     "name": "Kourovka.«7.26».GroupVariety.ordinalHeight",
+     "why_needed": "The problem's own definition: supremum of order types of all chains of proper subvarieties well-ordered by inclusion. Defined as `⨆ C : {C : Set GroupVariety // C ⊆ Set.Iio V ∧ IsWellOrder C (· < ·)}, Ordinal.type (· < ·)` in `Ordinal.{1}`. Test `ordinalHeight ⊥ = 0` is proved."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.26»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ α : Ordinal.{1}, α < ω₁ → ∃ V : GroupVariety, ordinalHeight V = α`, where `GroupVariety` is a bespoke structure for varieties of groups (classes of groups closed under subgroups/injective homs, homomorphic images and arbitrary cartesian products) ordered by inclusion, and `ordinalHeight V` is the supremum of `Ordinal.type` over all sets of proper subvarieties (`C ⊆ Set.Iio V`) on which strict inclusion is a well-order (`IsWellOrder C (· < ·)`). Mathlib has neither varieties of groups nor this ordinal-valued height, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.26»": "/--\nIs every countable ordinal number the ordinal height of some variety of groups?\n\nHere the ordinal height of a variety is the supremum of the order types of all\nchains of its proper subvarieties which are well-ordered by inclusion, and a\ncountable ordinal is an ordinal $\\alpha < \\omega_1$ (finite ordinals included).\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal.{1}, α < ω₁ → ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.26\n\nby A. V. Kuznetsov\n\nThe ordinal height of a variety of groups is the supremum of the order types of\nall its chains of proper subvarieties that are well-ordered by inclusion. Is\nevery countable ordinal the ordinal height of some variety of groups?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.26»\n\n/--\nA variety of groups, represented by its laws in the free group on countably\nmany variables. Its laws form a normal subgroup and are closed under every\nendomorphism of the free group (that is, under every substitution of words for\nvariables).\n-/\nstructure GroupVariety where\n  /-- The group words that are laws of the variety. -/\n  laws : Subgroup (FreeGroup ℕ)\n  normal_laws : laws.Normal\n  fullyInvariant : ∀ f : FreeGroup ℕ →* FreeGroup ℕ, ∀ w ∈ laws, f w ∈ laws\n\n/--\n`U` is a proper subvariety of `V`. Inclusion is reversed on their groups of\nlaws: a smaller variety satisfies strictly more laws.\n-/\ndef IsProperSubvariety (U V : GroupVariety) : Prop :=\n  V.laws < U.laws\n\n/--\nThe order types of chains of proper subvarieties of `V` that are well-ordered\nby inclusion. Such a chain is indexed by the canonical well-order of an\nordinal, and increases strictly with respect to inclusion of varieties.\n-/\ndef ChainOrderTypes (V : GroupVariety) : Set Ordinal.{0} :=\n  {o | ∃ c : o.ToType → GroupVariety,\n    (∀ i, IsProperSubvariety (c i) V) ∧\n    ∀ ⦃i j⦄, i < j → IsProperSubvariety (c i) (c j)}\n\n/--\nThe ordinal height of a variety: the supremum of the order types of all chains\nof its proper subvarieties that are well-ordered by inclusion.\n-/\nnoncomputable def ordinalHeight (V : GroupVariety) : Ordinal.{0} :=\n  sSup (ChainOrderTypes V)\n\n/--\nIs every countable ordinal number the ordinal height of some variety of\ngroups? Here countable includes finite ordinals and zero.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal.{0}, α.card ≤ ℵ₀ → ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry\n\nend Kourovka.«7.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A group variety is represented by its equational theory: a fully invariant normal subgroup of the free group on countably many generators. This is the standard Birkhoff/Neumann representation and avoids universe-dependent classes of all groups.",
+    "Subvariety inclusion is reverse strict inclusion of law subgroups: U is a proper subvariety of V exactly when V.laws < U.laws.",
+    "A well-ordered inclusion chain of order type o is represented by a strictly inclusion-increasing map from o.ToType, with every member a proper subvariety of the ambient variety.",
+    "Order types and ordinal height are pinned to Ordinal.{0}, matching the fixed small type of group varieties and avoiding irrelevant universe-lift artifacts.",
+    "Countability is expressed as α.card ≤ ℵ₀, which includes zero and all finite ordinals."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Subgroup (FreeGroup ℕ), augmented with normality and closure under all free-group endomorphisms.",
+     "name": "GroupVariety",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no existing notion of a variety of groups."
+    },
+    {
+     "closest_existing_considered": "Strict inclusion (<) on Subgroup (FreeGroup ℕ).",
+     "name": "IsProperSubvariety",
+     "why_needed": "The subvariety relation must express reverse strict inclusion of equational theories."
+    },
+    {
+     "closest_existing_considered": "Ordinal.ToType and strict monotonicity/order-chain APIs.",
+     "name": "ChainOrderTypes",
+     "why_needed": "No existing primitive collects order types of well-ordered chains of proper subvarieties."
+    },
+    {
+     "closest_existing_considered": "sSup on sets of ordinals.",
+     "name": "ordinalHeight",
+     "why_needed": "No existing ordinal-height definition applies to the subvariety poset."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.26»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.26»": "/--\nIs every countable ordinal number the ordinal height of some variety of\ngroups? Here countable includes finite ordinals and zero.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal.{0}, α.card ≤ ℵ₀ → ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.26\n\nby A. V. Kuznetsov\n\nThe ordinal height of a variety of groups is the supremum of the order types of all chains of\nproper subvarieties that are well-ordered by inclusion. Is every countable ordinal the ordinal\nheight of some variety?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen scoped Ordinal\n\nnamespace Kourovka.«7.26»\n\n/-- A subgroup of the countably generated free group is fully invariant if every endomorphism\nmaps it into itself. -/\ndef IsFullyInvariant (N : Subgroup (FreeGroup ℕ)) : Prop :=\n  ∀ f : FreeGroup ℕ →* FreeGroup ℕ, N.map f ≤ N\n\n/-- A variety of groups, represented by its equational theory in the free group on countably\nmany generators. Equational theories are fully invariant subgroups. The order is reversed because\na smaller variety satisfies more laws. -/\nabbrev GroupVariety := OrderDual {N : Subgroup (FreeGroup ℕ) // IsFullyInvariant N}\n\n/-- A well-ordered-by-inclusion chain of proper subvarieties of `V`. -/\nstructure ProperSubvarietyChain (V : GroupVariety) where\n  carrier : Set GroupVariety\n  isProper : ∀ W ∈ carrier, W < V\n  isWellOrder : IsWellOrder {W // W ∈ carrier} (fun W₁ W₂ => W₁.1 < W₂.1)\n\n/-- The order type of a well-ordered chain of proper subvarieties. -/\nnoncomputable def ProperSubvarietyChain.orderType {V : GroupVariety}\n    (C : ProperSubvarietyChain V) : Ordinal :=\n  @Ordinal.type {W // W ∈ C.carrier} (fun W₁ W₂ => W₁.1 < W₂.1) C.isWellOrder\n\n/-- The ordinal height of a variety is the supremum of the order types of all its\nwell-ordered-by-inclusion chains of proper subvarieties. -/\nnoncomputable def ordinalHeight (V : GroupVariety) : Ordinal :=\n  ⨆ C : ProperSubvarietyChain V, C.orderType\n\n/--\nIs every countable ordinal number the ordinal height of some variety of groups?\nHere countable ordinals include all finite ordinals, including zero.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal, α < ω₁ → ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry\n\nend Kourovka.«7.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A group variety is represented, via the standard Birkhoff–Neumann correspondence, by its equational theory: a fully invariant subgroup of the free group on countably many generators.",
+    "The order on equational theories is reversed, so the inherited order on `GroupVariety` is inclusion of the corresponding classes of groups.",
+    "A well-ordered chain is represented as a subset of the set-sized type of group varieties, with strict inclusion as its well-order relation; every member is required to be strictly below the ambient variety.",
+    "Ordinal height uses the ordinary ordinal indexed supremum `⨆`, not `Ordinal.lsub`, since the source asks for a supremum rather than a least strict upper bound.",
+    "Countable ordinals are expressed as `α < ω₁`, including zero and all finite ordinals. The `Ordinal` scope is explicitly opened so `ω₁` elaborates as the first uncountable ordinal."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Subgroup.Characteristic`; this only gives invariance under automorphisms, whereas group varieties require invariance under all endomorphisms.",
+     "name": "IsFullyInvariant",
+     "why_needed": "Mathlib has no predicate for fully invariant subgroups, needed to encode equational theories of group varieties."
+    },
+    {
+     "closest_existing_considered": "No existing group-variety or general universal-algebra variety primitive was found; `OrderDual` of fully invariant subgroups supplies the standard equational-theory model.",
+     "name": "GroupVariety",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines varieties of groups."
+    },
+    {
+     "closest_existing_considered": "`Set.IsChain` records comparability but does not bundle properness, a well-order proof, and the carrier needed to obtain an ordinal order type.",
+     "name": "ProperSubvarietyChain",
+     "why_needed": "The statement quantifies over well-ordered inclusion chains consisting only of proper subvarieties of a fixed variety."
+    },
+    {
+     "closest_existing_considered": "Built directly from Mathlib's `Ordinal.type`; no existing specialization to subvariety chains exists.",
+     "name": "ProperSubvarietyChain.orderType",
+     "why_needed": "Associates to each bundled well-ordered chain the ordinal whose supremum defines height."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Ordinal.type` and indexed supremum provide the components, but no existing ordinal-height definition matches this poset-of-proper-subvarieties notion.",
+     "name": "ordinalHeight",
+     "why_needed": "The problem defines the ordinal height of a group variety, a notion absent from Mathlib and FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.26»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.26»": "/--\nIs every countable ordinal number the ordinal height of some variety of groups?\nHere countable ordinals include all finite ordinals, including zero.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.26» : answer(sorry) ↔\n    ∀ α : Ordinal, α < ω₁ → ∃ V : GroupVariety, ordinalHeight V = α := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«7.26»": "c04"
+ },
+ "id": "kourovka-7.26",
+ "main_attempt": "c04"
+}

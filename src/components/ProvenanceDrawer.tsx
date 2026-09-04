@@ -1,27 +1,42 @@
 import { diffLines } from "diff";
 import { useEffect, useMemo, useState } from "react";
-import type { Alts, Entry, Meta } from "../data/schema";
+import type { Alts, Entry, ProbeBudget } from "../data/schema";
 import { Disclosure } from "./Disclosure";
 import { Markdown } from "./Markdown";
 import { MathText } from "./MathText";
 import { claimGlyph, claimNote } from "./SourcePane";
 import { firstSentence, shorten } from "./StatusLine";
 
-export const HOW_PRODUCED =
-  "The Wikipedia entry and article were split into claims statable in Lean. Eight independent attempts by two models each wrote a file and compiled it against Formal Conjectures. A separate model compared the compiling attempts with the source, chose or combined the most faithful, omitted statements it could not make faithful, and wrote the notes above. Finally a prover spent up to an hour trying to prove or refute each statement; success would have discarded the file.";
+// The fixed description of the pipeline; only the first sentence names the source.
+export function howProduced(source: string | null): string {
+  const split =
+    source === "kourovka"
+      ? "The notebook problem was split into claims statable in Lean."
+      : source === "wikipedia"
+        ? "The Wikipedia entry and article were split into claims statable in Lean."
+        : "The source text was split into claims statable in Lean.";
+  return `${split} Eight independent attempts by two models each wrote a file and compiled it against Formal Conjectures. A separate model compared the compiling attempts with the source, chose or combined the most faithful, omitted statements it could not make faithful, and wrote the notes above. Finally a prover tried, within a fixed budget, to prove or refute each statement; success would have discarded the file.`;
+}
 
-export function proverSentence(minutes: number): string {
-  return `Automated prover: tried for ${minutes} minutes to prove or refute the statements in this file and did neither. This rules out only trivially true or false formalizations.`;
+// Older runs gave the prover a wall clock; later ones a message limit (each
+// model call or tool use is one message).
+export function proverBudget(b: ProbeBudget): string {
+  if (b.minutes !== null) return `for ${b.minutes} minutes`;
+  if (b.messages !== null) return `within a budget of ${b.messages} model messages`;
+  return "within a fixed budget";
+}
+
+export function proverSentence(b: ProbeBudget): string {
+  return `Automated prover: tried ${proverBudget(b)} to prove or refute the statements in this file and did neither. This rules out only trivially true or false formalizations.`;
 }
 
 interface Props {
   entry: Entry;
-  meta: Meta;
   alts: Alts | null;
   requestAlts: () => void;
 }
 
-export function ProvenanceDrawer({ entry, meta, alts, requestAlts }: Props) {
+export function ProvenanceDrawer({ entry, alts, requestAlts }: Props) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (open) requestAlts();
@@ -39,7 +54,7 @@ export function ProvenanceDrawer({ entry, meta, alts, requestAlts }: Props) {
         <h2>How this file was produced</h2>
       </summary>
       <div className="drawer-body">
-        <p className="fixed">{HOW_PRODUCED}</p>
+        <p className="fixed">{howProduced(entry.source)}</p>
 
         <h3>Claims</h3>
         <table className="claims-table">
@@ -178,7 +193,11 @@ export function ProvenanceDrawer({ entry, meta, alts, requestAlts }: Props) {
               </ul>
             ) : null}
           </li>
-          <li>{entry.checks.probe.ran ? proverSentence(entry.checks.probe.budget_minutes) : "The automated prover did not run on this file."}</li>
+          <li>
+            {entry.checks.probe.ran
+              ? proverSentence({ minutes: entry.checks.probe.budget_minutes, messages: entry.checks.probe.budget_messages })
+              : "The automated prover did not run on this file."}
+          </li>
         </ul>
 
         {entry.references.length > 0 && (
@@ -202,7 +221,7 @@ export function ProvenanceDrawer({ entry, meta, alts, requestAlts }: Props) {
           <a href={entry.transcript_url} target="_blank" rel="noopener noreferrer">
             Open the full transcript
           </a>{" "}
-          <span className="muted">(Inspect log viewer; every model call of this entry, run {meta.run_id})</span>
+          <span className="muted">(Inspect log viewer; every model call of this entry, run {entry.run_id})</span>
         </p>
       </div>
     </details>

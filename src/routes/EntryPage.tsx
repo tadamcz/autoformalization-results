@@ -105,7 +105,7 @@ export function EntryPage() {
               search={search}
             />
             <ReviewerNotes entry={entry.data} />
-            <ProvenanceDrawer entry={entry.data} meta={index.data.meta} alts={alts.status === "ok" ? alts.data : null} requestAlts={requestAlts} />
+            <ProvenanceDrawer entry={entry.data} alts={alts.status === "ok" ? alts.data : null} requestAlts={requestAlts} />
           </>
         )}
       </main>

@@ -2,7 +2,9 @@
 // is the producer; scripts/check.ts validates data/** against these at build).
 import { z } from "zod";
 
-export const SCHEMA_VERSION = 2; // 2: confidence + lean_lines on entries and index rows
+// 3: several sources (Wikipedia list, Kourovka Notebook), one run each: meta.sources;
+// entry.source / source_ref / statement_tex; probe budget in minutes or messages
+export const SCHEMA_VERSION = 3;
 
 const nullableString = z.string().nullable();
 
@@ -25,6 +27,7 @@ export const Outcome = z.object({
 
 export const IndexEntry = z.object({
   id: z.string(),
+  source: z.string(),
   title: z.string(),
   statement: z.string(),
   area: z.string(),
@@ -41,25 +44,13 @@ export const IndexEntry = z.object({
 
 const ModelRef = z.object({ id: z.string(), name: z.string() });
 
-export const Meta = z.object({
-  schema_version: z.literal(SCHEMA_VERSION),
+// the prover's budget as the run configured it: a wall clock (older runs) and/or a message limit
+export const ProbeBudget = z.object({ minutes: z.number().nullable(), messages: z.number().nullable() });
+
+export const RunMeta = z.object({
   run_id: z.string(),
   log_name: z.string(),
-  generated_at: z.string(),
-  min_confidence: z.number(),
-  n_entries: z.number(),
   outcomes: z.record(z.string(), z.number()),
-  areas: z.record(
-    z.string(),
-    z.object({ count: z.number(), subareas: z.record(z.string(), z.number()) }),
-  ),
-  fc: z.object({
-    commit: z.string(),
-    commit_date: z.string(),
-    lean_toolchain: z.string(),
-    mathlib_rev: nullableString,
-  }),
-  fc_repo_url: z.string(),
   models: z.object({
     generators: z.array(ModelRef),
     adjudicator: ModelRef,
@@ -68,10 +59,42 @@ export const Meta = z.object({
   }),
   attempts_per_entry: z.number(),
   prover_settled_confidences: z.array(z.number()),
-  probe_budget_minutes: z.number(),
+  probe_budget: ProbeBudget,
   transcript_base: z.string(),
-  wikipedia_snapshot: nullableString,
-  list_url: z.string(),
+});
+
+export const Areas = z.record(
+  z.string(),
+  z.object({ count: z.number(), subareas: z.record(z.string(), z.number()) }),
+);
+
+export const SourceMeta = z.object({
+  order: z.number(),
+  name: z.string(),
+  short_name: z.string(),
+  url: z.string(),
+  n_entries: z.number(),
+  snapshot: nullableString,
+  areas: Areas,
+  run: RunMeta,
+  // kourovka only
+  notebook_version: nullableString.optional(),
+  katex_macros: z.record(z.string(), z.string()).optional(),
+});
+
+export const Meta = z.object({
+  schema_version: z.literal(SCHEMA_VERSION),
+  generated_at: z.string(),
+  min_confidence: z.number(),
+  n_entries: z.number(),
+  sources: z.record(z.string(), SourceMeta),
+  fc: z.object({
+    commit: z.string(),
+    commit_date: z.string(),
+    lean_toolchain: z.string(),
+    mathlib_rev: nullableString,
+  }),
+  fc_repo_url: z.string(),
   ams_subjects: z.record(z.string(), z.string()),
 });
 
@@ -153,15 +176,29 @@ export const AttemptSummary = z.object({
   confidence: z.number().nullable(),
 });
 
+// where a Kourovka entry sits in the notebook
+export const KourovkaRef = z.object({
+  number: z.string(),
+  issue: z.number(),
+  year: z.number(),
+  author: z.string(),
+  notebook_version: z.string(),
+});
+
 export const Entry = z.object({
   schema_version: z.literal(SCHEMA_VERSION),
   id: z.string(),
   uuid: z.string(),
+  source: z.string(),
+  run_id: z.string(),
+  source_ref: KourovkaRef.nullable(),
   title: z.string(),
   title_source: z.string(),
   record_title: z.string(),
   article_title: nullableString,
   statement: z.string(),
+  // the statement as the pipeline saw it when `statement` is a rendering of it (kourovka: TeX)
+  statement_tex: nullableString,
   statement_segments: z.array(z.object({ text: z.string(), ref: z.number().nullable() })),
   context: nullableString,
   area: z.string(),
@@ -169,7 +206,7 @@ export const Entry = z.object({
   tags: z.array(z.string()),
   list_url: z.string(),
   reference_url: z.string(),
-  article_url: z.string(),
+  article_url: nullableString,
   fc: z.object({
     path: z.string(),
     lean_namespace: z.string(),
@@ -203,7 +240,8 @@ export const Entry = z.object({
       ran: z.boolean(),
       attempts: z.number().nullable(),
       limit: nullableString,
-      budget_minutes: z.number(),
+      budget_minutes: z.number().nullable(),
+      budget_messages: z.number().nullable(),
     }),
   }),
   attempts: z.object({
@@ -276,6 +314,9 @@ export type Counts = z.infer<typeof Counts>;
 export type Outcome = z.infer<typeof Outcome>;
 export type IndexEntry = z.infer<typeof IndexEntry>;
 export type Meta = z.infer<typeof Meta>;
+export type SourceMeta = z.infer<typeof SourceMeta>;
+export type RunMeta = z.infer<typeof RunMeta>;
+export type ProbeBudget = z.infer<typeof ProbeBudget>;
 export type IndexFile = z.infer<typeof IndexFile>;
 export type Block = z.infer<typeof Block>;
 export type Claim = z.infer<typeof Claim>;

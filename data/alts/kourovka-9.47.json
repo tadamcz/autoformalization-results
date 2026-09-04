@@ -1,0 +1,383 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.47\n\nby I. V. Protasov\n\nIs it true that every scattered compact can be homeomorphically embedded into the\nspace of all closed non-compact subgroups with $E$-topology of a suitable locally\ncompact group?\n\nHere a *compact* is a compact Hausdorff space, and a space is *scattered* if every\nnonempty subset has a point which is isolated in it. For a topological group $G$,\nthe $E$-topology (Protasov) on the lattice $L(G)$ of closed subgroups of $G$ is the\ntopology in which a closed subgroup $H$ has the basic neighbourhoods\n$$E(H, U, K) = \\{X \\in L(G) : X \\cap K \\subseteq HU \\text{ and } H \\cap K \\subseteq XU\\},$$\nwhere $U$ ranges over the neighbourhoods of the identity and $K$ over the compact\nsubsets of $G$. On a locally compact group it coincides with the Chabauty topology.\nLocally compact groups are assumed to be Hausdorff.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.47»\n\nopen Filter Set Topology\nopen scoped Pointwise\n\n/--\nA topological space `X` is *scattered* if every nonempty subset `A` of `X` has a point\nwhich is isolated in `A`, i.e. a point `x ∈ A` which is not an accumulation point of `A`.\n-/\ndef IsScattered (X : Type*) [TopologicalSpace X] : Prop :=\n  ∀ A : Set X, A.Nonempty → ∃ x ∈ A, ¬ AccPt x (𝓟 A)\n\n/-- A space is scattered iff its only preperfect (dense-in-itself) subset is the empty set. -/\n@[category API, AMS 54]\ntheorem isScattered_iff_forall_preperfect {X : Type*} [TopologicalSpace X] :\n    IsScattered X ↔ ∀ A : Set X, Preperfect A → A = ∅ := by\n  simp only [IsScattered, Preperfect, ← not_nonempty_iff_eq_empty]\n  refine forall_congr' fun A => ⟨fun h hA hne => ?_, fun h hne => ?_⟩\n  · obtain ⟨x, hx, hx'⟩ := h hne\n    exact hx' (hA x hx)\n  · by_contra h'\n    push_neg at h'\n    exact h h' hne\n\n/-- A discrete space is scattered. -/\n@[category test, AMS 54]\ntheorem isScattered_of_discreteTopology (X : Type*) [TopologicalSpace X]\n    [DiscreteTopology X] : IsScattered X := by\n  intro A ⟨x, hx⟩\n  refine ⟨x, hx, fun h => ?_⟩\n  obtain ⟨y, ⟨hy, -⟩, hyx⟩ := accPt_iff_nhds.mp h {x} (isOpen_discrete _ |>.mem_nhds rfl)\n  exact hyx hy\n\nvariable {G : Type*} [Group G] [TopologicalSpace G]\n\n/--\nThe basic $E$-neighbourhood\n$$E(H, U, K) = \\{X \\in L(G) : X \\cap K \\subseteq HU \\text{ and } H \\cap K \\subseteq XU\\}$$\nof a closed subgroup `H` of `G`, determined by a subset `U` (a neighbourhood of the\nidentity) and a subset `K` (a compact set) of `G`.\n-/\ndef eNhd (H : ClosedSubgroup G) (U K : Set G) : Set (ClosedSubgroup G) :=\n  {X | (X : Set G) ∩ K ⊆ (H : Set G) * U ∧ (H : Set G) ∩ K ⊆ (X : Set G) * U}\n\n/-- A closed subgroup `H` lies in each of its basic $E$-neighbourhoods `eNhd H U K`, provided\n`U` contains the identity. -/\n@[category API, AMS 22]\ntheorem mem_eNhd_self (H : ClosedSubgroup G) {U : Set G} (hU : (1 : G) ∈ U) (K : Set G) :\n    H ∈ eNhd H U K :=\n  ⟨inter_subset_left.trans (subset_mul_left _ hU),\n    inter_subset_left.trans (subset_mul_left _ hU)⟩\n\nvariable (G) in\n/--\nProtasov's $E$-topology on the lattice $L(G)$ of closed subgroups of a topological group\n`G`: a set `O` of closed subgroups is open iff every `H ∈ O` has a basic neighbourhood\n`eNhd H U K ⊆ O`, where `U` is a neighbourhood of the identity and `K` is a compact\nsubset of `G`.\n-/\ndef eTopology : TopologicalSpace (ClosedSubgroup G) where\n  IsOpen O := ∀ H ∈ O, ∃ U ∈ 𝓝 (1 : G), ∃ K : Set G, IsCompact K ∧ eNhd H U K ⊆ O\n  isOpen_univ _ _ := ⟨univ, univ_mem, ∅, isCompact_empty, subset_univ _⟩\n  isOpen_inter O₁ O₂ h₁ h₂ H hH := by\n    obtain ⟨U₁, hU₁, K₁, hK₁, hO₁⟩ := h₁ H hH.1\n    obtain ⟨U₂, hU₂, K₂, hK₂, hO₂⟩ := h₂ H hH.2\n    refine ⟨U₁ ∩ U₂, inter_mem hU₁ hU₂, K₁ ∪ K₂, hK₁.union hK₂, fun X ⟨hX₁, hX₂⟩ => ?_⟩\n    refine ⟨hO₁ ⟨?_, ?_⟩, hO₂ ⟨?_, ?_⟩⟩\n    · exact (inter_subset_inter_right _ subset_union_left).trans\n        (hX₁.trans (mul_subset_mul_left inter_subset_left))\n    · exact (inter_subset_inter_right _ subset_union_left).trans\n        (hX₂.trans (mul_subset_mul_left inter_subset_left))\n    · exact (inter_subset_inter_right _ subset_union_right).trans\n        (hX₁.trans (mul_subset_mul_left inter_subset_right))\n    · exact (inter_subset_inter_right _ subset_union_right).trans\n        (hX₂.trans (mul_subset_mul_left inter_subset_right))\n  isOpen_sUnion S hS H := by\n    rintro ⟨O, hO, hHO⟩\n    obtain ⟨U, hU, K, hK, h⟩ := hS O hO H hHO\n    exact ⟨U, hU, K, hK, h.trans (subset_sUnion_of_mem hO)⟩\n\nscoped instance : TopologicalSpace (ClosedSubgroup G) := eTopology G\n\n/-- In the $E$-topology, a set `O` of closed subgroups is open iff every `H ∈ O` has a basic\nneighbourhood `eNhd H U K ⊆ O` with `U` a neighbourhood of the identity and `K` compact. -/\n@[category API, AMS 22]\ntheorem isOpen_iff_eNhd (O : Set (ClosedSubgroup G)) :\n    IsOpen O ↔\n      ∀ H ∈ O, ∃ U ∈ 𝓝 (1 : G), ∃ K : Set G, IsCompact K ∧ eNhd H U K ⊆ O :=\n  Iff.rfl\n\n/--\nIs it true that every scattered compact can be homeomorphically embedded into the\nspace of all closed non-compact subgroups with $E$-topology of a suitable locally\ncompact group?\n\nThat is: for every scattered compact Hausdorff space $X$, do there exist a locally compact\n(Hausdorff) group $G$ and a topological embedding of $X$ into the subspace of the lattice\n$L(G)$ of closed subgroups of $G$, carrying the $E$-topology, consisting of the\nnon-compact closed subgroups?\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [CompactSpace X] [T2Space X], IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ LocallyCompactSpace G ∧ T2Space G ∧\n        ∃ f : X → {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}, IsEmbedding f := by\n  sorry\n\nend Kourovka.«9.47»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (Hausdorff conventions, definition of the E-topology via the neighbourhood base {X : X∩K ⊆ HU, H∩K ⊆ XU}) are consistent with the statement and were followed exactly.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Compact' is read as compact Hausdorff (Russian convention, as the decomposition notes say): X carries [CompactSpace X] [T2Space X].",
+    "'Locally compact group' is read as a Hausdorff locally compact topological group: IsTopologicalGroup G ∧ LocallyCompactSpace G ∧ T2Space G (standard convention; also matches the notes).",
+    "The E-topology is defined exactly per the notes' neighbourhood base: eNhd H U K = {X | X ∩ K ⊆ H * U ∧ H ∩ K ⊆ X * U}, and a set O is declared open iff every H ∈ O has some eNhd H U K ⊆ O with U ∈ 𝓝 1 and K compact. This is the canonical topology determined by a neighbourhood base (Mathlib's mkOfNhds-style reading); whenever the base satisfies the neighbourhood axioms (which holds for locally compact G, the only case the problem uses) it is the unique topology with these basic neighbourhoods. Right translates HU/XU are used as in the notes; using UH/UX instead yields the same topology because conjugation by elements of a compact set is uniformly controlled.",
+    "The 'space of closed non-compact subgroups with E-topology' is modeled as the subtype {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)} with the subspace topology of the E-topology on ClosedSubgroup G (installed as a scoped instance in the problem namespace).",
+    "'Scattered' is defined as: every nonempty subset A has a point x ∈ A that is not an accumulation point of A (¬ AccPt x (𝓟 A)); an API lemma shows this is equivalent to 'the only Preperfect subset is ∅'.",
+    "'Homeomorphically embedded' is IsEmbedding f (inducing + injective), i.e. a homeomorphism onto the image.",
+    "Universe choices follow the collection's convention: X : Type and G : Type.",
+    "The empty space is (trivially) a scattered compact and trivially embeds; this matches the informal statement."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Preperfect / Perfect in Mathlib.Topology.Perfect (a space is scattered iff its only preperfect subset is empty; this equivalence is proved as an API lemma isScattered_iff_forall_preperfect).",
+     "name": "Kourovka.«9.47».IsScattered",
+     "why_needed": "Mathlib has no notion of scattered topological space (every nonempty subset has an isolated point)."
+    },
+    {
+     "closest_existing_considered": "TopologicalSpace.vietoris (Vietoris topology on Set α / Compacts) — a different topology (Vietoris, not Chabauty/Fell/E), and Mathlib explicitly does not put it on closed sets or subgroups.",
+     "name": "Kourovka.«9.47».eNhd",
+     "why_needed": "The basic E-neighbourhood {X | X ∩ K ⊆ H * U ∧ H ∩ K ⊆ X * U} of a closed subgroup H, the building block of Protasov's E-topology; not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "TopologicalSpace.vietoris / Compacts.topology (Vietoris), EMetric.Closeds (Hausdorff-metric topology, metric spaces only) — none is the Chabauty/E-topology on closed subgroups of a topological group.",
+     "name": "Kourovka.«9.47».eTopology (and the scoped TopologicalSpace (ClosedSubgroup G) instance)",
+     "why_needed": "Protasov's E-topology on the lattice of closed subgroups is not in Mathlib or FormalConjecturesForMathlib; ClosedSubgroup G carries no topology in Mathlib. Defined as: O is open iff every H ∈ O has a basic neighbourhood eNhd H U K ⊆ O with U ∈ 𝓝 1, K compact."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.47»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ scattered compact Hausdorff space X, ∃ locally compact Hausdorff topological group G and a topological embedding (IsEmbedding) of X into the subtype {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)} carrying the subspace topology of Protasov's E-topology. Needed bespoke definitions: IsScattered (not in Mathlib) and the E-topology eNhd/eTopology on ClosedSubgroup G (not in Mathlib; Mathlib only has the Vietoris topology on Set/Compacts, not the Chabauty/Fell or E-topology on closed subgroups)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.47»": "/--\nIs it true that every scattered compact can be homeomorphically embedded into the\nspace of all closed non-compact subgroups with $E$-topology of a suitable locally\ncompact group?\n\nThat is: for every scattered compact Hausdorff space $X$, do there exist a locally compact\n(Hausdorff) group $G$ and a topological embedding of $X$ into the subspace of the lattice\n$L(G)$ of closed subgroups of $G$, carrying the $E$-topology, consisting of the\nnon-compact closed subgroups?\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [CompactSpace X] [T2Space X], IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ LocallyCompactSpace G ∧ T2Space G ∧\n        ∃ f : X → {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}, IsEmbedding f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.47\n\nby I. V. Protasov\n\nIs it true that every scattered compact Hausdorff space can be homeomorphically\nembedded into the space of all closed noncompact subgroups, with the\n$E$-topology, of a suitable locally compact Hausdorff group?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.47»\n\nopen Set Topology\n\n/-- A topological space is scattered if every nonempty subset has a point\nisolated in that subset. -/\ndef IsScattered (X : Type*) [TopologicalSpace X] : Prop :=\n  ∀ A : Set X, A.Nonempty → ∃ x ∈ A, ∃ U : Set X, IsOpen U ∧ U ∩ A = {x}\n\n/-- The type of closed subgroups of a topological group. -/\ndef ClosedSubgroup (G : Type*) [Group G] [TopologicalSpace G] :=\n  {H : Subgroup G // IsClosed (H : Set G)}\n\n/-- Protasov's $E$-topology on closed subgroups. For a locally compact\nHausdorff group this is the Chabauty--Fell topology. It is generated by the\nsubbasic conditions that a closed subgroup hits an open set or misses a\ncompact set. -/\ndef eTopology (G : Type*) [Group G] [TopologicalSpace G] :\n    TopologicalSpace (ClosedSubgroup G) :=\n  TopologicalSpace.generateFrom\n    ({V | ∃ U : Set G, IsOpen U ∧\n        V = {H : ClosedSubgroup G | ((H.1 : Set G) ∩ U).Nonempty}} ∪\n     {V | ∃ K : Set G, IsCompact K ∧\n        V = {H : ClosedSubgroup G | Disjoint (H.1 : Set G) K}})\n\n/--\nIs it true that every scattered compact Hausdorff space can be homeomorphically\nembedded into the space of all closed noncompact subgroups, equipped with the\n$E$-topology, of some locally compact Hausdorff topological group?\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) (_ : TopologicalSpace X) (_ : CompactSpace X) (_ : T2Space X),\n      IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ LocallyCompactSpace G ∧ T2Space G ∧\n          letI : TopologicalSpace (ClosedSubgroup G) := eTopology G\n          ∃ f : X → {H : ClosedSubgroup G // ¬ IsCompact (H.1 : Set G)},\n            IsEmbedding f := by\n  sorry\n\nend Kourovka.«9.47»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “scattered compact” according to the stated Russian convention as a compact Hausdorff topological space in which every nonempty subset has an isolated point.",
+    "Defined the E-topology using the equivalent Chabauty–Fell subbasis (hitting open sets and missing compact sets). This is faithful on the locally compact Hausdorff groups quantified by the statement.",
+    "Represented the space of noncompact closed subgroups as a subtype of the type of closed subgroups; its automatically induced topology is therefore the required subspace topology.",
+    "Used `Topology.IsEmbedding` to express a homeomorphic embedding onto the map's image.",
+    "Expressed noncompactness of a closed subgroup by failure of `IsCompact` for its carrier in the ambient group; in the Hausdorff setting this agrees with noncompactness of the subgroup with its induced topology."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "No scattered-space primitive was found; the definition directly uses the standard isolated-point characterization for every nonempty subset.",
+     "name": "Kourovka.«9.47».IsScattered",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib contain no predicate for scattered topological spaces."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Subgroup G` and `TopologicalSpace.Closeds G`, but no type combining the subgroup structure with a closed-carrier proof.",
+     "name": "Kourovka.«9.47».ClosedSubgroup",
+     "why_needed": "The conjecture needs a type whose points are precisely the topologically closed subgroups of a group."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `TopologicalSpace.Closeds` and Vietoris/Hausdorff hyperspace topologies were inspected, but they do not provide the Fell topology required here; `TopologicalSpace.generateFrom` suffices to define its standard hit-open/miss-compact subbasis.",
+     "name": "Kourovka.«9.47».eTopology",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines Protasov's E-topology or the Chabauty–Fell topology on closed subgroups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.47»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.47»": "/--\nIs it true that every scattered compact Hausdorff space can be homeomorphically\nembedded into the space of all closed noncompact subgroups, equipped with the\n$E$-topology, of some locally compact Hausdorff topological group?\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) (_ : TopologicalSpace X) (_ : CompactSpace X) (_ : T2Space X),\n      IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ LocallyCompactSpace G ∧ T2Space G ∧\n          letI : TopologicalSpace (ClosedSubgroup G) := eTopology G\n          ∃ f : X → {H : ClosedSubgroup G // ¬ IsCompact (H.1 : Set G)},\n            IsEmbedding f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.47\n\nby I. V. Protasov\n\nIs it true that every scattered compact can be homeomorphically embedded into the space of all\nclosed non-compact subgroups with $E$-topology of a suitable locally compact group?\n\nHere a *compact* is a compact Hausdorff space, and a space is *scattered* if every nonempty\nsubset has an isolated point. The $E$-topology (introduced by Protasov) on the set $L(G)$ of all\nclosed subgroups of a topological group $G$ is the topology in which a base of neighbourhoods of\n$H \\in L(G)$ is formed by the sets\n$$O(H, K, U) = \\{X \\in L(G) : X \\cap K \\subseteq HU \\text{ and } H \\cap K \\subseteq XU\\},$$\nwhere $K$ ranges over the compact subsets of $G$ and $U$ over the neighbourhoods of the identity\nof $G$. For a locally compact group $G$ the $E$-topology coincides with the Chabauty topology on\n$L(G)$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Filter Topology\nopen scoped Pointwise\n\nnamespace Kourovka.«9.47»\n\n/-- A topological space $X$ is *scattered* if every nonempty subset $C \\subseteq X$ has a point\nthat is isolated in $C$, i.e. a point $x \\in C$ that is not an accumulation point of $C$. -/\ndef IsScattered (X : Type*) [TopologicalSpace X] : Prop :=\n  ∀ C : Set X, C.Nonempty → ∃ x ∈ C, ¬ AccPt x (𝓟 C)\n\n/-- Every discrete space is scattered. -/\n@[category test, AMS 54]\ntheorem isScattered_of_discreteTopology (X : Type*) [TopologicalSpace X] [DiscreteTopology X] :\n    IsScattered X := by\n  rintro C ⟨x, hx⟩\n  refine ⟨x, hx, fun h => ?_⟩\n  rw [AccPt, discreteTopology_iff_nhds_ne.1 ‹_› x, bot_inf_eq] at h\n  exact h.ne rfl\n\nvariable (G : Type*) [Group G] [TopologicalSpace G]\n\n/-- Protasov's $E$-topology on the set $L(G)$ of all closed subgroups of a topological group $G$.\nA base of neighbourhoods of $H \\in L(G)$ is given by the sets\n$$O(H, K, U) = \\{X \\in L(G) : X \\cap K \\subseteq HU \\text{ and } H \\cap K \\subseteq XU\\},$$\nwhere $K$ ranges over the compact subsets of $G$ and $U$ over the neighbourhoods of $1$ in $G$.\nA set $S \\subseteq L(G)$ is open iff it contains such a basic neighbourhood of each of its\npoints (see `isOpen_eTopology_iff`). -/\ndef eTopology : TopologicalSpace (ClosedSubgroup G) :=\n  .mkOfNhds fun H => ⨅ (K : Set G) (_ : IsCompact K) (U : Set G) (_ : U ∈ 𝓝 (1 : G)),\n    𝓟 {X : ClosedSubgroup G | (X : Set G) ∩ K ⊆ (H : Set G) * U ∧ (H : Set G) ∩ K ⊆ (X : Set G) * U}\n\nvariable {G} in\n/-- A set $S$ of closed subgroups of $G$ is open in the $E$-topology iff it contains a basic\nneighbourhood $O(H, K, U)$ of each of its points $H$. -/\n@[category API, AMS 22 54]\ntheorem isOpen_eTopology_iff (S : Set (ClosedSubgroup G)) :\n    IsOpen[eTopology G] S ↔ ∀ H ∈ S, ∃ K : Set G, IsCompact K ∧ ∃ U ∈ 𝓝 (1 : G),\n      ∀ X : ClosedSubgroup G, (X : Set G) ∩ K ⊆ H * U → (H : Set G) ∩ K ⊆ X * U → X ∈ S := by\n  set O : ClosedSubgroup G → Set G → Set G → Set (ClosedSubgroup G) := fun H K U =>\n    {X | (X : Set G) ∩ K ⊆ (H : Set G) * U ∧ (H : Set G) ∩ K ⊆ (X : Set G) * U} with hO\n  have O_mono (H : ClosedSubgroup G) {K K' U U' : Set G} (hK : K ⊆ K') (hU : U' ⊆ U) :\n      O H K' U' ⊆ O H K U := fun X ⟨h1, h2⟩ =>\n    ⟨(Set.inter_subset_inter_right _ hK).trans (h1.trans (Set.mul_subset_mul_left hU)),\n      (Set.inter_subset_inter_right _ hK).trans (h2.trans (Set.mul_subset_mul_left hU))⟩\n  change (∀ H ∈ S, S ∈ ⨅ (K : Set G) (_ : IsCompact K) (U : Set G) (_ : U ∈ 𝓝 (1 : G)),\n    𝓟 (O H K U)) ↔ _\n  refine forall₂_congr fun H _ => ?_\n  have key : (⨅ (K : Set G) (_ : IsCompact K) (U : Set G) (_ : U ∈ 𝓝 (1 : G)), 𝓟 (O H K U))\n      = ⨅ p ∈ {p : Set G × Set G | IsCompact p.1 ∧ p.2 ∈ 𝓝 (1 : G)}, 𝓟 (O H p.1 p.2) := by\n    rw [iInf_prod]\n    refine iInf_congr fun K => ?_\n    rw [iInf_comm]\n    refine iInf_congr fun U => ?_\n    simp only [Set.mem_setOf_eq, iInf_and]\n  have dir : DirectedOn ((fun p : Set G × Set G => 𝓟 (O H p.1 p.2)) ⁻¹'o (· ≥ ·))\n      {p : Set G × Set G | IsCompact p.1 ∧ p.2 ∈ 𝓝 (1 : G)} := by\n    rintro ⟨K₁, U₁⟩ ⟨hK₁, hU₁⟩ ⟨K₂, U₂⟩ ⟨hK₂, hU₂⟩\n    refine ⟨(K₁ ∪ K₂, U₁ ∩ U₂), ⟨hK₁.union hK₂, inter_mem hU₁ hU₂⟩, ?_, ?_⟩\n    · exact principal_mono.2 (O_mono H Set.subset_union_left Set.inter_subset_left)\n    · exact principal_mono.2 (O_mono H Set.subset_union_right Set.inter_subset_right)\n  rw [key, mem_biInf_of_directed dir ⟨(∅, Set.univ), isCompact_empty, univ_mem⟩]\n  simp only [Set.mem_setOf_eq, mem_principal, Prod.exists, hO]\n  constructor\n  · rintro ⟨K, U, ⟨hK, hU⟩, h⟩\n    exact ⟨K, hK, U, hU, fun X h1 h2 => h ⟨h1, h2⟩⟩\n  · rintro ⟨K, hK, U, hU, h⟩\n    exact ⟨K, U, ⟨hK, hU⟩, fun X hX => h X hX.1 hX.2⟩\n\n/-- The space of all closed non-compact subgroups of `G`, as a subspace of the space `L(G)` of all\nclosed subgroups of `G` with the $E$-topology. -/\nabbrev NoncompactClosedSubgroup : Type _ := {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}\n\ninstance : TopologicalSpace (NoncompactClosedSubgroup G) :=\n  (eTopology G).induced fun H => H.1\n\n/--\nIs it true that every scattered compact can be homeomorphically embedded into the space of all\nclosed non-compact subgroups with $E$-topology of a suitable locally compact group?\n\nThat is, given a scattered compact Hausdorff space $X$, is there a locally compact (Hausdorff)\ngroup $G$ and a topological embedding of $X$ into the subspace of non-compact closed subgroups of\n$G$, where the space $L(G)$ of closed subgroups of $G$ carries the $E$-topology?\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [CompactSpace X] [T2Space X], IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G) (_ : IsTopologicalGroup G)\n        (_ : T2Space G) (_ : LocallyCompactSpace G),\n        ∃ f : X → NoncompactClosedSubgroup G, IsEmbedding f := by\n  sorry\n\nend Kourovka.«9.47»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (Hausdorff conventions, E-topology definition, coincidence with Chabauty topology on locally compact groups) agree with my reading of the statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Compact' is read in the Russian convention as compact Hausdorff (`[CompactSpace X] [T2Space X]`), and 'locally compact group' as a Hausdorff locally compact topological group (`IsTopologicalGroup G`, `T2Space G`, `LocallyCompactSpace G`), following the decomposition note.",
+    "The E-topology is formalized directly from the neighbourhood-base description in the decomposition note ({X : X ∩ K ⊆ HU ∧ H ∩ K ⊆ XU}, K compact, U ∈ 𝓝 1) rather than as the Chabauty topology. I checked informally that with this definition the E-topology coincides with the Chabauty (hit-or-miss with compact misses) topology on closed subgroups for every topological group, and in particular for locally compact groups, so the choice HU vs UH and the exact form of the base do not affect the statement. If Protasov's original E-topology were defined differently, the statement is still faithful as long as the Protasov–Tsybenko theorem (E-topology = Chabauty topology on locally compact groups) holds, as asserted in the decomposition note.",
+    "'Space of all closed non-compact subgroups with E-topology' is read as the subspace of L(G) (with the E-topology) consisting of the closed subgroups H with `¬ IsCompact (H : Set G)`. Defining the E-topology directly on this set with the same neighbourhood base gives the same topology.",
+    "'Homeomorphically embedded' is formalized as `Topology.IsEmbedding f` (inducing + injective), i.e. a homeomorphism onto the image.",
+    "Universes: both `X` and `G` are taken in `Type`, following the convention of the other Kourovka files (e.g. 1_40, 1_74); `Type` contains spaces/groups of all cardinalities.",
+    "Boundary case: for the empty space X the statement is trivially satisfied (e.g. with the trivial group), which matches the mathematics; for a one-point space one needs some locally compact group with a non-compact closed subgroup (e.g. ℤ), which is fine."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Preperfect` / `Perfect` / `PerfectSpace` (Mathlib.Topology.Perfect) express the opposite notion (dense-in-itself); `IsScattered X` is equivalent to `∀ C, C.Nonempty → ¬ Preperfect C`, but the direct `AccPt` form is more readable.",
+     "name": "Kourovka.«9.47».IsScattered",
+     "why_needed": "'Scattered space' (every nonempty subset has an isolated point) is not in Mathlib or FormalConjecturesForMathlib (`rg -i scattered` finds nothing relevant). Defined as `∀ C : Set X, C.Nonempty → ∃ x ∈ C, ¬ AccPt x (𝓟 C)`, using Mathlib's `AccPt` so that 'not an accumulation point of C' is literally 'isolated in C'. A `category test` lemma checks that discrete spaces are scattered."
+    },
+    {
+     "closest_existing_considered": "`TopologicalSpace.vietoris` / `Compacts` Vietoris topology and the Hausdorff uniformity on `Closeds` (Mathlib.Topology.UniformSpace.Closeds); neither is the E-topology/Chabauty topology on closed subgroups.",
+     "name": "Kourovka.«9.47».eTopology",
+     "why_needed": "Protasov's E-topology on `ClosedSubgroup G` is not in Mathlib (no Chabauty/Fell topology either; Mathlib's Vietoris topology is only on compact sets and is a different topology). Defined via `TopologicalSpace.mkOfNhds` with the neighbourhood filter of H being `⨅ K compact, U ∈ 𝓝 1, 𝓟 {X | X ∩ K ⊆ H * U ∧ H ∩ K ⊆ X * U}`, exactly the basic neighbourhoods given in the decomposition note. The `category API` lemma `isOpen_eTopology_iff` proves that the open sets are precisely the sets containing a basic neighbourhood O(H,K,U) of each of their points, so the encoding is verified."
+    },
+    {
+     "closest_existing_considered": "`ClosedSubgroup G` (Mathlib.Topology.Algebra.Group.ClosedSubgroup) is used as the underlying type; it carries no topology in Mathlib.",
+     "name": "Kourovka.«9.47».NoncompactClosedSubgroup (abbrev) and its TopologicalSpace instance",
+     "why_needed": "The problem's ambient space is the set of closed non-compact subgroups of G, topologised as a subspace of L(G) with the E-topology. Defined as the subtype `{H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}` with the topology induced from `eTopology G`. Checked in a scratch file that Mathlib has no competing `TopologicalSpace (ClosedSubgroup G)` instance, so the induced topology is unambiguous."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.47»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ X compact Hausdorff scattered, ∃ G locally compact Hausdorff topological group, ∃ f : X → {non-compact closed subgroups of G}, IsEmbedding f`, where the closed subgroups carry Protasov's E-topology (defined in the file exactly as in the decomposition note) and the non-compact ones carry the subspace topology. Needed bespoke definitions for scatteredness and for the E-topology, neither of which is in Mathlib or FormalConjecturesForMathlib."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.47»": "/--\nIs it true that every scattered compact can be homeomorphically embedded into the space of all\nclosed non-compact subgroups with $E$-topology of a suitable locally compact group?\n\nThat is, given a scattered compact Hausdorff space $X$, is there a locally compact (Hausdorff)\ngroup $G$ and a topological embedding of $X$ into the subspace of non-compact closed subgroups of\n$G$, where the space $L(G)$ of closed subgroups of $G$ carries the $E$-topology?\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [CompactSpace X] [T2Space X], IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G) (_ : IsTopologicalGroup G)\n        (_ : T2Space G) (_ : LocallyCompactSpace G),\n        ∃ f : X → NoncompactClosedSubgroup G, IsEmbedding f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.47\n\nby I. V. Protasov\n\nIs it true that every scattered compact can be homeomorphically embedded into\nthe space of all closed non-compact subgroups with $E$-topology of a suitable\nlocally compact group?\n\nHere a *compact* is a compact Hausdorff space, and a space is *scattered* if\nevery nonempty subset has an isolated point. The $E$-topology on the lattice\n$L(G)$ of closed subgroups of a topological group $G$ is Protasov's topology in\nwhich a closed subgroup $H$ has the basic neighbourhoods\n$$E(H, K, U) = \\{X \\in L(G) : X \\cap K \\subseteq HU,\\ H \\cap K \\subseteq XU\\},$$\nwhere $K$ ranges over the compact subsets of $G$ and $U$ over the\nneighbourhoods of the identity. For a locally compact group it coincides with\nthe Chabauty topology on $L(G)$.\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n* I. V. Protasov, *Topological groups with compact lattices of closed subgroups*,\n  Sib. Math. J. 20 (1979), 378–385.\n* I. V. Protasov, Yu. V. Tsybenko, *Chabauty topology in the lattice of closed subgroups*,\n  Ukrainian Math. J. 36 (1984), 207–213.\n-/\n\nopen Topology\nopen scoped Pointwise\n\nnamespace Kourovka.«9.47»\n\nsection Scattered\n\nvariable (X : Type*) [TopologicalSpace X]\n\n/-- A topological space $X$ is *scattered* if every nonempty subset $A \\subseteq X$ has a\npoint that is isolated in $A$, i.e. some $x \\in A$ with $U \\cap A = \\{x\\}$ for an open set\n$U$. -/\ndef IsScattered : Prop :=\n  ∀ A : Set X, A.Nonempty → ∃ x ∈ A, ∃ U : Set X, IsOpen U ∧ U ∩ A = {x}\n\n/-- Every discrete space is scattered. -/\n@[category test, AMS 54]\ntheorem isScattered_of_discreteTopology [DiscreteTopology X] : IsScattered X :=\n  fun _ ⟨x, hx⟩ => ⟨x, hx, {x}, isOpen_discrete _, Set.inter_eq_left.mpr (by simpa)⟩\n\nend Scattered\n\nsection ETopology\n\nvariable {G : Type*} [Group G] [TopologicalSpace G]\n\n/-- Protasov's basic $E$-neighbourhood $E(H, K, U)$ of a closed subgroup $H$ of $G$,\ndetermined by a set $K$ (usually compact) and a set $U$ (usually a neighbourhood of the\nidentity): the closed subgroups $X$ of $G$ with $X \\cap K \\subseteq HU$ and\n$H \\cap K \\subseteq XU$. -/\ndef eNhd (H : ClosedSubgroup G) (K U : Set G) : Set (ClosedSubgroup G) :=\n  {X | (X : Set G) ∩ K ⊆ (H : Set G) * U ∧ (H : Set G) ∩ K ⊆ (X : Set G) * U}\n\n/-- The $E$-neighbourhoods shrink as $K$ grows and $U$ shrinks. -/\n@[category API, AMS 22 54]\ntheorem eNhd_anti {H : ClosedSubgroup G} {K K' U U' : Set G} (hK : K ⊆ K') (hU : U' ⊆ U) :\n    eNhd H K' U' ⊆ eNhd H K U := fun _ ⟨h₁, h₂⟩ =>\n  ⟨(Set.inter_subset_inter_right _ hK).trans (h₁.trans (Set.mul_subset_mul_left hU)),\n    (Set.inter_subset_inter_right _ hK).trans (h₂.trans (Set.mul_subset_mul_left hU))⟩\n\n/-- The $E$-topology on the lattice of closed subgroups of a topological group $G$\n(I. V. Protasov, 1979): a set $S$ of closed subgroups is open iff every $H \\in S$ has a\nbasic $E$-neighbourhood $E(H, K, U) \\subseteq S$, where $K \\subseteq G$ is compact and $U$ is a\nneighbourhood of the identity. -/\ninstance eTopology : TopologicalSpace (ClosedSubgroup G) where\n  IsOpen S := ∀ H ∈ S, ∃ K U : Set G, IsCompact K ∧ U ∈ 𝓝 (1 : G) ∧ eNhd H K U ⊆ S\n  isOpen_univ _ _ := ⟨∅, Set.univ, isCompact_empty, Filter.univ_mem, Set.subset_univ _⟩\n  isOpen_inter S T hS hT H hH := by\n    obtain ⟨K₁, U₁, hK₁, hU₁, h₁⟩ := hS H hH.1\n    obtain ⟨K₂, U₂, hK₂, hU₂, h₂⟩ := hT H hH.2\n    refine ⟨K₁ ∪ K₂, U₁ ∩ U₂, hK₁.union hK₂, Filter.inter_mem hU₁ hU₂, Set.subset_inter ?_ ?_⟩\n    · exact (eNhd_anti Set.subset_union_left Set.inter_subset_left).trans h₁\n    · exact (eNhd_anti Set.subset_union_right Set.inter_subset_right).trans h₂\n  isOpen_sUnion 𝒮 h𝒮 H hH := by\n    obtain ⟨S, hS, hHS⟩ := Set.mem_sUnion.mp hH\n    obtain ⟨K, U, hK, hU, h⟩ := h𝒮 S hS H hHS\n    exact ⟨K, U, hK, hU, h.trans (Set.subset_sUnion_of_mem hS)⟩\n\n/-- Unfolding the definition of open sets in the $E$-topology. -/\n@[category API, AMS 22 54]\ntheorem isOpen_iff {S : Set (ClosedSubgroup G)} :\n    IsOpen S ↔ ∀ H ∈ S, ∃ K U : Set G, IsCompact K ∧ U ∈ 𝓝 (1 : G) ∧ eNhd H K U ⊆ S :=\n  Iff.rfl\n\n/-- For $U = \\{1\\}$ the basic $E$-neighbourhood $E(H, K, \\{1\\})$ consists of the closed\nsubgroups that agree with $H$ on $K$. -/\n@[category API, AMS 22 54]\ntheorem eNhd_one (H : ClosedSubgroup G) (K : Set G) :\n    eNhd H K 1 = {X : ClosedSubgroup G | (X : Set G) ∩ K = (H : Set G) ∩ K} := by\n  ext X\n  simp only [eNhd, mul_one, Set.mem_setOf_eq]\n  constructor\n  · rintro ⟨h₁, h₂⟩\n    exact Set.Subset.antisymm (Set.subset_inter h₁ Set.inter_subset_right)\n      (Set.subset_inter h₂ Set.inter_subset_right)\n  · intro h\n    exact ⟨h.le.trans Set.inter_subset_left, h.ge.trans Set.inter_subset_left⟩\n\n/-- A closed subgroup belongs to each of its basic $E$-neighbourhoods. -/\n@[category API, AMS 22 54]\ntheorem mem_eNhd_self (H : ClosedSubgroup G) (K : Set G) {U : Set G} (hU : U ∈ 𝓝 (1 : G)) :\n    H ∈ eNhd H K U :=\n  ⟨Set.inter_subset_left.trans (Set.subset_mul_left _ (mem_of_mem_nhds hU)),\n    Set.inter_subset_left.trans (Set.subset_mul_left _ (mem_of_mem_nhds hU))⟩\n\nend ETopology\n\n/--\nIs it true that every scattered compact can be homeomorphically embedded into the space of\nall closed non-compact subgroups with $E$-topology of a suitable locally compact group?\n\nThat is: for every scattered compact Hausdorff space $X$, is there a locally compact\nHausdorff group $G$ such that $X$ embeds topologically into the subspace\n$\\{H \\in L(G) : H \\text{ is not compact}\\}$ of the lattice $L(G)$ of closed subgroups of $G$\nequipped with the $E$-topology?\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [CompactSpace X] [T2Space X], IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ LocallyCompactSpace G ∧ T2Space G ∧\n        ∃ f : X → {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}, IsEmbedding f := by\n  sorry\n\nend Kourovka.«9.47»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (compact = compact Hausdorff, Hausdorff locally compact group, E-topology with basic neighbourhoods {X : X∩K ⊆ HU, H∩K ⊆ XU}) match my reading of the statement and of Protasov's definition.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Compact' is read in the Russian sense as compact Hausdorff: [CompactSpace X] [T2Space X]; 'locally compact group' is read as Hausdorff: IsTopologicalGroup G ∧ LocallyCompactSpace G ∧ T2Space G.",
+    "The E-topology is defined directly from Protasov's neighbourhood system: a set S of closed subgroups is open iff every H ∈ S contains some E(H,K,U) = {X | X ∩ K ⊆ HU ∧ H ∩ K ⊆ XU} with K compact and U ∈ 𝓝 1. This is the topology generated by the neighbourhood system (the standard meaning); the E-sets are neighbourhoods in it whenever Protasov's system is a genuine neighbourhood base, which his papers establish. The Chabauty topology was deliberately NOT used as a substitute, since the problem explicitly names the E-topology (they coincide for locally compact G per Protasov–Tsybenko 1984, but defining the named object is more faithful).",
+    "Right translates HU, XU are used (as in the decomposition notes). Left translates UH, UX give the same topology in any topological group because K is compact (uniform continuity of conjugation on compacta), so this choice is immaterial.",
+    "eTopology is declared as a global `instance : TopologicalSpace (ClosedSubgroup G)`; Mathlib currently has no TopologicalSpace instance on ClosedSubgroup (checked with #synth), so there is no conflict, and the subtype {H // ¬ IsCompact (H : Set G)} then carries the subspace topology automatically. The elaborated statement was inspected with pp.explicit to confirm IsEmbedding uses instTopologicalSpaceSubtype of eTopology.",
+    "Non-compactness of a closed subgroup is expressed as ¬ IsCompact (H : Set G) (equivalent to ¬ CompactSpace H).",
+    "Scatteredness is defined directly as 'every nonempty subset A has a point x ∈ A with U ∩ A = {x} for some open U' rather than via Mathlib's Preperfect; the two are equivalent.",
+    "Types X and G live in Type (universe 0), following the repository's convention in the other Kourovka files.",
+    "AMS tags 22 (topological groups) and 54 (general topology) were chosen rather than 20."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Preperfect / Perfect in Mathlib.Topology.Perfect (scattered ⇔ no nonempty preperfect subset); a direct definition was preferred for readability.",
+     "name": "Kourovka.«9.47».IsScattered",
+     "why_needed": "Mathlib has no notion of a scattered topological space (every nonempty subset has an isolated point)."
+    },
+    {
+     "closest_existing_considered": "hausdorffEntourage in Mathlib.Topology.UniformSpace.Closeds (the Hausdorff uniformity), which is the non-localized (no compact K) version and gives a different topology.",
+     "name": "Kourovka.«9.47».eNhd",
+     "why_needed": "Protasov's basic E-neighbourhood E(H,K,U) = {X ∈ L(G) : X ∩ K ⊆ HU, H ∩ K ⊆ XU} of a closed subgroup; not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "TopologicalSpace.vietoris (Vietoris topology on Set α, only used for Compacts) and UniformSpace.hausdorff (Hausdorff uniformity on Closeds); both differ from the E-topology, which is the topology of uniform convergence on compacta.",
+     "name": "Kourovka.«9.47».eTopology",
+     "why_needed": "Protasov's E-topology on the lattice of closed subgroups of a topological group; Mathlib has no topology at all on ClosedSubgroup G, and neither the Chabauty/Fell topology nor the E-topology exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.47»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ (X : Type) compact Hausdorff scattered, ∃ (G : Type) with Group, TopologicalSpace, IsTopologicalGroup, LocallyCompactSpace, T2Space, ∃ f : X → {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}, IsEmbedding f, where the codomain carries the subspace topology of Protasov's E-topology on ClosedSubgroup G. Mathlib has no scatteredness predicate and no topology on closed subgroups (neither Chabauty/Fell nor Protasov's E-topology; TopologicalSpace.vietoris and UniformSpace.hausdorff are different), so IsScattered, eNhd and eTopology were defined in the file directly from Protasov's definition."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.47»": "/--\nIs it true that every scattered compact can be homeomorphically embedded into the space of\nall closed non-compact subgroups with $E$-topology of a suitable locally compact group?\n\nThat is: for every scattered compact Hausdorff space $X$, is there a locally compact\nHausdorff group $G$ such that $X$ embeds topologically into the subspace\n$\\{H \\in L(G) : H \\text{ is not compact}\\}$ of the lattice $L(G)$ of closed subgroups of $G$\nequipped with the $E$-topology?\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [CompactSpace X] [T2Space X], IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ LocallyCompactSpace G ∧ T2Space G ∧\n        ∃ f : X → {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}, IsEmbedding f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.47\n\nby I. V. Protasov\n\nIs it true that every scattered compact can be homeomorphically embedded into\nthe space of all closed non-compact subgroups with the $E$-topology of a\nsuitable locally compact group?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen scoped Pointwise Topology\nopen Filter Set\n\nnamespace Kourovka.«9.47»\n\n/-- A topological space is scattered if every nonempty subset has a point that\nis isolated in that subset. -/\ndef IsScatteredSpace (X : Type*) [TopologicalSpace X] : Prop :=\n  ∀ s : Set X, s.Nonempty → ∃ x ∈ s, {x} ∈ 𝓝[s] x\n\nvariable {G : Type*} [Group G] [TopologicalSpace G]\n\n/-- The basic $E$-neighborhood of a closed subgroup $H$ determined by a\nneighborhood $U$ of the identity and a compact set $K$ consists of the closed\nsubgroups $L$ such that\n$L \\cap K \\subseteq HU$ and $H \\cap K \\subseteq LU$. -/\ndef eBasic (H : ClosedSubgroup G) (U K : Set G) : Set (ClosedSubgroup G) :=\n  {L | (L : Set G) ∩ K ⊆ (H : Set G) * U ∧\n    (H : Set G) ∩ K ⊆ (L : Set G) * U}\n\n/-- Protasov's $E$-topology on the space of closed subgroups. Its neighborhoods\nare generated by `eBasic H U K`, where $U$ is a neighborhood of the identity\nand $K$ is compact. For locally compact groups this is the Chabauty--Fell\ntopology. -/\ndef eTopology (G : Type*) [Group G] [TopologicalSpace G] :\n    TopologicalSpace (ClosedSubgroup G) :=\n  TopologicalSpace.generateFrom\n    {O | ∀ H ∈ O, ∃ U : Set G, U ∈ 𝓝 (1 : G) ∧\n      ∃ K : Set G, IsCompact K ∧ eBasic H U K ⊆ O}\n\n/--\nIs every scattered compact Hausdorff space homeomorphically embeddable into\nthe space of closed non-compact subgroups, equipped with the $E$-topology, of\nsome locally compact Hausdorff topological group?\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [CompactSpace X] [T2Space X],\n      IsScatteredSpace X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ T2Space G ∧ LocallyCompactSpace G ∧\n        ∃ f : X → {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)},\n          @Topology.IsEmbedding X\n            {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)} _\n            ((eTopology G).induced Subtype.val) f := by\n  sorry\n\nend Kourovka.«9.47»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “scattered compact” according to the stated Russian convention as a compact Hausdorff space in which every nonempty subset has a relatively isolated point.",
+    "Interpreted “locally compact group” as a Hausdorff topological group with `LocallyCompactSpace`.",
+    "Represented the space of closed non-compact subgroups as the subtype of `ClosedSubgroup G` whose underlying carrier is not an `IsCompact` subset of `G`, and explicitly equipped this subtype with the topology induced from the E-topology.",
+    "Defined the E-topology through the stated neighborhood basis: for a neighborhood `U` of the identity and compact `K`, the basic neighborhood at `H` consists of `L` satisfying `L ∩ K ⊆ H * U` and `H ∩ K ⊆ L * U`.",
+    "Used `Topology.IsEmbedding`, Mathlib's predicate for a homeomorphic/topological embedding onto the image."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `AccPt`, `derivedSet`, `IsDiscrete`, and `isDiscrete_iff_nhdsWithin`.",
+     "name": "Kourovka.«9.47».IsScatteredSpace",
+     "why_needed": "Mathlib has isolated-point and accumulation-point primitives but no predicate expressing that every nonempty subset of a space has an isolated point."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `ClosedSubgroup`, pointwise set multiplication, and neighborhood/compact-set primitives; no Chabauty, Fell, or E-neighborhood definition was found.",
+     "name": "Kourovka.«9.47».eBasic",
+     "why_needed": "The basic E-neighborhood relation on closed subgroups is absent from Mathlib and is needed to state Protasov's topology exactly."
+    },
+    {
+     "closest_existing_considered": "`TopologicalSpace.generateFrom`, hyperspace compact-set APIs, and Mathlib's `ClosedSubgroup`; repository-wide searches found no existing Chabauty/Fell topology.",
+     "name": "Kourovka.«9.47».eTopology",
+     "why_needed": "Neither Protasov's E-topology nor the equivalent Chabauty/Fell topology on closed subgroups exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.47»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.47»": "/--\nIs every scattered compact Hausdorff space homeomorphically embeddable into\nthe space of closed non-compact subgroups, equipped with the $E$-topology, of\nsome locally compact Hausdorff topological group?\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [CompactSpace X] [T2Space X],\n      IsScatteredSpace X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ T2Space G ∧ LocallyCompactSpace G ∧\n        ∃ f : X → {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)},\n          @Topology.IsEmbedding X\n            {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)} _\n            ((eTopology G).induced Subtype.val) f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.47\n\nby I. V. Protasov\n\nIs it true that every scattered compact space can be homeomorphically embedded into the space of\nall closed noncompact subgroups, with the $E$-topology, of a suitable locally compact group?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Set\n\nnamespace Kourovka.«9.47»\n\n/-- A topological space is scattered if every nonempty subset has a point that is isolated relative\nto that subset. -/\ndef IsScattered (X : Type*) [TopologicalSpace X] : Prop :=\n  ∀ s : Set X, s.Nonempty → ∃ x ∈ s, ∃ U : Set X, IsOpen U ∧ U ∩ s = {x}\n\n/-- The $E$-topology on the closed subgroups of $G$, presented as the Fell topology with which it\ncoincides for locally compact groups. Its subbasic open sets consist of the closed subgroups that\nmeet a fixed open set and those that miss a fixed compact set. -/\ndef eTopology (G : Type*) [Group G] [TopologicalSpace G] :\n    TopologicalSpace (ClosedSubgroup G) :=\n  .generateFrom <|\n    {𝒰 | ∃ U : Set G, IsOpen U ∧\n      𝒰 = {H : ClosedSubgroup G | ((H : Set G) ∩ U).Nonempty}} ∪\n    {𝒰 | ∃ K : Set G, IsCompact K ∧\n      𝒰 = {H : ClosedSubgroup G | Disjoint (H : Set G) K}}\n\n/-- The space of closed noncompact subgroups of $G$, equipped with the $E$-topology. -/\ndef NoncompactClosedSubgroups (G : Type*) [Group G] [TopologicalSpace G] :=\n  {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}\n\ninstance (G : Type*) [Group G] [TopologicalSpace G] :\n    TopologicalSpace (NoncompactClosedSubgroups G) :=\n  (eTopology G).induced Subtype.val\n\n/--\nIs it true that every scattered compact Hausdorff space $X$ can be homeomorphically embedded into\nthe space of all closed noncompact subgroups of some locally compact Hausdorff topological group\n$G$, equipped with the $E$-topology? Equivalently, the $E$-topology used here is the Fell--Chabauty\ntopology. Its basic neighborhoods of a closed subgroup $H$ are given by\n$$\n  \\{L : L \\cap K \\subseteq HU \\text{ and } H \\cap K \\subseteq LU\\},\n$$\nwhere $U$ is a neighborhood of the identity and $K$ is compact.\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [T2Space X] [CompactSpace X], IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ T2Space G ∧ LocallyCompactSpace G ∧\n          ∃ S : Set (NoncompactClosedSubgroups G), Nonempty (X ≃ₜ S) := by\n  sorry\n\nend Kourovka.«9.47»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “scattered compact” according to the stated Russian convention as a compact Hausdorff space in which every nonempty subset has a relatively isolated point.",
+    "Presented Protasov's E-topology by the Fell topology on closed subgroups, generated by the subbasic conditions of meeting an open set and missing a compact set. These topologies coincide for locally compact Hausdorff groups, which are exactly the groups quantified in the theorem.",
+    "Expressed a homeomorphic embedding into the target as the existence of a subspace S of the space of noncompact closed subgroups and a homeomorphism from X to S.",
+    "Expressed noncompactness of a closed subgroup as failure of compactness of its carrier in G; this is equivalent to noncompactness of the subgroup with its induced topology."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's isolated-point and derived-set APIs; neither packages the condition that every nonempty subset has a relatively isolated point.",
+     "name": "Kourovka.«9.47».IsScattered",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no predicate or typeclass for scattered topological spaces."
+    },
+    {
+     "closest_existing_considered": "TopologicalSpace.vietoris, which is intended for compact subsets and uses an upper-open rather than compact-miss subbasis, so it is not suitable for arbitrary noncompact closed subgroups.",
+     "name": "Kourovka.«9.47».eTopology",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines the E-topology or the Fell/Chabauty topology on arbitrary closed subgroups."
+    },
+    {
+     "closest_existing_considered": "Mathlib's ClosedSubgroup together with a raw subtype; no existing named type represents its noncompact members with the E-topology.",
+     "name": "Kourovka.«9.47».NoncompactClosedSubgroups",
+     "why_needed": "A named subtype is needed to represent exactly the noncompact closed subgroups and equip it with the topology induced from eTopology without installing an unrelated global topology on Mathlib's ClosedSubgroup type."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.47»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.47»": "/--\nIs it true that every scattered compact Hausdorff space $X$ can be homeomorphically embedded into\nthe space of all closed noncompact subgroups of some locally compact Hausdorff topological group\n$G$, equipped with the $E$-topology? Equivalently, the $E$-topology used here is the Fell--Chabauty\ntopology. Its basic neighborhoods of a closed subgroup $H$ are given by\n$$\n  \\{L : L \\cap K \\subseteq HU \\text{ and } H \\cap K \\subseteq LU\\},\n$$\nwhere $U$ is a neighborhood of the identity and $K$ is compact.\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [T2Space X] [CompactSpace X], IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ T2Space G ∧ LocallyCompactSpace G ∧\n          ∃ S : Set (NoncompactClosedSubgroups G), Nonempty (X ≃ₜ S) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.47\n\nby I. V. Protasov\n\nIs it true that every scattered compact can be homeomorphically embedded into the\nspace of all closed non-compact subgroups with $E$-topology of a suitable locally\ncompact group?\n\nHere a *compact* is a compact Hausdorff space, and a space is *scattered* if every\nnonempty subset has an isolated point. The $E$-topology is Protasov's topology on the\nlattice of closed subgroups of a topological group $G$: a base of neighbourhoods of a\nclosed subgroup $H$ is formed by the sets\n$$O(H; K, U) = \\{X : X \\cap K \\subseteq HU,\\ H \\cap K \\subseteq XU\\},$$\nwhere $K$ ranges over the compact subsets of $G$ and $U$ over the neighbourhoods of\nthe identity. For a locally compact group this is the Chabauty (Fell) topology on the\nspace of closed subgroups. Locally compact groups are assumed Hausdorff.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Filter Topology Pointwise\n\nnamespace Kourovka.«9.47»\n\n/-- A topological space `X` is *scattered* if every nonempty subset `s` of `X` has a point\nthat is isolated in `s`, i.e. a point of `s` that is not an accumulation point of `s`. -/\ndef IsScattered (X : Type*) [TopologicalSpace X] : Prop :=\n  ∀ s : Set X, s.Nonempty → ∃ x ∈ s, ¬ AccPt x (𝓟 s)\n\n/-- A discrete space is scattered. -/\n@[category test, AMS 54]\ntheorem isScattered_of_discreteTopology (X : Type*) [TopologicalSpace X] [DiscreteTopology X] :\n    IsScattered X := by\n  rintro s ⟨x, hx⟩\n  refine ⟨x, hx, fun h => ?_⟩\n  obtain ⟨y, ⟨hy, -⟩, hyx⟩ := accPt_iff_nhds.mp h {x} ((isOpen_discrete {x}).mem_nhds rfl)\n  exact hyx hy\n\n/-- The real line is not scattered. -/\n@[category test, AMS 54]\ntheorem not_isScattered_real : ¬ IsScattered ℝ := by\n  rintro h\n  obtain ⟨x, -, hx⟩ := h Set.univ Set.univ_nonempty\n  exact hx (by simpa [AccPt] using (inferInstance : NeBot (𝓝[≠] x)))\n\nvariable (G : Type*) [Group G] [TopologicalSpace G]\n\nvariable {G} in\n/-- Protasov's basic neighbourhood $O(H; K, U)$ of a closed subgroup $H$ in the lattice of\nclosed subgroups of $G$: the set of closed subgroups $X$ with $X \\cap K \\subseteq HU$ and\n$H \\cap K \\subseteq XU$. -/\ndef eNhd (H : ClosedSubgroup G) (K U : Set G) : Set (ClosedSubgroup G) :=\n  {X | (X : Set G) ∩ K ⊆ (H : Set G) * U ∧ (H : Set G) ∩ K ⊆ (X : Set G) * U}\n\nvariable {G} in\n/-- A basic neighbourhood $O(H; K, U)$ contains $H$ when $U$ is a neighbourhood of the\nidentity. -/\n@[category API, AMS 22]\ntheorem mem_eNhd_self (H : ClosedSubgroup G) {K U : Set G} (hU : U ∈ 𝓝 (1 : G)) :\n    H ∈ eNhd H K U := by\n  have h1 : (1 : G) ∈ U := mem_of_mem_nhds hU\n  exact ⟨fun x hx => ⟨x, hx.1, 1, h1, mul_one x⟩,\n    fun x hx => ⟨x, hx.1, 1, h1, mul_one x⟩⟩\n\n/-- The $E$-topology on the lattice of closed subgroups of a topological group `G`: the\nsets $O(H; K, U)$, with $K$ compact and $U$ a neighbourhood of the identity, form a base of\nneighbourhoods of $H$. Concretely, a set of closed subgroups is open if it contains some\n$O(H; K, U)$ for each of its members $H$. -/\ndef eTopology : TopologicalSpace (ClosedSubgroup G) :=\n  .mkOfNhds fun H => Filter.generate\n    {eNhd H K U | (K : Set G) (_ : IsCompact K) (U : Set G) (_ : U ∈ 𝓝 (1 : G))}\n\n/-- The space of all closed non-compact subgroups of `G`. -/\nabbrev NonCompactClosedSubgroup : Type _ :=\n  {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}\n\n/-- The space of closed non-compact subgroups of `G` carries the topology induced by the\n$E$-topology on all closed subgroups. -/\ninstance : TopologicalSpace (NonCompactClosedSubgroup G) :=\n  (eTopology G).induced Subtype.val\n\n/--\nIs it true that every scattered compact can be homeomorphically embedded into the\nspace of all closed non-compact subgroups with $E$-topology of a suitable locally\ncompact group?\n\nA *compact* is a compact Hausdorff space, and the locally compact group is Hausdorff.\nThe space of closed non-compact subgroups carries the topology induced by the\n$E$-topology `eTopology` on all closed subgroups.\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [CompactSpace X] [T2Space X], IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ LocallyCompactSpace G ∧ T2Space G ∧\n        ∃ f : X → NonCompactClosedSubgroup G, IsEmbedding f := by\n  sorry\n\nend Kourovka.«9.47»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot table and its reading of the E-topology (Protasov's neighbourhoods O(H;K,U) = {X : X∩K ⊆ HU, H∩K ⊆ XU}, coinciding with the Chabauty topology for locally compact groups) are consistent with the statement and were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Compact' (Russian 'компакт') is read as compact Hausdorff: X carries `[CompactSpace X] [T2Space X]`.",
+    "The locally compact group is required to be Hausdorff (`T2Space G`) following the standard convention for locally compact groups (also stated in the decomposition notes).",
+    "Quantifier structure: ∀ X, ∃ G (depending on X), ∃ embedding — matching 'a suitable locally compact group' for each scattered compact.",
+    "'Homeomorphically embedded' is formalised as `IsEmbedding f` (injective and inducing) into the subtype of closed non-compact subgroups with the subspace topology from the E-topology.",
+    "E-topology is defined via `TopologicalSpace.mkOfNhds` from the filter generated by the basic neighbourhoods O(H;K,U) with U ranging over all neighbourhoods of 1 (not only open ones); since O is monotone in U this generates the same filter. For locally compact G this is the Chabauty topology; the definition is not asserted to have good properties for non-locally-compact G (irrelevant to the statement).",
+    "Non-compact closed subgroups are `H : ClosedSubgroup G` with `¬ IsCompact (H : Set G)`; if G is compact this space is empty and only the empty X embeds, which is the mathematically correct behaviour.",
+    "Both X and G are taken in `Type` (universe 0), following the other Kourovka files.",
+    "IsScattered is a `def` (not a class) taken as an explicit hypothesis `IsScattered X →`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Preperfect`/`Perfect`/`PerfectSpace` in Mathlib.Topology.Perfect (dense-in-itself sets; scattered = no nonempty preperfect subset, but no such predicate exists), `AccPt` (used as the building block).",
+     "name": "Kourovka.«9.47».IsScattered",
+     "why_needed": "Mathlib has no notion of scattered space. Defined as: every nonempty subset s has a point x ∈ s with ¬ AccPt x (𝓟 s) (x isolated in s). Tested: discrete spaces are scattered, ℝ is not."
+    },
+    {
+     "closest_existing_considered": "Nothing comparable in Mathlib; `Set.mul` (pointwise) and `ClosedSubgroup` are used.",
+     "name": "Kourovka.«9.47».eNhd",
+     "why_needed": "Protasov's basic neighbourhood O(H; K, U) = {X : X ∩ K ⊆ HU ∧ H ∩ K ⊆ XU} of a closed subgroup H, exactly as given in the decomposition notes. API lemma `mem_eNhd_self` proved."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `TopologicalSpace.vietoris` (only on `Set α`/`Compacts`, and Vietoris ≠ Chabauty on closed subgroups); no Fell/Chabauty topology exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«9.47».eTopology",
+     "why_needed": "The E-topology on `ClosedSubgroup G`: built with `TopologicalSpace.mkOfNhds` from the filter generated by the sets `eNhd H K U`, K compact, U ∈ 𝓝 1. So a set is open iff it contains a basic neighbourhood O(H;K,U) of each of its members — the standard topology 'with neighbourhood base O(H;K,U)'. For locally compact G this is the Chabauty/Fell topology."
+    },
+    {
+     "closest_existing_considered": "Plain subtype with `letI := eTopology G`; the named abbreviation and explicit induced instance were chosen for readability.",
+     "name": "Kourovka.«9.47».NonCompactClosedSubgroup (+ its TopologicalSpace instance)",
+     "why_needed": "Abbreviation for the subtype `{H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}`, equipped (via an instance in the file's namespace) with `(eTopology G).induced Subtype.val`, i.e. the subspace E-topology; this is the target space of the embedding."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.47»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ scattered compact Hausdorff X, ∃ Hausdorff locally compact topological group G and an `IsEmbedding` of X into the subtype of non-compact closed subgroups of G, topologised by the subspace topology of the E-topology`. Mathlib lacks scattered spaces and the E-/Chabauty topology, so both were defined in the file (with short proved test/API lemmas)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.47»": "/--\nIs it true that every scattered compact can be homeomorphically embedded into the\nspace of all closed non-compact subgroups with $E$-topology of a suitable locally\ncompact group?\n\nA *compact* is a compact Hausdorff space, and the locally compact group is Hausdorff.\nThe space of closed non-compact subgroups carries the topology induced by the\n$E$-topology `eTopology` on all closed subgroups.\n-/\n@[category research open, AMS 22 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) [TopologicalSpace X] [CompactSpace X] [T2Space X], IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ LocallyCompactSpace G ∧ T2Space G ∧\n        ∃ f : X → NonCompactClosedSubgroup G, IsEmbedding f := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.47\n\nby I. V. Protasov\n\nIs it true that every scattered compact can be homeomorphically embedded into the space of all\nclosed non-compact subgroups, with the $E$-topology, of a suitable locally compact group?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.47»\n\nopen scoped Pointwise\n\n/-- A topological space is scattered if every nonempty subset has a point which is isolated in\nthat subset. -/\ndef IsScattered (X : Type*) [TopologicalSpace X] : Prop :=\n  ∀ S : Set X, S.Nonempty → ∃ x ∈ S, ∃ U : Set X, IsOpen U ∧ U ∩ S = {x}\n\n/-- The basic $E$-neighborhood of a closed subgroup $H$, determined by a compact set $K$ and a\nneighborhood $U$ of the identity. -/\ndef eBasicNeighborhood (G : Type*) [Group G] [TopologicalSpace G]\n    (H : ClosedSubgroup G) (K U : Set G) : Set (ClosedSubgroup G) :=\n  {L | ((L : Set G) ∩ K) ⊆ (H : Set G) * U ∧\n    ((H : Set G) ∩ K) ⊆ (L : Set G) * U}\n\n/-- Protasov's $E$-topology on the closed subgroups of a topological group. Its neighborhoods at\n$H$ have a basis consisting of `eBasicNeighborhood G H K U`, where $K$ is compact and $U$ is a\nneighborhood of the identity. -/\ndef eTopology (G : Type*) [Group G] [TopologicalSpace G] :\n    TopologicalSpace (ClosedSubgroup G) :=\n  TopologicalSpace.generateFrom\n    {O | ∀ H ∈ O, ∃ (K U : Set G), IsCompact K ∧ U ∈ nhds (1 : G) ∧\n      eBasicNeighborhood G H K U ⊆ O}\n\n/--\nIs it true that every scattered compact Hausdorff space can be homeomorphically embedded into the\nspace of all closed non-compact subgroups, with the $E$-topology, of a suitable locally compact\nHausdorff topological group?\n-/\n@[category research open, AMS 20 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) (_ : TopologicalSpace X) (_ : T2Space X) (_ : CompactSpace X),\n      IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ T2Space G ∧ LocallyCompactSpace G ∧\n          letI : TopologicalSpace (ClosedSubgroup G) := eTopology G\n          ∃ f : X → {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}, Topology.IsEmbedding f := by\n  sorry\n\nend Kourovka.«9.47»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted “scattered compact” according to the stated Russian convention as a compact Hausdorff topological space in which every nonempty subset has an isolated point.",
+    "Interpreted “locally compact group” as a Hausdorff topological group with `LocallyCompactSpace`.",
+    "Represented the space of closed non-compact subgroups as the subtype of `ClosedSubgroup G` whose underlying subset of `G` is not compact; its topology is induced from the bespoke E-topology.",
+    "Defined the E-topology from the stated local basic-neighborhood criterion: for compact K and an identity neighborhood U, L lies in the basic neighborhood of H exactly when L ∩ K ⊆ H * U and H ∩ K ⊆ L * U.",
+    "Used `Topology.IsEmbedding` for “homeomorphically embedded,” which states injectivity and that the source topology is induced from the target topology."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has general isolated-point and subspace-topology primitives, but no scattered-space predicate.",
+     "name": "Kourovka.«9.47».IsScattered",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib contain no predicate for a scattered topological space."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `ClosedSubgroup` supplies the underlying closed-subgroup type and pointwise set multiplication supplies H * U, but no E-neighborhood construction exists.",
+     "name": "Kourovka.«9.47».eBasicNeighborhood",
+     "why_needed": "The problem requires Protasov's explicit E-neighborhoods on closed subgroups, which are absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Vietoris topology on sets was considered, but it is not directly the Fell topology required here; `TopologicalSpace.generateFrom` was used to encode the stated E-neighborhood basis exactly.",
+     "name": "Kourovka.«9.47».eTopology",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines the E/Chabauty/Fell topology on closed subgroups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.47»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.47»": "/--\nIs it true that every scattered compact Hausdorff space can be homeomorphically embedded into the\nspace of all closed non-compact subgroups, with the $E$-topology, of a suitable locally compact\nHausdorff topological group?\n-/\n@[category research open, AMS 20 54]\ntheorem kourovka.«9.47» : answer(sorry) ↔\n    ∀ (X : Type) (_ : TopologicalSpace X) (_ : T2Space X) (_ : CompactSpace X),\n      IsScattered X →\n      ∃ (G : Type) (_ : Group G) (_ : TopologicalSpace G),\n        IsTopologicalGroup G ∧ T2Space G ∧ LocallyCompactSpace G ∧\n          letI : TopologicalSpace (ClosedSubgroup G) := eTopology G\n          ∃ f : X → {H : ClosedSubgroup G // ¬ IsCompact (H : Set G)}, Topology.IsEmbedding f := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«9.47»": "c01"
+ },
+ "id": "kourovka-9.47",
+ "main_attempt": "c01"
+}

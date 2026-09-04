@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { AreaSelect, AreaSidebar } from "../components/AreaSidebar";
+import { AreaSelect, AreaSidebar, orderedSources } from "../components/AreaSidebar";
 import { CountsLine, EntryChips } from "../components/Chips";
 import { MathText } from "../components/MathText";
 import { TopBar } from "../components/TopBar";
@@ -17,7 +17,7 @@ import {
   type ListState,
 } from "../data/filters";
 import { useFcStatus, useIndex } from "../data/load";
-import type { FcStatusEntry, IndexEntry } from "../data/schema";
+import type { FcStatusEntry, IndexEntry, Meta } from "../data/schema";
 
 export function ListPage() {
   const index = useIndex();
@@ -62,23 +62,29 @@ export function ListPage() {
   const fcData = fc.status === "ok" ? fc.data : null;
   const visible = applyFilters(entries, { ...state, q }, fcData);
   const nFc = fcData ? entries.filter((e) => fcData.entries[e.id]).length : 0;
-  const nAreas = Object.keys(meta.areas).length;
   const grouped = state.sort === "area" && !q;
+  const select = (source: string | null, area: string | null, subarea: string | null) => update({ source, area, subarea });
+  // group headers and row labels name the source unless one is selected
+  const where = (e: IndexEntry) =>
+    (state.source ? "" : `${meta.sources[e.source]?.short_name ?? e.source} › `) + capitalize(e.area) + (e.subarea ? ` › ${e.subarea}` : "");
 
   const open = (id: string) => navigate({ pathname: `/p/${id}`, search: params.toString() });
 
   return (
     <Shell>
       <p className="count-line">
-        {meta.n_entries} files · {nAreas} areas
+        {meta.n_entries} files ·{" "}
+        {orderedSources(meta)
+          .map(([, s]) => `${s.n_entries} from the ${s.short_name}`)
+          .join(" · ")}
       </p>
       <div className="list-layout">
         <aside className="list-side">
-          <AreaSidebar meta={meta} area={state.area} subarea={state.subarea} total={entries.length} onSelect={(a, s) => update({ area: a, subarea: s })} />
+          <AreaSidebar meta={meta} source={state.source} area={state.area} subarea={state.subarea} total={entries.length} onSelect={select} />
         </aside>
         <div className="list-main">
           <div className="toolbar">
-            <AreaSelect meta={meta} area={state.area} subarea={state.subarea} onSelect={(a, s) => update({ area: a, subarea: s })} />
+            <AreaSelect meta={meta} source={state.source} area={state.area} subarea={state.subarea} onSelect={select} />
             <input
               ref={searchRef}
               type="search"
@@ -91,7 +97,7 @@ export function ListPage() {
             <label className="sort">
               Sort
               <select value={state.sort} onChange={(e) => update({ sort: e.target.value as ListState["sort"] })}>
-                <option value="area">by area</option>
+                <option value="area">by source and area</option>
                 <option value="title">title A–Z</option>
               </select>
             </label>
@@ -104,19 +110,18 @@ export function ListPage() {
           <ol className="rows">
             {visible.map((e, i) => {
               const prev = visible[i - 1];
-              const header = grouped && (!prev || prev.area !== e.area || prev.subarea !== e.subarea);
+              const header = grouped && (!prev || prev.source !== e.source || prev.area !== e.area || prev.subarea !== e.subarea);
               return (
                 <Fragment key={e.id}>
                   {header && (
                     <li className="group-header" aria-hidden="true">
-                      {capitalize(e.area)}
-                      {e.subarea ? <> › {e.subarea}</> : null}{" "}
+                      {where(e)}{" "}
                       <span className="muted">
-                        ({visible.filter((x) => x.area === e.area && x.subarea === e.subarea).length})
+                        ({visible.filter((x) => x.source === e.source && x.area === e.area && x.subarea === e.subarea).length})
                       </span>
                     </li>
                   )}
-                  <Row entry={e} fc={fcData?.entries[e.id]} showArea={!grouped} onOpen={() => open(e.id)} search={params.toString()} />
+                  <Row entry={e} meta={meta} fc={fcData?.entries[e.id]} where={grouped ? null : where(e)} onOpen={() => open(e.id)} search={params.toString()} />
                 </Fragment>
               );
             })}
@@ -208,7 +213,7 @@ function Bound({
   );
 }
 
-function Row({ entry, fc, showArea, onOpen, search }: { entry: IndexEntry; fc: FcStatusEntry | undefined; showArea: boolean; onOpen: () => void; search: string }) {
+function Row({ entry, fc, where, onOpen, search }: { entry: IndexEntry; meta: Meta; fc: FcStatusEntry | undefined; where: string | null; onOpen: () => void; search: string }) {
   const statement = entry.statement !== entry.title ? entry.statement : "";
   return (
     <li
@@ -226,10 +231,9 @@ function Row({ entry, fc, showArea, onOpen, search }: { entry: IndexEntry; fc: F
       </div>
       <div className="row-line2">
         <span className="row-statement">
-          {showArea && (
+          {where && (
             <span className="row-area">
-              {capitalize(entry.area)}
-              {entry.subarea ? ` › ${entry.subarea}` : ""}
+              {where}
               {statement ? " · " : ""}
             </span>
           )}

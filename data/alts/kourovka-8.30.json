@@ -1,0 +1,890 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.30\n\nby H. Lausch\n\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of soluble groups which satisfy the\nLockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$,\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all soluble groups and the lower star the bottom of the Lockett section determined by\nthe given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the Lockett condition?\n\nEditors' comment (2001): the answer is affirmative if $\\mathfrak{X}$ and $\\mathfrak{Y}$ are\nlocal (A. Grytczuk, N. T. Vorob'ev, *Tsukuba J. Math.* **18**, no. 1 (1994), 63–67).\n\n## Conventions\n\nAs usual in the theory of Fitting classes (and in Lockett's work), \"group\" means finite group,\nand the universe is the class $\\mathfrak{S}$ of all finite soluble groups. A class of groups is\na set of bundled groups (`GrpCat`), and all notions are isomorphism invariant.\n\n* A *Fitting class* is a nonempty, isomorphism closed class $\\mathfrak{X} \\subseteq \\mathfrak{S}$\n  which is closed under normal subgroups and under products of two normal subgroups.\n* The *$\\mathfrak{X}$-radical* $G_{\\mathfrak{X}}$ of a group $G$ is the join (product) of all\n  normal subgroups of $G$ belonging to $\\mathfrak{X}$; for a Fitting class $\\mathfrak{X}$ and a\n  finite group $G$ it is the largest normal $\\mathfrak{X}$-subgroup of $G$.\n* A Fitting class $\\mathfrak{X}$ is a *Lockett class* if\n  $(G \\times H)_{\\mathfrak{X}} = G_{\\mathfrak{X}} \\times H_{\\mathfrak{X}}$ for all $G, H$.\n* The *Lockett closure* $\\mathfrak{X}^*$ of a Fitting class $\\mathfrak{X}$ is the smallest\n  Lockett class containing $\\mathfrak{X}$ (Lockett, 1974); we define it as the intersection of\n  all Lockett classes containing $\\mathfrak{X}$.\n* The *Lockett section* of $\\mathfrak{X}$ is the set of all Fitting classes $\\mathfrak{Y}$ with\n  $\\mathfrak{Y}^* = \\mathfrak{X}^*$, and $\\mathfrak{X}_*$ is its bottom element, i.e. the\n  intersection of all Fitting classes in the Lockett section of $\\mathfrak{X}$.\n* $\\mathfrak{X}$ *satisfies the Lockett condition* (Lockett's conjecture holds for\n  $\\mathfrak{X}$) if $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$. Lockett conjectured\n  that every Fitting class of finite soluble groups satisfies this; Berger and Cossey (1978)\n  gave a counterexample.\n* Following Hartley (1969), a Fitting class $\\mathfrak{X}$ is *local* if\n  $\\mathfrak{X} = LR(f) = \\mathfrak{S}_\\pi \\cap \\bigcap_{p \\in \\pi}\n  f(p)\\,\\mathfrak{S}_p\\,\\mathfrak{S}_{p'}$ for some Hartley function $f$, i.e. a function\n  assigning to each prime $p$ a Fitting class $f(p)$ or the empty class, where\n  $\\pi = \\{p : f(p) \\neq \\emptyset\\}$ is the support of $f$ and juxtaposition denotes the\n  Fitting product $\\mathfrak{X}\\mathfrak{Y} = (G : G/G_{\\mathfrak{X}} \\in \\mathfrak{Y})$.\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 8.30.\n* F. P. Lockett, *The Fitting class $\\mathfrak{F}^*$*, Math. Z. **137** (1974), 131–136.\n* B. Hartley, *On Fischer's dualization of formation theory*, Proc. London Math. Soc. (3) **19**\n  (1969), 193–207.\n* A. Grytczuk, N. T. Vorob'ev, *On Lockett's conjecture for finite groups*, Tsukuba J. Math.\n  **18**, no. 1 (1994), 63–67.\n* K. Doerk, T. Hawkes, *Finite Soluble Groups*, de Gruyter, 1992, Chapters IX and X.\n-/\n\nnamespace Kourovka.«8.30»\n\n/-- A class of (finite) groups: a set of bundled groups. -/\nabbrev GroupClass := Set GrpCat.{0}\n\n/-- The class $\\mathfrak{S}$ of all finite soluble groups. -/\ndef solubleGroups : GroupClass := {G | Finite G ∧ IsSolvable G}\n\nlocal notation \"𝔖\" => solubleGroups\n\n/-- The $\\mathfrak{X}$-radical $G_{\\mathfrak{X}}$ of a group $G$: the join of all normal\nsubgroups of $G$ that belong to the class $\\mathfrak{X}$. When $\\mathfrak{X}$ is a Fitting class\nand $G$ is finite, this is the largest normal $\\mathfrak{X}$-subgroup of $G$. -/\ndef radical (𝔛 : GroupClass) (G : Type) [Group G] : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ GrpCat.of N ∈ 𝔛}\n\n/-- The radical is a normal subgroup, being a join of normal subgroups. -/\ninstance radical_normal (𝔛 : GroupClass) (G : Type) [Group G] : (radical 𝔛 G).Normal := by\n  refine Subgroup.Normal.of_conjugate_fixed fun g => ?_\n  rw [radical, sSup_eq_iSup', Subgroup.pointwise_smul_def, Subgroup.map_iSup]\n  refine iSup_congr fun N => ?_\n  rw [← Subgroup.pointwise_smul_def]\n  exact @Subgroup.Normal.conj_smul_eq_self _ _ g N N.2.1\n\n/-- A *Fitting class* (of finite soluble groups): a nonempty, isomorphism closed class of finite\nsoluble groups that is closed under taking normal subgroups and under products of two normal\nsubgroups. -/\nstructure IsFittingClass (𝔛 : GroupClass) : Prop where\n  /-- The universe: every member of the class is a finite soluble group. -/\n  subset_soluble : 𝔛 ⊆ 𝔖\n  /-- The class is nonempty. -/\n  nonempty : 𝔛.Nonempty\n  /-- The class is closed under isomorphisms. -/\n  iso_closed : ∀ {G H : GrpCat.{0}}, (G ≃* H) → G ∈ 𝔛 → H ∈ 𝔛\n  /-- The class is closed under normal subgroups. -/\n  normal_closed : ∀ (G : GrpCat.{0}) (N : Subgroup G), N.Normal → G ∈ 𝔛 → GrpCat.of N ∈ 𝔛\n  /-- The class is closed under products of two normal subgroups: if $G = N_1 N_2$ with\n  $N_1, N_2 \\trianglelefteq G$ and $N_1, N_2 \\in \\mathfrak{X}$, then $G \\in \\mathfrak{X}$. -/\n  normal_prod_closed : ∀ (G : GrpCat.{0}) (N₁ N₂ : Subgroup G), N₁.Normal → N₂.Normal →\n    GrpCat.of N₁ ∈ 𝔛 → GrpCat.of N₂ ∈ 𝔛 → N₁ ⊔ N₂ = ⊤ → G ∈ 𝔛\n\n/-- A *Lockett class*: a Fitting class $\\mathfrak{X}$ such that\n$(G \\times H)_{\\mathfrak{X}} = G_{\\mathfrak{X}} \\times H_{\\mathfrak{X}}$ for all finite soluble\ngroups $G$ and $H$. -/\ndef IsLockettClass (𝔛 : GroupClass) : Prop :=\n  IsFittingClass 𝔛 ∧ ∀ G H : GrpCat.{0}, G ∈ 𝔖 → H ∈ 𝔖 →\n    radical 𝔛 (G × H) = (radical 𝔛 G).prod (radical 𝔛 H)\n\n/-- The *Lockett closure* $\\mathfrak{X}^*$ of a class $\\mathfrak{X}$: the intersection of all\nLockett classes containing $\\mathfrak{X}$. By Lockett's theorem, for a Fitting class\n$\\mathfrak{X}$ this is the smallest Fitting class $\\mathfrak{X}^*$ containing $\\mathfrak{X}$ with\n$(G \\times H)_{\\mathfrak{X}^*} = G_{\\mathfrak{X}^*} \\times H_{\\mathfrak{X}^*}$ for all $G, H$. -/\ndef lockettStar (𝔛 : GroupClass) : GroupClass :=\n  ⋂₀ {𝔜 : GroupClass | IsLockettClass 𝔜 ∧ 𝔛 ⊆ 𝔜}\n\n/-- The *Lockett section* of $\\mathfrak{X}$: the set of all Fitting classes $\\mathfrak{Y}$ with\n$\\mathfrak{Y}^* = \\mathfrak{X}^*$. -/\ndef lockettSection (𝔛 : GroupClass) : Set GroupClass :=\n  {𝔜 | IsFittingClass 𝔜 ∧ lockettStar 𝔜 = lockettStar 𝔛}\n\n/-- The bottom $\\mathfrak{X}_*$ of the Lockett section of $\\mathfrak{X}$: the intersection of all\nFitting classes $\\mathfrak{Y}$ with $\\mathfrak{Y}^* = \\mathfrak{X}^*$. By Lockett's theorem, this\nintersection again lies in the Lockett section, so it is its smallest element. -/\ndef lockettLower (𝔛 : GroupClass) : GroupClass :=\n  ⋂₀ lockettSection 𝔛\n\n/-- A class $\\mathfrak{X}$ *satisfies the Lockett condition* if\n$\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$, where $\\mathfrak{S}$ is the class of all\nfinite soluble groups. -/\ndef SatisfiesLockettCondition (𝔛 : GroupClass) : Prop :=\n  𝔛 ∩ lockettLower 𝔖 = lockettLower 𝔛\n\n/-- A Lockett class is its own Lockett closure. -/\n@[category API, AMS 20]\ntheorem lockettStar_eq_self {𝔛 : GroupClass} (h : IsLockettClass 𝔛) : lockettStar 𝔛 = 𝔛 := by\n  refine (Set.sInter_subset_of_mem ?_).antisymm (Set.subset_sInter fun _ h𝔜 => h𝔜.2)\n  exact ⟨h, subset_rfl⟩\n\n/-- A class is contained in its Lockett closure. -/\n@[category API, AMS 20]\ntheorem subset_lockettStar (𝔛 : GroupClass) : 𝔛 ⊆ lockettStar 𝔛 :=\n  Set.subset_sInter fun _ h𝔜 => h𝔜.2\n\n/-- A Fitting class belongs to its own Lockett section. -/\n@[category API, AMS 20]\ntheorem mem_lockettSection_self {𝔛 : GroupClass} (h : IsFittingClass 𝔛) :\n    𝔛 ∈ lockettSection 𝔛 :=\n  ⟨h, rfl⟩\n\n/-- The bottom of the Lockett section of a Fitting class $\\mathfrak{X}$ is contained in\n$\\mathfrak{X}$. -/\n@[category API, AMS 20]\ntheorem lockettLower_subset {𝔛 : GroupClass} (h : IsFittingClass 𝔛) : lockettLower 𝔛 ⊆ 𝔛 :=\n  Set.sInter_subset_of_mem (mem_lockettSection_self h)\n\n/--\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of soluble groups which satisfy the\nLockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$,\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all soluble groups and the lower star the bottom of the Lockett section determined by\nthe given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the Lockett condition?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛 ∩ 𝔜) := by\n  sorry\n\n/-- The class $\\mathfrak{S}_\\pi$ of all finite soluble $\\pi$-groups, for a set $\\pi$ of primes:\nthe finite soluble groups whose order is divisible only by primes in $\\pi$. In particular\n$\\mathfrak{S}_{\\{p\\}} = \\mathfrak{S}_p$ is the class of finite $p$-groups and\n$\\mathfrak{S}_{\\{p\\}^c} = \\mathfrak{S}_{p'}$ is the class of finite soluble $p'$-groups. -/\ndef piGroups (π : Set Nat.Primes) : GroupClass :=\n  {G | G ∈ 𝔖 ∧ ∀ p : Nat.Primes, (p : ℕ) ∣ Nat.card G → p ∈ π}\n\n/-- The *Fitting product* $\\mathfrak{X}\\mathfrak{Y}$ of two classes: the class of all groups $G$\nwith $G / G_{\\mathfrak{X}} \\in \\mathfrak{Y}$. -/\ndef fittingProduct (𝔛 𝔜 : GroupClass) : GroupClass :=\n  {G | GrpCat.of (G ⧸ radical 𝔛 G) ∈ 𝔜}\n\n/-- The support $\\{p : f(p) \\neq \\emptyset\\}$ of a function $f$ from the primes to classes of\ngroups. -/\ndef hartleySupport (f : Nat.Primes → GroupClass) : Set Nat.Primes :=\n  {p | (f p).Nonempty}\n\n/-- A *Hartley function* ($H$-function): a function assigning to each prime $p$ either the empty\nclass or a Fitting class $f(p)$. -/\ndef IsHartleyFunction (f : Nat.Primes → GroupClass) : Prop :=\n  ∀ p, (f p).Nonempty → IsFittingClass (f p)\n\n/-- The class $LR(f) = \\mathfrak{S}_\\pi \\cap \\bigcap_{p \\in \\pi} f(p)\\,\\mathfrak{S}_p\\,\n\\mathfrak{S}_{p'}$ locally defined by a Hartley function $f$ with support $\\pi$ (Hartley, 1969).\nHere $f(p)\\,\\mathfrak{S}_p\\,\\mathfrak{S}_{p'}$ is the Fitting product, i.e. the class of finite\nsoluble groups $G$ such that $G / G_{f(p)\\mathfrak{S}_p}$ is a $p'$-group, where\n$G_{f(p)\\mathfrak{S}_p}$ is the largest normal subgroup $N$ of $G$ with $N / N_{f(p)}$ a\n$p$-group. -/\ndef locallyDefined (f : Nat.Primes → GroupClass) : GroupClass :=\n  piGroups (hartleySupport f) ∩\n    ⋂ p ∈ hartleySupport f, fittingProduct (fittingProduct (f p) (piGroups {p})) (piGroups {p}ᶜ)\n\n/-- A class of groups is a *local Fitting class* if it is of the form $LR(f)$ for some Hartley\nfunction $f$. -/\ndef IsLocalFittingClass (𝔛 : GroupClass) : Prop :=\n  ∃ f : Nat.Primes → GroupClass, IsHartleyFunction f ∧ 𝔛 = locallyDefined f\n\n/--\nEditors' comment (2001): the answer to Problem 8.30 is affirmative if $\\mathfrak{X}$ and\n$\\mathfrak{Y}$ are local. That is, if $\\mathfrak{X}$, $\\mathfrak{Y}$ are local Fitting classes\nof finite soluble groups satisfying the Lockett condition\n$\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$, $\\mathfrak{Y} \\cap \\mathfrak{S}_* =\n\\mathfrak{Y}_*$, then $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfies the Lockett condition\n(A. Grytczuk, N. T. Vorob'ev, *Tsukuba J. Math.* **18**, no. 1 (1994), 63–67).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.local :\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      IsLocalFittingClass 𝔛 → IsLocalFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛 ∩ 𝔜) := by\n  sorry\n\nend Kourovka.«8.30»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.75,
+   "decomposition_objections": "No substantive objection. One clarification for the variant slot: the notes describe local Fitting classes by a formula of the shape '⋂_p S_{p'} ∘ f(p) ∘ S_p', which is the formation-style shape. The Hartley/Vorob'ev definition of a local Fitting class (the one used by Grytczuk–Vorob'ev) is the dual LR(f) = 𝔖_π ∩ ⋂_{p∈π} f(p)𝔖_p𝔖_{p'} with the Fitting product 𝔛𝔜 = (G : G/G_𝔛 ∈ 𝔜) and π = Supp f; the file uses this form, as the notes' 'style … must be formalized carefully' seems to intend.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "A class of groups is a `Set GrpCat.{0}` (bundled groups in `Type`); every finite group is isomorphic to one in `Type`, so no generality is lost. Isomorphism closure is a field of `IsFittingClass`, so all class-theoretic notions are only meaningful up to isomorphism, as in the literature.",
+    "Universe: following Lockett's paper and the notebook's 'soluble group' convention, `IsFittingClass` bakes in `𝔛 ⊆ 𝔖` where `𝔖 = solubleGroups = {G | Finite G ∧ IsSolvable G}`. The Lockett-class property is quantified over G, H ∈ 𝔖 only. (Quantifying over all finite groups would be equivalent since 𝔛 ⊆ 𝔖.)",
+    "`IsFittingClass` requires nonemptiness (per the decomposition notes), isomorphism closure, closure under normal subgroups, and closure under products of two normal subgroups in the form `N₁ ⊔ N₂ = ⊤ → G ∈ 𝔛` (the standard N₀-closure for two normal subgroups; equivalent to the `N₁N₂ ∈ 𝔛` form given iso- and sₙ-closure).",
+    "The radical `radical 𝔛 G` is defined as `sSup` of the normal subgroups belonging to 𝔛. For a Fitting class and a finite group this is exactly the largest normal 𝔛-subgroup (the set is finite, contains ⊥, and is closed under joins by N₀-closure). It is proved normal in the file (`radical_normal`), which is needed to form the quotient in the Fitting product.",
+    "The Lockett closure 𝔛^* is defined as the intersection of all Lockett classes (Fitting classes 𝔜 ⊆ 𝔖 with (G×H)_𝔜 = G_𝔜 × H_𝔜 for all finite soluble G, H) containing 𝔛, i.e. as the smallest Lockett class containing 𝔛. This is the characterization given in the decomposition notes; it agrees with Lockett's original construction by Lockett's theorem (𝔉 ⊆ 𝔉^*, 𝔉^* is a Lockett class, and 𝔉 ⊆ 𝔊 ⟹ 𝔉^* ⊆ 𝔊^* = 𝔊 for Lockett 𝔊). Reviewers should confirm they accept this equivalent definition instead of the (G×G)_𝔉 construction.",
+    "The Lockett section of 𝔛 is `{𝔜 | IsFittingClass 𝔜 ∧ lockettStar 𝔜 = lockettStar 𝔛}` and 𝔛_* is its intersection `⋂₀`. Lockett proved this intersection again lies in the section, so it is the bottom element; the file relies on that theorem rather than restating it.",
+    "The Lockett condition is stated literally as the set equation `𝔛 ∩ lockettLower 𝔖 = lockettLower 𝔛`.",
+    "Local Fitting classes follow Hartley (1969) in the form used by Vorob'ev and Grytczuk–Vorob'ev: a Hartley function assigns to each prime a Fitting class or ∅ (`IsHartleyFunction`), π = Supp f, and `locallyDefined f = piGroups π ∩ ⋂_{p∈π} fittingProduct (fittingProduct (f p) (piGroups {p})) (piGroups {p}ᶜ)`, i.e. LR(f) = 𝔖_π ∩ ⋂_{p∈π} f(p)𝔖_p𝔖_{p'} where the Fitting product is 𝔛𝔜 = (G : G/G_𝔛 ∈ 𝔜). The product is parenthesised as (f(p)𝔖_p)𝔖_{p'}; the Fitting product is associative so this is immaterial. This is the point a reviewer should check most carefully (product order f(p)·𝔖_p·𝔖_{p'} and the support convention 𝔖_π ∩ …), since the decomposition notes only give the shape '⋂_p S_{p'} ∘ f(p) ∘ S_p style'.",
+    "p-groups and p'-groups are defined via prime divisors of `Nat.card` inside the finite soluble universe (`piGroups π`), rather than via `IsPGroup`; for finite groups these agree.",
+    "The variant theorem keeps the explicit `IsFittingClass 𝔛`/`IsFittingClass 𝔜` hypotheses alongside `IsLocalFittingClass`; they are redundant (LR(f) is always a Fitting class) but harmless and match the wording 'Fitting classes … which are local'.",
+    "Four short `@[category API]` lemmas with proofs (`lockettStar_eq_self`, `subset_lockettStar`, `mem_lockettSection_self`, `lockettLower_subset`) are included as basic sanity checks of the bespoke definitions, as CONTRIBUTING.md asks for bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "A predicate `(G : Type) → [Group G] → Prop`; `Set GrpCat` was chosen for the lattice operations ∩, ⊆, ⋂₀ used in the statement.",
+     "name": "Kourovka.«8.30».GroupClass",
+     "why_needed": "A class of groups (a set of bundled groups `Set GrpCat.{0}`); Mathlib has no notion of a class of groups."
+    },
+    {
+     "closest_existing_considered": "`IsSolvable` and `Finite` (used to define it).",
+     "name": "Kourovka.«8.30».solubleGroups",
+     "why_needed": "The class 𝔖 of all finite soluble groups, needed for 𝔖_* and the universe."
+    },
+    {
+     "closest_existing_considered": "Mathlib has no radical for classes of groups; `Subgroup.normalCore`, `commutator` etc. are unrelated.",
+     "name": "Kourovka.«8.30».radical",
+     "why_needed": "The 𝔛-radical G_𝔛 (join of normal 𝔛-subgroups), needed for the Lockett-class property and the Fitting product."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.sup_normal` (binary only); proved via `Subgroup.Normal.of_conjugate_fixed` and `Subgroup.map_iSup`.",
+     "name": "Kourovka.«8.30».radical_normal",
+     "why_needed": "Instance that the radical is normal, needed to form the quotient G ⧸ G_𝔛 in the Fitting product."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib; searched for Fitting/formation/radical.",
+     "name": "Kourovka.«8.30».IsFittingClass",
+     "why_needed": "Fitting classes of finite soluble groups are absent from Mathlib and the repo."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».IsLockettClass",
+     "why_needed": "Fitting classes with (G×H)_𝔛 = G_𝔛 × H_𝔛, used to define 𝔛^*."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».lockettStar",
+     "why_needed": "The Lockett closure 𝔛^* (smallest Lockett class containing 𝔛)."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».lockettSection",
+     "why_needed": "The Lockett section {𝔜 Fitting : 𝔜^* = 𝔛^*}."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».lockettLower",
+     "why_needed": "𝔛_*, the bottom of the Lockett section (its intersection)."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».SatisfiesLockettCondition",
+     "why_needed": "The Lockett condition 𝔛 ∩ 𝔖_* = 𝔛_* appearing in the problem."
+    },
+    {
+     "closest_existing_considered": "`IsPGroup` (covers only p-groups, not π- or p'-groups; equivalent for finite groups).",
+     "name": "Kourovka.«8.30».piGroups",
+     "why_needed": "The classes 𝔖_π, 𝔖_p, 𝔖_{p'} used in Hartley's local definition."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».fittingProduct",
+     "why_needed": "The Fitting product 𝔛𝔜 = (G : G/G_𝔛 ∈ 𝔜) used in LR(f)."
+    },
+    {
+     "closest_existing_considered": "`Function.support` (needs a Zero; not applicable to sets of groups).",
+     "name": "Kourovka.«8.30».hartleySupport",
+     "why_needed": "The support π = {p : f(p) ≠ ∅} of a Hartley function."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».IsHartleyFunction",
+     "why_needed": "Hartley functions: each value is a Fitting class or the empty class."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».locallyDefined",
+     "why_needed": "The class LR(f) = 𝔖_π ∩ ⋂_{p∈π} f(p)𝔖_p𝔖_{p'}."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».IsLocalFittingClass",
+     "why_needed": "'Local' Fitting classes, as in the editors' comment."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.30»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ 𝔛 𝔜, IsFittingClass 𝔛 → IsFittingClass 𝔜 → SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 → SatisfiesLockettCondition (𝔛 ∩ 𝔜), in the universe of finite soluble groups. Mathlib/repo have no Fitting classes, radicals, Lockett closure/section, so these were defined in the file (see new_definitions)."
+    },
+    "kourovka.«8.30».variants.local": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as the positive assertion: local Fitting classes 𝔛, 𝔜 (Hartley/Vorob'ev sense: 𝔛 = LR(f) = 𝔖_π ∩ ⋂_{p∈π} f(p)𝔖_p𝔖_{p'} for a Hartley function f with support π) satisfying the Lockett condition have intersection satisfying the Lockett condition; category research solved, AMS 20. Needed bespoke definitions of π-groups, the Fitting product, Hartley functions and LR(f)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.30»": "/--\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of soluble groups which satisfy the\nLockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$,\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all soluble groups and the lower star the bottom of the Lockett section determined by\nthe given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the Lockett condition?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛 ∩ 𝔜) := by\n  sorry",
+    "kourovka.«8.30».variants.local": "/--\nEditors' comment (2001): the answer to Problem 8.30 is affirmative if $\\mathfrak{X}$ and\n$\\mathfrak{Y}$ are local. That is, if $\\mathfrak{X}$, $\\mathfrak{Y}$ are local Fitting classes\nof finite soluble groups satisfying the Lockett condition\n$\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$, $\\mathfrak{Y} \\cap \\mathfrak{S}_* =\n\\mathfrak{Y}_*$, then $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfies the Lockett condition\n(A. Grytczuk, N. T. Vorob'ev, *Tsukuba J. Math.* **18**, no. 1 (1994), 63–67).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.local :\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      IsLocalFittingClass 𝔛 → IsLocalFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛 ∩ 𝔜) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.30\n\nby H. Lausch\n\nLet $\\mathfrak X$ and $\\mathfrak Y$ be Fitting classes of finite soluble groups\nwhich satisfy the Lockett condition. Does $\\mathfrak X \\cap \\mathfrak Y$ also\nsatisfy the Lockett condition?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46),\nProblem 8.30.\n-/\n\nnamespace Kourovka.«8.30»\n\n/-- A class of finite groups. Membership is allowed to depend on the group\nstructure, but not on a choice of enumeration of the underlying finite type. -/\nstructure FiniteGroupClass where\n  mem (G : Type) [Group G] [Finite G] : Prop\n\n/-- Pointwise inclusion of classes of finite groups. -/\ndef FiniteGroupClass.LE (𝔛 𝔜 : FiniteGroupClass) : Prop :=\n  ∀ (G : Type) [Group G] [Finite G], 𝔛.mem G → 𝔜.mem G\n\n/-- Pointwise equality of classes of finite groups. -/\ndef FiniteGroupClass.Equiv (𝔛 𝔜 : FiniteGroupClass) : Prop :=\n  ∀ (G : Type) [Group G] [Finite G], 𝔛.mem G ↔ 𝔜.mem G\n\n/-- The intersection of two classes of finite groups. -/\ndef FiniteGroupClass.inter (𝔛 𝔜 : FiniteGroupClass) : FiniteGroupClass where\n  mem G := 𝔛.mem G ∧ 𝔜.mem G\n\n/-- A Fitting class is a nonempty, isomorphism-closed class of finite groups\nclosed under normal subgroups and under joins (equivalently, products) of\nnormal subgroups. Nonemptiness is represented by membership of the trivial\ngroup; in the presence of normal-subgroup closure this is equivalent to the\nusual nonemptiness condition. -/\ndef IsFittingClass (𝔛 : FiniteGroupClass) : Prop :=\n  𝔛.mem PUnit ∧\n  (∀ (G H : Type) [Group G] [Group H] [Finite G] [Finite H],\n    (G ≃* H) → (𝔛.mem G ↔ 𝔛.mem H)) ∧\n  (∀ (G : Type) [Group G] [Finite G] (N : Subgroup G),\n    N.Normal → 𝔛.mem G → 𝔛.mem N) ∧\n  (∀ (G : Type) [Group G] [Finite G] (M N : Subgroup G),\n    M.Normal → N.Normal → 𝔛.mem M → 𝔛.mem N → 𝔛.mem (M ⊔ N : Subgroup G))\n\n/-- The $\\mathfrak X$-radical $G_{\\mathfrak X}$ is the subgroup generated by\nall normal $\\mathfrak X$-subgroups of $G$. -/\ndef classRadical (𝔛 : FiniteGroupClass) (G : Type) [Group G] [Finite G] : Subgroup G :=\n  Subgroup.normalClosure {g | ∃ N : Subgroup G, N.Normal ∧ 𝔛.mem N ∧ g ∈ N}\n\nlemma classRadical_normal (𝔛 : FiniteGroupClass) (G : Type) [Group G] [Finite G] :\n    (classRadical 𝔛 G).Normal := by\n  exact Subgroup.normalClosure_normal\n\n/-- A Fitting class is Lockett (or direct-product closed) when its radical\ncommutes with every direct product: $(G \\times H)_{\\mathfrak X} =\nG_{\\mathfrak X} \\times H_{\\mathfrak X}$. -/\ndef IsLockettClass (𝔛 : FiniteGroupClass) : Prop :=\n  IsFittingClass 𝔛 ∧\n  ∀ (G H : Type) [Group G] [Group H] [Finite G] [Finite H],\n    classRadical 𝔛 (G × H) = (classRadical 𝔛 G).prod (classRadical 𝔛 H)\n\n/-- The upper star $\\mathfrak X^*$: the smallest Lockett Fitting class which\ncontains $\\mathfrak X$. -/\ndef upperStar (𝔛 : FiniteGroupClass) : FiniteGroupClass where\n  mem G := ∀ 𝔉 : FiniteGroupClass, IsLockettClass 𝔉 → 𝔛.LE 𝔉 → 𝔉.mem G\n\n/-- The lower star $\\mathfrak X_*$: the bottom of the Lockett section\n$\\{\\mathfrak F : \\mathfrak F^* = \\mathfrak X^*\\}$. -/\ndef lowerStar (𝔛 : FiniteGroupClass) : FiniteGroupClass where\n  mem G := ∀ 𝔉 : FiniteGroupClass, IsFittingClass 𝔉 →\n    (upperStar 𝔉).Equiv (upperStar 𝔛) → 𝔉.mem G\n\n/-- The Fitting class $\\mathfrak S$ of all finite soluble groups. -/\ndef solubleGroups : FiniteGroupClass where\n  mem G := IsSolvable G\n\n/-- The Lockett condition is\n$\\mathfrak X \\cap \\mathfrak S_* = \\mathfrak X_*$. -/\ndef SatisfiesLockettCondition (𝔛 : FiniteGroupClass) : Prop :=\n  (𝔛.inter (lowerStar solubleGroups)).Equiv (lowerStar 𝔛)\n\n/-- The Fitting product $\\mathfrak X \\circ \\mathfrak Y$ consists of the finite\ngroups $G$ for which $G/G_{\\mathfrak X}$ belongs to $\\mathfrak Y$. -/\ndef fittingProduct (𝔛 𝔜 : FiniteGroupClass) : FiniteGroupClass where\n  mem := fun G _ _ => by\n    letI : (classRadical 𝔛 G).Normal := classRadical_normal 𝔛 G\n    exact 𝔜.mem (G ⧸ classRadical 𝔛 G)\n\n/-- The class $\\mathfrak S_p$ of finite $p$-groups. -/\ndef pGroups (p : ℕ) : FiniteGroupClass where\n  mem G := IsPGroup p G\n\n/-- The class $\\mathfrak S_{p'}$ of finite groups whose order is not divisible\nby the prime $p$. -/\ndef pComplementGroups (p : ℕ) : FiniteGroupClass where\n  mem G := ¬p ∣ Nat.card G\n\n/-- The local class defined by a Hartley function $f$ is\n$\\bigcap_p \\mathfrak S_{p'} \\circ f(p) \\circ \\mathfrak S_p$, where $p$ runs\nover the primes. The displayed Fitting products are associated to the left. -/\ndef hartleyLocalClass (f : ℕ → FiniteGroupClass) : FiniteGroupClass where\n  mem G := ∀ p : ℕ, p.Prime →\n    (fittingProduct (fittingProduct (pComplementGroups p) (f p)) (pGroups p)).mem G\n\n/-- A Fitting class is local if it is defined by a Hartley function whose\nvalues at primes are Fitting classes. -/\ndef IsLocalFittingClass (𝔛 : FiniteGroupClass) : Prop :=\n  ∃ f : ℕ → FiniteGroupClass,\n    (∀ p : ℕ, p.Prime → IsFittingClass (f p)) ∧ 𝔛.Equiv (hartleyLocalClass f)\n\n/--\nLet $\\mathfrak X$ and $\\mathfrak Y$ be Fitting classes of finite soluble\ngroups satisfying\n$\\mathfrak X \\cap \\mathfrak S_* = \\mathfrak X_*$ and\n$\\mathfrak Y \\cap \\mathfrak S_* = \\mathfrak Y_*$. Does\n$\\mathfrak X \\cap \\mathfrak Y$ satisfy the same Lockett condition?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ 𝔛 𝔜 : FiniteGroupClass,\n      IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      𝔛.LE solubleGroups → 𝔜.LE solubleGroups →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛.inter 𝔜) := by\n  sorry\n\n/--\nThe answer to Problem 8.30 is affirmative when $\\mathfrak X$ and\n$\\mathfrak Y$ are local Fitting classes of finite soluble groups: if each\nsatisfies $\\mathfrak X \\cap \\mathfrak S_* = \\mathfrak X_*$, then their\nintersection also satisfies the Lockett condition.\n\nThis is the affirmative special case recorded in the editors' comment, citing\nA. Grytczuk and N. T. Vorob'ev, *Tsukuba Journal of Mathematics* **18** (1994),\nno. 1, 63--67.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.local :\n    ∀ 𝔛 𝔜 : FiniteGroupClass,\n      IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      𝔛.LE solubleGroups → 𝔜.LE solubleGroups →\n      IsLocalFittingClass 𝔛 → IsLocalFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛.inter 𝔜) := by\n  sorry\n\nend Kourovka.«8.30»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.88,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite groups are represented by types with `Group` and proof-irrelevant `Finite` instances, rather than `Fintype`, so class membership cannot depend on an enumeration.",
+    "A Fitting class is required to contain `PUnit`; together with normal-subgroup closure this is equivalent to the conventional nonemptiness requirement. Products of normal subgroups are represented by their join.",
+    "The class radical is the normal closure of the union of all normal subgroups belonging to the class. For a finite group and a Fitting class, this is the usual largest normal class-subgroup.",
+    "The upper star is defined pointwise as the intersection of all Lockett Fitting classes containing the given class. The lower star is the pointwise intersection of all Fitting classes with the same upper star.",
+    "A class 'of soluble groups' is modeled by pointwise inclusion in the class defined by Mathlib's `IsSolvable`.",
+    "The Fitting product `𝔛 ∘ 𝔜` is defined by membership of `G / G_𝔛` in `𝔜`. Following the decomposition note literally, a Hartley local class is the intersection over primes of the left-associated product `(𝔖_{p'} ∘ f(p)) ∘ 𝔖_p`; reviewers should confirm this association against the intended literature convention (the Fitting product is conventionally associative in this setting).",
+    "The Hartley function is required to take Fitting-class values at primes. Its values at composite natural numbers are irrelevant."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Predicates on group types; no existing Fitting-class structure was found.",
+     "name": "FiniteGroupClass",
+     "why_needed": "Mathlib and the repository have no type representing isomorphism-stable predicates on finite groups."
+    },
+    {
+     "closest_existing_considered": "Set inclusion/equality/intersection, which cannot directly range over group types equipped with typeclass structures.",
+     "name": "FiniteGroupClass.LE / FiniteGroupClass.Equiv / FiniteGroupClass.inter",
+     "why_needed": "Pointwise inclusion, extensional equality, and intersection are needed for containment, Lockett sections, and the conjecture itself."
+    },
+    {
+     "closest_existing_considered": "Mathlib subgroup closure structures; none encode classes of finite groups closed under normal subgroups and normal products.",
+     "name": "IsFittingClass",
+     "why_needed": "The statement quantifies over Fitting classes, absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.normalClosure`; used to construct the radical, but Mathlib has no radical parameterized by a group class.",
+     "name": "classRadical",
+     "why_needed": "The Lockett closure and Fitting product require the largest normal subgroup belonging to a Fitting class."
+    },
+    {
+     "closest_existing_considered": "No Lockett-related primitive was found.",
+     "name": "IsLockettClass",
+     "why_needed": "Defines the direct-product radical property used to characterize the upper Lockett closure."
+    },
+    {
+     "closest_existing_considered": "No Lockett-section or closure primitive was found.",
+     "name": "upperStar",
+     "why_needed": "Models the Lockett closure `𝔛^*` as the smallest Lockett Fitting class containing `𝔛`."
+    },
+    {
+     "closest_existing_considered": "No Lockett-section primitive was found.",
+     "name": "lowerStar",
+     "why_needed": "Models the bottom `𝔛_*` of the Lockett section determined by `𝔛`."
+    },
+    {
+     "closest_existing_considered": "Mathlib `IsSolvable`, which is a property of one group rather than a finite-group class object.",
+     "name": "solubleGroups",
+     "why_needed": "Packages Mathlib's group property `IsSolvable` as the Fitting class `𝔖`."
+    },
+    {
+     "closest_existing_considered": "No existing Lockett-condition predicate was found.",
+     "name": "SatisfiesLockettCondition",
+     "why_needed": "States exactly `𝔛 ∩ 𝔖_* = 𝔛_*`."
+    },
+    {
+     "closest_existing_considered": "Mathlib quotient groups and `classRadical`; no product of group classes exists.",
+     "name": "fittingProduct",
+     "why_needed": "The Hartley definition of a local Fitting class uses class products defined through class radicals and quotients."
+    },
+    {
+     "closest_existing_considered": "Mathlib `IsPGroup` and `Nat.card`; these provide the per-group predicates but not finite-group class objects.",
+     "name": "pGroups / pComplementGroups",
+     "why_needed": "The Hartley local definition uses the classes `𝔖_p` and `𝔖_{p'}`."
+    },
+    {
+     "closest_existing_considered": "No Hartley-function or local-Fitting-class machinery was found.",
+     "name": "hartleyLocalClass",
+     "why_needed": "Constructs the local class associated to a Hartley function by the required prime-indexed intersection."
+    },
+    {
+     "closest_existing_considered": "No local Fitting class predicate was found.",
+     "name": "IsLocalFittingClass",
+     "why_needed": "Expresses the additional locality hypotheses in the solved variant."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.30»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.30».variants.local": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.30»": "/--\nLet $\\mathfrak X$ and $\\mathfrak Y$ be Fitting classes of finite soluble\ngroups satisfying\n$\\mathfrak X \\cap \\mathfrak S_* = \\mathfrak X_*$ and\n$\\mathfrak Y \\cap \\mathfrak S_* = \\mathfrak Y_*$. Does\n$\\mathfrak X \\cap \\mathfrak Y$ satisfy the same Lockett condition?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ 𝔛 𝔜 : FiniteGroupClass,\n      IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      𝔛.LE solubleGroups → 𝔜.LE solubleGroups →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛.inter 𝔜) := by\n  sorry",
+    "kourovka.«8.30».variants.local": "/--\nThe answer to Problem 8.30 is affirmative when $\\mathfrak X$ and\n$\\mathfrak Y$ are local Fitting classes of finite soluble groups: if each\nsatisfies $\\mathfrak X \\cap \\mathfrak S_* = \\mathfrak X_*$, then their\nintersection also satisfies the Lockett condition.\n\nThis is the affirmative special case recorded in the editors' comment, citing\nA. Grytczuk and N. T. Vorob'ev, *Tsukuba Journal of Mathematics* **18** (1994),\nno. 1, 63--67.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.local :\n    ∀ 𝔛 𝔜 : FiniteGroupClass,\n      IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      𝔛.LE solubleGroups → 𝔜.LE solubleGroups →\n      IsLocalFittingClass 𝔛 → IsLocalFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛.inter 𝔜) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.30\n\nby H. Lausch\n\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of soluble groups which satisfy the\nLockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$,\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all soluble groups and the lower star the bottom group of the Lockett section\ndetermined by the given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the\nLockett condition?\n\n*Editors' comment (2001):* The answer is affirmative if $\\mathfrak{X}$ and $\\mathfrak{Y}$ are\nlocal (A. Grytczuk, N. T. Vorob'ev, *Tsukuba J. Math.*, **18**, no. 1 (1994), 63–67).\n\n## Conventions\n\nAs usual in the theory of Fitting classes (Lockett; Doerk–Hawkes), \"soluble group\" means\n*finite* soluble group, and $\\mathfrak{S}$ is the class of all finite soluble groups.\n\n* A *Fitting class* is a nonempty, isomorphism-closed class of finite soluble groups that is\n  closed under normal subgroups and under products of two normal subgroups.\n* For a Fitting class $\\mathfrak{F}$ and a finite group $G$, the *$\\mathfrak{F}$-radical*\n  $G_{\\mathfrak{F}}$ is the largest normal $\\mathfrak{F}$-subgroup of $G$.\n* A Fitting class $\\mathfrak{F}$ is a *Lockett class* if\n  $(G \\times H)_{\\mathfrak{F}} = G_{\\mathfrak{F}} \\times H_{\\mathfrak{F}}$ for all finite soluble\n  groups $G$, $H$. The *Lockett closure* $\\mathfrak{F}^*$ is the smallest Lockett class\n  containing $\\mathfrak{F}$, and $\\mathfrak{F}_*$ is the intersection of all Fitting classes\n  $\\mathfrak{X}$ with $\\mathfrak{X}^* = \\mathfrak{F}^*$. Lockett proved\n  $(\\mathfrak{F}_*)^* = \\mathfrak{F}^*$, so $\\mathfrak{F}_*$ is the bottom of the *Lockett\n  section* $\\{\\mathfrak{X} : \\mathfrak{X}^* = \\mathfrak{F}^*\\}$ of $\\mathfrak{F}$ (the word\n  \"group\" in \"the bottom group of the Lockett section\" is a misprint for \"class\").\n* $\\mathfrak{F}$ satisfies the *Lockett condition* if\n  $\\mathfrak{F} \\cap \\mathfrak{S}_* = \\mathfrak{F}_*$. Lockett conjectured that every Fitting\n  class of finite soluble groups satisfies it; Berger and Cossey refuted this, so the condition\n  is a genuine restriction.\n* Following Hartley, a *Hartley function* assigns to every prime $p$ a Fitting class $f(p)$ or\n  the empty class; its support is $\\pi = \\{p : f(p) \\neq \\emptyset\\}$, and it defines the class\n  $$LR(f) = \\mathfrak{S}_\\pi \\cap \\bigcap_{p \\in \\pi} f(p)\\,\\mathfrak{N}_p\\,\\mathfrak{S}_{p'},$$\n  i.e. the finite soluble $\\pi$-groups $G$ such that, for every $p \\in \\pi$, the quotient\n  $G / G_{f(p)}$ has a normal Sylow $p$-subgroup. A Fitting class is *local* if it is of the\n  form $LR(f)$ for some Hartley function $f$.\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 8.30.\n* F. P. Lockett, *The Fitting class $\\mathfrak{F}^*$*, Math. Z. **137** (1974), 131–136.\n* K. Doerk, T. Hawkes, *Finite Soluble Groups*, de Gruyter, Berlin 1992, Chapters IX and X.\n* B. Hartley, *On Fischer's dualization of formation theory*, Proc. London Math. Soc. (3) **19**\n  (1969), 193–207.\n* A. Grytczuk, N. T. Vorob'ev, Tsukuba J. Math. **18**, no. 1 (1994), 63–67.\n-/\n\nnamespace Kourovka.«8.30»\n\nuniverse u\n\n/-- The class $\\mathfrak{S}$ of all finite soluble groups. Classes of groups are modelled as\nsets of bundled groups `GrpCat`. -/\ndef finiteSolvableClass : Set GrpCat.{u} := {G | Finite G ∧ IsSolvable G}\n\n/-- A *Fitting class* (of finite soluble groups) is a nonempty class $\\mathfrak{X}$ of finite\nsoluble groups that is closed under isomorphisms, under taking normal subgroups\n($N \\trianglelefteq G \\in \\mathfrak{X} \\Rightarrow N \\in \\mathfrak{X}$) and under products of\nnormal subgroups ($N_1, N_2 \\trianglelefteq G$, $N_1, N_2 \\in \\mathfrak{X} \\Rightarrow\nN_1 N_2 \\in \\mathfrak{X}$). For normal subgroups the product $N_1 N_2$ is the join\n$N_1 \\sqcup N_2$. -/\ndef IsFittingClass (𝔛 : Set GrpCat.{u}) : Prop :=\n  𝔛.Nonempty ∧ 𝔛 ⊆ finiteSolvableClass ∧\n  (∀ G H : GrpCat.{u}, Nonempty (G ≃* H) → G ∈ 𝔛 → H ∈ 𝔛) ∧\n  (∀ G ∈ 𝔛, ∀ N : Subgroup G, N.Normal → GrpCat.of N ∈ 𝔛) ∧\n  (∀ (G : GrpCat.{u}) (N₁ N₂ : Subgroup G), N₁.Normal → N₂.Normal →\n    GrpCat.of N₁ ∈ 𝔛 → GrpCat.of N₂ ∈ 𝔛 → GrpCat.of ↥(N₁ ⊔ N₂) ∈ 𝔛)\n\n/-- The *$\\mathfrak{X}$-radical* $G_{\\mathfrak{X}}$ of a group $G$: the join of all normal\nsubgroups of $G$ that belong to $\\mathfrak{X}$. When $\\mathfrak{X}$ is a Fitting class and $G$\nis finite, this is the largest normal $\\mathfrak{X}$-subgroup of $G$. -/\ndef radical (𝔛 : Set GrpCat.{u}) (G : Type u) [Group G] : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ GrpCat.of N ∈ 𝔛}\n\nopen scoped Pointwise in\ninstance radical_normal (𝔛 : Set GrpCat.{u}) (G : Type u) [Group G] : (radical 𝔛 G).Normal := by\n  refine Subgroup.Normal.of_conjugate_fixed fun g => ?_\n  unfold radical\n  rw [sSup_eq_iSup', Subgroup.pointwise_smul_def, Subgroup.map_iSup]\n  refine iSup_congr fun N => ?_\n  rw [← Subgroup.pointwise_smul_def]\n  exact @Subgroup.Normal.conj_smul_eq_self _ _ g N.1 N.2.1\n\n/-- A class $\\mathfrak{X}$ is a *Lockett class* if\n$(G \\times H)_{\\mathfrak{X}} = G_{\\mathfrak{X}} \\times H_{\\mathfrak{X}}$ for all finite soluble\ngroups $G$ and $H$. For a Fitting class $\\mathfrak{X}$ this is equivalent to\n$\\mathfrak{X} = \\mathfrak{X}^*$. -/\ndef IsLockettClass (𝔛 : Set GrpCat.{u}) : Prop :=\n  ∀ (G H : Type u) [Group G] [Group H] [Finite G] [Finite H] [IsSolvable G] [IsSolvable H],\n    radical 𝔛 (G × H) = (radical 𝔛 G).prod (radical 𝔛 H)\n\n/-- The *Lockett closure* $\\mathfrak{X}^*$ of a class $\\mathfrak{X}$: the smallest Fitting class\n$\\mathfrak{Y} \\supseteq \\mathfrak{X}$ with\n$(G \\times H)_{\\mathfrak{Y}} = G_{\\mathfrak{Y}} \\times H_{\\mathfrak{Y}}$ for all finite soluble\ngroups $G$, $H$, realised as the intersection of all such Fitting classes (the intersection of\nLockett Fitting classes is again a Lockett Fitting class). -/\ndef lockettStar (𝔛 : Set GrpCat.{u}) : Set GrpCat.{u} :=\n  ⋂₀ {𝔜 | IsFittingClass 𝔜 ∧ IsLockettClass 𝔜 ∧ 𝔛 ⊆ 𝔜}\n\n/-- The bottom $\\mathfrak{X}_*$ of the Lockett section of $\\mathfrak{X}$: the intersection of\nall Fitting classes $\\mathfrak{Y}$ with $\\mathfrak{Y}^* = \\mathfrak{X}^*$. -/\ndef lockettLower (𝔛 : Set GrpCat.{u}) : Set GrpCat.{u} :=\n  ⋂₀ {𝔜 | IsFittingClass 𝔜 ∧ lockettStar 𝔜 = lockettStar 𝔛}\n\n/-- A class $\\mathfrak{X}$ satisfies the *Lockett condition* if\n$\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$, where $\\mathfrak{S}$ is the class of all\nfinite soluble groups. -/\ndef SatisfiesLockettCondition (𝔛 : Set GrpCat.{u}) : Prop :=\n  𝔛 ∩ lockettLower finiteSolvableClass = lockettLower 𝔛\n\n/-- The class $LR(f) = \\mathfrak{S}_\\pi \\cap \\bigcap_{p \\in \\pi} f(p)\\,\\mathfrak{N}_p\\,\n\\mathfrak{S}_{p'}$ locally defined by a function $f$ from the primes to classes of groups,\nwhere $\\pi = \\{p : f(p) \\neq \\emptyset\\}$ is the support of $f$: the finite soluble groups $G$\nwhose order is divisible only by primes in $\\pi$ and such that, for every $p \\in \\pi$, the\nquotient $G / G_{f(p)}$ has a normal Sylow $p$-subgroup (i.e. $G / G_{f(p)} \\in\n\\mathfrak{N}_p \\mathfrak{S}_{p'}$). -/\ndef localRadicalClass (f : Nat.Primes → Set GrpCat.{u}) : Set GrpCat.{u} :=\n  {G | Finite G ∧ IsSolvable G ∧\n    (∀ p : Nat.Primes, (p : ℕ) ∣ Nat.card G → (f p).Nonempty) ∧\n    ∀ p : Nat.Primes, (f p).Nonempty →\n      ∃ P : Sylow p (G ⧸ radical (f p) G), (P : Subgroup (G ⧸ radical (f p) G)).Normal}\n\n/-- A Fitting class $\\mathfrak{X}$ is *local* if $\\mathfrak{X} = LR(f)$ for some Hartley\nfunction $f$, i.e. a function assigning to each prime either the empty class or a Fitting\nclass. -/\ndef IsLocalFittingClass (𝔛 : Set GrpCat.{u}) : Prop :=\n  IsFittingClass 𝔛 ∧ ∃ f : Nat.Primes → Set GrpCat.{u},\n    (∀ p, f p = ∅ ∨ IsFittingClass (f p)) ∧ 𝔛 = localRadicalClass f\n\n@[category test, AMS 20]\ntheorem radical_finiteSolvableClass (G : Type u) [Group G] [Finite G] [IsSolvable G] :\n    radical finiteSolvableClass G = ⊤ :=\n  le_antisymm le_top <| le_sSup ⟨inferInstance, inferInstance, inferInstance⟩\n\n@[category test, AMS 20]\ntheorem isLockettClass_finiteSolvableClass : IsLockettClass finiteSolvableClass.{u} := by\n  intro G H _ _ _ _ _ _\n  simp only [radical_finiteSolvableClass, Subgroup.top_prod_top]\n\n/-- The Hartley function with empty support defines the class of trivial groups. -/\n@[category test, AMS 20]\ntheorem localRadicalClass_empty :\n    localRadicalClass (fun _ : Nat.Primes => (∅ : Set GrpCat.{u})) =\n      {G : GrpCat.{u} | Subsingleton G} := by\n  ext G\n  simp only [localRadicalClass, Set.mem_setOf_eq, Set.not_nonempty_empty, imp_false,\n    false_imp_iff, imp_true_iff, and_true]\n  constructor\n  · rintro ⟨_, -, h⟩\n    have : Nat.card G = 1 :=\n      Nat.eq_one_iff_not_exists_prime_dvd.mpr fun p hp => h ⟨p, hp⟩\n    exact (Nat.card_eq_one_iff_unique.mp this).1\n  · intro h\n    exact ⟨Finite.of_subsingleton, inferInstance, fun p hp =>\n      (Nat.eq_one_iff_not_exists_prime_dvd.mp Nat.card_unique) p p.2 hp⟩\n\n/--\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of (finite) soluble groups which satisfy\nthe Lockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$ and\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all (finite) soluble groups and the lower star the bottom of the Lockett section\ndetermined by the given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the\nLockett condition, i.e. is\n$(\\mathfrak{X} \\cap \\mathfrak{Y}) \\cap \\mathfrak{S}_* = (\\mathfrak{X} \\cap \\mathfrak{Y})_*$?\n\nThe intersection $\\mathfrak{X} \\cap \\mathfrak{Y}$ of two Fitting classes is again a Fitting\nclass.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ 𝔛 𝔜 : Set GrpCat.{0}, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛 ∩ 𝔜) := by\n  sorry\n\n/--\nThe answer to Problem 8.30 is affirmative if $\\mathfrak{X}$ and $\\mathfrak{Y}$ are local: if\n$\\mathfrak{X}$ and $\\mathfrak{Y}$ are local Fitting classes of finite soluble groups which\nsatisfy the Lockett condition $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$ and\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, then $\\mathfrak{X} \\cap \\mathfrak{Y}$\nsatisfies the Lockett condition\n(A. Grytczuk, N. T. Vorob'ev, Tsukuba J. Math. **18**, no. 1 (1994), 63–67).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.«local» :\n    ∀ 𝔛 𝔜 : Set GrpCat.{0}, IsLocalFittingClass 𝔛 → IsLocalFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛 ∩ 𝔜) := by\n  sorry\n\nend Kourovka.«8.30»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None of substance. The only note: the table's hint for the local definition ('X = ⋂_p S_{p'} ∘ f(p) ∘ S_p style') is not the standard Hartley/Vorob'ev formula LR(f) = 𝔖_π ∩ ⋂_{p∈π} f(p)𝔑_p𝔖_{p'}; the standard formula was formalized as the notes themselves ask for it to be 'formalized carefully'. Also, the slot name `kourovka.«8.30».variants.local` must be written `kourovka.«8.30».variants.«local»` in Lean source since `local` is a keyword; the resulting Lean name is identical.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Classes of groups are modelled as `Set GrpCat.{0}` (sets of bundled groups in `Type`), with isomorphism-closure imposed explicitly in `IsFittingClass`; 'soluble group' is read as finite soluble group throughout (Kourovka/Lockett convention), enforced by `𝔛 ⊆ finiteSolvableClass`.",
+    "`IsFittingClass` requires nonemptiness (equivalent, given N-closure and iso-closure, to containing the trivial group). The N₀-closure axiom quantifies over all groups G (not only finite soluble ones); this is equivalent to the restricted version because N₁N₂ = N₁ ⊔ N₂ is itself finite soluble and N₀ can be applied inside it, using iso-closure.",
+    "The radical is `sSup` of the normal 𝔛-subgroups; for a Fitting class and finite G this is the largest normal 𝔛-subgroup. The Lockett property is required only for finite soluble G, H (the universe 𝔖), since for infinite groups the sSup-radical is not meaningful.",
+    "𝔛^* is defined as the intersection of all Lockett Fitting classes containing 𝔛 (the decomposition notes' characterisation as the smallest such class); this equals Lockett's 𝔛^* by Lockett's theorem (𝔛^* is a Lockett class, and 𝔛 ⊆ 𝔜 ⟹ 𝔛^* ⊆ 𝔜^* = 𝔜 for Lockett 𝔜). 𝔛_* is Lockett's own definition (intersection of all Fitting classes with the same star), which is the bottom of the Lockett section.",
+    "The Lockett condition is stated as the literal set equality 𝔛 ∩ 𝔖_* = 𝔛_*.",
+    "Local Fitting classes follow Hartley/Vorob'ev: LR(f) = 𝔖_π ∩ ⋂_{p∈π} f(p)𝔑_p𝔖_{p'} with π = {p : f(p) ≠ ∅}. Membership in f(p)𝔑_p𝔖_{p'} is encoded as 'G/G_{f(p)} has a normal Sylow p-subgroup' (𝔑_p𝔖_{p'} is the class of p-closed groups; Fitting products are associative). The decomposition notes' sketch '⋂_p S_{p'} ∘ f(p) ∘ S_p style' does not match any standard definition, so the standard literature formula was used. `IsLocalFittingClass` additionally (redundantly) requires `IsFittingClass 𝔛` for robustness.",
+    "Three `@[category test]` lemmas sanity-check the definitions: the 𝔖-radical is ⊤, 𝔖 is a Lockett class, and the empty Hartley function defines exactly the trivial groups.",
+    "Definitions are universe-polymorphic (`GrpCat.{u}`); the two problem statements are pinned to `GrpCat.{0}` (groups in `Type`) like other Kourovka files."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `IsSolvable` and `Finite` but no notion of a class of groups; `Set GrpCat` (bundled groups) is used as the carrier for classes.",
+     "name": "Kourovka.«8.30».finiteSolvableClass",
+     "why_needed": "The class 𝔖 of all finite soluble groups, needed both as the universe restriction and for 𝔖_* in the Lockett condition."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib (no group-class / Fitting class / formation theory); grep for Fitting only finds Fitting decompositions of modules.",
+     "name": "Kourovka.«8.30».IsFittingClass",
+     "why_needed": "Fitting classes (nonempty, isomorphism-closed, contained in 𝔖, closed under normal subgroups and joins of two normal subgroups) do not exist in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.normalCore`/`normalClosure` and `sSup` on `Subgroup G`; the radical is defined as `sSup` of the normal 𝔛-subgroups. An instance `radical_normal` proves it is normal (needed for the quotient).",
+     "name": "Kourovka.«8.30».radical",
+     "why_needed": "The 𝔛-radical G_𝔛 (join of all normal 𝔛-subgroups), required to state the Lockett property (G×H)_𝔛 = G_𝔛 × H_𝔛 and the local definition G/G_{f(p)}."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "Kourovka.«8.30».IsLockettClass",
+     "why_needed": "Lockett's property (G × H)_𝔛 = G_𝔛 × H_𝔛 for all finite soluble G, H, used to define 𝔛^*."
+    },
+    {
+     "closest_existing_considered": "None; `Set.sInter` used.",
+     "name": "Kourovka.«8.30».lockettStar",
+     "why_needed": "Lockett closure 𝔛^*: intersection of all Lockett Fitting classes containing 𝔛 (the smallest such, as in the decomposition notes; intersections of Lockett Fitting classes are Lockett Fitting classes)."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».lockettLower",
+     "why_needed": "𝔛_*: intersection of all Fitting classes 𝔜 with 𝔜^* = 𝔛^*, i.e. the bottom of the Lockett section (Lockett's definition)."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».SatisfiesLockettCondition",
+     "why_needed": "The Lockett condition 𝔛 ∩ 𝔖_* = 𝔛_* from the problem statement."
+    },
+    {
+     "closest_existing_considered": "Mathlib `Sylow`, `IsPGroup`, `Nat.Primes`, `Nat.card` used as building blocks; no notion of local Fitting class / Fitting class product exists.",
+     "name": "Kourovka.«8.30».localRadicalClass",
+     "why_needed": "Hartley's locally defined class LR(f) = 𝔖_π ∩ ⋂_{p∈π} f(p)𝔑_p𝔖_{p'}, encoded as: finite soluble π-group G such that for every p in the support, G/G_{f(p)} has a normal Sylow p-subgroup (i.e. lies in 𝔑_p𝔖_{p'})."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».IsLocalFittingClass",
+     "why_needed": "'Local' Fitting class for the editors' solved special case: a Fitting class equal to LR(f) for a Hartley function f (each value ∅ or a Fitting class)."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.30»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ 𝔛 𝔜 : Set GrpCat.{0}, IsFittingClass 𝔛 → IsFittingClass 𝔜 → SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 → SatisfiesLockettCondition (𝔛 ∩ 𝔜)`, with bespoke definitions of Fitting class (finite soluble universe), radical, Lockett class, Lockett closure 𝔛^*, bottom 𝔛_* of the Lockett section, and the Lockett condition 𝔛 ∩ 𝔖_* = 𝔛_*. Category research open, AMS 20."
+    },
+    "kourovka.«8.30».variants.local": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated (as `kourovka.«8.30».variants.«local»`, the same Lean name with the keyword `local` escaped) as the positive assertion: for local Fitting classes 𝔛, 𝔜 (Hartley's LR(f) = 𝔖_π ∩ ⋂_{p∈π} f(p)𝔑_p𝔖_{p'} for a Hartley function f with values Fitting classes or ∅) satisfying the Lockett condition, 𝔛 ∩ 𝔜 satisfies it. Category research solved, AMS 20."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.30»": "/--\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of (finite) soluble groups which satisfy\nthe Lockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$ and\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all (finite) soluble groups and the lower star the bottom of the Lockett section\ndetermined by the given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the\nLockett condition, i.e. is\n$(\\mathfrak{X} \\cap \\mathfrak{Y}) \\cap \\mathfrak{S}_* = (\\mathfrak{X} \\cap \\mathfrak{Y})_*$?\n\nThe intersection $\\mathfrak{X} \\cap \\mathfrak{Y}$ of two Fitting classes is again a Fitting\nclass.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ 𝔛 𝔜 : Set GrpCat.{0}, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛 ∩ 𝔜) := by\n  sorry",
+    "kourovka.«8.30».variants.local": "/--\nThe answer to Problem 8.30 is affirmative if $\\mathfrak{X}$ and $\\mathfrak{Y}$ are local: if\n$\\mathfrak{X}$ and $\\mathfrak{Y}$ are local Fitting classes of finite soluble groups which\nsatisfy the Lockett condition $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$ and\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, then $\\mathfrak{X} \\cap \\mathfrak{Y}$\nsatisfies the Lockett condition\n(A. Grytczuk, N. T. Vorob'ev, Tsukuba J. Math. **18**, no. 1 (1994), 63–67).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.«local» :\n    ∀ 𝔛 𝔜 : Set GrpCat.{0}, IsLocalFittingClass 𝔛 → IsLocalFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (𝔛 ∩ 𝔜) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.30\n\nby H. Lausch\n\nLet $\\mathfrak X$ and $\\mathfrak Y$ be Fitting classes of finite soluble groups satisfying the\nLockett condition. Does $\\mathfrak X \\cap \\mathfrak Y$ satisfy the Lockett condition?\n\nThe editors report that the answer is affirmative when $\\mathfrak X$ and $\\mathfrak Y$ are local\nFitting classes, citing A. Grytczuk and N. T. Vorob'ev, *Tsukuba J. Math.* **18** (1994), 63--67.\n\n*Reference:* [The Kourovka Notebook, Problem 8.30](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.30»\n\n/-- A bundled finite group. This lets a Fitting class range over finite groups up to isomorphism. -/\nstructure FiniteGroup where\n  carrier : Type\n  group : Group carrier\n  finite : Finite carrier\n\nattribute [instance] FiniteGroup.group FiniteGroup.finite\n\n/-- A class of finite groups. -/\nabbrev GroupClass := FiniteGroup → Prop\n\n/-- The finite group carried by a subgroup of a bundled finite group. -/\ndef FiniteGroup.subgroup (G : FiniteGroup) (H : Subgroup G.carrier) : FiniteGroup where\n  carrier := H\n  group := inferInstance\n  finite := inferInstance\n\n/-- The direct product of two bundled finite groups. -/\ndef FiniteGroup.prod (G H : FiniteGroup) : FiniteGroup where\n  carrier := G.carrier × H.carrier\n  group := inferInstance\n  finite := inferInstance\n\n/-- The quotient of a bundled finite group by a normal subgroup. -/\ndef FiniteGroup.quotient (G : FiniteGroup) (N : Subgroup G.carrier) (hN : N.Normal) :\n    FiniteGroup := by\n  letI : N.Normal := hN\n  exact {\n    carrier := G.carrier ⧸ N\n    group := inferInstance\n    finite := inferInstance }\n\n/-- Pointwise inclusion of classes of finite groups. -/\ndef ClassLE (X Y : GroupClass) : Prop :=\n  ∀ G, X G → Y G\n\n/-- Pointwise intersection of classes of finite groups. -/\ndef classInter (X Y : GroupClass) : GroupClass :=\n  fun G ↦ X G ∧ Y G\n\n/--\nA Fitting class of finite groups: it is nonempty and closed under isomorphisms, normal subgroups,\nand products of normal subgroups.\n-/\ndef IsFittingClass (X : GroupClass) : Prop :=\n  (∃ G, X G) ∧\n  (∀ G H, X G → Nonempty (G.carrier ≃* H.carrier) → X H) ∧\n  (∀ (G : FiniteGroup) (N : Subgroup G.carrier), X G → N.Normal → X (G.subgroup N)) ∧\n  (∀ (G : FiniteGroup) (N M : Subgroup G.carrier), N.Normal → M.Normal →\n    X (G.subgroup N) → X (G.subgroup M) → X (G.subgroup (N ⊔ M)))\n\n/-- The $X$-radical of a finite group: the join of its normal $X$-subgroups. -/\ndef radical (X : GroupClass) (G : FiniteGroup) : Subgroup G.carrier :=\n  sSup {N : Subgroup G.carrier | N.Normal ∧ X (G.subgroup N)}\n\n/-- A class has direct-product radicals if the radical of a product is the product of radicals. -/\ndef HasDirectProductRadicals (X : GroupClass) : Prop :=\n  ∀ G H, radical X (G.prod H) = (radical X G).prod (radical X H)\n\n/--\nThe Lockett closure $X^*$ is the smallest Fitting class containing $X$ whose radicals commute\nwith finite direct products.\n-/\ndef lockettClosure (X : GroupClass) : GroupClass :=\n  fun G ↦ ∀ Y, IsFittingClass Y → ClassLE X Y → HasDirectProductRadicals Y → Y G\n\n/--\nThe lower star $X_*$ is the bottom of the Lockett section consisting of the Fitting classes $Y$\nwith $Y^* = X^*$.\n-/\ndef lowerStar (X : GroupClass) : GroupClass :=\n  fun G ↦ ∀ Y, IsFittingClass Y → lockettClosure Y = lockettClosure X → Y G\n\n/-- The Fitting class $\\mathfrak S$ of all finite soluble groups. -/\ndef solubleClass : GroupClass :=\n  fun G ↦ IsSolvable G.carrier\n\n/-- A Fitting class all of whose members are soluble. -/\ndef IsSolubleFittingClass (X : GroupClass) : Prop :=\n  IsFittingClass X ∧ ClassLE X solubleClass\n\n/-- The Lockett condition $X \\cap \\mathfrak S_* = X_*$. -/\ndef SatisfiesLockettCondition (X : GroupClass) : Prop :=\n  classInter X (lowerStar solubleClass) = lowerStar X\n\n/-- The product $X \\circ Y$ of Fitting classes, defined using the $X$-radical. -/\ndef classProduct (X Y : GroupClass) : GroupClass :=\n  fun G ↦ ∃ (N : Subgroup G.carrier) (hN : N.Normal),\n    N = radical X G ∧ Y (G.quotient N hN)\n\n/-- The class $\\mathfrak S_p$ of finite soluble $p$-groups. -/\ndef solublePClass (p : ℕ) : GroupClass :=\n  fun G ↦ IsSolvable G.carrier ∧ IsPGroup p G.carrier\n\n/-- The class $\\mathfrak S_{p'}$ of finite soluble groups whose order is prime to $p$. -/\ndef solublePComplementClass (p : ℕ) : GroupClass :=\n  fun G ↦ IsSolvable G.carrier ∧ ¬p ∣ Nat.card G.carrier\n\n/--\nA local Fitting class is one defined by a Hartley function $f$ via\n$X = \\bigcap_p \\mathfrak S_{p'} \\circ f(p) \\circ \\mathfrak S_p$, where $p$ ranges over primes.\n-/\ndef IsLocalFittingClass (X : GroupClass) : Prop :=\n  IsFittingClass X ∧ ∃ f : ℕ → GroupClass,\n    (∀ p, p.Prime → IsFittingClass (f p)) ∧\n    X = fun G ↦ ∀ p, p.Prime →\n      classProduct (classProduct (solublePComplementClass p) (f p)) (solublePClass p) G\n\n/--\nLet $\\mathfrak X$ and $\\mathfrak Y$ be Fitting classes of finite soluble groups which satisfy\n$\\mathfrak X \\cap \\mathfrak S_* = \\mathfrak X_*$ and\n$\\mathfrak Y \\cap \\mathfrak S_* = \\mathfrak Y_*$. Does $\\mathfrak X \\cap \\mathfrak Y$ satisfy\n$(\\mathfrak X \\cap \\mathfrak Y) \\cap \\mathfrak S_* = (\\mathfrak X \\cap \\mathfrak Y)_*$?\nHere the lower star denotes the bottom of the Lockett section determined by the class.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ X Y : GroupClass,\n      IsSolubleFittingClass X → IsSolubleFittingClass Y →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n      SatisfiesLockettCondition (classInter X Y) := by\n  sorry\n\n/--\nThe answer to Problem 8.30 is affirmative if $\\mathfrak X$ and $\\mathfrak Y$ are local Fitting\nclasses of finite soluble groups: if both satisfy the Lockett condition, then so does\n$\\mathfrak X \\cap \\mathfrak Y$.\n-/\n@[category research solved, AMS 20]\ntheorem variants.local :\n    ∀ X Y : GroupClass,\n      IsSolubleFittingClass X → IsSolubleFittingClass Y →\n      IsLocalFittingClass X → IsLocalFittingClass Y →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n      SatisfiesLockettCondition (classInter X Y) := by\n  sorry\n\nend Kourovka.«8.30»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite groups are bundled with carrier in `Type` (universe 0). This is sufficient up to isomorphism because every finite group is isomorphic to a group on a finite small type, and Fitting classes are explicitly isomorphism-closed.",
+    "A Fitting class is modeled as a nonempty, isomorphism-closed predicate on bundled finite groups, closed under normal subgroups and joins (products) of normal subgroups in a common ambient finite group.",
+    "The class radical is the supremum of all normal subgroups belonging to the class. The Lockett closure is defined pointwise as the intersection of all direct-product-radical Fitting classes containing the given class.",
+    "The lower star is defined as the pointwise intersection of all Fitting classes in the same Lockett section, i.e. all classes having the same Lockett closure.",
+    "The Lockett condition is stated literally as `X ∩ S_* = X_*`, where `S` is the class of all finite soluble groups.",
+    "Locality uses a Hartley function on primes and the formula `⋂ p, S_{p'} ∘ f(p) ∘ S_p`; the displayed iterated class product is left-associated. Class product is defined by quotienting by the radical of its left factor.",
+    "The editor's local result is a positive assertion tagged `research solved`; the original yes/no question uses `answer(sorry)` and is tagged `research open`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has groups as typeclasses and `GrpCat`, but no bundled type restricted to finite groups suited to these class predicates.",
+     "name": "FiniteGroup",
+     "why_needed": "Fitting classes must be first-class predicates ranging over all finite groups."
+    },
+    {
+     "closest_existing_considered": "No Mathlib or repository Fitting/group-class predicate type exists.",
+     "name": "GroupClass",
+     "why_needed": "Represents a class of finite groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib supplies the subgroup's inherited group and finite instances, but not this finite-group bundle.",
+     "name": "FiniteGroup.subgroup",
+     "why_needed": "Turns a subgroup into an object to which a group class can be applied."
+    },
+    {
+     "closest_existing_considered": "Mathlib supplies product group instances, but not the finite-group bundle.",
+     "name": "FiniteGroup.prod",
+     "why_needed": "Bundles direct products for the Lockett radical condition."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `QuotientGroup` supplies the quotient group, but not the finite-group bundle.",
+     "name": "FiniteGroup.quotient",
+     "why_needed": "Bundles quotients used in Fitting-class products."
+    },
+    {
+     "closest_existing_considered": "Pointwise implication is available generically but there is no existing group-class API.",
+     "name": "ClassLE",
+     "why_needed": "States inclusion of group classes without relying on an unavailable dedicated class order."
+    },
+    {
+     "closest_existing_considered": "Set intersection was considered, but classes are predicates on bundled groups and this explicit operation keeps the statement transparent.",
+     "name": "classInter",
+     "why_needed": "Represents intersection of Fitting classes in the conjecture."
+    },
+    {
+     "closest_existing_considered": "Hard searches for `Fitting class`, `FittingClass`, and related terminology found no implementation.",
+     "name": "IsFittingClass",
+     "why_needed": "The central notion is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib has subgroup suprema and many specialized radicals, but no radical attached to an arbitrary Fitting class.",
+     "name": "radical",
+     "why_needed": "Defines the class radical required to formulate Lockett closure and class products."
+    },
+    {
+     "closest_existing_considered": "No existing Lockett or arbitrary class-radical product predicate was found.",
+     "name": "HasDirectProductRadicals",
+     "why_needed": "Expresses the defining direct-product property of a Lockett-closed class."
+    },
+    {
+     "closest_existing_considered": "No Lockett closure exists in Mathlib or the repository.",
+     "name": "lockettClosure",
+     "why_needed": "Formalizes the upper star/Lockett closure that determines a Lockett section."
+    },
+    {
+     "closest_existing_considered": "No Lockett section or lower-star operation exists in Mathlib or the repository.",
+     "name": "lowerStar",
+     "why_needed": "Formalizes the bottom class of a Lockett section."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsSolvable` is used internally, but it is a proposition on one group rather than a group class.",
+     "name": "solubleClass",
+     "why_needed": "Represents the source's Fitting class S of all finite soluble groups."
+    },
+    {
+     "closest_existing_considered": "Built directly from `IsFittingClass`, class inclusion, and Mathlib's `IsSolvable`.",
+     "name": "IsSolubleFittingClass",
+     "why_needed": "Packages the source restriction that every member of a Fitting class is soluble."
+    },
+    {
+     "closest_existing_considered": "No existing Lockett-condition predicate exists.",
+     "name": "SatisfiesLockettCondition",
+     "why_needed": "Names the exact equation `X ∩ S_* = X_*` used repeatedly in both declarations."
+    },
+    {
+     "closest_existing_considered": "Mathlib has quotient groups and subgroup radicals separately, but no product of group classes.",
+     "name": "classProduct",
+     "why_needed": "Fitting-class products are required by the Hartley local definition."
+    },
+    {
+     "closest_existing_considered": "Uses Mathlib's `IsSolvable` and `IsPGroup`; no class-level combination exists.",
+     "name": "solublePClass",
+     "why_needed": "Represents the local-definition class S_p."
+    },
+    {
+     "closest_existing_considered": "Uses Mathlib solvability and finite cardinality/divisibility, but no class-level definition exists.",
+     "name": "solublePComplementClass",
+     "why_needed": "Represents the local-definition class S_{p'}."
+    },
+    {
+     "closest_existing_considered": "Searches found no Hartley function or local Fitting class in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsLocalFittingClass",
+     "why_needed": "The solved variant requires the Hartley-function notion of a local Fitting class."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.30»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.30».variants.local": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.30»": "/--\nLet $\\mathfrak X$ and $\\mathfrak Y$ be Fitting classes of finite soluble groups which satisfy\n$\\mathfrak X \\cap \\mathfrak S_* = \\mathfrak X_*$ and\n$\\mathfrak Y \\cap \\mathfrak S_* = \\mathfrak Y_*$. Does $\\mathfrak X \\cap \\mathfrak Y$ satisfy\n$(\\mathfrak X \\cap \\mathfrak Y) \\cap \\mathfrak S_* = (\\mathfrak X \\cap \\mathfrak Y)_*$?\nHere the lower star denotes the bottom of the Lockett section determined by the class.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ X Y : GroupClass,\n      IsSolubleFittingClass X → IsSolubleFittingClass Y →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n      SatisfiesLockettCondition (classInter X Y) := by\n  sorry",
+    "kourovka.«8.30».variants.local": "/--\nThe answer to Problem 8.30 is affirmative if $\\mathfrak X$ and $\\mathfrak Y$ are local Fitting\nclasses of finite soluble groups: if both satisfy the Lockett condition, then so does\n$\\mathfrak X \\cap \\mathfrak Y$.\n-/\n@[category research solved, AMS 20]\ntheorem variants.local :\n    ∀ X Y : GroupClass,\n      IsSolubleFittingClass X → IsSolubleFittingClass Y →\n      IsLocalFittingClass X → IsLocalFittingClass Y →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n      SatisfiesLockettCondition (classInter X Y) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.30\n\nby H. Lausch\n\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of soluble groups which satisfy the\nLockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$,\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all soluble groups and the lower star the bottom of the Lockett section determined by\nthe given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the Lockett condition?\n\n*Editors' comment (2001):* The answer is affirmative if $\\mathfrak{X}$ and $\\mathfrak{Y}$ are\nlocal (A. Grytczuk, N. T. Vorob'ev, *Tsukuba J. Math.* **18**, no. 1 (1994), 63–67).\n\n## Conventions\n\nAs usual in this theory, all groups are finite: a *Fitting class* is a nonempty class of finite\ngroups that is closed under isomorphisms, under normal subgroups and under products of normal\nsubgroups. For a Fitting class $\\mathfrak{F}$ and a finite group $G$, the\n$\\mathfrak{F}$-radical $G_{\\mathfrak{F}}$ is the largest normal $\\mathfrak{F}$-subgroup of $G$.\n\nLockett's construction: $\\mathfrak{F}^*$ is the smallest Fitting class containing $\\mathfrak{F}$\nsuch that $(G \\times H)_{\\mathfrak{F}^*} = G_{\\mathfrak{F}^*} \\times H_{\\mathfrak{F}^*}$ for all\nfinite groups $G$, $H$ (Fitting classes with this property are called *Lockett classes*).\nThe *Lockett section* of $\\mathfrak{F}$ is the set of Fitting classes $\\mathfrak{G}$ with\n$\\mathfrak{G}^* = \\mathfrak{F}^*$; its intersection $\\mathfrak{F}_*$ is again a member and\nhence is the bottom of the section. Lockett conjectured that\n$\\mathfrak{F}_* = \\mathfrak{F} \\cap \\mathfrak{S}_*$ for every Fitting class $\\mathfrak{F}$ of\nfinite soluble groups; Berger and Cossey refuted this, so the *Lockett condition*\n$\\mathfrak{F} \\cap \\mathfrak{S}_* = \\mathfrak{F}_*$ is a genuine restriction.\n\nFollowing Hartley, a Fitting class $\\mathfrak{F}$ of finite soluble groups is *local* if\n$\\mathfrak{F} = LR(f) := \\mathfrak{S}_\\pi \\cap \\bigcap_{p \\in \\pi}\nf(p)\\,\\mathfrak{N}_p\\,\\mathfrak{S}_{p'}$ for some function $f$ assigning to every prime $p$ a\nFitting class $f(p)$ or the empty class (a *Hartley function*), where\n$\\pi = \\{p : f(p) \\neq \\emptyset\\}$ is the support of $f$, $\\mathfrak{S}_\\pi$ is the class of\nfinite soluble $\\pi$-groups, $\\mathfrak{N}_p$ the class of finite $p$-groups, and\n$\\mathfrak{X}\\mathfrak{Y} = (G : G/G_{\\mathfrak{X}} \\in \\mathfrak{Y})$ is the Fitting product.\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 8.30.\n* F. P. Lockett, *The Fitting class $\\mathfrak{F}^*$*, Math. Z. **137** (1974), 131–136.\n* T. R. Berger, J. Cossey, *An example in the theory of normal Fitting classes*,\n  Math. Z. **154** (1977).\n* B. Hartley, *On Fischer's dualization of formation theory*,\n  Proc. London Math. Soc. (3) **19** (1969), 193–207.\n* A. Grytczuk, N. T. Vorob'ev, *On Lockett's conjecture for finite groups*,\n  Tsukuba J. Math. **18** (1994), no. 1, 63–67.\n* K. Doerk, T. Hawkes, *Finite Soluble Groups*, de Gruyter, 1992, Chapters IX–X.\n-/\n\nnamespace Kourovka.«8.30»\n\n/-- A class of groups, given as a predicate on groups (with carrier in `Type`). Every finite\ngroup is isomorphic to a group with carrier in `Type`, so this suffices for classes of finite\ngroups; the classes considered below are all closed under isomorphism. -/\nabbrev GroupClass := (G : Type) → [Group G] → Prop\n\n/-- A *Fitting class* is a nonempty class of finite groups that is closed under isomorphisms,\nunder taking normal subgroups, and under products of normal subgroups (for normal subgroups\n$N_1$, $N_2$ of $G$ the product $N_1 N_2$ is the join $N_1 \\sqcup N_2$). -/\nstructure IsFittingClass (𝔉 : GroupClass) : Prop where\n  finite : ∀ (G : Type) [Group G], 𝔉 G → Finite G\n  of_mulEquiv : ∀ (G H : Type) [Group G] [Group H], G ≃* H → 𝔉 G → 𝔉 H\n  nonempty : ∃ (G : Type) (_ : Group G), 𝔉 G\n  of_normal : ∀ (G : Type) [Group G] (N : Subgroup G), N.Normal → 𝔉 G → 𝔉 N\n  sup_of_normal : ∀ (G : Type) [Group G] (N₁ N₂ : Subgroup G), N₁.Normal → N₂.Normal →\n    𝔉 N₁ → 𝔉 N₂ → 𝔉 ↥(N₁ ⊔ N₂)\n\n/-- The $\\mathfrak{F}$-radical $G_{\\mathfrak{F}}$ of $G$: the product (join) of all normal\nsubgroups of $G$ belonging to $\\mathfrak{F}$. For a Fitting class $\\mathfrak{F}$ and a finite\ngroup $G$ this is the largest normal $\\mathfrak{F}$-subgroup of $G$. -/\ndef radical (𝔉 : GroupClass) (G : Type) [Group G] : Subgroup G :=\n  ⨆ N : {N : Subgroup G // N.Normal ∧ 𝔉 N}, (N : Subgroup G)\n\n/-- The radical is a normal subgroup (being a join of normal subgroups). -/\ninstance radical_normal (𝔉 : GroupClass) (G : Type) [Group G] : (radical 𝔉 G).Normal where\n  conj_mem x hx g := by\n    refine Subgroup.iSup_induction (C := fun x => g * x * g⁻¹ ∈ radical 𝔉 G) _ hx ?_ ?_ ?_\n    · rintro ⟨N, hN, hN𝔉⟩ y hy\n      exact Subgroup.mem_iSup_of_mem ⟨N, hN, hN𝔉⟩ (hN.conj_mem y hy g)\n    · simp\n    · intro y z hy hz\n      simpa [mul_assoc] using mul_mem hy hz\n\n/-- The class of all finite groups is a Fitting class. -/\n@[category test, AMS 20]\ntheorem isFittingClass_finite : IsFittingClass (fun G _ => Finite G) where\n  finite _ _ h := h\n  of_mulEquiv _ _ _ _ e h := Finite.of_equiv _ e.toEquiv\n  nonempty := ⟨Unit, inferInstance, inferInstance⟩\n  of_normal _ _ _ _ h := by\n    have := h\n    infer_instance\n  sup_of_normal G _ N₁ N₂ _ h₂ hN₁ hN₂ := by\n    have h : ((N₁ ⊔ N₂ : Subgroup G) : Set G).Finite := by\n      rw [Subgroup.mul_normal N₁ N₂]\n      exact (Set.toFinite (N₁ : Set G)).mul (Set.toFinite (N₂ : Set G))\n    exact h.to_subtype\n\n/-- Every normal $\\mathfrak{F}$-subgroup of $G$ is contained in the $\\mathfrak{F}$-radical. -/\n@[category API, AMS 20]\ntheorem le_radical {𝔉 : GroupClass} {G : Type} [Group G] (N : Subgroup G) (hN : N.Normal)\n    (h : 𝔉 N) : N ≤ radical 𝔉 G :=\n  le_iSup (fun N : {N : Subgroup G // N.Normal ∧ 𝔉 N} => (N : Subgroup G)) ⟨N, hN, h⟩\n\n/-- A *Lockett class* is a Fitting class $\\mathfrak{F}$ such that\n$(G \\times H)_{\\mathfrak{F}} = G_{\\mathfrak{F}} \\times H_{\\mathfrak{F}}$ for all finite groups\n$G$, $H$. -/\ndef IsLockettClass (𝔉 : GroupClass) : Prop :=\n  IsFittingClass 𝔉 ∧ ∀ (G H : Type) [Group G] [Group H] [Finite G] [Finite H],\n    radical 𝔉 (G × H) = (radical 𝔉 G).prod (radical 𝔉 H)\n\n/-- Lockett's class $\\mathfrak{F}^*$: the smallest Lockett class containing $\\mathfrak{F}$,\ni.e. the intersection of all Lockett classes containing $\\mathfrak{F}$. -/\ndef lockettStar (𝔉 : GroupClass) : GroupClass :=\n  fun G _ => ∀ 𝔊 : GroupClass, IsLockettClass 𝔊 →\n    (∀ (H : Type) [Group H], 𝔉 H → 𝔊 H) → 𝔊 G\n\n/-- Every group in $\\mathfrak{F}$ lies in $\\mathfrak{F}^*$. -/\n@[category API, AMS 20]\ntheorem lockettStar_of_mem {𝔉 : GroupClass} {G : Type} [Group G] (h : 𝔉 G) :\n    lockettStar 𝔉 G :=\n  fun _ _ h𝔉𝔊 => h𝔉𝔊 G h\n\n/-- The *Lockett section* of $\\mathfrak{F}$: the set of all Fitting classes $\\mathfrak{G}$\nwith $\\mathfrak{G}^* = \\mathfrak{F}^*$. -/\ndef lockettSection (𝔉 : GroupClass) : Set GroupClass :=\n  {𝔊 | IsFittingClass 𝔊 ∧ lockettStar 𝔊 = lockettStar 𝔉}\n\n/-- The class $\\mathfrak{F}_*$: the intersection of all Fitting classes in the Lockett section\nof $\\mathfrak{F}$. By a theorem of Lockett, $\\mathfrak{F}_*$ itself belongs to the Lockett\nsection, so it is the bottom of the section. -/\ndef lockettLower (𝔉 : GroupClass) : GroupClass :=\n  fun G _ => ∀ 𝔊 ∈ lockettSection 𝔉, 𝔊 G\n\n/-- For a Fitting class $\\mathfrak{F}$ we have $\\mathfrak{F}_* \\subseteq \\mathfrak{F}$. -/\n@[category API, AMS 20]\ntheorem mem_of_lockettLower {𝔉 : GroupClass} (h𝔉 : IsFittingClass 𝔉) {G : Type} [Group G]\n    (h : lockettLower 𝔉 G) : 𝔉 G :=\n  h 𝔉 ⟨h𝔉, rfl⟩\n\n/-- The class $\\mathfrak{S}$ of all finite soluble groups. -/\ndef solvableGroups : GroupClass :=\n  fun G _ => Finite G ∧ IsSolvable G\n\n/-- A class $\\mathfrak{F}$ satisfies the *Lockett condition* if\n$\\mathfrak{F} \\cap \\mathfrak{S}_* = \\mathfrak{F}_*$, where $\\mathfrak{S}$ is the class of all\nfinite soluble groups. -/\ndef SatisfiesLockettCondition (𝔉 : GroupClass) : Prop :=\n  ∀ (G : Type) [Group G], (𝔉 G ∧ lockettLower solvableGroups G) ↔ lockettLower 𝔉 G\n\n/--\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of (finite) soluble groups which satisfy\nthe Lockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$ and\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all soluble groups and the lower star the bottom of the Lockett section determined by\nthe given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the Lockett condition?\n\nAll groups are finite. (The intersection $\\mathfrak{X} \\cap \\mathfrak{Y}$ of two Fitting classes is\nagain a Fitting class.)\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      (∀ (G : Type) [Group G], 𝔛 G → solvableGroups G) →\n      (∀ (G : Type) [Group G], 𝔜 G → solvableGroups G) →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (fun G _ => 𝔛 G ∧ 𝔜 G) := by\n  sorry\n\n/-- The class $\\mathfrak{N}_p$ of finite $p$-groups. -/\ndef pGroups (p : Nat.Primes) : GroupClass :=\n  fun G _ => Finite G ∧ IsPGroup (p : ℕ) G\n\n/-- The class $\\mathfrak{S}_\\pi$ of finite soluble $\\pi$-groups, for a set $\\pi$ of primes. -/\ndef solvablePiGroups (π : Set Nat.Primes) : GroupClass :=\n  fun G _ => Finite G ∧ IsSolvable G ∧ ∀ p : Nat.Primes, (p : ℕ) ∣ Nat.card G → p ∈ π\n\n/-- The Fitting product $\\mathfrak{X}\\mathfrak{Y} = (G : G/G_{\\mathfrak{X}} \\in \\mathfrak{Y})$\nof two classes of groups. -/\ndef fittingProduct (𝔛 𝔜 : GroupClass) : GroupClass :=\n  fun G _ => 𝔜 (G ⧸ radical 𝔛 G)\n\n/-- A *Hartley function* assigns to every prime either the empty class or a Fitting class. -/\ndef IsHartleyFunction (f : Nat.Primes → GroupClass) : Prop :=\n  ∀ p, (∀ (G : Type) [Group G], ¬ f p G) ∨ IsFittingClass (f p)\n\n/-- The support $\\{p : f(p) \\neq \\emptyset\\}$ of a function from primes to classes of groups. -/\ndef support (f : Nat.Primes → GroupClass) : Set Nat.Primes :=\n  {p | ∃ (G : Type) (_ : Group G), f p G}\n\n/-- The class $LR(f) = \\mathfrak{S}_\\pi \\cap \\bigcap_{p \\in \\pi}\nf(p)\\,\\mathfrak{N}_p\\,\\mathfrak{S}_{p'}$ locally defined by a Hartley function $f$ with\nsupport $\\pi$, where the products are Fitting products. -/\ndef localFittingClass (f : Nat.Primes → GroupClass) : GroupClass :=\n  fun G _ => solvablePiGroups (support f) G ∧\n    ∀ p ∈ support f,\n      fittingProduct (fittingProduct (f p) (pGroups p)) (solvablePiGroups {p}ᶜ) G\n\n/-- A class of finite soluble groups is a *local Fitting class* (in the sense of Hartley) if it\nis of the form $LR(f)$ for some Hartley function $f$. -/\ndef IsLocalFittingClass (𝔉 : GroupClass) : Prop :=\n  ∃ f : Nat.Primes → GroupClass, IsHartleyFunction f ∧ 𝔉 = localFittingClass f\n\n/--\nThe answer to Problem 8.30 is affirmative if $\\mathfrak{X}$ and $\\mathfrak{Y}$ are local:\nif $\\mathfrak{X}$, $\\mathfrak{Y}$ are local Fitting classes of (finite) soluble groups which\nsatisfy the Lockett condition, then $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfies the Lockett\ncondition (A. Grytczuk, N. T. Vorob'ev, 1994).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.«local» :\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      (∀ (G : Type) [Group G], 𝔛 G → solvableGroups G) →\n      (∀ (G : Type) [Group G], 𝔜 G → solvableGroups G) →\n      IsLocalFittingClass 𝔛 → IsLocalFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (fun G _ => 𝔛 G ∧ 𝔜 G) := by\n  sorry\n\nend Kourovka.«8.30»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.72,
+   "decomposition_objections": "Minor: the notes describe the local definition schematically as 'X = ⋂_p S_{p'} ∘ f(p) ∘ S_p style', which is the ordering used for *local formations*. Hartley's dual definition for Fitting classes reverses the order: X = LR(f) = 𝔖_π ∩ ⋂_{p∈π} f(p)𝔑_p𝔖_{p'} (Fitting products 𝔛𝔜 = (G : G/G_𝔛 ∈ 𝔜)), with the Hartley function f allowed to take the empty class as value and π = Supp(f); this is the convention of Hartley (1969) and of the Vorob'ev school (coauthor of the cited 1994 paper), and it is what the file formalizes. Otherwise the table was followed as written.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Classes of groups are modelled as predicates `(G : Type) → [Group G] → Prop`; all classes quantified over in the statements are Fitting classes and hence isomorphism-closed, and every finite group is isomorphic to one with carrier in `Type`.",
+    "`IsFittingClass` builds in the standard conventions: members are finite, the class is isomorphism-closed, nonempty, closed under normal subgroups and under joins N₁ ⊔ N₂ (= products N₁N₂) of normal subgroups.",
+    "The radical G_𝔉 is defined as the join of all normal 𝔉-subgroups of G (for a Fitting class and finite G this is the largest normal 𝔉-subgroup). A `Normal` instance is proved so that quotients G ⧸ G_𝔉 are groups.",
+    "𝔉^* is defined as the intersection of all Lockett classes (Fitting classes 𝔊 with (G × H)_𝔊 = G_𝔊 × H_𝔊 for all *finite* G, H) containing 𝔉. This is Lockett's characterization ('smallest Fitting class containing 𝔉 with the direct-product property'); it agrees with Lockett's original projection definition by Lockett's theorem. The product property is required only for finite G, H, as in the theory.",
+    "The Lockett section is taken over all Fitting classes of finite groups (not only classes of soluble groups) with 𝔊^* = 𝔉^*. For 𝔉 ⊆ 𝔖 this coincides with the section in the soluble universe, since 𝔊 ⊆ 𝔊^* = 𝔉^* ⊆ 𝔖 (𝔖 is a Lockett class). 𝔉_* is defined as the intersection of the section (Lockett's theorem shows it is a member, i.e. the bottom), so 'bottom group' in the source is read as 'bottom class'.",
+    "The Lockett condition is stated as class equality 𝔉 ∩ 𝔖_* = 𝔉_* via ∀ G, (𝔉 G ∧ 𝔖_* G) ↔ 𝔉_* G, with 𝔖 := finite soluble groups. 'Fitting class of soluble groups' is the hypothesis ∀ G, 𝔛 G → solvableGroups G. The intersection X ∩ Y is written as the pointwise conjunction `fun G _ => 𝔛 G ∧ 𝔜 G`.",
+    "Local Fitting classes follow Hartley/Vorob'ev: a Hartley function f : Nat.Primes → GroupClass has values that are empty or Fitting classes; LR(f) = 𝔖_π ∩ ⋂_{p∈π} (f(p)𝔑_p)𝔖_{p'} with π = Supp f, 𝔖_π the finite soluble π-groups, 𝔑_p the finite p-groups, Fitting product 𝔛𝔜 = (G : G/G_𝔛 ∈ 𝔜) nested to the left (the product is associative). The soluble universe is used for 𝔖_π and 𝔖_{p'}; allowing non-soluble values f(p) does not change which classes of soluble groups are local. A reviewer should check this convention against Grytczuk–Vorob'ev (1994), in particular that f(p) = ∅ is allowed (so that 𝔖_π is local).",
+    "In the variant, the hypotheses 'X, Y ⊆ 𝔖' and 'X, Y satisfy the Lockett condition' are kept alongside 'X, Y local' even though the first is implied by locality, matching the editors' comment as a special case of the main question."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Set Grp` (bundled category objects) — rejected as needlessly heavy; `Grp` and `IsSolvable` exist but no class-of-groups predicate type.",
+     "name": "Kourovka.«8.30».GroupClass",
+     "why_needed": "A notion of 'class of groups' is needed to quantify over Fitting classes; nothing in Mathlib or FormalConjecturesForMathlib provides it."
+    },
+    {
+     "closest_existing_considered": "Mathlib has no formations/Fitting classes; grep for 'Fitting' finds only Fitting decompositions of modules/Lie algebras.",
+     "name": "Kourovka.«8.30».IsFittingClass",
+     "why_needed": "Fitting classes (finite, iso-closed, nonempty, S_n- and N_0-closed) are not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.sSup`/`iSup` are used to define it; no generic radical exists (only e.g. `Subgroup.center`, `commutator`).",
+     "name": "Kourovka.«8.30».radical",
+     "why_needed": "The 𝔉-radical G_𝔉 (join of normal 𝔉-subgroups) is essential for Lockett's construction and Fitting products."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.sup_normal` (binary only); no iSup/sSup version in Mathlib.",
+     "name": "Kourovka.«8.30».radical_normal",
+     "why_needed": "Instance that the radical is normal, needed to form quotient groups in the Fitting product."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».IsLockettClass",
+     "why_needed": "Fitting classes with (G × H)_𝔉 = G_𝔉 × H_𝔉 for finite G, H; used to define 𝔉^*."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».lockettStar",
+     "why_needed": "Lockett's 𝔉^*, the smallest Lockett class containing 𝔉."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».lockettSection",
+     "why_needed": "The Lockett section {𝔊 Fitting : 𝔊^* = 𝔉^*} referred to in the statement."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».lockettLower",
+     "why_needed": "𝔉_*, the bottom (intersection) of the Lockett section."
+    },
+    {
+     "closest_existing_considered": "`IsSolvable` and `Finite` from Mathlib are used to define it.",
+     "name": "Kourovka.«8.30».solvableGroups",
+     "why_needed": "The class 𝔖 of finite soluble groups."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».SatisfiesLockettCondition",
+     "why_needed": "The Lockett condition 𝔉 ∩ 𝔖_* = 𝔉_* from the statement."
+    },
+    {
+     "closest_existing_considered": "`IsPGroup` from Mathlib is used to define it.",
+     "name": "Kourovka.«8.30».pGroups",
+     "why_needed": "The class 𝔑_p of finite p-groups for Hartley's local definition."
+    },
+    {
+     "closest_existing_considered": "`IsSolvable`, `Nat.card`, `Nat.Primes` are used to define it.",
+     "name": "Kourovka.«8.30».solvablePiGroups",
+     "why_needed": "The classes 𝔖_π and 𝔖_{p'} for Hartley's local definition."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».fittingProduct",
+     "why_needed": "The Fitting product 𝔛𝔜 = (G : G/G_𝔛 ∈ 𝔜) for Hartley's local definition."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».IsHartleyFunction",
+     "why_needed": "Hartley functions (values empty or Fitting classes) for the local definition."
+    },
+    {
+     "closest_existing_considered": "`Function.support` is for functions into types with zero, not applicable to classes.",
+     "name": "Kourovka.«8.30».support",
+     "why_needed": "Supp(f) = {p : f(p) ≠ ∅} for the local definition."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».localFittingClass",
+     "why_needed": "The class LR(f) locally defined by a Hartley function."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».IsLocalFittingClass",
+     "why_needed": "'Local' in the editors' comment: 𝔉 = LR(f) for some Hartley function f."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.30»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ X Y, X Y Fitting classes (finite, iso-closed, nonempty, S_n- and N_0-closed) contained in the class 𝔖 of finite soluble groups, both satisfying X ∩ 𝔖_* = X_*, then (X ∩ Y) ∩ 𝔖_* = (X ∩ Y)_*. Needed bespoke definitions of Fitting class, radical, Lockett class, F^*, Lockett section, F_* (none exist in Mathlib or FormalConjecturesForMathlib)."
+    },
+    "kourovka.«8.30».variants.local": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as a positive assertion with the same hypotheses as the main question plus 'X, Y local' in Hartley's sense (X = LR(f) = 𝔖_π ∩ ⋂_{p∈π} f(p)𝔑_p𝔖_{p'} for a Hartley function f, π = Supp f). Needed bespoke definitions of Fitting product, 𝔑_p, 𝔖_π, Hartley function, support, LR(f), local Fitting class."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.30»": "/--\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of (finite) soluble groups which satisfy\nthe Lockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$ and\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all soluble groups and the lower star the bottom of the Lockett section determined by\nthe given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the Lockett condition?\n\nAll groups are finite. (The intersection $\\mathfrak{X} \\cap \\mathfrak{Y}$ of two Fitting classes is\nagain a Fitting class.)\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      (∀ (G : Type) [Group G], 𝔛 G → solvableGroups G) →\n      (∀ (G : Type) [Group G], 𝔜 G → solvableGroups G) →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (fun G _ => 𝔛 G ∧ 𝔜 G) := by\n  sorry",
+    "kourovka.«8.30».variants.local": "/--\nThe answer to Problem 8.30 is affirmative if $\\mathfrak{X}$ and $\\mathfrak{Y}$ are local:\nif $\\mathfrak{X}$, $\\mathfrak{Y}$ are local Fitting classes of (finite) soluble groups which\nsatisfy the Lockett condition, then $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfies the Lockett\ncondition (A. Grytczuk, N. T. Vorob'ev, 1994).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.«local» :\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      (∀ (G : Type) [Group G], 𝔛 G → solvableGroups G) →\n      (∀ (G : Type) [Group G], 𝔜 G → solvableGroups G) →\n      IsLocalFittingClass 𝔛 → IsLocalFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (fun G _ => 𝔛 G ∧ 𝔜 G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.30\n\nby H. Lausch\n\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of soluble groups which satisfy the\nLockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$,\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all soluble groups and the lower star the bottom of the Lockett section determined by\nthe given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the Lockett condition?\n\n*Editors' comment (2001):* the answer is affirmative if $\\mathfrak{X}$ and $\\mathfrak{Y}$ are\nlocal (A. Grytczuk, N. T. Vorob'ev, *Tsukuba J. Math.* **18**, no. 1 (1994), 63–67).\n\nThroughout, as is standard in this theory, \"group\" means finite group and \"soluble\" means finite\nsoluble, so all classes live inside the class $\\mathfrak{S}$ of finite soluble groups. A *Fitting\nclass* is a nonempty isomorphism-closed class of groups that is closed under normal subgroups\nand under products of normal subgroups. For a Fitting class $\\mathfrak{X}$ and a group $G$, the\n$\\mathfrak{X}$-radical $G_{\\mathfrak{X}}$ is the largest normal $\\mathfrak{X}$-subgroup of $G$.\n\n* A Fitting class $\\mathfrak{X}$ is a *Lockett class* if\n  $(G \\times H)_{\\mathfrak{X}} = G_{\\mathfrak{X}} \\times H_{\\mathfrak{X}}$ for all $G$, $H$.\n* The *Lockett closure* $\\mathfrak{X}^*$ is the smallest Lockett class containing\n  $\\mathfrak{X}$ (Lockett); equivalently, the intersection of all Lockett classes containing\n  $\\mathfrak{X}$.\n* The *Lockett section* of $\\mathfrak{X}$ is the set of Fitting classes $\\mathfrak{Y}$ with\n  $\\mathfrak{Y}^* = \\mathfrak{X}^*$; its bottom element $\\mathfrak{X}_*$ (the *lower star*) is\n  the intersection of all such $\\mathfrak{Y}$.\n* $\\mathfrak{X}$ satisfies the *Lockett condition* if\n  $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$. Lockett conjectured that every Fitting\n  class of finite soluble groups satisfies it; this was refuted by Berger and Cossey.\n* A Fitting class is *local* (Hartley) if it is of the form\n  $LR(f) = \\bigcap_{p} f(p)\\mathfrak{N}_p\\mathfrak{S}_{p'}$ for a Hartley function $f$, which\n  assigns to every prime $p$ a Fitting class $f(p)$ or the empty class (the $p$-th term being\n  $\\mathfrak{S}_{p'}$ when $f(p) = \\emptyset$).\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n* A. Grytczuk, N. T. Vorob'ev, *On Lockett's conjecture for finite groups*,\n  Tsukuba J. Math. **18** (1994), no. 1, 63–67.\n* K. Doerk, T. Hawkes, *Finite Soluble Groups*, de Gruyter, 1992, Chapters IX and X.\n* B. Hartley, *On Fischer's dualization of formation theory*,\n  Proc. London Math. Soc. (3) **19** (1969), 193–207.\n-/\n\nnamespace Kourovka.«8.30»\n\n/-- A class of groups, represented as a predicate on groups. -/\nabbrev GroupClass : Type 1 := (G : Type) → [Group G] → Prop\n\n/-- A class of groups `𝔛` is a *Fitting class of finite soluble groups* if it consists of finite\nsoluble groups, is nonempty, is closed under isomorphisms, is closed under taking normal\nsubgroups, and is closed under products of normal subgroups: if `G = N₁N₂` with `N₁`, `N₂`\nnormal subgroups of `G` lying in `𝔛`, then `G ∈ 𝔛`. -/\nstructure IsFittingClass (𝔛 : GroupClass) : Prop where\n  finite_isSolvable : ∀ (G : Type) [Group G], 𝔛 G → Finite G ∧ IsSolvable G\n  nonempty : ∃ (G : Type) (_ : Group G), 𝔛 G\n  of_mulEquiv : ∀ (G H : Type) [Group G] [Group H], G ≃* H → 𝔛 G → 𝔛 H\n  of_normal : ∀ (G : Type) [Group G] (N : Subgroup G), N.Normal → 𝔛 G → 𝔛 N\n  of_sup_eq_top : ∀ (G : Type) [Group G] (N₁ N₂ : Subgroup G), N₁.Normal → N₂.Normal →\n    𝔛 N₁ → 𝔛 N₂ → N₁ ⊔ N₂ = ⊤ → 𝔛 G\n\n/-- The intersection `𝔛 ∩ 𝔜` of two classes of groups. -/\ndef inter (𝔛 𝔜 : GroupClass) : GroupClass :=\n  fun G _ => 𝔛 G ∧ 𝔜 G\n\n/-- The class `𝔖` of all finite soluble groups. -/\ndef solubleClass : GroupClass :=\n  fun G _ => Finite G ∧ IsSolvable G\n\n/-- The `𝔛`-radical `G_𝔛` of a group `G`: the join of all normal subgroups of `G` lying in `𝔛`.\nWhen `𝔛` is a Fitting class and `G` is finite, this is the largest normal `𝔛`-subgroup of `G`. -/\ndef radical (𝔛 : GroupClass) (G : Type) [Group G] : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ 𝔛 N}\n\n/-- A Fitting class `𝔛` of finite soluble groups is a *Lockett class* if\n`(G × H)_𝔛 = G_𝔛 × H_𝔛` for all finite soluble groups `G` and `H`. -/\ndef IsLockettClass (𝔛 : GroupClass) : Prop :=\n  IsFittingClass 𝔛 ∧\n    ∀ (G H : Type) [Group G] [Group H] [Finite G] [Finite H] [IsSolvable G] [IsSolvable H],\n      radical 𝔛 (G × H) = (radical 𝔛 G).prod (radical 𝔛 H)\n\n/-- The *Lockett closure* `𝔛^*` of a class `𝔛`: the intersection of all Lockett classes\ncontaining `𝔛`. For a Fitting class `𝔛` this is the smallest Lockett class containing `𝔛`. -/\ndef lockettClosure (𝔛 : GroupClass) : GroupClass :=\n  fun G _ => ∀ 𝔜 : GroupClass, IsLockettClass 𝔜 → (∀ (H : Type) [Group H], 𝔛 H → 𝔜 H) → 𝔜 G\n\n/-- The *lower star* `𝔛_*` of a Fitting class `𝔛`: the intersection of all Fitting classes `𝔜`\nwith `𝔜^* = 𝔛^*`, i.e. the bottom of the Lockett section determined by `𝔛`. -/\ndef lowerStar (𝔛 : GroupClass) : GroupClass :=\n  fun G _ => ∀ 𝔜 : GroupClass, IsFittingClass 𝔜 → lockettClosure 𝔜 = lockettClosure 𝔛 → 𝔜 G\n\n/-- A Fitting class `𝔛` satisfies the *Lockett condition* if `𝔛 ∩ 𝔖_* = 𝔛_*`, where `𝔖` is the\nclass of all finite soluble groups. -/\ndef SatisfiesLockettCondition (𝔛 : GroupClass) : Prop :=\n  inter 𝔛 (lowerStar solubleClass) = lowerStar 𝔛\n\n/-- Every class is contained in its Lockett closure: `𝔛 ⊆ 𝔛^*`. -/\n@[category API, AMS 20]\ntheorem le_lockettClosure (𝔛 : GroupClass) (G : Type) [Group G] (hG : 𝔛 G) :\n    lockettClosure 𝔛 G :=\n  fun _ _ h𝔜 => h𝔜 G hG\n\n/-- The Lockett closure of `𝔛` is contained in every Lockett class containing `𝔛`. -/\n@[category API, AMS 20]\ntheorem lockettClosure_le (𝔛 𝔜 : GroupClass) (h𝔜 : IsLockettClass 𝔜)\n    (h : ∀ (H : Type) [Group H], 𝔛 H → 𝔜 H) (G : Type) [Group G] (hG : lockettClosure 𝔛 G) :\n    𝔜 G :=\n  hG 𝔜 h𝔜 h\n\n/-- The lower star of a Fitting class is contained in it: `𝔛_* ⊆ 𝔛`. -/\n@[category API, AMS 20]\ntheorem lowerStar_le (𝔛 : GroupClass) (h𝔛 : IsFittingClass 𝔛) (G : Type) [Group G]\n    (hG : lowerStar 𝔛 G) : 𝔛 G :=\n  hG 𝔛 h𝔛 rfl\n\n/-- The `𝔖`-radical of a finite soluble group is the whole group. -/\n@[category test, AMS 20]\ntheorem radical_solubleClass (G : Type) [Group G] [Finite G] [IsSolvable G] :\n    radical solubleClass G = ⊤ :=\n  le_antisymm le_top (le_sSup ⟨inferInstance, inferInstance, inferInstance⟩)\n\n/--\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of (finite) soluble groups which satisfy\nthe Lockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$ and\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all soluble groups and the lower star the bottom of the Lockett section determined by\nthe given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the Lockett condition?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (inter 𝔛 𝔜) := by\n  sorry\n\n/-- A group `G` is *`p`-closed* if it has a normal Sylow `p`-subgroup. -/\ndef IsPClosed (p : ℕ) (G : Type) [Group G] : Prop :=\n  ∃ P : Sylow p G, (P : Subgroup G).Normal\n\n/-- A *Hartley function* assigns to every prime `p` either a Fitting class of finite soluble\ngroups or the empty class. -/\ndef IsHartleyFunction (f : ℕ → GroupClass) : Prop :=\n  ∀ p : ℕ, p.Prime → IsFittingClass (f p) ∨ ∀ (G : Type) [Group G], ¬ f p G\n\n/-- The class `LR(f) = ⋂_p f(p) 𝔑_p 𝔖_{p'}` locally defined by a Hartley function `f`, where\n`𝔑_p` is the class of `p`-groups, `𝔖_{p'}` the class of finite soluble `p'`-groups, and products\nare Fitting products. Concretely, a finite soluble group `G` lies in `LR(f)` if and only if for\nevery prime `p` dividing `|G|` there is a normal subgroup `N` of `G` lying in `f(p)` such that\n`G / N` is `p`-closed. Since `p`-closed groups are closed under quotients, this is equivalent to\n`G / G_{f(p)} ∈ 𝔑_p 𝔖_{p'}` when `f(p)` is a Fitting class, and to `p ∤ |G|` (i.e. `G ∈ 𝔖_{p'}`)\nwhen `f(p)` is empty. -/\ndef localFittingClass (f : ℕ → GroupClass) : GroupClass :=\n  fun G _ => Finite G ∧ IsSolvable G ∧\n    ∀ p : ℕ, p.Prime → p ∣ Nat.card G →\n      ∃ (N : Subgroup G) (_ : N.Normal), f p N ∧ IsPClosed p (G ⧸ N)\n\n/-- A class `𝔛` is a *local Fitting class* if `𝔛 = LR(f)` for some Hartley function `f`. -/\ndef IsLocalFittingClass (𝔛 : GroupClass) : Prop :=\n  ∃ f : ℕ → GroupClass, IsHartleyFunction f ∧ 𝔛 = localFittingClass f\n\n/-- Every commutative group is `p`-closed. -/\n@[category test, AMS 20]\ntheorem isPClosed_of_commGroup (p : ℕ) (G : Type) [CommGroup G] : IsPClosed p G :=\n  ⟨Sylow.nonempty.some, inferInstance⟩\n\n/-- If a Hartley function takes only empty values, then the class it locally defines consists of\nthe trivial group only (it is `⋂_p 𝔖_{p'}`). -/\n@[category test, AMS 20]\ntheorem subsingleton_of_localFittingClass_empty (f : ℕ → GroupClass)\n    (hf : ∀ (p : ℕ) (G : Type) [Group G], ¬ f p G) (G : Type) [Group G]\n    (hG : localFittingClass f G) : Subsingleton G := by\n  obtain ⟨-, -, h⟩ := hG\n  by_contra hns\n  have hcard : Nat.card G ≠ 1 := fun h1 => hns (Nat.card_eq_one_iff_unique.mp h1).1\n  obtain ⟨p, hp, hpd⟩ := Nat.exists_prime_and_dvd hcard\n  obtain ⟨N, -, hN, -⟩ := h p hp hpd\n  exact hf p N hN\n\n/--\nIf $\\mathfrak{X}$ and $\\mathfrak{Y}$ are *local* Fitting classes of (finite) soluble groups\nwhich satisfy the Lockett condition, then $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfies the Lockett\ncondition (A. Grytczuk, N. T. Vorob'ev, *Tsukuba J. Math.* **18**, no. 1 (1994), 63–67).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.«local» :\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      IsLocalFittingClass 𝔛 → IsLocalFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (inter 𝔛 𝔜) := by\n  sorry\n\nend Kourovka.«8.30»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None of substance. The variant slot's note describes the local definition as an 'S_{p'} ∘ f(p) ∘ S_p style' formula; the standard Hartley/Vorob'ev local Fitting class is LR(f) = ⋂_p f(p)𝔑_p𝔖_{p'} (Fitting products; G/G_{f(p)} p-closed), which is the reversal-dual of Gaschütz's local formation ⋂_p 𝔖_{p'}𝔑_p f(p). I followed the standard formula rather than the note's factor order.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Classes of groups are represented as predicates `GroupClass := (G : Type) → [Group G] → Prop` (universe `Type`, as in the other Kourovka files); class equality/intersection are function equality / pointwise conjunction.",
+    "`IsFittingClass` encodes 'Fitting class of soluble groups' in the Kourovka/Lockett sense: every member is a finite soluble group (`Finite G ∧ IsSolvable G`), the class is nonempty, isomorphism-closed, closed under normal subgroups (S_n) and under normal products (N₀: N₁, N₂ ⊴ G in the class with N₁ ⊔ N₂ = ⊤ ⟹ G in the class).",
+    "The 𝔛-radical is defined as `sSup` of the normal 𝔛-subgroups; for a Fitting class and a finite group this is the largest normal 𝔛-subgroup (the join of finitely many normal 𝔛-subgroups is again a normal 𝔛-subgroup).",
+    "A Lockett class is defined by the standard characterization (G × H)_𝔛 = G_𝔛 × H_𝔛 for all finite soluble G, H (Lockett: equivalent to 𝔛 = 𝔛^*). The Lockett closure 𝔛^* is then defined as the intersection of all Lockett classes containing 𝔛, matching the decomposition notes ('smallest Fitting class containing X with the direct-product radical property'); this is well-defined because 𝔖 is such a class and intersections of Lockett classes are Lockett (G_{⋂𝔜} = ⋂ G_𝔜 for finite G), and equals Lockett's 𝔉^* by his theorem that 𝔉^* is the smallest Lockett class containing 𝔉. Lockett's explicit construction via (G × G)_𝔉 was deliberately not used.",
+    "The lower star 𝔛_* is defined as the intersection of all Fitting classes 𝔜 with 𝔜^* = 𝔛^* (the standard definition of the bottom of the Lockett section Locksec(𝔛)); the text's 'bottom group' is read as 'bottom class' per the decomposition notes.",
+    "The Lockett condition is stated as the class equality `inter 𝔛 (lowerStar solubleClass) = lowerStar 𝔛`, i.e. 𝔛 ∩ 𝔖_* = 𝔛_* with 𝔖 the class of finite soluble groups.",
+    "The Lockett-class property quantifies over finite soluble G, H only (the universe 𝔖 of the problem); for a Fitting class contained in 𝔖 this is equivalent to quantifying over all finite groups, since (G × H)_𝔖 = G_𝔖 × H_𝔖 and G_𝔛 = (G_𝔖)_𝔛.",
+    "Local Fitting classes follow Hartley/Vorob'ev: a Hartley function assigns to each prime a Fitting class or the empty class, and LR(f) = ⋂_p f(p)𝔑_p𝔖_{p'} (Fitting products, restricted to the soluble universe). It is formalized as: G finite soluble and for every prime p ∣ |G| there is N ⊴ G with N ∈ f(p) and G/N p-closed (normal Sylow p-subgroup). For a Fitting class f(p) this is equivalent to G/G_{f(p)} ∈ 𝔑_p𝔖_{p'} (p-closed groups are quotient-closed, and the radical lies in f(p)), and the guard `p ∣ |G|` is then harmless; for f(p) = ∅ it yields the convention that the p-th term is 𝔖_{p'} (so that Supp(f) is the set of primes p with C_p ∈ LR(f), dual to Gaschütz's local formations). A reviewer should confirm this empty-value convention and the factor order f(p)𝔑_p𝔖_{p'} against Hartley (1969) / Grytczuk–Vorob'ev (1994).",
+    "The variant keeps the redundant hypotheses `IsFittingClass 𝔛`, `IsFittingClass 𝔜` alongside `IsLocalFittingClass`; every LR(f) is a Fitting class (Hartley), so this only makes the specialization of the primary statement explicit.",
+    "The solved variant is stated in the finite soluble universe, as the Kourovka editors apply it to the (soluble) problem; the Grytczuk–Vorob'ev paper may be phrased for all finite groups.",
+    "Added short, fully proved `API`/`test` statements for the bespoke definitions (𝔛 ⊆ 𝔛^*, 𝔛^* ⊆ any Lockett class containing 𝔛, 𝔛_* ⊆ 𝔛, the 𝔖-radical is ⊤, commutative groups are p-closed, an all-empty Hartley function defines only the trivial group)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Set Grp` / bundled category objects `Grp`; rejected as heavier and less readable than a predicate `(G : Type) → [Group G] → Prop`.",
+     "name": "Kourovka.«8.30».GroupClass",
+     "why_needed": "A 'class of groups' (predicate on groups closed under isomorphism) has no Mathlib counterpart; Fitting classes, radicals and Lockett sections are all about such classes."
+    },
+    {
+     "closest_existing_considered": "Nothing comparable; Mathlib only has `IsSolvable`, `Subgroup.Normal`, `IsPGroup`.",
+     "name": "Kourovka.«8.30».IsFittingClass",
+     "why_needed": "Fitting classes (S_n- and N₀-closed nonempty isomorphism-closed classes of finite soluble groups) do not exist in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`Set.inter`/`Inf` on `Pi` types; a dedicated definition is more transparent for the instance-implicit pi type.",
+     "name": "Kourovka.«8.30».inter",
+     "why_needed": "Intersection 𝔛 ∩ 𝔜 of two classes of groups, needed for the statement itself and for the Lockett condition 𝔛 ∩ 𝔖_*."
+    },
+    {
+     "closest_existing_considered": "`IsSolvable` and `Finite` (used as its components).",
+     "name": "Kourovka.«8.30».solubleClass",
+     "why_needed": "The Fitting class 𝔖 of all finite soluble groups, appearing in the Lockett condition via 𝔖_*."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Subgroup.sSup` (used to define it); no radical for a class of groups exists.",
+     "name": "Kourovka.«8.30».radical",
+     "why_needed": "The 𝔛-radical G_𝔛 (largest normal 𝔛-subgroup) is needed to state the Lockett class property (G × H)_𝔛 = G_𝔛 × H_𝔛."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».IsLockettClass",
+     "why_needed": "Lockett classes (𝔛 = 𝔛^*), via the standard direct-product radical characterization; needed to define the Lockett closure."
+    },
+    {
+     "closest_existing_considered": "A closure operator on `Set`; not applicable to classes of groups.",
+     "name": "Kourovka.«8.30».lockettClosure",
+     "why_needed": "The Lockett closure 𝔛^*, defined as the intersection of Lockett classes containing 𝔛; needed to define the Lockett section."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».lowerStar",
+     "why_needed": "The lower star 𝔛_*, bottom of the Lockett section {𝔜 : 𝔜^* = 𝔛^*}, appearing in the Lockett condition."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».SatisfiesLockettCondition",
+     "why_needed": "The Lockett condition 𝔛 ∩ 𝔖_* = 𝔛_*, the hypothesis and conclusion of the problem."
+    },
+    {
+     "closest_existing_considered": "`Sylow` and `Subgroup.Normal` (used as components); `Subsingleton (Sylow p G)` is equivalent but less direct.",
+     "name": "Kourovka.«8.30».IsPClosed",
+     "why_needed": "p-closed groups (normal Sylow p-subgroup), i.e. the class 𝔑_p𝔖_{p'} appearing in Hartley's local definition."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».IsHartleyFunction",
+     "why_needed": "Hartley functions (prime ↦ Fitting class or empty class) parametrize local Fitting classes."
+    },
+    {
+     "closest_existing_considered": "None (Mathlib has no Fitting products or local formations).",
+     "name": "Kourovka.«8.30».localFittingClass",
+     "why_needed": "The class LR(f) = ⋂_p f(p)𝔑_p𝔖_{p'} locally defined by a Hartley function."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.30».IsLocalFittingClass",
+     "why_needed": "'Local' Fitting classes, the hypothesis of the solved variant."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.30»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 → SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 → SatisfiesLockettCondition (inter 𝔛 𝔜), where classes are of finite soluble groups, SatisfiesLockettCondition 𝔛 is the class equality 𝔛 ∩ 𝔖_* = 𝔛_*, 𝔛_* is the intersection of all Fitting classes 𝔜 with 𝔜^* = 𝔛^* (bottom of the Lockett section), and 𝔛^* is the intersection of all Lockett classes (Fitting classes with (G×H)_𝔛 = G_𝔛 × H_𝔛 for all finite soluble G, H) containing 𝔛. No Fitting-class primitives exist in Mathlib or the repo, so all of these are bespoke."
+    },
+    "kourovka.«8.30».variants.local": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated (declaration `kourovka.«8.30».variants.«local»`, same Name since `local` is a Lean keyword) as the positive assertion: for Fitting classes 𝔛, 𝔜 of finite soluble groups that are local (𝔛 = LR(f) for a Hartley function f) and satisfy the Lockett condition, 𝔛 ∩ 𝔜 satisfies the Lockett condition. Local Fitting classes are defined via Hartley's LR(f) = ⋂_p f(p)𝔑_p𝔖_{p'}, formalized concretely as: finite soluble G with, for every prime p ∣ |G|, a normal N ∈ f(p) such that G/N has a normal Sylow p-subgroup."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.30»": "/--\nLet $\\mathfrak{X}$, $\\mathfrak{Y}$ be Fitting classes of (finite) soluble groups which satisfy\nthe Lockett condition, i.e. $\\mathfrak{X} \\cap \\mathfrak{S}_* = \\mathfrak{X}_*$ and\n$\\mathfrak{Y} \\cap \\mathfrak{S}_* = \\mathfrak{Y}_*$, where $\\mathfrak{S}$ denotes the Fitting\nclass of all soluble groups and the lower star the bottom of the Lockett section determined by\nthe given Fitting class. Does $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfy the Lockett condition?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (inter 𝔛 𝔜) := by\n  sorry",
+    "kourovka.«8.30».variants.local": "/--\nIf $\\mathfrak{X}$ and $\\mathfrak{Y}$ are *local* Fitting classes of (finite) soluble groups\nwhich satisfy the Lockett condition, then $\\mathfrak{X} \\cap \\mathfrak{Y}$ satisfies the Lockett\ncondition (A. Grytczuk, N. T. Vorob'ev, *Tsukuba J. Math.* **18**, no. 1 (1994), 63–67).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.«local» :\n    ∀ 𝔛 𝔜 : GroupClass, IsFittingClass 𝔛 → IsFittingClass 𝔜 →\n      IsLocalFittingClass 𝔛 → IsLocalFittingClass 𝔜 →\n      SatisfiesLockettCondition 𝔛 → SatisfiesLockettCondition 𝔜 →\n      SatisfiesLockettCondition (inter 𝔛 𝔜) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.30\n\nby H. Lausch\n\nLet $\\mathfrak X$ and $\\mathfrak Y$ be Fitting classes of finite soluble groups satisfying the\nLockett condition. Does their intersection also satisfy the Lockett condition?\n\nThe editors report that the answer is affirmative when $\\mathfrak X$ and $\\mathfrak Y$ are local\nFitting classes.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 8.30.\n\n*Reference:* A. Grytczuk and N. T. Vorob'ev, Tsukuba J. Math. **18** (1994), no. 1,\n63--67.\n-/\n\nnamespace Kourovka.«8.30»\n\n/-- A class of finite groups. Membership is later required to be invariant under group\nisomorphism. Using `FiniteGrp.{0}` loses no finite groups up to isomorphism. -/\nabbrev GroupClass := Set FiniteGrp.{0}\n\n/-- A Fitting class of finite soluble groups: a nonempty, isomorphism-closed class consisting of\nsoluble groups and closed under normal subgroups and products of normal subgroups in a common\nambient finite group. -/\ndef IsFittingClass (X : GroupClass) : Prop :=\n  X.Nonempty ∧\n  (∀ G ∈ X, IsSolvable G) ∧\n  (∀ (G H : FiniteGrp), Nonempty (G ≃* H) → G ∈ X → H ∈ X) ∧\n  (∀ G ∈ X, ∀ (N : Subgroup G), N.Normal → FiniteGrp.of N ∈ X) ∧\n  (∀ (G : FiniteGrp) (N M : Subgroup G), N.Normal → M.Normal →\n    FiniteGrp.of N ∈ X → FiniteGrp.of M ∈ X →\n      FiniteGrp.of (↥(N ⊔ M : Subgroup G)) ∈ X)\n\n/-- The $X$-radical $G_X$ of a finite group $G$: the join of all normal subgroups of $G$ whose\nunderlying abstract groups belong to $X$. -/\ndef radical (X : GroupClass) (G : FiniteGrp) : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ FiniteGrp.of N ∈ X}\n\n/-- A Fitting class is Lockett-closed when its radicals commute with every binary direct product:\n$(G \\times H)_X = G_X \\times H_X$. -/\ndef IsLockettClosed (X : GroupClass) : Prop :=\n  ∀ G H : FiniteGrp,\n    radical X (FiniteGrp.of (G × H)) = (radical X G).prod (radical X H)\n\n/-- The Lockett closure $X^*$ is the smallest Fitting class containing $X$ whose radicals commute\nwith binary direct products. It is represented as the intersection of all such classes. -/\ndef lockettClosure (X : GroupClass) : GroupClass :=\n  {G | ∀ C : GroupClass, IsFittingClass C → X ⊆ C → IsLockettClosed C → G ∈ C}\n\n/-- The lower star $X_*$ is the bottom of the Lockett section determined by $X$, namely the\nintersection of all Fitting classes $C$ such that $C^* = X^*$. -/\ndef lowerStar (X : GroupClass) : GroupClass :=\n  {G | ∀ C : GroupClass, IsFittingClass C →\n    lockettClosure C = lockettClosure X → G ∈ C}\n\n/-- The Fitting class $\\mathfrak S$ of all finite soluble groups. -/\ndef solubleGroups : GroupClass := {G | IsSolvable G}\n\n/-- The Lockett condition $X \\cap \\mathfrak S_* = X_*$. -/\ndef SatisfiesLockettCondition (X : GroupClass) : Prop :=\n  X ∩ lowerStar solubleGroups = lowerStar X\n\n/-- The product $XY$ of group classes: the groups $G$ for which the quotient by the $X$-radical\nbelongs to $Y$. -/\ndef classProduct (X Y : GroupClass) : GroupClass :=\n  {G | let N := radical X G\n    N.Normal ∧ ∀ [N.Normal], FiniteGrp.of (G ⧸ N) ∈ Y}\n\n/-- The class $\\mathfrak S_p$ of finite $p$-groups. -/\ndef pGroups (p : ℕ) : GroupClass := {G | IsPGroup p G}\n\n/-- The class $\\mathfrak S_{p'}$ of finite soluble groups whose orders are not divisible by $p$. -/\ndef solublePPrimeGroups (p : ℕ) : GroupClass :=\n  {G | IsSolvable G ∧ ¬p ∣ Nat.card G}\n\n/-- A Fitting class $X$ is local if it is defined by a Hartley function $f$ on the primes via\n$X = \\bigcap_p \\mathfrak S_{p'} f(p) \\mathfrak S_p$, where juxtaposition denotes class product. -/\ndef IsLocal (X : GroupClass) : Prop :=\n  ∃ f : ℕ → GroupClass, (∀ p, IsFittingClass (f p)) ∧\n    X = {G | ∀ p, p.Prime →\n      G ∈ classProduct (classProduct (solublePPrimeGroups p) (f p)) (pGroups p)}\n\n/--\nLet $\\mathfrak X$ and $\\mathfrak Y$ be Fitting classes of finite soluble groups satisfying\n$\\mathfrak X \\cap \\mathfrak S_* = \\mathfrak X_*$ and\n$\\mathfrak Y \\cap \\mathfrak S_* = \\mathfrak Y_*$. Does\n$\\mathfrak X \\cap \\mathfrak Y$ satisfy the Lockett condition\n$(\\mathfrak X \\cap \\mathfrak Y) \\cap \\mathfrak S_* = (\\mathfrak X \\cap \\mathfrak Y)_*$?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ X Y : GroupClass, IsFittingClass X → IsFittingClass Y →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n        SatisfiesLockettCondition (X ∩ Y) := by\n  sorry\n\n/--\nThe solved local variant of Problem 8.30: if $\\mathfrak X$ and $\\mathfrak Y$ are local Fitting\nclasses of finite soluble groups and each satisfies the Lockett condition, then\n$\\mathfrak X \\cap \\mathfrak Y$ satisfies the Lockett condition.\n-/\n@[category research solved, AMS 20]\ntheorem variants.local :\n    ∀ X Y : GroupClass, IsFittingClass X → IsFittingClass Y → IsLocal X → IsLocal Y →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n        SatisfiesLockettCondition (X ∩ Y) := by\n  sorry\n\nend Kourovka.«8.30»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.88,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite group classes are predicates on `FiniteGrp.{0}` and are explicitly required to be closed under multiplicative equivalence. This small-universe presentation represents every finite group up to isomorphism.",
+    "A Fitting class of soluble groups is modeled as nonempty, isomorphism-closed, consisting only of solvable groups, and closed under normal subgroups and joins of two normal subgroups in a common ambient finite group.",
+    "The class radical is the supremum of all normal subgroups whose underlying abstract group belongs to the class.",
+    "The Lockett closure is represented as the intersection of all Fitting classes containing the given class whose radicals commute with binary direct products. The lower star is the intersection of all Fitting classes having the same Lockett closure.",
+    "The local-class editor's variant uses a Hartley function from natural primes to Fitting classes and the decomposition-specified formula `S_{p'} ∘ f(p) ∘ S_p`, left-associated. Here `S_{p'}` is restricted to solvable groups of order not divisible by `p`.",
+    "The open question uses `answer(sorry) ↔` around the universally quantified implication, while the known local special case is stated positively with category `research solved`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `FiniteGrp` supplies bundled finite groups, but neither Mathlib nor FormalConjecturesForMathlib provides group classes.",
+     "name": "GroupClass",
+     "why_needed": "Provides a small type of classes of finite groups on which intersections and closure operators can be defined."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `IsSolvable`, normal subgroups, and subgroup joins, but no Fitting-class predicate.",
+     "name": "IsFittingClass",
+     "why_needed": "Expresses the precise finite-soluble Fitting-class axioms required by both slots."
+    },
+    {
+     "closest_existing_considered": "Mathlib has subgroup suprema and several unrelated specialized radicals, but no radical attached to an arbitrary Fitting class.",
+     "name": "radical",
+     "why_needed": "Defines the class radical used in the Lockett closure and class product."
+    },
+    {
+     "closest_existing_considered": "No Lockett definitions were found in Mathlib, FormalConjecturesForMathlib, or existing conjecture files.",
+     "name": "IsLockettClosed",
+     "why_needed": "Expresses the direct-product radical property defining Lockett closure."
+    },
+    {
+     "closest_existing_considered": "No generic closure operator with the required Fitting/Lockett semantics exists.",
+     "name": "lockettClosure",
+     "why_needed": "Formalizes the upper star as the smallest direct-product-radical Fitting class containing a class."
+    },
+    {
+     "closest_existing_considered": "No Lockett-section or lower-star primitive exists.",
+     "name": "lowerStar",
+     "why_needed": "Formalizes the bottom class in the Lockett section determined by a class."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsSolvable` is a group proposition, not a group class.",
+     "name": "solubleGroups",
+     "why_needed": "Names the class `S` of all finite soluble groups appearing in the Lockett condition."
+    },
+    {
+     "closest_existing_considered": "No existing Lockett-condition predicate exists.",
+     "name": "SatisfiesLockettCondition",
+     "why_needed": "Directly packages the equation `X ∩ S_* = X_*` used repeatedly in both statements."
+    },
+    {
+     "closest_existing_considered": "Mathlib has direct products and quotient groups, but no Fitting-class product.",
+     "name": "classProduct",
+     "why_needed": "Defines the product of classes needed in the Hartley local definition."
+    },
+    {
+     "closest_existing_considered": "`IsPGroup` exists, but not the corresponding `GroupClass` wrapper.",
+     "name": "pGroups",
+     "why_needed": "Lifts Mathlib's elementwise `IsPGroup` predicate to the group class `S_p`."
+    },
+    {
+     "closest_existing_considered": "Mathlib has divisibility and solvability predicates, but no combined group class.",
+     "name": "solublePPrimeGroups",
+     "why_needed": "Defines the local-theory class `S_{p'}` of finite soluble groups of order prime to `p`."
+    },
+    {
+     "closest_existing_considered": "No Hartley function or local Fitting-class notion was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsLocal",
+     "why_needed": "Formalizes local Fitting classes through the Hartley-function formula required for the solved variant."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.30»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.30».variants.local": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.30»": "/--\nLet $\\mathfrak X$ and $\\mathfrak Y$ be Fitting classes of finite soluble groups satisfying\n$\\mathfrak X \\cap \\mathfrak S_* = \\mathfrak X_*$ and\n$\\mathfrak Y \\cap \\mathfrak S_* = \\mathfrak Y_*$. Does\n$\\mathfrak X \\cap \\mathfrak Y$ satisfy the Lockett condition\n$(\\mathfrak X \\cap \\mathfrak Y) \\cap \\mathfrak S_* = (\\mathfrak X \\cap \\mathfrak Y)_*$?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ X Y : GroupClass, IsFittingClass X → IsFittingClass Y →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n        SatisfiesLockettCondition (X ∩ Y) := by\n  sorry",
+    "kourovka.«8.30».variants.local": "/--\nThe solved local variant of Problem 8.30: if $\\mathfrak X$ and $\\mathfrak Y$ are local Fitting\nclasses of finite soluble groups and each satisfies the Lockett condition, then\n$\\mathfrak X \\cap \\mathfrak Y$ satisfies the Lockett condition.\n-/\n@[category research solved, AMS 20]\ntheorem variants.local :\n    ∀ X Y : GroupClass, IsFittingClass X → IsFittingClass Y → IsLocal X → IsLocal Y →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n        SatisfiesLockettCondition (X ∩ Y) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.30\n\nby H. Lausch\n\nProblem 8.30 asks whether the intersection of two Fitting classes of finite\nsoluble groups satisfying the Lockett condition again satisfies that condition.\nThe editors report an affirmative answer when both classes are local.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.30»\n\n/-- A class of finite groups. The use of `Finite`, rather than `Fintype`, makes\nmembership independent of a choice of enumeration of the group. -/\ndef FiniteGroupClass := ∀ (G : Type) [Group G] [Finite G], Prop\n\n/-- Inclusion of classes of finite groups. -/\ndef classLE (X Y : FiniteGroupClass) : Prop :=\n  ∀ (G : Type) [Group G] [Finite G], X G → Y G\n\n/-- The intersection of two classes of finite groups. -/\ndef classInter (X Y : FiniteGroupClass) : FiniteGroupClass :=\n  fun G _ _ ↦ X G ∧ Y G\n\n/-- A Fitting class is a nonempty isomorphism-closed class of finite groups\nclosed under taking normal subgroups and under the join of two normal\nsubgroups belonging to the class. -/\ndef IsFittingClass (X : FiniteGroupClass) : Prop :=\n  (∃ (G : Type) (instG : Group G) (finG : Finite G), @X G instG finG) ∧\n  (∀ (G H : Type) [Group G] [Finite G] [Group H] [Finite H],\n    Nonempty (G ≃* H) → X G → X H) ∧\n  (∀ (G : Type) [Group G] [Finite G] (H : Subgroup G),\n    H.Normal → X G → X H) ∧\n  (∀ (G : Type) [Group G] [Finite G] (H K : Subgroup G),\n    H.Normal → K.Normal → X H → X K → X ↥(H ⊔ K))\n\n/-- The `X`-radical of a finite group: the subgroup generated by all normal\n`X`-subgroups. -/\ndef radical (X : FiniteGroupClass) (G : Type) [Group G] [Finite G] : Subgroup G :=\n  Subgroup.normalClosure (⋃ (H : Subgroup G) (_ : H.Normal) (_ : X H), (H : Set G))\n\n/-- A Fitting class is Lockett (normally denoted by a superscript star) when\nits radicals commute with all finite direct products. -/\ndef IsLockettClass (X : FiniteGroupClass) : Prop :=\n  ∀ (G H : Type) [Group G] [Finite G] [Group H] [Finite H],\n    radical X (G × H) = (radical X G).prod (radical X H)\n\n/-- The Lockett closure `X⁎`: the intersection of all Lockett Fitting classes\nwhich contain `X`. -/\ndef upperStar (X : FiniteGroupClass) : FiniteGroupClass :=\n  fun G _ _ ↦ ∀ Y : FiniteGroupClass,\n    IsFittingClass Y → classLE X Y → IsLockettClass Y → Y G\n\n/-- The bottom `X_*` of the Lockett section determined by `X`: the intersection\nof all Fitting classes having the same Lockett closure as `X`. -/\ndef lowerStar (X : FiniteGroupClass) : FiniteGroupClass :=\n  fun G _ _ ↦ ∀ Y : FiniteGroupClass,\n    IsFittingClass Y → upperStar Y = upperStar X → Y G\n\n/-- The Fitting class `S` of all finite soluble groups. -/\ndef solubleClass : FiniteGroupClass :=\n  fun G _ _ ↦ IsSolvable G\n\n/-- The Lockett condition `X ∩ S_* = X_*`. -/\ndef SatisfiesLockettCondition (X : FiniteGroupClass) : Prop :=\n  classInter X (lowerStar solubleClass) = lowerStar X\n\n/-- Membership of a quotient by a specified normal subgroup in a finite group\nclass. -/\ndef quotientMem (Y : FiniteGroupClass) {G : Type} [Group G] [Finite G]\n    (N : Subgroup G) (hN : N.Normal) : Prop := by\n  letI := hN\n  exact Y (G ⧸ N)\n\n/-- The Fitting product `X ∘ Y`: a group belongs to it when its quotient by\nits `X`-radical belongs to `Y`. -/\ndef classProduct (X Y : FiniteGroupClass) : FiniteGroupClass :=\n  fun G _ _ ↦ quotientMem Y (radical X G) Subgroup.normalClosure_normal\n\n/-- The class of finite `p`-groups. -/\ndef pGroupClass (p : ℕ) : FiniteGroupClass :=\n  fun G _ _ ↦ IsPGroup p G\n\n/-- The class of finite groups whose order is prime to `p`. -/\ndef pComplementClass (p : ℕ) : FiniteGroupClass :=\n  fun G _ _ ↦ (Nat.card G).Coprime p\n\n/-- The class locally defined by a Hartley function `f`. -/\ndef hartleyClass (f : ℕ → FiniteGroupClass) : FiniteGroupClass :=\n  fun G _ _ ↦ ∀ p, p.Prime →\n    classProduct (classProduct (pComplementClass p) (f p)) (pGroupClass p) G\n\n/-- A local Fitting class, expressed by a Hartley function `f` through the\nlocal definition\n`X = ⋂ₚ (S_{p'} ∘ f(p) ∘ S_p)` over the primes `p`. -/\ndef IsLocalFittingClass (X : FiniteGroupClass) : Prop :=\n  ∃ f : ℕ → FiniteGroupClass,\n    (∀ p, p.Prime → IsFittingClass (f p)) ∧ X = hartleyClass f\n\n/--\nLet $\\mathfrak X$ and $\\mathfrak Y$ be Fitting classes of finite soluble\ngroups satisfying the Lockett condition\n$\\mathfrak X \\cap \\mathfrak S_* = \\mathfrak X_*$ and\n$\\mathfrak Y \\cap \\mathfrak S_* = \\mathfrak Y_*$, where $\\mathfrak S$ is the\nclass of all finite soluble groups and the lower star denotes the bottom of\nthe Lockett section. Does $\\mathfrak X \\cap \\mathfrak Y$ satisfy the Lockett\ncondition?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ X Y : FiniteGroupClass,\n      IsFittingClass X → IsFittingClass Y →\n      classLE X solubleClass → classLE Y solubleClass →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n      SatisfiesLockettCondition (classInter X Y) := by\n  sorry\n\n/--\nThe editors' 2001 comment gives an affirmative answer in the local case: if\n$\\mathfrak X$ and $\\mathfrak Y$ are local Fitting classes of finite soluble\ngroups and each satisfies the Lockett condition, then\n$\\mathfrak X \\cap \\mathfrak Y$ satisfies the Lockett condition.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.local :\n    ∀ X Y : FiniteGroupClass,\n      IsFittingClass X → IsFittingClass Y →\n      classLE X solubleClass → classLE Y solubleClass →\n      IsLocalFittingClass X → IsLocalFittingClass Y →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n      SatisfiesLockettCondition (classInter X Y) := by\n  sorry\n\nend Kourovka.«8.30»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite group classes are predicates on small types equipped with `Group` and proof-irrelevant `Finite` instances. Isomorphism closure is an explicit Fitting-class axiom; restricting to small types loses no finite isomorphism types.",
+    "A Fitting class is encoded as nonempty and isomorphism-closed, closed under normal subgroups, and closed under joins of two normal member subgroups. For normal subgroups the join is their subgroup product.",
+    "The class radical is the normal closure of the union of all normal member subgroups. For a Fitting class this is the usual product of all normal class subgroups.",
+    "The Lockett closure is represented by its universal minimal characterization: the intersection of all containing Fitting classes whose radicals commute with finite direct products. The lower star is the intersection of all Fitting classes with the same Lockett closure.",
+    "The Fitting product is oriented by `G ∈ X ∘ Y` iff `G / G_X ∈ Y`. The Hartley local definition is the prime-indexed intersection `S_{p'} ∘ f(p) ∘ S_p`, with left-associated products; Fitting products are conventionally associative.",
+    "The hypotheses that X and Y are classes of soluble groups are represented by class inclusion in the class defined by Mathlib's `IsSolvable`.",
+    "The local variant retains every hypothesis of the main question and adds locality for both classes, matching the editors' phrase 'the answer is affirmative if X and Y are local'."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has bundled group categories and `Finite`, but no finite-group-class predicate or Fitting-class object.",
+     "name": "FiniteGroupClass",
+     "why_needed": "The statements quantify over classes of all finite groups, for which the repository has no abstraction."
+    },
+    {
+     "closest_existing_considered": "Ordinary function order is not directly available for the dependent finite-group-class predicate.",
+     "name": "classLE",
+     "why_needed": "Needed to express containment of group classes and the restriction to soluble groups."
+    },
+    {
+     "closest_existing_considered": "Set intersection does not apply directly to the dependent finite-group-class predicate.",
+     "name": "classInter",
+     "why_needed": "Needed for the intersections in the conjecture and Lockett condition."
+    },
+    {
+     "closest_existing_considered": "Mathlib's subgroup closure notions concern subgroups of one fixed group, not isomorphism-closed classes of finite groups.",
+     "name": "IsFittingClass",
+     "why_needed": "Fitting classes are absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib has several specialized radicals but no radical attached to an arbitrary Fitting class.",
+     "name": "radical",
+     "why_needed": "The class radical `G_X` is required to define Lockett closure and Fitting products."
+    },
+    {
+     "closest_existing_considered": "No Lockett theory exists in Mathlib or the repository.",
+     "name": "IsLockettClass",
+     "why_needed": "Needed to characterize classes fixed by Lockett closure through direct-product compatibility of radicals."
+    },
+    {
+     "closest_existing_considered": "No Lockett closure exists in Mathlib or the repository.",
+     "name": "upperStar",
+     "why_needed": "This is the Lockett closure used to define the Lockett section."
+    },
+    {
+     "closest_existing_considered": "No Lockett section or lower-star operation exists in Mathlib or the repository.",
+     "name": "lowerStar",
+     "why_needed": "This is the bottom class of the Lockett section appearing explicitly in the problem."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides the group predicate `IsSolvable`, but not the corresponding finite group class.",
+     "name": "solubleClass",
+     "why_needed": "The conjecture uses the Fitting class of all finite soluble groups."
+    },
+    {
+     "closest_existing_considered": "No existing Lockett-condition predicate was found.",
+     "name": "SatisfiesLockettCondition",
+     "why_needed": "Packages the equation `X ∩ S_* = X_*` stated in the problem."
+    },
+    {
+     "closest_existing_considered": "Mathlib supplies quotient groups but no helper for membership in the bespoke dependent group-class type.",
+     "name": "quotientMem",
+     "why_needed": "Allows class membership of a quotient while installing an explicitly supplied normality proof as the quotient-group instance."
+    },
+    {
+     "closest_existing_considered": "Mathlib has no product operation on Fitting classes.",
+     "name": "classProduct",
+     "why_needed": "The local Fitting-class definition uses iterated Fitting products."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `IsPGroup`, but not the corresponding finite group class.",
+     "name": "pGroupClass",
+     "why_needed": "The Hartley local definition uses the class `S_p`."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides cardinality and coprimality predicates, but not this finite group class.",
+     "name": "pComplementClass",
+     "why_needed": "The Hartley local definition uses the class `S_{p'}`."
+    },
+    {
+     "closest_existing_considered": "No Hartley function or local Fitting-class construction exists in Mathlib or the repository.",
+     "name": "hartleyClass",
+     "why_needed": "Represents the prime-indexed class determined by a Hartley function and avoids duplicating the local-definition expression."
+    },
+    {
+     "closest_existing_considered": "No local Fitting-class predicate or Hartley-function infrastructure was found.",
+     "name": "IsLocalFittingClass",
+     "why_needed": "The solved variant quantifies over local Fitting classes."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.30»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.30».variants.local": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.30»": "/--\nLet $\\mathfrak X$ and $\\mathfrak Y$ be Fitting classes of finite soluble\ngroups satisfying the Lockett condition\n$\\mathfrak X \\cap \\mathfrak S_* = \\mathfrak X_*$ and\n$\\mathfrak Y \\cap \\mathfrak S_* = \\mathfrak Y_*$, where $\\mathfrak S$ is the\nclass of all finite soluble groups and the lower star denotes the bottom of\nthe Lockett section. Does $\\mathfrak X \\cap \\mathfrak Y$ satisfy the Lockett\ncondition?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.30» : answer(sorry) ↔\n    ∀ X Y : FiniteGroupClass,\n      IsFittingClass X → IsFittingClass Y →\n      classLE X solubleClass → classLE Y solubleClass →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n      SatisfiesLockettCondition (classInter X Y) := by\n  sorry",
+    "kourovka.«8.30».variants.local": "/--\nThe editors' 2001 comment gives an affirmative answer in the local case: if\n$\\mathfrak X$ and $\\mathfrak Y$ are local Fitting classes of finite soluble\ngroups and each satisfies the Lockett condition, then\n$\\mathfrak X \\cap \\mathfrak Y$ satisfies the Lockett condition.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«8.30».variants.local :\n    ∀ X Y : FiniteGroupClass,\n      IsFittingClass X → IsFittingClass Y →\n      classLE X solubleClass → classLE Y solubleClass →\n      IsLocalFittingClass X → IsLocalFittingClass Y →\n      SatisfiesLockettCondition X → SatisfiesLockettCondition Y →\n      SatisfiesLockettCondition (classInter X Y) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«8.30»": "c01",
+  "kourovka.«8.30».variants.local": "c01"
+ },
+ "id": "kourovka-8.30",
+ "main_attempt": "c01"
+}

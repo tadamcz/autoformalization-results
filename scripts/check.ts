@@ -23,6 +23,32 @@ const indexIds = index.entries.map((e) => e.id).sort();
 if (new Set(indexIds).size !== indexIds.length) problems.push("duplicate ids in index.json");
 if (index.meta.n_entries !== index.entries.length) problems.push("meta.n_entries != entries.length");
 
+// per-source metadata agrees with the rows
+const sources = index.meta.sources;
+for (const row of index.entries) {
+  if (!sources[row.source]) problems.push(`${row.id}: source ${row.source} not in meta.sources`);
+}
+for (const [key, s] of Object.entries(sources)) {
+  const rows = index.entries.filter((e) => e.source === key);
+  if (s.n_entries !== rows.length) problems.push(`meta.sources.${key}.n_entries=${s.n_entries} but ${rows.length} rows`);
+  const areas: Record<string, { count: number; subareas: Record<string, number> }> = {};
+  for (const e of rows) {
+    const a = (areas[e.area] ??= { count: 0, subareas: {} });
+    a.count += 1;
+    if (e.subarea) a.subareas[e.subarea] = (a.subareas[e.subarea] ?? 0) + 1;
+  }
+  const norm = (x: unknown) => JSON.stringify(x, Object.keys(x as object).sort());
+  for (const [name, info] of Object.entries(s.areas)) {
+    if (!areas[name]) problems.push(`meta.sources.${key}.areas has ${name} with no rows`);
+    else if (info.count !== areas[name].count || norm(info.subareas) !== norm(areas[name].subareas))
+      problems.push(`meta.sources.${key}.areas.${name} disagrees with the rows`);
+  }
+  for (const name of Object.keys(areas)) if (!s.areas[name]) problems.push(`meta.sources.${key}.areas lacks ${name}`);
+  if (s.run.outcomes.shown !== rows.length) problems.push(`meta.sources.${key}.run.outcomes.shown != rows`);
+}
+const orders = Object.values(sources).map((s) => s.order);
+if (new Set(orders).size !== orders.length) problems.push("meta.sources orders are not distinct");
+
 const entryIds = ids("entries");
 const altIds = ids("alts");
 const same = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -39,9 +65,17 @@ for (const row of index.entries) {
   }
   const e = parsed.data;
   if (e.id !== row.id) problems.push(`${row.id}: id mismatch`);
+  if (e.source !== row.source) problems.push(`${row.id}: source differs between index and entry`);
   if (e.title !== row.title) problems.push(`${row.id}: title differs between index and entry`);
   if (e.confidence !== row.confidence) problems.push(`${row.id}: confidence differs between index and entry`);
   if (e.lean_lines !== row.lean_lines) problems.push(`${row.id}: lean_lines differs between index and entry`);
+  if (e.area !== row.area || e.subarea !== row.subarea) problems.push(`${row.id}: area differs between index and entry`);
+  const src = sources[e.source];
+  if (src && e.run_id !== src.run.run_id) problems.push(`${row.id}: run_id ${e.run_id} is not the source's run ${src.run.run_id}`);
+  if ((e.source === "kourovka") !== (e.source_ref !== null)) problems.push(`${row.id}: source_ref must be set exactly for kourovka entries`);
+  if ((e.source === "kourovka") !== (e.statement_tex !== null)) problems.push(`${row.id}: statement_tex must be set exactly for kourovka entries`);
+  if (e.source_ref && e.id !== `kourovka-${e.source_ref.number}`) problems.push(`${row.id}: source_ref.number does not match the id`);
+  if (e.checks.probe.budget_minutes === null && e.checks.probe.budget_messages === null) problems.push(`${row.id}: probe has no budget`);
   const nl = e.lean.split("\n").length - (e.lean.endsWith("\n") || e.lean === "" ? 1 : 0);
   if (e.lean_lines !== nl) problems.push(`${row.id}: lean_lines=${e.lean_lines} but the file has ${nl} lines`);
   if (e.confidence < index.meta.min_confidence) problems.push(`${row.id}: confidence ${e.confidence} below meta.min_confidence`);
@@ -95,7 +129,7 @@ if (existsSync(fcPath)) {
   problems.push("data/fc_status.json missing");
 }
 
-console.log(`check: ${index.entries.length} entries, ${blocks} blocks`);
+console.log(`check: ${index.entries.length} entries (${Object.entries(sources).map(([k, s]) => `${k} ${s.n_entries}`).join(", ")}), ${blocks} blocks`);
 if (problems.length) {
   console.error(`check: ${problems.length} problem(s)`);
   for (const p of problems) console.error("  " + p);

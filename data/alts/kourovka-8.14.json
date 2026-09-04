@@ -1,0 +1,762 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.14\n\nby O. H. Kegel\n\nb) Assume a group $G$ is existentially closed in one of the classes\n$L\\mathfrak{N}^{+}$, $L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of,\nrespectively, all locally nilpotent torsion-free groups, all locally soluble $\\pi$-groups,\nall locally soluble torsion-free groups, or all locally soluble groups.\nIs it true that $G$ is characteristically simple?\n\nThe notebook remarks that the existential closedness of $G$ is a local property, so it seems\ndifficult to obtain global properties of $G$ from it. Part a) of the problem is solved and has\nbeen moved to the Archive of the notebook; it is not stated here.\n\nA group $G$ is *existentially closed* in a class $\\mathfrak{X}$ of groups if $G \\in \\mathfrak{X}$\nand every finite system of equations and inequations with coefficients in $G$ that has a solution\nin some group $H \\in \\mathfrak{X}$ containing $G$ as a subgroup already has a solution in $G$.\nA group is *characteristically simple* if its only characteristic subgroups are the trivial\nsubgroup and the whole group.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nuniverse u\n\nnamespace Kourovka.«8.14»\n\n/-- A finite system of equations and inequations over the group `G` in `n` unknowns. Words are\nelements of the free group on the alphabet `G ⊕ Fin n`: letters from `G` are the coefficients and\nletters from `Fin n` are the unknowns. A word `w ∈ eqs` stands for the equation `w = 1` and a word\n`w ∈ neqs` stands for the inequation `w ≠ 1`. -/\nstructure EqSystem (G : Type u) [Group G] (n : ℕ) where\n  /-- The words `w` standing for the equations `w = 1`. -/\n  eqs : Finset (FreeGroup (G ⊕ Fin n))\n  /-- The words `w` standing for the inequations `w ≠ 1`. -/\n  neqs : Finset (FreeGroup (G ⊕ Fin n))\n\n/-- The assignment `v` of the unknowns is a solution in the group `H` of the system `S` over `G`,\nwhere the coefficients from `G` are interpreted in `H` via the homomorphism `f`: every word of\n`S.eqs` evaluates to `1` and no word of `S.neqs` evaluates to `1`. -/\ndef EqSystem.IsSolution {G H : Type*} [Group G] [Group H] {n : ℕ} (S : EqSystem G n)\n    (f : G →* H) (v : Fin n → H) : Prop :=\n  (∀ w ∈ S.eqs, FreeGroup.lift (Sum.elim f v) w = 1) ∧\n    (∀ w ∈ S.neqs, FreeGroup.lift (Sum.elim f v) w ≠ 1)\n\n/-- A group `G` is *existentially closed* in the class `𝒳` of groups if `G` belongs to `𝒳`\nand, for every group `H` in `𝒳` containing `G` as a subgroup (i.e. with an injective\nhomomorphism `G →* H`), every finite system of equations and inequations with coefficients in\n`G` that has a solution in `H` already has a solution in `G`. -/\ndef IsExistentiallyClosedIn (𝒳 : ∀ (H : Type u) [Group H], Prop) (G : Type u) [Group G] :\n    Prop :=\n  𝒳 G ∧ ∀ (H : Type u) [Group H], 𝒳 H → ∀ f : G →* H, Function.Injective f →\n    ∀ (n : ℕ) (S : EqSystem G n), (∃ v : Fin n → H, S.IsSolution f v) →\n      ∃ v : Fin n → G, S.IsSolution (MonoidHom.id G) v\n\n/-- A group is *locally nilpotent* if every finitely generated subgroup is nilpotent. -/\ndef IsLocallyNilpotent (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/-- A group is *locally soluble* (locally solvable) if every finitely generated subgroup is\nsoluble. -/\ndef IsLocallySolvable (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → IsSolvable H\n\n/-- A group is *torsion-free* if its only element of finite order is the identity.\n\nThis is weaker than Mathlib's `IsMulTorsionFree` (injectivity of `x ↦ x ^ n` for `n ≠ 0`), which\nfor non-abelian groups additionally demands uniqueness of roots. -/\ndef IsTorsionFreeGroup (G : Type*) [Group G] : Prop :=\n  ∀ g : G, IsOfFinOrder g → g = 1\n\n/-- For a set of primes `π`, a group `G` is a *`π`-group* if every element of `G` has finite order\nand every prime divisor of the order of every element of `G` lies in `π`. -/\ndef IsPiGroup (π : Set Nat.Primes) (G : Type*) [Group G] : Prop :=\n  ∀ g : G, IsOfFinOrder g ∧ ∀ p : Nat.Primes, (p : ℕ) ∣ orderOf g → p ∈ π\n\n/-- A group is *characteristically simple* if its only characteristic subgroups are the trivial\nsubgroup `⊥` and the whole group `⊤`. -/\ndef IsCharacteristicallySimple (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.Characteristic → H = ⊥ ∨ H = ⊤\n\n/-- A group existentially closed in a class of groups belongs to that class. -/\n@[category API, AMS 20]\ntheorem IsExistentiallyClosedIn.mem {𝒳 : ∀ (H : Type u) [Group H], Prop} {G : Type u} [Group G]\n    (h : IsExistentiallyClosedIn 𝒳 G) : 𝒳 G :=\n  h.1\n\n/-- A simple group is characteristically simple. -/\n@[category API, AMS 20]\ntheorem IsCharacteristicallySimple.of_isSimpleGroup (G : Type*) [Group G] [IsSimpleGroup G] :\n    IsCharacteristicallySimple G :=\n  fun H _ => IsSimpleGroup.eq_bot_or_eq_top_of_normal H (Subgroup.normal_of_characteristic H)\n\n/--\nAssume a group $G$ is existentially closed in one of the classes $L\\mathfrak{N}^{+}$,\n$L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of, respectively, all locally\nnilpotent torsion-free groups, all locally soluble $\\pi$-groups (for some set of primes $\\pi$),\nall locally soluble torsion-free groups, or all locally soluble groups. Is it true that $G$ is\ncharacteristically simple?\n\nThe set of primes $\\pi$ is required to be nonempty: for $\\pi = \\emptyset$ the class\n$L\\mathfrak{S}_{\\pi}$ consists of the trivial groups only, and the question would degenerate to\nthe convention on whether the trivial group is characteristically simple.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      (IsExistentiallyClosedIn\n          (fun H [Group H] => IsLocallyNilpotent H ∧ IsTorsionFreeGroup H) G ∨\n        (∃ π : Set Nat.Primes, π.Nonempty ∧\n          IsExistentiallyClosedIn (fun H [Group H] => IsLocallySolvable H ∧ IsPiGroup π H) G) ∨\n        IsExistentiallyClosedIn\n          (fun H [Group H] => IsLocallySolvable H ∧ IsTorsionFreeGroup H) G ∨\n        IsExistentiallyClosedIn (fun H [Group H] => IsLocallySolvable H) G) →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group that is existentially closed in the class $L\\mathfrak{N}^{+}$ of all locally\nnilpotent torsion-free groups characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn\n        (fun H [Group H] => IsLocallyNilpotent H ∧ IsTorsionFreeGroup H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nLet $\\pi$ be a nonempty set of primes. Is every group that is existentially closed in the class\n$L\\mathfrak{S}_{\\pi}$ of all locally soluble $\\pi$-groups characteristically simple?\n\nThe set of primes $\\pi$ is required to be nonempty: for $\\pi = \\emptyset$ the class\n$L\\mathfrak{S}_{\\pi}$ consists of the trivial groups only, and the question would degenerate to\nthe convention on whether the trivial group is characteristically simple.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set Nat.Primes), π.Nonempty → ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H [Group H] => IsLocallySolvable H ∧ IsPiGroup π H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group that is existentially closed in the class $L\\mathfrak{S}^{+}$ of all locally\nsoluble torsion-free groups characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn\n        (fun H [Group H] => IsLocallySolvable H ∧ IsTorsionFreeGroup H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group that is existentially closed in the class $L\\mathfrak{S}$ of all locally soluble\ngroups characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H [Group H] => IsLocallySolvable H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\nend Kourovka.«8.14»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table is consistent with the source: part a) is only cross-referenced to the Archive and is not posed here, and the closing remark is commentary.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Existential closedness is formalized via finite systems of equations and inequations with coefficients in G (words in FreeGroup (G ⊕ Fin n)), which is equivalent to the model-theoretic formulation with existential formulas with parameters from G (DNF + distributing ∃ over ∨). Inequations are included, as in the standard notion of 'existentially closed' (as opposed to 'algebraically closed').",
+    "'G ≤ H' is modeled as an injective group homomorphism G →* H with H in the same universe as G (Type). This is harmless for all four classes: each is closed under subgroups, and a solution in a large H lives in the subgroup generated by the image of G and finitely many elements, which has small cardinality.",
+    "IsExistentiallyClosedIn includes the requirement G ∈ 𝒳, following the standard definition.",
+    "Torsion-free is defined as 'only the identity has finite order' (IsTorsionFreeGroup), deliberately NOT Mathlib's IsMulTorsionFree, which for non-abelian groups is the stronger unique-roots property.",
+    "The set of primes π is taken as π : Set Nat.Primes and required to be nonempty. For π = ∅ the class L𝔖_π consists only of trivial groups, the trivial group is then existentially closed in it, and the answer would depend purely on the convention of whether the trivial group is characteristically simple; excluding this degenerate case is robust to either convention. For nonempty π (and for the other three classes) existentially closed groups are automatically nontrivial, so the chosen definition of IsCharacteristicallySimple (no Nontrivial requirement) agrees with the alternative convention on all groups the statement actually quantifies over.",
+    "The primary slot is stated with a disjunctive hypothesis ('existentially closed in one of the classes'), with π existentially quantified inside the disjunct; this is equivalent to the conjunction over the four classes with π universally quantified.",
+    "Locally nilpotent / locally soluble mean every finitely generated subgroup (Subgroup.FG) is nilpotent / soluble.",
+    "Two short proved API lemmas were added for the bespoke definitions (an existentially closed group lies in its class; a simple group is characteristically simple), as CONTRIBUTING.md asks for basic API tests of bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Monoid.Coprod / Monoid.CoprodI (free products) and FirstOrder.Language formulas (Mathlib has a ring language but no group language); FreeGroup (G ⊕ Fin n) with FreeGroup.lift gives the same expressive power far more simply.",
+     "name": "Kourovka.«8.14».EqSystem",
+     "why_needed": "A finite system of equations and inequations over a group G in n unknowns: two Finsets of words in FreeGroup (G ⊕ Fin n) (letters from G are coefficients, letters from Fin n are unknowns); w ∈ eqs means w = 1, w ∈ neqs means w ≠ 1. Mathlib has no notion of equations over a group with coefficients."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift (used inside); no existing 'solution of a system' predicate.",
+     "name": "Kourovka.«8.14».EqSystem.IsSolution",
+     "why_needed": "Evaluates a system in a group H via a hom f : G →* H on coefficients and an assignment v : Fin n → H on unknowns, using FreeGroup.lift (Sum.elim f v); every eqs word evaluates to 1 and no neqs word does."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib ModelTheory for IsExistentiallyClosed / existentially closed — nothing exists.",
+     "name": "Kourovka.«8.14».IsExistentiallyClosedIn",
+     "why_needed": "G is existentially closed in the class 𝒳 (𝒳 : ∀ (H : Type u) [Group H], Prop): 𝒳 G and for every H with 𝒳 H and injective f : G →* H, every finite system of equations and inequations over G solvable in H is solvable in G. Mathlib has no notion of existential closedness (neither model-theoretic nor algebraic)."
+    },
+    {
+     "closest_existing_considered": "Group.IsNilpotent (global nilpotency only).",
+     "name": "Kourovka.«8.14».IsLocallyNilpotent",
+     "why_needed": "Every finitely generated subgroup (Subgroup.FG) is nilpotent (Group.IsNilpotent). Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "IsSolvable (global solvability only).",
+     "name": "Kourovka.«8.14».IsLocallySolvable",
+     "why_needed": "Every finitely generated subgroup is soluble (IsSolvable). Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "IsMulTorsionFree (rejected as too strong for non-abelian groups; isMulTorsionFree_iff_not_isOfFinOrder requires CommGroup), Monoid.IsTorsion (the opposite notion).",
+     "name": "Kourovka.«8.14».IsTorsionFreeGroup",
+     "why_needed": "∀ g, IsOfFinOrder g → g = 1. Mathlib's IsMulTorsionFree means x ↦ x^n is injective for n ≠ 0, which for non-abelian groups is strictly stronger (unique roots; e.g. the Klein bottle group ⟨a,b | a²=b²⟩ is torsion-free and soluble but not IsMulTorsionFree), so it would misformalize the classes L𝔑⁺ and especially L𝔖⁺. The former Monoid.IsTorsionFree no longer exists in Mathlib."
+    },
+    {
+     "closest_existing_considered": "IsPGroup p G (single prime; a π-group is not a conjunction/disjunction of these).",
+     "name": "Kourovka.«8.14».IsPiGroup",
+     "why_needed": "For π : Set Nat.Primes, every element has finite order and every prime dividing orderOf g lies in π. Mathlib only has IsPGroup for a single prime."
+    },
+    {
+     "closest_existing_considered": "IsSimpleGroup (normal rather than characteristic subgroups, and requires Nontrivial).",
+     "name": "Kourovka.«8.14».IsCharacteristicallySimple",
+     "why_needed": "∀ H : Subgroup G, H.Characteristic → H = ⊥ ∨ H = ⊤. Mathlib has Subgroup.Characteristic but no characteristic simplicity."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.14».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ G, (G existentially closed in L𝔑⁺ ∨ (∃ nonempty π, G ex. closed in L𝔖_π) ∨ G ex. closed in L𝔖⁺ ∨ G ex. closed in L𝔖) → G characteristically simple. Uses bespoke definitions IsExistentiallyClosedIn (with EqSystem/IsSolution), IsLocallyNilpotent, IsLocallySolvable, IsTorsionFreeGroup, IsPiGroup, IsCharacteristicallySimple, none of which exist in Mathlib or FormalConjecturesForMathlib."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Special case for the class of locally nilpotent torsion-free groups, same bespoke definitions."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Special case for the class of all locally soluble groups, same bespoke definitions."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Special case for L𝔖_π with π : Set Nat.Primes universally quantified and required nonempty (degenerate π = ∅ excluded; explained in the docstring)."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Special case for the class of locally soluble torsion-free groups, same bespoke definitions."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.14».parts.b": "/--\nAssume a group $G$ is existentially closed in one of the classes $L\\mathfrak{N}^{+}$,\n$L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of, respectively, all locally\nnilpotent torsion-free groups, all locally soluble $\\pi$-groups (for some set of primes $\\pi$),\nall locally soluble torsion-free groups, or all locally soluble groups. Is it true that $G$ is\ncharacteristically simple?\n\nThe set of primes $\\pi$ is required to be nonempty: for $\\pi = \\emptyset$ the class\n$L\\mathfrak{S}_{\\pi}$ consists of the trivial groups only, and the question would degenerate to\nthe convention on whether the trivial group is characteristically simple.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      (IsExistentiallyClosedIn\n          (fun H [Group H] => IsLocallyNilpotent H ∧ IsTorsionFreeGroup H) G ∨\n        (∃ π : Set Nat.Primes, π.Nonempty ∧\n          IsExistentiallyClosedIn (fun H [Group H] => IsLocallySolvable H ∧ IsPiGroup π H) G) ∨\n        IsExistentiallyClosedIn\n          (fun H [Group H] => IsLocallySolvable H ∧ IsTorsionFreeGroup H) G ∨\n        IsExistentiallyClosedIn (fun H [Group H] => IsLocallySolvable H) G) →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": "/--\nIs every group that is existentially closed in the class $L\\mathfrak{N}^{+}$ of all locally\nnilpotent torsion-free groups characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn\n        (fun H [Group H] => IsLocallyNilpotent H ∧ IsTorsionFreeGroup H) G →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble": "/--\nIs every group that is existentially closed in the class $L\\mathfrak{S}$ of all locally soluble\ngroups characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H [Group H] => IsLocallySolvable H) G →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": "/--\nLet $\\pi$ be a nonempty set of primes. Is every group that is existentially closed in the class\n$L\\mathfrak{S}_{\\pi}$ of all locally soluble $\\pi$-groups characteristically simple?\n\nThe set of primes $\\pi$ is required to be nonempty: for $\\pi = \\emptyset$ the class\n$L\\mathfrak{S}_{\\pi}$ consists of the trivial groups only, and the question would degenerate to\nthe convention on whether the trivial group is characteristically simple.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set Nat.Primes), π.Nonempty → ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H [Group H] => IsLocallySolvable H ∧ IsPiGroup π H) G →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": "/--\nIs every group that is existentially closed in the class $L\\mathfrak{S}^{+}$ of all locally\nsoluble torsion-free groups characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn\n        (fun H [Group H] => IsLocallySolvable H ∧ IsTorsionFreeGroup H) G →\n      IsCharacteristicallySimple G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.14\n\nby O. H. Kegel\n\nb) Assume a group $G$ is existentially closed in one of the classes $L\\mathfrak{N}^{+}$,\n$L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of, respectively, all locally\nnilpotent torsion-free groups, all locally soluble $\\pi$-groups, all locally soluble\ntorsion-free groups, or all locally soluble groups. Is it true that $G$ is characteristically\nsimple?\n\nThe existential closedness of $G$ is a local property, thus it seems difficult to obtain global\nproperties of $G$ from it. See also Archive, 8.14 a.\n\nOnly part b) is posed in the notebook; part a) is solved and has been moved to the Archive.\n\nTerminology. A group $G$ is *existentially closed* in a class $\\mathfrak{X}$ of groups if\n$G \\in \\mathfrak{X}$ and every finite system of equations and inequations with coefficients in\n$G$ (in finitely many unknowns) that has a solution in some group $H \\in \\mathfrak{X}$ containing\n$G$ already has a solution in $G$. A group is *locally nilpotent* (resp. *locally soluble*) if\nall its finitely generated subgroups are nilpotent (resp. soluble). It is *torsion-free* if $1$\nis its only element of finite order. For a set of primes $\\pi$, it is a *$\\pi$-group* if every\nelement has finite order all of whose prime divisors lie in $\\pi$. A group is\n*characteristically simple* if its only characteristic subgroups are the trivial subgroup and the\nwhole group.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.14»\n\nuniverse u\n\nvariable {G H : Type*} [Group G] [Group H]\n\n/-- A class of groups, i.e. a property of groups. -/\nabbrev GroupClass := (H : Type u) → [Group H] → Prop\n\n/-- A finite system of equations and inequations over the group `G` in the `n` unknowns\n`x_0, …, x_{n-1}`. Each side of an equation or inequation is a word in the unknowns and in the\nelements of `G`, i.e. an element of the free group on `G ⊕ Fin n`. A pair `(u, v)` in `eqs`\nstands for the equation `u = v` and a pair `(u, v)` in `neqs` stands for the inequation `u ≠ v`. -/\nstructure FiniteSystem (G : Type*) (n : ℕ) where\n  /-- The equations of the system. -/\n  eqs : Finset (FreeGroup (G ⊕ Fin n) × FreeGroup (G ⊕ Fin n))\n  /-- The inequations of the system. -/\n  neqs : Finset (FreeGroup (G ⊕ Fin n) × FreeGroup (G ⊕ Fin n))\n\nnamespace FiniteSystem\n\nvariable {n : ℕ}\n\n/-- Evaluation of words over `G` in a group `H` at the tuple `x : Fin n → H`, where the\ncoefficients from `G` are interpreted in `H` via the homomorphism `φ : G →* H`. -/\ndef eval (φ : G →* H) (x : Fin n → H) : FreeGroup (G ⊕ Fin n) →* H :=\n  FreeGroup.lift (Sum.elim φ x)\n\n/-- The tuple `x : Fin n → H` is a solution of the system `S` in the group `H`, where the\ncoefficients from `G` are interpreted in `H` via `φ`. -/\ndef IsSolution (S : FiniteSystem G n) (φ : G →* H) (x : Fin n → H) : Prop :=\n  (∀ p ∈ S.eqs, eval φ x p.1 = eval φ x p.2) ∧ ∀ p ∈ S.neqs, eval φ x p.1 ≠ eval φ x p.2\n\n/-- The system `S` has a solution in the group `H`, where the coefficients from `G` are\ninterpreted in `H` via `φ`. -/\ndef HasSolution (S : FiniteSystem G n) (φ : G →* H) : Prop :=\n  ∃ x : Fin n → H, S.IsSolution φ x\n\nend FiniteSystem\n\n/-- A group `G` is *existentially closed* in a class of groups `𝔛` if `G ∈ 𝔛` and every finite\nsystem of equations and inequations with coefficients in `G` that has a solution in some group\n`H ∈ 𝔛` containing `G` (i.e. into which `G` embeds) already has a solution in `G`. -/\ndef IsExistentiallyClosedIn (𝔛 : GroupClass.{u}) (G : Type u) [Group G] : Prop :=\n  𝔛 G ∧ ∀ (n : ℕ) (S : FiniteSystem G n) (H : Type u) [Group H] (φ : G →* H),\n    Function.Injective φ → 𝔛 H → S.HasSolution φ → S.HasSolution (MonoidHom.id G)\n\n/-- A group is *torsion-free* if `1` is its only element of finite order. (For non-abelian groups\nthis is weaker than Mathlib's `IsMulTorsionFree`, which asks for unique roots.) -/\ndef IsTorsionFree (G : Type*) [Group G] : Prop :=\n  ∀ g : G, IsOfFinOrder g → g = 1\n\n/-- A group is *locally nilpotent* if all its finitely generated subgroups are nilpotent. -/\ndef IsLocallyNilpotent (G : Type*) [Group G] : Prop :=\n  ∀ K : Subgroup G, K.FG → Group.IsNilpotent K\n\n/-- A group is *locally soluble* if all its finitely generated subgroups are soluble. -/\ndef IsLocallySolvable (G : Type*) [Group G] : Prop :=\n  ∀ K : Subgroup G, K.FG → IsSolvable K\n\n/-- For a set of primes `π`, a group is a *`π`-group* if each of its elements has finite order\nall of whose prime divisors lie in `π`. -/\ndef IsPiGroup (π : Set Nat.Primes) (G : Type*) [Group G] : Prop :=\n  ∀ g : G, IsOfFinOrder g ∧ ∀ p : Nat.Primes, (p : ℕ) ∣ orderOf g → p ∈ π\n\n/-- A group is *characteristically simple* if its only characteristic subgroups are the trivial\nsubgroup and the whole group. With this definition the trivial group is characteristically\nsimple. -/\ndef IsCharacteristicallySimple (G : Type*) [Group G] : Prop :=\n  ∀ K : Subgroup G, K.Characteristic → K = ⊥ ∨ K = ⊤\n\n@[category API, AMS 20]\ntheorem IsTorsionFree.of_isMulTorsionFree [IsMulTorsionFree G] : IsTorsionFree G :=\n  fun _ hg => by_contra fun h => not_isOfFinOrder_of_isMulTorsionFree h hg\n\n@[category API, AMS 20]\ntheorem IsLocallyNilpotent.of_isNilpotent [Group.IsNilpotent G] : IsLocallyNilpotent G :=\n  fun _ _ => inferInstance\n\n@[category API, AMS 20]\ntheorem IsLocallySolvable.of_isSolvable [IsSolvable G] : IsLocallySolvable G :=\n  fun _ _ => inferInstance\n\n@[category API, AMS 20]\ntheorem isPiGroup_singleton_iff_isPGroup (p : Nat.Primes) :\n    IsPiGroup {p} G ↔ IsPGroup p G := by\n  haveI : Fact (p : ℕ).Prime := ⟨p.2⟩\n  rw [IsPGroup.iff_orderOf]\n  refine forall_congr' fun g => ⟨fun ⟨hg, hp⟩ => ?_, fun ⟨k, hk⟩ => ⟨?_, fun q hq => ?_⟩⟩\n  · exact ⟨_, Nat.eq_prime_pow_of_unique_prime_dvd hg.orderOf_pos.ne' fun hq hd =>\n      congrArg Subtype.val (hp ⟨_, hq⟩ hd)⟩\n  · exact orderOf_pos_iff.mp (hk ▸ pow_pos p.2.pos k)\n  · rw [hk] at hq\n    exact Set.mem_singleton_iff.mpr (Subtype.ext ((Nat.prime_dvd_prime_iff_eq q.2 p.2).mp\n      (q.2.dvd_of_dvd_pow hq)))\n\n@[category API, AMS 20]\ntheorem IsCharacteristicallySimple.of_isSimpleGroup [IsSimpleGroup G] :\n    IsCharacteristicallySimple G :=\n  fun K _ => IsSimpleGroup.eq_bot_or_eq_top_of_normal K inferInstance\n\n@[category test, AMS 20]\ntheorem IsCharacteristicallySimple.of_subsingleton [Subsingleton G] :\n    IsCharacteristicallySimple G :=\n  fun K _ => Or.inl K.eq_bot_of_subsingleton\n\n/--\nAssume a group $G$ is existentially closed in one of the classes $L\\mathfrak{N}^{+}$,\n$L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of, respectively, all locally\nnilpotent torsion-free groups, all locally soluble $\\pi$-groups (for some set of primes $\\pi$),\nall locally soluble torsion-free groups, or all locally soluble groups. Is it true that $G$ is\ncharacteristically simple?\n\nThe trivial group counts as characteristically simple here; this matters only for the degenerate\nclass $L\\mathfrak{S}_{\\emptyset}$, which consists of the trivial group alone.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.14».parts.b : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      (IsExistentiallyClosedIn (fun H _ ↦ IsLocallyNilpotent H ∧ IsTorsionFree H) G ∨\n        (∃ π : Set Nat.Primes,\n          IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H ∧ IsPiGroup π H) G) ∨\n        IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H ∧ IsTorsionFree H) G ∨\n        IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H) G) →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group that is existentially closed in the class $L\\mathfrak{N}^{+}$ of all locally\nnilpotent torsion-free groups characteristically simple?\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallyNilpotent H ∧ IsTorsionFree H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nLet $\\pi$ be a set of primes. Is every group that is existentially closed in the class\n$L\\mathfrak{S}_{\\pi}$ of all locally soluble $\\pi$-groups characteristically simple?\n\nThe trivial group counts as characteristically simple here; this matters only for\n$\\pi = \\emptyset$, where $L\\mathfrak{S}_{\\emptyset}$ consists of the trivial group alone.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set Nat.Primes) (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H ∧ IsPiGroup π H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group that is existentially closed in the class $L\\mathfrak{S}^{+}$ of all locally\nsoluble torsion-free groups characteristically simple?\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H ∧ IsTorsionFree H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group that is existentially closed in the class $L\\mathfrak{S}$ of all locally soluble\ngroups characteristically simple?\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\nend Kourovka.«8.14»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The table's reading (only part b) is posed; single yes/no question with a disjunctive hypothesis; four special-case variants; π implicitly universally quantified; degenerate π = ∅ needs an explicit convention) matches the source and was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Existential closedness quantifies over ambient groups H : Type (same universe as G). This is harmless because all four classes are subgroup-closed and any solution lies in the subgroup generated by the image of G and finitely many elements, which lives in universe 0; but a reviewer should confirm they are happy with a fixed universe.",
+    "'H contains G' is modeled as an injective homomorphism φ : G →* H rather than G literally being a subgroup of H (classes are isomorphism-closed, so equivalent).",
+    "Equations/inequations are pairs (u, v) of words in FreeGroup (G ⊕ Fin n), read as u = v / u ≠ v, and gathered in Finsets; evaluation uses FreeGroup.lift (Sum.elim φ x). This is equivalent to using elements of the free product G ∗ F_n.",
+    "Torsion-free is defined classically (∀ g, IsOfFinOrder g → g = 1), deliberately NOT Mathlib's IsMulTorsionFree, which is strictly stronger for non-abelian groups (unique roots) and would misformalize L𝔖⁺.",
+    "π ranges over Set Nat.Primes (sets of primes); a π-group requires every element to have finite order with all prime divisors in π.",
+    "Characteristically simple is 'only characteristic subgroups are ⊥ and ⊤' with no nontriviality requirement, so the trivial group counts. This only matters for π = ∅ (verified in scratch: IsPiGroup ∅ G ↔ Subsingleton G and the trivial group is e.c. in L𝔖_∅), where the statement becomes harmlessly true; requiring Nontrivial without restricting π would instead make the answer trivially False. The convention is stated in the docstrings.",
+    "The primary slot uses a disjunctive hypothesis (as in 'in one of the classes'), with ∃ π inside the hypothesis, which is equivalent to the conjunction of the four variants with π universally quantified.",
+    "AMS tags 3 (mathematical logic, for existential closedness) and 20 (group theory).",
+    "Added short proved API/test lemmas for the bespoke definitions (torsion-free from IsMulTorsionFree, nilpotent ⇒ locally nilpotent, soluble ⇒ locally soluble, IsPiGroup {p} ↔ IsPGroup p, simple ⇒ characteristically simple, trivial group is characteristically simple)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "None in Mathlib; plain `(H : Type u) → [Group H] → Prop` abbreviation.",
+     "name": "Kourovka.«8.14».GroupClass",
+     "why_needed": "A 'class of groups' (property of groups in a fixed universe) to parametrize existential closedness."
+    },
+    {
+     "closest_existing_considered": "FreeGroup / Monoid.Coprod (G ∗ F_n) in Mathlib; free group on G ⊕ Fin n is simpler and equivalent for evaluation purposes. Mathlib has no notion of systems of group equations with coefficients.",
+     "name": "Kourovka.«8.14».FiniteSystem (with eval, IsSolution, HasSolution)",
+     "why_needed": "A finite system of equations and inequations over G in n unknowns: finsets of pairs of words in FreeGroup (G ⊕ Fin n), evaluated in a group H via FreeGroup.lift (Sum.elim φ x) for an embedding φ : G →* H."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or FormalConjecturesForMathlib (searched 'existentially closed', 'algebraically closed group').",
+     "name": "Kourovka.«8.14».IsExistentiallyClosedIn",
+     "why_needed": "G ∈ 𝔛 and every finite system over G solvable in some 𝔛-group H into which G embeds is solvable in G (Kegel/Hodges definition)."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsMulTorsionFree (injectivity of n-th power maps); equivalent only for commutative groups (isMulTorsionFree_iff_not_isOfFinOrder is stated for CommGroup), strictly stronger for non-abelian soluble groups, so unusable for L𝔖⁺. Monoid.IsTorsionFree no longer exists.",
+     "name": "Kourovka.«8.14».IsTorsionFree",
+     "why_needed": "Classical torsion-freeness: ∀ g, IsOfFinOrder g → g = 1."
+    },
+    {
+     "closest_existing_considered": "Group.IsNilpotent (global only); no local version in Mathlib.",
+     "name": "Kourovka.«8.14».IsLocallyNilpotent",
+     "why_needed": "Every finitely generated subgroup (Subgroup.FG) is nilpotent (Group.IsNilpotent)."
+    },
+    {
+     "closest_existing_considered": "IsSolvable (global only); no local version in Mathlib.",
+     "name": "Kourovka.«8.14».IsLocallySolvable",
+     "why_needed": "Every finitely generated subgroup is soluble (IsSolvable)."
+    },
+    {
+     "closest_existing_considered": "IsPGroup p G (single prime, via p-power exponents); API lemma isPiGroup_singleton_iff_isPGroup proves the two agree for π = {p}.",
+     "name": "Kourovka.«8.14».IsPiGroup",
+     "why_needed": "For π : Set Nat.Primes, every element has finite order all of whose prime divisors lie in π."
+    },
+    {
+     "closest_existing_considered": "Subgroup.Characteristic (used), IsSimpleGroup (normal subgroups, and requires Nontrivial).",
+     "name": "Kourovka.«8.14».IsCharacteristicallySimple",
+     "why_needed": "The only characteristic subgroups are ⊥ and ⊤."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.14».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ G, (e.c. in L𝔑⁺ ∨ (∃ π, e.c. in L𝔖_π) ∨ e.c. in L𝔖⁺ ∨ e.c. in L𝔖) → characteristically simple, with the disjunctive hypothesis mirroring 'in one of the classes' and π implicitly universally quantified (equivalent to the conjunction over the four classes). All notions (existential closedness, local nilpotency/solubility, torsion-freeness, π-group, characteristic simplicity) are bespoke since neither Mathlib nor the repo has them."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Special case: every group existentially closed in the class of locally nilpotent torsion-free groups is characteristically simple."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Special case for the class of all locally soluble groups."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Special case with π : Set Nat.Primes universally quantified (after answer(sorry)). The trivial group counts as characteristically simple (only characteristic subgroups ⊥ and ⊤), so the degenerate case π = ∅ (class = trivial group only) is harmlessly true; this convention is stated in the docstring."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Special case for locally soluble torsion-free groups. Torsion-free is defined classically (1 is the only element of finite order) rather than via Mathlib's IsMulTorsionFree, which for non-abelian groups is the strictly stronger unique-roots property (e.g. the soluble torsion-free Klein bottle group fails it)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.14».parts.b": "/--\nAssume a group $G$ is existentially closed in one of the classes $L\\mathfrak{N}^{+}$,\n$L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of, respectively, all locally\nnilpotent torsion-free groups, all locally soluble $\\pi$-groups (for some set of primes $\\pi$),\nall locally soluble torsion-free groups, or all locally soluble groups. Is it true that $G$ is\ncharacteristically simple?\n\nThe trivial group counts as characteristically simple here; this matters only for the degenerate\nclass $L\\mathfrak{S}_{\\emptyset}$, which consists of the trivial group alone.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.14».parts.b : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      (IsExistentiallyClosedIn (fun H _ ↦ IsLocallyNilpotent H ∧ IsTorsionFree H) G ∨\n        (∃ π : Set Nat.Primes,\n          IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H ∧ IsPiGroup π H) G) ∨\n        IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H ∧ IsTorsionFree H) G ∨\n        IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H) G) →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": "/--\nIs every group that is existentially closed in the class $L\\mathfrak{N}^{+}$ of all locally\nnilpotent torsion-free groups characteristically simple?\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallyNilpotent H ∧ IsTorsionFree H) G →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble": "/--\nIs every group that is existentially closed in the class $L\\mathfrak{S}$ of all locally soluble\ngroups characteristically simple?\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H) G →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": "/--\nLet $\\pi$ be a set of primes. Is every group that is existentially closed in the class\n$L\\mathfrak{S}_{\\pi}$ of all locally soluble $\\pi$-groups characteristically simple?\n\nThe trivial group counts as characteristically simple here; this matters only for\n$\\pi = \\emptyset$, where $L\\mathfrak{S}_{\\emptyset}$ consists of the trivial group alone.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set Nat.Primes) (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H ∧ IsPiGroup π H) G →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": "/--\nIs every group that is existentially closed in the class $L\\mathfrak{S}^{+}$ of all locally\nsoluble torsion-free groups characteristically simple?\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySolvable H ∧ IsTorsionFree H) G →\n      IsCharacteristicallySimple G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.14\n\nby O. H. Kegel\n\nb) Assume a group $G$ is existentially closed in one of the classes $L\\mathfrak{N}^{+}$,\n$L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of, respectively, all locally\nnilpotent torsion-free groups, all locally soluble $\\pi$-groups, all locally soluble\ntorsion-free groups, or all locally soluble groups. Is it true that $G$ is characteristically\nsimple?\n\nHere a group $G$ is *existentially closed* in a class $\\mathfrak{X}$ of groups if\n$G \\in \\mathfrak{X}$ and every finite system of equations and inequations with coefficients in\n$G$ which has a solution in some $\\mathfrak{X}$-group containing $G$ already has a solution in\n$G$. A group is *characteristically simple* if its only characteristic subgroups are the trivial\nsubgroup and the whole group.\n\nPart a) of Problem 8.14 is in the Archive of solved problems of the notebook and is not posed\nhere.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.14»\n\nuniverse u\n\n/-- A group is *locally nilpotent* if every finitely generated subgroup is nilpotent. -/\ndef IsLocallyNilpotent (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/-- A group is *locally soluble* if every finitely generated subgroup is soluble. -/\ndef IsLocallySolvable (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → IsSolvable H\n\n/-- A group is *torsion-free* if its only element of finite order is the identity.\n\nThis is the usual group-theoretic notion. It is weaker than Mathlib's `IsMulTorsionFree`\n(injectivity of $x \\mapsto x^n$ for $n \\neq 0$) for non-abelian groups: the torsion-free\nmetabelian Klein bottle group $\\langle a, b \\mid aba^{-1} = b^{-1} \\rangle$ satisfies\n$(ab)^2 = a^2$ with $ab \\neq a$. -/\ndef IsTorsionFree (G : Type*) [Group G] : Prop :=\n  ∀ g : G, IsOfFinOrder g → g = 1\n\n/-- For a set `π` of primes, a group is a *`π`-group* if every element has finite order and\nevery prime divisor of the order of every element belongs to `π`.\n\nHere `π` is an arbitrary set of natural numbers; its non-prime elements play no role, so a\n`π`-group is the same thing as a `(π ∩ primes)`-group. -/\ndef IsPiGroup (π : Set ℕ) (G : Type*) [Group G] : Prop :=\n  ∀ g : G, IsOfFinOrder g ∧ ∀ p : ℕ, p.Prime → p ∣ orderOf g → p ∈ π\n\n/-- A group is *characteristically simple* if its only characteristic subgroups are the trivial\nsubgroup `⊥` and the whole group `⊤`.\n\nWith this convention the trivial group is characteristically simple. This convention only\nmatters for the class $L\\mathfrak{S}_{\\pi}$ with $\\pi$ containing no prime, which consists of\nthe trivial groups alone; all other groups existentially closed in one of the classes of\nProblem 8.14 are non-trivial. -/\ndef IsCharacteristicallySimple (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.Characteristic → H = ⊥ ∨ H = ⊤\n\n/-- Evaluation of a word `w` in the free group on `Fin n ⊕ G` in a group `H`: the letters\n`Sum.inl i` (the unknowns `x_i`) are replaced by `x i : H` and the letters `Sum.inr g` (the\ncoefficients from `G`) by `f g`, where `f : G →* H`.\n\nThe equation (resp. inequation) `w = 1` (resp. `w ≠ 1`) in the unknowns `x_0, …, x_{n-1}` with\ncoefficients in `G` is then the assertion `evalWord f x w = 1` (resp. `evalWord f x w ≠ 1`).\nEvery equation `u = v` between words is of this form since `u = v ↔ u * v⁻¹ = 1`. -/\ndef evalWord {G H : Type*} [Group G] [Group H] {n : ℕ} (f : G →* H) (x : Fin n → H)\n    (w : FreeGroup (Fin n ⊕ G)) : H :=\n  FreeGroup.lift (Sum.elim x f) w\n\n/-- A group `G` is *existentially closed* in a class `𝔛` of groups if `G` belongs to `𝔛` and\nevery finite system of equations `w = 1` (`w ∈ E`) and inequations `w ≠ 1` (`w ∈ I`) in\nfinitely many unknowns with coefficients in `G` which has a solution in some `𝔛`-group `H`\ncontaining `G` (i.e. equipped with an injective homomorphism `G →* H`) already has a solution\nin `G`.\n\nSince the classes of groups considered in Problem 8.14 are closed under taking subgroups, it is\nharmless that `H` ranges over groups in the same universe as `G`: a solution in `H` lies in the\nsubgroup generated by `G` together with the solution. -/\ndef IsExistentiallyClosedIn (𝔛 : (H : Type u) → [Group H] → Prop) (G : Type u) [Group G] :\n    Prop :=\n  𝔛 G ∧\n    ∀ (n : ℕ) (E I : Finset (FreeGroup (Fin n ⊕ G))),\n      (∃ (H : Type u) (_ : Group H) (f : G →* H) (x : Fin n → H),\n        𝔛 H ∧ Function.Injective f ∧\n          (∀ w ∈ E, evalWord f x w = 1) ∧ (∀ w ∈ I, evalWord f x w ≠ 1)) →\n      ∃ x : Fin n → G,\n        (∀ w ∈ E, evalWord (MonoidHom.id G) x w = 1) ∧\n          (∀ w ∈ I, evalWord (MonoidHom.id G) x w ≠ 1)\n\n/-- The class $L\\mathfrak{N}^{+}$ of all locally nilpotent torsion-free groups. -/\ndef IsLocallyNilpotentTorsionFree (G : Type*) [Group G] : Prop :=\n  IsLocallyNilpotent G ∧ IsTorsionFree G\n\n/-- The class $L\\mathfrak{S}_{\\pi}$ of all locally soluble $\\pi$-groups. -/\ndef IsLocallySolvablePiGroup (π : Set ℕ) (G : Type*) [Group G] : Prop :=\n  IsLocallySolvable G ∧ IsPiGroup π G\n\n/-- The class $L\\mathfrak{S}^{+}$ of all locally soluble torsion-free groups. -/\ndef IsLocallySolvableTorsionFree (G : Type*) [Group G] : Prop :=\n  IsLocallySolvable G ∧ IsTorsionFree G\n\n/-- A simple group is characteristically simple. -/\n@[category API, AMS 20]\ntheorem IsCharacteristicallySimple.of_isSimpleGroup (G : Type*) [Group G] [IsSimpleGroup G] :\n    IsCharacteristicallySimple G :=\n  fun H _ => IsSimpleGroup.eq_bot_or_eq_top_of_normal H inferInstance\n\n/-- The trivial group is characteristically simple. -/\n@[category test, AMS 20]\ntheorem IsCharacteristicallySimple.of_subsingleton (G : Type*) [Group G] [Subsingleton G] :\n    IsCharacteristicallySimple G :=\n  fun _ _ => Or.inl (Subsingleton.elim _ _)\n\n/-- A `p`-group is a `{p}`-group. -/\n@[category API, AMS 20]\ntheorem IsPiGroup.of_isPGroup {p : ℕ} [hp : Fact p.Prime] {G : Type*} [Group G]\n    (h : IsPGroup p G) : IsPiGroup {p} G := by\n  intro g\n  obtain ⟨k, hk⟩ := IsPGroup.iff_orderOf.mp h g\n  refine ⟨orderOf_pos_iff.mp (hk ▸ pow_pos hp.out.pos k), fun q hq hqd => ?_⟩\n  rw [hk] at hqd\n  exact (Nat.prime_dvd_prime_iff_eq hq hp.out).mp (hq.dvd_of_dvd_pow hqd)\n\n/-- The group of integers is locally nilpotent and torsion-free. -/\n@[category test, AMS 20]\ntheorem isLocallyNilpotentTorsionFree_multiplicative_int :\n    IsLocallyNilpotentTorsionFree (Multiplicative ℤ) :=\n  ⟨fun _ _ => inferInstance, fun _ hg => by\n    by_contra h\n    exact not_isOfFinOrder_of_isMulTorsionFree h hg⟩\n\n/--\nAssume a group $G$ is existentially closed in one of the classes $L\\mathfrak{N}^{+}$,\n$L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of, respectively, all locally\nnilpotent torsion-free groups, all locally soluble $\\pi$-groups, all locally soluble\ntorsion-free groups, or all locally soluble groups. Is it true that $G$ is characteristically\nsimple?\n\nThe set of primes $\\pi$ is arbitrary (it is universally quantified). For $\\pi$ containing no\nprime the class $L\\mathfrak{S}_{\\pi}$ consists of the trivial groups, which are\ncharacteristically simple by the convention of `IsCharacteristicallySimple`, so this degenerate\ncase does not affect the answer.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      (IsExistentiallyClosedIn IsLocallyNilpotentTorsionFree G ∨\n        (∃ π : Set ℕ, IsExistentiallyClosedIn (IsLocallySolvablePiGroup π) G) ∨\n        IsExistentiallyClosedIn IsLocallySolvableTorsionFree G ∨\n        IsExistentiallyClosedIn IsLocallySolvable G) →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group existentially closed in the class $L\\mathfrak{N}^{+}$ of all locally nilpotent\ntorsion-free groups characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn IsLocallyNilpotentTorsionFree G → IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group existentially closed in the class $L\\mathfrak{S}_{\\pi}$ of all locally soluble\n$\\pi$-groups characteristically simple? Here $\\pi$ is an arbitrary set of primes.\n\nFor $\\pi$ containing no prime the class $L\\mathfrak{S}_{\\pi}$ consists of the trivial groups,\nwhich are characteristically simple by the convention of `IsCharacteristicallySimple`, so this\ndegenerate case does not affect the answer.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set ℕ) (G : Type) [Group G],\n      IsExistentiallyClosedIn (IsLocallySolvablePiGroup π) G → IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group existentially closed in the class $L\\mathfrak{S}^{+}$ of all locally soluble\ntorsion-free groups characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn IsLocallySolvableTorsionFree G → IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group existentially closed in the class $L\\mathfrak{S}$ of all locally soluble groups\ncharacteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn IsLocallySolvable G → IsCharacteristicallySimple G := by\n  sorry\n\nend Kourovka.«8.14»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table matches the statement: part a) is only cross-referenced to the Archive and is not posed, and the remark about local vs. global properties is commentary.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Existential closedness uses finite systems of equations AND inequations (Finsets E, I of words in FreeGroup (Fin n ⊕ G)), the standard Kegel/Hickin–Macintyre definition; it includes the requirement G ∈ 𝔛. Equations are normalised to the form w = 1 (u = v ↔ u v⁻¹ = 1).",
+    "'𝔛-group containing G' is formalised as an 𝔛-group H with an injective homomorphism G →* H; H ranges over the same universe as G (Type). This is harmless because all four classes are subgroup-closed (a solution lies in the subgroup generated by G and the solution), as noted in the docstring.",
+    "Torsion-free is defined as 'every element of finite order is 1' rather than via Mathlib's IsMulTorsionFree, which for non-abelian (e.g. soluble) groups is a strictly stronger unique-roots condition.",
+    "π is an arbitrary Set ℕ; the π-group condition only involves prime divisors, so non-prime elements of π are irrelevant and quantifying over all Set ℕ is exactly quantifying over all sets of primes.",
+    "Characteristically simple is 'every characteristic subgroup is ⊥ or ⊤' with no Nontrivial requirement, so the trivial group counts as characteristically simple. This only matters for L𝔖_π with π containing no prime (the class of trivial groups), where it makes that instance trivially true rather than trivially false; documented explicitly in the docstrings. Under the alternative convention one would need to restrict to π containing a prime.",
+    "The primary slot keeps the notebook's disjunctive hypothesis literally (with ∃ π inside the disjunction), which is equivalent to the conjunction of the four variants with π universally quantified.",
+    "Unlike other Kourovka files, the reference URL is the requested v46 of arXiv:1401.0300.",
+    "Four short API/test lemmas with proofs were added for the bespoke definitions (simple ⇒ characteristically simple; trivial group is characteristically simple; p-group ⇒ {p}-group; Multiplicative ℤ is locally nilpotent torsion-free)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib.ModelTheory (FirstOrder.Language.ring / Field exist, but no group language and no IsExistentiallyClosed); Monoid.Coprod with FreeGroup (equivalent encoding, more cumbersome).",
+     "name": "Kourovka.«8.14».IsExistentiallyClosedIn",
+     "why_needed": "Existential closedness of a group in a class of groups (G ∈ 𝔛, and every finite system of equations w = 1 and inequations w ≠ 1 with coefficients in G, w ranging over words in FreeGroup (Fin n ⊕ G), that is solvable in an 𝔛-group H with an injective hom G →* H is solvable in G). Not in Mathlib; Mathlib's model theory has no language of groups and no notion of existential closedness."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift (used directly in the definition; the wrapper just fixes the Sum.elim convention).",
+     "name": "Kourovka.«8.14».evalWord",
+     "why_needed": "Evaluation of a word in FreeGroup (Fin n ⊕ G) in a group H via f : G →* H and an assignment Fin n → H of the unknowns; used to express equations/inequations over G."
+    },
+    {
+     "closest_existing_considered": "Group.IsNilpotent, Subgroup.FG",
+     "name": "Kourovka.«8.14».IsLocallyNilpotent",
+     "why_needed": "Every finitely generated subgroup is nilpotent; Mathlib has Group.IsNilpotent but no local version."
+    },
+    {
+     "closest_existing_considered": "IsSolvable, Subgroup.FG",
+     "name": "Kourovka.«8.14».IsLocallySolvable",
+     "why_needed": "Every finitely generated subgroup is soluble; Mathlib has IsSolvable but no local version."
+    },
+    {
+     "closest_existing_considered": "IsMulTorsionFree (rejected as unfaithful for non-abelian groups); Monoid.IsTorsionFree (removed from Mathlib).",
+     "name": "Kourovka.«8.14».IsTorsionFree",
+     "why_needed": "Torsion-free group in the group-theoretic sense (only the identity has finite order). Mathlib's IsMulTorsionFree (injectivity of x ↦ xⁿ) is strictly stronger for non-abelian groups, e.g. the torsion-free metabelian Klein bottle group has (ab)² = a² with ab ≠ a, so using it would shrink the class L𝔖⁺. Monoid.IsTorsionFree no longer exists in the current Mathlib."
+    },
+    {
+     "closest_existing_considered": "IsPGroup p G, Monoid.IsTorsion",
+     "name": "Kourovka.«8.14».IsPiGroup",
+     "why_needed": "π-group for a set π of primes: every element has finite order and all prime divisors of element orders lie in π. Mathlib only has IsPGroup for a single prime."
+    },
+    {
+     "closest_existing_considered": "IsSimpleGroup, Subgroup.Characteristic",
+     "name": "Kourovka.«8.14».IsCharacteristicallySimple",
+     "why_needed": "Only characteristic subgroups are ⊥ and ⊤. Not in Mathlib (only IsSimpleGroup, which is about normal subgroups and requires Nontrivial)."
+    },
+    {
+     "closest_existing_considered": "inline lambdas (rejected for readability)",
+     "name": "Kourovka.«8.14».IsLocallyNilpotentTorsionFree / IsLocallySolvablePiGroup / IsLocallySolvableTorsionFree",
+     "why_needed": "Named predicates for the classes L𝔑⁺, L𝔖_π, L𝔖⁺ (conjunctions of the above), to pass to IsExistentiallyClosedIn readably."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.14».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ G, (e.c. in L𝔑⁺ ∨ (∃ π, e.c. in L𝔖_π) ∨ e.c. in L𝔖⁺ ∨ e.c. in L𝔖) → IsCharacteristicallySimple G, i.e. the literal disjunctive hypothesis with π implicitly universally quantified. Needed bespoke definitions for existential closedness, locally nilpotent/soluble, torsion-free, π-group and characteristically simple (none exist in Mathlib or FormalConjecturesForMathlib)."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "∀ G, IsExistentiallyClosedIn IsLocallyNilpotentTorsionFree G → IsCharacteristicallySimple G."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "∀ G, IsExistentiallyClosedIn IsLocallySolvable G → IsCharacteristicallySimple G."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "∀ (π : Set ℕ) G, IsExistentiallyClosedIn (IsLocallySolvablePiGroup π) G → IsCharacteristicallySimple G. π ranges over all subsets of ℕ; non-prime elements are irrelevant to the π-group condition, so this is exactly quantification over all sets of primes. The degenerate π-without-primes case (class = trivial groups) is made harmless by the explicit convention that the trivial group is characteristically simple; documented in the docstring."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "∀ G, IsExistentiallyClosedIn IsLocallySolvableTorsionFree G → IsCharacteristicallySimple G."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.14».parts.b": "/--\nAssume a group $G$ is existentially closed in one of the classes $L\\mathfrak{N}^{+}$,\n$L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of, respectively, all locally\nnilpotent torsion-free groups, all locally soluble $\\pi$-groups, all locally soluble\ntorsion-free groups, or all locally soluble groups. Is it true that $G$ is characteristically\nsimple?\n\nThe set of primes $\\pi$ is arbitrary (it is universally quantified). For $\\pi$ containing no\nprime the class $L\\mathfrak{S}_{\\pi}$ consists of the trivial groups, which are\ncharacteristically simple by the convention of `IsCharacteristicallySimple`, so this degenerate\ncase does not affect the answer.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      (IsExistentiallyClosedIn IsLocallyNilpotentTorsionFree G ∨\n        (∃ π : Set ℕ, IsExistentiallyClosedIn (IsLocallySolvablePiGroup π) G) ∨\n        IsExistentiallyClosedIn IsLocallySolvableTorsionFree G ∨\n        IsExistentiallyClosedIn IsLocallySolvable G) →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": "/--\nIs every group existentially closed in the class $L\\mathfrak{N}^{+}$ of all locally nilpotent\ntorsion-free groups characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn IsLocallyNilpotentTorsionFree G → IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble": "/--\nIs every group existentially closed in the class $L\\mathfrak{S}$ of all locally soluble groups\ncharacteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn IsLocallySolvable G → IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": "/--\nIs every group existentially closed in the class $L\\mathfrak{S}_{\\pi}$ of all locally soluble\n$\\pi$-groups characteristically simple? Here $\\pi$ is an arbitrary set of primes.\n\nFor $\\pi$ containing no prime the class $L\\mathfrak{S}_{\\pi}$ consists of the trivial groups,\nwhich are characteristically simple by the convention of `IsCharacteristicallySimple`, so this\ndegenerate case does not affect the answer.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set ℕ) (G : Type) [Group G],\n      IsExistentiallyClosedIn (IsLocallySolvablePiGroup π) G → IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": "/--\nIs every group existentially closed in the class $L\\mathfrak{S}^{+}$ of all locally soluble\ntorsion-free groups characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn IsLocallySolvableTorsionFree G → IsCharacteristicallySimple G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.14\n\nby O. H. Kegel\n\nIf a group is existentially closed in one of the classes of locally nilpotent\ntorsion-free groups, locally soluble $\\pi$-groups, locally soluble\ntorsion-free groups, or locally soluble groups, is it characteristically\nsimple?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.14»\n\n/-- A group is locally nilpotent if every subgroup generated by finitely many\nelements is nilpotent. -/\ndef IsLocallyNilpotent (G : Type) [Group G] : Prop :=\n  ∀ (n : ℕ) (x : Fin n → G), Group.IsNilpotent (Subgroup.closure (Set.range x))\n\n/-- A group is locally soluble if every subgroup generated by finitely many\nelements is soluble. -/\ndef IsLocallySoluble (G : Type) [Group G] : Prop :=\n  ∀ (n : ℕ) (x : Fin n → G), IsSolvable (Subgroup.closure (Set.range x))\n\n/-- A $\\pi$-group is a torsion group in which every prime divisor of the order\nof every element belongs to $\\pi$. -/\ndef IsPiGroup (π : Set Nat.Primes) (G : Type) [Group G] : Prop :=\n  ∀ g : G, IsOfFinOrder g ∧\n    ∀ (p : ℕ) (hp : p.Prime), p ∣ orderOf g → (⟨p, hp⟩ : Nat.Primes) ∈ π\n\n/-- A group is characteristically simple if its only characteristic subgroups\nare the bottom and top subgroups. Under this convention, the trivial group is\ncharacteristically simple. -/\ndef IsCharacteristicallySimple (G : Type) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.Characteristic → H = ⊥ ∨ H = ⊤\n\n/-- A group class is a predicate on groups. -/\nabbrev GroupClass := (G : Type) → [Group G] → Prop\n\n/-- A group $G$ is existentially closed in a class $C$ if $G$ belongs to $C$\nand every finite system of equations and inequations over $G$ that has a\nsolution in a group in $C$ containing an isomorphic copy of $G$ already has a\nsolution in $G$.\n\nA system with `n` variables is represented by finite families of words in the\nfree group on `Fin n ⊕ G`; the second summand supplies coefficients from $G$.\nEach equation says that its word is one, and each inequation says that its word\nis not one. -/\ndef IsExistentiallyClosedIn (C : GroupClass) (G : Type) [Group G] : Prop :=\n  C G ∧\n    ∀ (H : Type) [Group H], C H →\n      ∀ (ι : G →* H), Function.Injective ι →\n        ∀ (n equationCount inequationCount : ℕ)\n          (equations : Fin equationCount → FreeGroup (Fin n ⊕ G))\n          (inequations : Fin inequationCount → FreeGroup (Fin n ⊕ G)),\n          (∃ x : Fin n → H,\n              (∀ j, FreeGroup.lift (Sum.elim x ι) (equations j) = 1) ∧\n              (∀ j, FreeGroup.lift (Sum.elim x ι) (inequations j) ≠ 1)) →\n            ∃ x : Fin n → G,\n              (∀ j, FreeGroup.lift (Sum.elim x (fun g ↦ g)) (equations j) = 1) ∧\n              (∀ j, FreeGroup.lift (Sum.elim x (fun g ↦ g)) (inequations j) ≠ 1)\n\n/-- The class $L\\mathfrak{N}^{+}$ of locally nilpotent torsion-free groups. -/\ndef LocallyNilpotentTorsionFree : GroupClass :=\n  fun G _ ↦ IsLocallyNilpotent G ∧ IsMulTorsionFree G\n\n/-- The class $L\\mathfrak{S}_{\\pi}$ of locally soluble $\\pi$-groups. -/\ndef LocallySolublePi (π : Set Nat.Primes) : GroupClass :=\n  fun G _ ↦ IsLocallySoluble G ∧ IsPiGroup π G\n\n/-- The class $L\\mathfrak{S}^{+}$ of locally soluble torsion-free groups. -/\ndef LocallySolubleTorsionFree : GroupClass :=\n  fun G _ ↦ IsLocallySoluble G ∧ IsMulTorsionFree G\n\n/-- The class $L\\mathfrak{S}$ of locally soluble groups. -/\ndef LocallySoluble : GroupClass :=\n  fun G _ ↦ IsLocallySoluble G\n\n/--\nAssume that a group $G$ is existentially closed in one of the classes\n$L\\mathfrak{N}^{+}$, $L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, or\n$L\\mathfrak{S}$ of, respectively, locally nilpotent torsion-free groups,\nlocally soluble $\\pi$-groups, locally soluble torsion-free groups, and locally\nsoluble groups. Is $G$ characteristically simple? Here $\\pi$ ranges over all\nsets of primes.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallyNilpotentTorsionFree G →\n        IsCharacteristicallySimple G) ∧\n    (∀ (π : Set Nat.Primes) (G : Type) [Group G],\n      IsExistentiallyClosedIn (LocallySolublePi π) G → IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallySolubleTorsionFree G →\n        IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallySoluble G → IsCharacteristicallySimple G) := by\n  sorry\n\n/--\nIf a group is existentially closed in $L\\mathfrak{N}^{+}$, the class of\nlocally nilpotent torsion-free groups, is it characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallyNilpotentTorsionFree G →\n        IsCharacteristicallySimple G := by\n  sorry\n\n/--\nFor every set $\\pi$ of primes, if a group is existentially closed in\n$L\\mathfrak{S}_{\\pi}$, the class of locally soluble $\\pi$-groups, is it\ncharacteristically simple? The empty set is allowed; then this class contains\nonly the trivial group, which counts as characteristically simple here.\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set Nat.Primes) (G : Type) [Group G],\n      IsExistentiallyClosedIn (LocallySolublePi π) G →\n        IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIf a group is existentially closed in $L\\mathfrak{S}^{+}$, the class of\nlocally soluble torsion-free groups, is it characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallySolubleTorsionFree G →\n        IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIf a group is existentially closed in $L\\mathfrak{S}$, the class of all\nlocally soluble groups, is it characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallySoluble G → IsCharacteristicallySimple G := by\n  sorry\n\nend Kourovka.«8.14»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented an arbitrary set of primes as `Set Nat.Primes`, so the empty set is included but composite natural numbers cannot occur as members of π.",
+    "Defined local nilpotence and local solubility by requiring the subgroup generated by every finite tuple to satisfy Mathlib's `Group.IsNilpotent` or `IsSolvable` predicate.",
+    "Encoded a finite system over G as finite families of words in `FreeGroup (Fin n ⊕ G)`, with equations evaluated to one and inequations evaluated away from one.",
+    "Modeled a class extension containing G by an injective group homomorphism `G →* H`; coefficients are interpreted through that homomorphism.",
+    "Defined characteristic simplicity as having only bottom and top characteristic subgroups. This convention makes the trivial group characteristically simple, including the π = ∅ case.",
+    "Interpreted the primary yes/no question as the conjunction of the four universal class-specific assertions, with π universally quantified, as required by the fixed decomposition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Group.IsNilpotent`, applied here to every finitely generated subgroup.",
+     "name": "IsLocallyNilpotent",
+     "why_needed": "The statement requires locally nilpotent groups, and no such group predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`IsSolvable`, applied here to every finitely generated subgroup.",
+     "name": "IsLocallySoluble",
+     "why_needed": "The statement requires locally soluble groups, and no such group predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`Monoid.IsTorsion`, `IsOfFinOrder`, `orderOf`, and `IsPGroup`; the last handles only one prime.",
+     "name": "IsPiGroup",
+     "why_needed": "Mathlib's torsion API explicitly lacks a general π-torsion group predicate."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.Characteristic` and Mathlib's simple-group predicates, which concern normal rather than characteristic subgroups.",
+     "name": "IsCharacteristicallySimple",
+     "why_needed": "Mathlib has characteristic subgroups but no predicate saying that only bottom and top are characteristic."
+    },
+    {
+     "closest_existing_considered": "No reusable group-class predicate alias was found.",
+     "name": "GroupClass",
+     "why_needed": "A local abbreviation was useful to type predicates on groups uniformly in the existential-closedness definition."
+    },
+    {
+     "closest_existing_considered": "Mathlib's first-order model theory has formulas and embeddings but no ready existential-closedness notion; direct free-group words exactly encode the finite systems specified in the decomposition.",
+     "name": "IsExistentiallyClosedIn",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides existential closedness in a class of groups."
+    },
+    {
+     "closest_existing_considered": "Conjunction of bespoke `IsLocallyNilpotent` and Mathlib's `IsMulTorsionFree`.",
+     "name": "LocallyNilpotentTorsionFree",
+     "why_needed": "Names the class L𝔑⁺ used repeatedly by the question and its variant."
+    },
+    {
+     "closest_existing_considered": "Conjunction of bespoke `IsLocallySoluble` and `IsPiGroup`.",
+     "name": "LocallySolublePi",
+     "why_needed": "Names the parameterized class L𝔖_π used repeatedly by the question and its variant."
+    },
+    {
+     "closest_existing_considered": "Conjunction of bespoke `IsLocallySoluble` and Mathlib's `IsMulTorsionFree`.",
+     "name": "LocallySolubleTorsionFree",
+     "why_needed": "Names the class L𝔖⁺ used repeatedly by the question and its variant."
+    },
+    {
+     "closest_existing_considered": "The bespoke `IsLocallySoluble` group property.",
+     "name": "LocallySoluble",
+     "why_needed": "Names the class L𝔖 passed to the generic existential-closedness predicate."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.14».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.14».parts.b": "/--\nAssume that a group $G$ is existentially closed in one of the classes\n$L\\mathfrak{N}^{+}$, $L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, or\n$L\\mathfrak{S}$ of, respectively, locally nilpotent torsion-free groups,\nlocally soluble $\\pi$-groups, locally soluble torsion-free groups, and locally\nsoluble groups. Is $G$ characteristically simple? Here $\\pi$ ranges over all\nsets of primes.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallyNilpotentTorsionFree G →\n        IsCharacteristicallySimple G) ∧\n    (∀ (π : Set Nat.Primes) (G : Type) [Group G],\n      IsExistentiallyClosedIn (LocallySolublePi π) G → IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallySolubleTorsionFree G →\n        IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallySoluble G → IsCharacteristicallySimple G) := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": "/--\nIf a group is existentially closed in $L\\mathfrak{N}^{+}$, the class of\nlocally nilpotent torsion-free groups, is it characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallyNilpotentTorsionFree G →\n        IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble": "/--\nIf a group is existentially closed in $L\\mathfrak{S}$, the class of all\nlocally soluble groups, is it characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallySoluble G → IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": "/--\nFor every set $\\pi$ of primes, if a group is existentially closed in\n$L\\mathfrak{S}_{\\pi}$, the class of locally soluble $\\pi$-groups, is it\ncharacteristically simple? The empty set is allowed; then this class contains\nonly the trivial group, which counts as characteristically simple here.\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set Nat.Primes) (G : Type) [Group G],\n      IsExistentiallyClosedIn (LocallySolublePi π) G →\n        IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": "/--\nIf a group is existentially closed in $L\\mathfrak{S}^{+}$, the class of\nlocally soluble torsion-free groups, is it characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LocallySolubleTorsionFree G →\n        IsCharacteristicallySimple G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.14\n\nby O. H. Kegel\n\nAssume that a group is existentially closed in one of the following classes:\nlocally nilpotent torsion-free groups, locally soluble $\\pi$-groups, locally\nsoluble torsion-free groups, or locally soluble groups. Is the group\ncharacteristically simple?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.14»\n\n/-- A group property, used to specify a class of groups. -/\ndef GroupProperty := ∀ (G : Type) [Group G], Prop\n\n/-- Whether an assignment solves specified finite systems of equations and inequations.\n\nWords are elements of the free group on the disjoint union of coefficient symbols from $G$\nand variables indexed by `Fin n`. Each equation is normalized to $w=1$, and each inequation\nto $w\\ne 1$. The homomorphism `f` interprets coefficients and `x` interprets variables. -/\ndef SolvesSystem {G H : Type} [Group G] [Group H] {n : ℕ} (f : G →* H) (x : Fin n → H)\n    (equations inequations : Set (FreeGroup (G ⊕ Fin n))) : Prop :=\n  let eval := FreeGroup.lift (Sum.elim f x)\n  (∀ w ∈ equations, eval w = 1) ∧ (∀ w ∈ inequations, eval w ≠ 1)\n\n/-- A group $G$ is existentially closed in a class $\\mathcal C$ if $G\\in\\mathcal C$ and every\nfinite system of equations and inequations over $G$ which has a solution in a\n$\\mathcal C$-group containing $G$ already has a solution in $G$. -/\ndef IsExistentiallyClosed (C : GroupProperty) (G : Type) [Group G] : Prop :=\n  C G ∧\n    ∀ (H : Type) [Group H] (f : G →* H), Function.Injective f → C H →\n      ∀ (n : ℕ) (equations inequations : Set (FreeGroup (G ⊕ Fin n))),\n        equations.Finite → inequations.Finite →\n        (∃ x : Fin n → H, SolvesSystem f x equations inequations) →\n        ∃ x : Fin n → G, SolvesSystem (MonoidHom.id G) x equations inequations\n\n/-- A group is locally nilpotent if each of its finitely generated subgroups is nilpotent. -/\ndef IsLocallyNilpotent (G : Type) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/-- A group is locally soluble if each of its finitely generated subgroups is soluble. -/\ndef IsLocallySoluble (G : Type) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → IsSolvable H\n\n/-- A $\\pi$-group is a group in which every element has finite order and every prime divisor\nof an element order belongs to $\\pi$. -/\ndef IsPiGroup (π : Set ℕ) (G : Type) [Group G] : Prop :=\n  ∀ g : G, IsOfFinOrder g ∧ ∀ p : ℕ, p.Prime → p ∣ orderOf g → p ∈ π\n\n/-- The class $L\\mathfrak N^+$ of locally nilpotent torsion-free groups. -/\ndef locallyNilpotentTorsionFree : GroupProperty :=\n  fun G _ ↦ IsLocallyNilpotent G ∧ IsMulTorsionFree G\n\n/-- The class $L\\mathfrak S_\\pi$ of locally soluble $\\pi$-groups. -/\ndef locallySolublePi (π : Set ℕ) : GroupProperty :=\n  fun G _ ↦ IsLocallySoluble G ∧ IsPiGroup π G\n\n/-- The class $L\\mathfrak S^+$ of locally soluble torsion-free groups. -/\ndef locallySolubleTorsionFree : GroupProperty :=\n  fun G _ ↦ IsLocallySoluble G ∧ IsMulTorsionFree G\n\n/-- The class $L\\mathfrak S$ of locally soluble groups. -/\ndef locallySoluble : GroupProperty :=\n  fun G _ ↦ IsLocallySoluble G\n\n/-- A group is characteristically simple if its only characteristic subgroups are the trivial\nand whole subgroups. Under this convention, the trivial group is characteristically simple. -/\ndef IsCharacteristicallySimple (G : Type) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.Characteristic → H = ⊥ ∨ H = ⊤\n\n/--\nAssume a group $G$ is existentially closed in one of the classes\n$L\\mathfrak N^+$, $L\\mathfrak S_\\pi$, $L\\mathfrak S^+$, or $L\\mathfrak S$ of,\nrespectively, all locally nilpotent torsion-free groups, all locally soluble\n$\\pi$-groups, all locally soluble torsion-free groups, or all locally soluble\ngroups. Is $G$ characteristically simple?\n\nHere $\\pi$ ranges over sets of primes. The question asks for a positive answer\nfor each of the four classes.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    (∀ (G : Type) [Group G], IsExistentiallyClosed locallyNilpotentTorsionFree G →\n      IsCharacteristicallySimple G) ∧\n    (∀ (π : Set ℕ), (∀ p ∈ π, p.Prime) → ∀ (G : Type) [Group G],\n      IsExistentiallyClosed (locallySolublePi π) G → IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G], IsExistentiallyClosed locallySolubleTorsionFree G →\n      IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G], IsExistentiallyClosed locallySoluble G →\n      IsCharacteristicallySimple G) := by\n  sorry\n\n/--\nIs every group existentially closed in $L\\mathfrak N^+$, the class of locally\nnilpotent torsion-free groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsExistentiallyClosed locallyNilpotentTorsionFree G →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nFor every set of primes $\\pi$, is every group existentially closed in\n$L\\mathfrak S_\\pi$, the class of locally soluble $\\pi$-groups,\ncharacteristically simple? For $\\pi=\\varnothing$ this class contains only the\ntrivial group, which counts as characteristically simple under the convention used here.\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set ℕ), (∀ p ∈ π, p.Prime) → ∀ (G : Type) [Group G],\n      IsExistentiallyClosed (locallySolublePi π) G → IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group existentially closed in $L\\mathfrak S^+$, the class of locally\nsoluble torsion-free groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsExistentiallyClosed locallySolubleTorsionFree G →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group existentially closed in $L\\mathfrak S$, the class of all locally\nsoluble groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsExistentiallyClosed locallySoluble G →\n      IsCharacteristicallySimple G := by\n  sorry\n\nend Kourovka.«8.14»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A finite system over G is encoded by finite sets of words in the free group on G ⊕ Fin n. Equations and inequations are normalized to w = 1 and w ≠ 1, respectively.",
+    "An extension containing G is represented by an injective group homomorphism G →* H. Existential closedness also explicitly requires both G and H to belong to the selected group class.",
+    "A π-group requires every element to have finite order and every prime divisor of its order to lie in π. The conjectures quantify over sets π all of whose members are prime.",
+    "Locally nilpotent and locally soluble mean that every subgroup satisfying Mathlib's Subgroup.FG predicate is respectively nilpotent or soluble.",
+    "Characteristically simple means every characteristic subgroup is bottom or top. Thus the trivial group counts as characteristically simple, including in the π = ∅ boundary case.",
+    "The primary question is represented as the conjunction of the four universally quantified class-specific claims, with π universally quantified in the L𝔖_π claim."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "No corresponding group-class predicate wrapper was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«8.14».GroupProperty",
+     "why_needed": "Packages a class of groups so existential closedness can be parameterized by the ambient class."
+    },
+    {
+     "closest_existing_considered": "Mathlib's FreeGroup.lift supplies word evaluation, but no predicate for systems of equations and inequations over a group was found.",
+     "name": "Kourovka.«8.14».SolvesSystem",
+     "why_needed": "Expresses satisfaction of finite systems of group equations and inequations with coefficients from the base group."
+    },
+    {
+     "closest_existing_considered": "Mathlib model theory has existential formulas and elementary embeddings, but no standard first-order group language instance or relative existential-closedness predicate matching finite group equations and inequations.",
+     "name": "Kourovka.«8.14».IsExistentiallyClosed",
+     "why_needed": "The source's central relative existential-closedness notion is absent from Mathlib and the repository."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides Subgroup.FG and Group.IsNilpotent separately, but no locally nilpotent group predicate was found.",
+     "name": "Kourovka.«8.14».IsLocallyNilpotent",
+     "why_needed": "States that every finitely generated subgroup is nilpotent."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides Subgroup.FG and IsSolvable separately, but no locally soluble group predicate was found.",
+     "name": "Kourovka.«8.14».IsLocallySoluble",
+     "why_needed": "States that every finitely generated subgroup is soluble."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides p-groups and torsion groups; Mathlib's torsion file explicitly lists general π-torsion groups as future work.",
+     "name": "Kourovka.«8.14».IsPiGroup",
+     "why_needed": "Defines π-groups for an arbitrary set of primes."
+    },
+    {
+     "closest_existing_considered": "Composes the bespoke local-nilpotence predicate with Mathlib's IsMulTorsionFree.",
+     "name": "Kourovka.«8.14».locallyNilpotentTorsionFree",
+     "why_needed": "Names the specific class L𝔑⁺ used by the conjecture."
+    },
+    {
+     "closest_existing_considered": "Composes the bespoke locally soluble and π-group predicates.",
+     "name": "Kourovka.«8.14».locallySolublePi",
+     "why_needed": "Names the specific class L𝔖_π used by the conjecture."
+    },
+    {
+     "closest_existing_considered": "Composes the bespoke local-solubility predicate with Mathlib's IsMulTorsionFree.",
+     "name": "Kourovka.«8.14».locallySolubleTorsionFree",
+     "why_needed": "Names the specific class L𝔖⁺ used by the conjecture."
+    },
+    {
+     "closest_existing_considered": "Uses the bespoke IsLocallySoluble predicate; no existing packaged class was found.",
+     "name": "Kourovka.«8.14».locallySoluble",
+     "why_needed": "Packages the class L𝔖 for use as the ambient class parameter."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Subgroup.Characteristic is used directly; no characteristically simple group predicate was found.",
+     "name": "Kourovka.«8.14».IsCharacteristicallySimple",
+     "why_needed": "Mathlib has characteristic subgroups but no predicate asserting that only bottom and top are characteristic."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.14».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.14».parts.b": "/--\nAssume a group $G$ is existentially closed in one of the classes\n$L\\mathfrak N^+$, $L\\mathfrak S_\\pi$, $L\\mathfrak S^+$, or $L\\mathfrak S$ of,\nrespectively, all locally nilpotent torsion-free groups, all locally soluble\n$\\pi$-groups, all locally soluble torsion-free groups, or all locally soluble\ngroups. Is $G$ characteristically simple?\n\nHere $\\pi$ ranges over sets of primes. The question asks for a positive answer\nfor each of the four classes.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    (∀ (G : Type) [Group G], IsExistentiallyClosed locallyNilpotentTorsionFree G →\n      IsCharacteristicallySimple G) ∧\n    (∀ (π : Set ℕ), (∀ p ∈ π, p.Prime) → ∀ (G : Type) [Group G],\n      IsExistentiallyClosed (locallySolublePi π) G → IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G], IsExistentiallyClosed locallySolubleTorsionFree G →\n      IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G], IsExistentiallyClosed locallySoluble G →\n      IsCharacteristicallySimple G) := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": "/--\nIs every group existentially closed in $L\\mathfrak N^+$, the class of locally\nnilpotent torsion-free groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsExistentiallyClosed locallyNilpotentTorsionFree G →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble": "/--\nIs every group existentially closed in $L\\mathfrak S$, the class of all locally\nsoluble groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsExistentiallyClosed locallySoluble G →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": "/--\nFor every set of primes $\\pi$, is every group existentially closed in\n$L\\mathfrak S_\\pi$, the class of locally soluble $\\pi$-groups,\ncharacteristically simple? For $\\pi=\\varnothing$ this class contains only the\ntrivial group, which counts as characteristically simple under the convention used here.\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set ℕ), (∀ p ∈ π, p.Prime) → ∀ (G : Type) [Group G],\n      IsExistentiallyClosed (locallySolublePi π) G → IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": "/--\nIs every group existentially closed in $L\\mathfrak S^+$, the class of locally\nsoluble torsion-free groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsExistentiallyClosed locallySolubleTorsionFree G →\n      IsCharacteristicallySimple G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.14\n\nby O. H. Kegel\n\nIs a group that is existentially closed in one of the following classes\ncharacteristically simple?\n\n* locally nilpotent torsion-free groups, $L\\mathfrak{N}^{+}$;\n* locally soluble $\\pi$-groups, $L\\mathfrak{S}_{\\pi}$;\n* locally soluble torsion-free groups, $L\\mathfrak{S}^{+}$;\n* locally soluble groups, $L\\mathfrak{S}$.\n\nHere existential closedness means that every finite system of group equations\nand inequations over the group which has a solution in a class-group extension\nalready has a solution in the group.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.14»\n\n/-- A group term in `n` variables with coefficients in `G`. -/\ninductive GroupTerm (G : Type) (n : ℕ) where\n  | variable : Fin n → GroupTerm G n\n  | coefficient : G → GroupTerm G n\n  | one : GroupTerm G n\n  | mul : GroupTerm G n → GroupTerm G n → GroupTerm G n\n  | inv : GroupTerm G n → GroupTerm G n\n\n/-- Interpret a group term after mapping its coefficients into another group. -/\ndef GroupTerm.eval {G H : Type} [Group G] [Group H] {n : ℕ}\n    (f : G →* H) (x : Fin n → H) : GroupTerm G n → H\n  | .variable i => x i\n  | .coefficient g => f g\n  | .one => 1\n  | .mul u v => u.eval f x * v.eval f x\n  | .inv u => (u.eval f x)⁻¹\n\n/-- A finite system of equations and inequations over `G` has a solution after\nmapping the coefficients along `f`. -/\ndef HasSolution {G H : Type} [Group G] [Group H] {n : ℕ} (f : G →* H)\n    (equations inequations : List (GroupTerm G n × GroupTerm G n)) : Prop :=\n  ∃ x : Fin n → H,\n    (∀ e ∈ equations, e.1.eval f x = e.2.eval f x) ∧\n    (∀ e ∈ inequations, e.1.eval f x ≠ e.2.eval f x)\n\n/-- A group is existentially closed in a class `C` if it belongs to `C` and\nevery finite system of equations and inequations over it which is soluble in a\n`C`-group extension is already soluble in the original group. Extensions are\nrepresented by injective group homomorphisms. -/\ndef IsExistentiallyClosed\n    (C : ∀ (H : Type) [Group H], Prop) (G : Type) [Group G] : Prop :=\n  C G ∧\n    ∀ (H : Type) [Group H] (f : G →* H), Function.Injective f → C H →\n      ∀ (n : ℕ) (equations inequations : List (GroupTerm G n × GroupTerm G n)),\n        HasSolution f equations inequations →\n          HasSolution (MonoidHom.id G) equations inequations\n\n/-- A group is locally nilpotent if each of its finitely generated subgroups is\nnilpotent. -/\ndef IsLocallyNilpotent (G : Type) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/-- A group is locally soluble if each of its finitely generated subgroups is\nsoluble. -/\ndef IsLocallySoluble (G : Type) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → IsSolvable H\n\n/-- A group is a $\\pi$-group if every element has finite order and every prime\ndivisor of that order belongs to `π`. -/\ndef IsPiGroup (π : Set {p : ℕ // p.Prime}) (G : Type) [Group G] : Prop :=\n  ∀ g : G, IsOfFinOrder g ∧\n    ∀ (p : ℕ) (hp : p.Prime), p ∣ orderOf g → (⟨p, hp⟩ : {q : ℕ // q.Prime}) ∈ π\n\n/-- A group is characteristically simple if its only characteristic subgroups\nare the bottom and top subgroups. Under this convention, the trivial group is\ncharacteristically simple. -/\ndef IsCharacteristicallySimple (G : Type) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.Characteristic → H = ⊥ ∨ H = ⊤\n\n/--\nAssume that $G$ is existentially closed in one of the classes\n$L\\mathfrak{N}^{+}$, $L\\mathfrak{S}_{\\pi}$,\n$L\\mathfrak{S}^{+}$, or $L\\mathfrak{S}$ of, respectively, locally nilpotent\ntorsion-free groups, locally soluble $\\pi$-groups, locally soluble torsion-free\ngroups, or locally soluble groups. In each of these four cases, must $G$ be\ncharacteristically simple? The set of primes $\\pi$ is arbitrary.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] =>\n        IsLocallyNilpotent H ∧ IsMulTorsionFree H) G →\n      IsCharacteristicallySimple G) ∧\n    (∀ (π : Set {p : ℕ // p.Prime}) (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] => IsLocallySoluble H ∧ IsPiGroup π H) G →\n      IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] =>\n        IsLocallySoluble H ∧ IsMulTorsionFree H) G →\n      IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] => IsLocallySoluble H) G →\n      IsCharacteristicallySimple G) := by\n  sorry\n\n/--\nIf $G$ is existentially closed in the class $L\\mathfrak{N}^{+}$ of locally\nnilpotent torsion-free groups, must $G$ be characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] =>\n        IsLocallyNilpotent H ∧ IsMulTorsionFree H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nFor an arbitrary set of primes $\\pi$, if $G$ is existentially closed in the\nclass $L\\mathfrak{S}_{\\pi}$ of locally soluble $\\pi$-groups, must $G$ be\ncharacteristically simple? For $\\pi = \\varnothing$ this class contains only\nthe trivial group, which counts as characteristically simple here.\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set {p : ℕ // p.Prime}) (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] => IsLocallySoluble H ∧ IsPiGroup π H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIf $G$ is existentially closed in the class $L\\mathfrak{S}^{+}$ of locally\nsoluble torsion-free groups, must $G$ be characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] =>\n        IsLocallySoluble H ∧ IsMulTorsionFree H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIf $G$ is existentially closed in the class $L\\mathfrak{S}$ of all locally\nsoluble groups, must $G$ be characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] => IsLocallySoluble H) G →\n      IsCharacteristicallySimple G := by\n  sorry\n\nend Kourovka.«8.14»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Existential closedness is stated concretely using finite lists of group equations and inequations in finitely many variables, with coefficients from the base group.",
+    "A class-group extension is represented by an injective group homomorphism from the base group; coefficients are interpreted along that homomorphism.",
+    "Local nilpotence and local solubility mean that every Mathlib-finitely-generated subgroup (`Subgroup.FG`) is respectively `Group.IsNilpotent` or `IsSolvable`.",
+    "The parameter π has type `Set {p : ℕ // p.Prime}`, so it is literally an arbitrary set of primes. A π-group is defined elementwise by finite order and restriction of every prime divisor of the order to π.",
+    "Characteristic simplicity means every `Subgroup.Characteristic` subgroup is bottom or top. Thus the trivial group is characteristically simple, including the degenerate π = ∅ case.",
+    "The primary yes/no proposition is the conjunction of the positive assertions for all four classes, with π universally quantified, as specified by the decomposition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `FreeGroup` and model-theory formula syntax; neither directly packages group terms with base-group coefficients for this statement.",
+     "name": "GroupTerm",
+     "why_needed": "Provides syntax for group words in finitely many variables with coefficients in the base group."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`; using it would still require a bespoke encoding combining variables and coefficients.",
+     "name": "GroupTerm.eval",
+     "why_needed": "Interprets coefficients along an extension homomorphism and variables under an assignment."
+    },
+    {
+     "closest_existing_considered": "Mathlib model-theory semantics; no existing group-specific finite equation/inequation system predicate was found.",
+     "name": "HasSolution",
+     "why_needed": "Expresses solvability of a finite list of equations and a finite list of inequations."
+    },
+    {
+     "closest_existing_considered": "Mathlib model-theory elementary embeddings and semantics; no ready-made existentially-closed-in-a-class notion or group language with parameter handling was found.",
+     "name": "IsExistentiallyClosed",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no existential-closedness predicate for a class of groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib `Subgroup.FG` and `Group.IsNilpotent`, which are used in the definition.",
+     "name": "IsLocallyNilpotent",
+     "why_needed": "No predicate for every finitely generated subgroup of a group being nilpotent was found."
+    },
+    {
+     "closest_existing_considered": "Mathlib `Subgroup.FG` and `IsSolvable`, which are used in the definition.",
+     "name": "IsLocallySoluble",
+     "why_needed": "No predicate for every finitely generated subgroup of a group being soluble was found."
+    },
+    {
+     "closest_existing_considered": "Mathlib `IsPGroup`, `IsOfFinOrder`, and `orderOf`; the latter two are used to define the arbitrary-π notion.",
+     "name": "IsPiGroup",
+     "why_needed": "Mathlib has p-groups but no arbitrary-set-of-primes π-group predicate."
+    },
+    {
+     "closest_existing_considered": "Mathlib `Subgroup.Characteristic`, used directly in the definition.",
+     "name": "IsCharacteristicallySimple",
+     "why_needed": "Mathlib provides characteristic subgroups but no predicate saying the only such subgroups are bottom and top."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.14».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.14».parts.b": "/--\nAssume that $G$ is existentially closed in one of the classes\n$L\\mathfrak{N}^{+}$, $L\\mathfrak{S}_{\\pi}$,\n$L\\mathfrak{S}^{+}$, or $L\\mathfrak{S}$ of, respectively, locally nilpotent\ntorsion-free groups, locally soluble $\\pi$-groups, locally soluble torsion-free\ngroups, or locally soluble groups. In each of these four cases, must $G$ be\ncharacteristically simple? The set of primes $\\pi$ is arbitrary.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] =>\n        IsLocallyNilpotent H ∧ IsMulTorsionFree H) G →\n      IsCharacteristicallySimple G) ∧\n    (∀ (π : Set {p : ℕ // p.Prime}) (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] => IsLocallySoluble H ∧ IsPiGroup π H) G →\n      IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] =>\n        IsLocallySoluble H ∧ IsMulTorsionFree H) G →\n      IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] => IsLocallySoluble H) G →\n      IsCharacteristicallySimple G) := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": "/--\nIf $G$ is existentially closed in the class $L\\mathfrak{N}^{+}$ of locally\nnilpotent torsion-free groups, must $G$ be characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] =>\n        IsLocallyNilpotent H ∧ IsMulTorsionFree H) G →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble": "/--\nIf $G$ is existentially closed in the class $L\\mathfrak{S}$ of all locally\nsoluble groups, must $G$ be characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] => IsLocallySoluble H) G →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": "/--\nFor an arbitrary set of primes $\\pi$, if $G$ is existentially closed in the\nclass $L\\mathfrak{S}_{\\pi}$ of locally soluble $\\pi$-groups, must $G$ be\ncharacteristically simple? For $\\pi = \\varnothing$ this class contains only\nthe trivial group, which counts as characteristically simple here.\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set {p : ℕ // p.Prime}) (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] => IsLocallySoluble H ∧ IsPiGroup π H) G →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": "/--\nIf $G$ is existentially closed in the class $L\\mathfrak{S}^{+}$ of locally\nsoluble torsion-free groups, must $G$ be characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosed (fun H [Group H] =>\n        IsLocallySoluble H ∧ IsMulTorsionFree H) G →\n      IsCharacteristicallySimple G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.14\n\nby O. H. Kegel\n\nIs a group that is existentially closed in one of the classes\n$L\\mathfrak{N}^{+}$, $L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, or\n$L\\mathfrak{S}$ characteristically simple? These are respectively the classes\nof locally nilpotent torsion-free groups, locally soluble $\\pi$-groups,\nlocally soluble torsion-free groups, and locally soluble groups.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.14»\n\n/-- A group is locally nilpotent if each of its finitely generated subgroups is nilpotent. -/\ndef IsLocallyNilpotent (G : Type) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/-- A group is locally soluble if each of its finitely generated subgroups is soluble. -/\ndef IsLocallySoluble (G : Type) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → IsSolvable H\n\n/-- A $\\pi$-group is a torsion group in which every prime divisor of the order of an element\nbelongs to the set $\\pi$ of primes. -/\ndef IsPiGroup (π : Set ℕ) (G : Type) [Group G] : Prop :=\n  ∀ g : G, IsOfFinOrder g ∧ ∀ p : ℕ, p.Prime → p ∣ orderOf g → p ∈ π\n\n/-- A group is characteristically simple if its only characteristic subgroups are the trivial\nsubgroup and the whole group. Under this convention, the trivial group is characteristically\nsimple. -/\ndef IsCharacteristicallySimple (G : Type) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.Characteristic → H = ⊥ ∨ H = ⊤\n\n/-- A group `G` is existentially closed in a class `C` if `G` belongs to `C` and every finite\nsystem of group equations and inequations over `G` that has a solution in a member of `C`\ncontaining an isomorphic copy of `G` already has a solution in `G`.\n\nA word in the coefficients and $n$ variables is represented by `FreeGroup (G ⊕ Fin n)`.\nThe two lists represent respectively the equations and inequations in the finite system. -/\ndef IsExistentiallyClosedIn (C : ∀ (H : Type), [Group H] → Prop)\n    (G : Type) [Group G] : Prop :=\n  C G ∧\n    ∀ (H : Type) [Group H] (ι : G →* H), Function.Injective ι → C H →\n      ∀ (n : ℕ)\n        (equations inequations : List (FreeGroup (G ⊕ Fin n) × FreeGroup (G ⊕ Fin n))),\n        (∃ x : Fin n → H,\n          equations.Forall (fun e ↦\n            FreeGroup.lift (Sum.elim ι x) e.1 = FreeGroup.lift (Sum.elim ι x) e.2) ∧\n          inequations.Forall (fun e ↦\n            FreeGroup.lift (Sum.elim ι x) e.1 ≠ FreeGroup.lift (Sum.elim ι x) e.2)) →\n        ∃ x : Fin n → G,\n          equations.Forall (fun e ↦\n            FreeGroup.lift (Sum.elim (fun g : G ↦ g) x) e.1 =\n              FreeGroup.lift (Sum.elim (fun g : G ↦ g) x) e.2) ∧\n          inequations.Forall (fun e ↦\n            FreeGroup.lift (Sum.elim (fun g : G ↦ g) x) e.1 ≠\n              FreeGroup.lift (Sum.elim (fun g : G ↦ g) x) e.2)\n\n/--\nAssume that a group $G$ is existentially closed in one of the four classes\n$L\\mathfrak{N}^{+}$, $L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, or\n$L\\mathfrak{S}$. Is $G$ characteristically simple?\n\nThis asks all four questions simultaneously. The set $\\pi$ is arbitrary. For\n$\\pi = \\varnothing$, the class of $\\pi$-groups consists only of the trivial\ngroup, which is counted as characteristically simple here.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallyNilpotent H ∧ IsMulTorsionFree H) G →\n        IsCharacteristicallySimple G) ∧\n    (∀ π : Set ℕ, ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H ∧ IsPiGroup π H) G →\n        IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H ∧ IsMulTorsionFree H) G →\n        IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H) G →\n        IsCharacteristicallySimple G) := by\n  sorry\n\n/--\nIs every group existentially closed in $L\\mathfrak{N}^{+}$, the class of\nlocally nilpotent torsion-free groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallyNilpotent H ∧ IsMulTorsionFree H) G →\n        IsCharacteristicallySimple G := by\n  sorry\n\n/--\nFor an arbitrary set $\\pi$ of primes, is every group existentially closed in\n$L\\mathfrak{S}_{\\pi}$, the class of locally soluble $\\pi$-groups,\ncharacteristically simple? For $\\pi = \\varnothing$, this class consists only\nof the trivial group, which is counted as characteristically simple here.\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ π : Set ℕ, ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H ∧ IsPiGroup π H) G →\n        IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group existentially closed in $L\\mathfrak{S}^{+}$, the class of\nlocally soluble torsion-free groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H ∧ IsMulTorsionFree H) G →\n        IsCharacteristicallySimple G := by\n  sorry\n\n/--\nIs every group existentially closed in $L\\mathfrak{S}$, the class of all\nlocally soluble groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H) G →\n        IsCharacteristicallySimple G := by\n  sorry\n\nend Kourovka.«8.14»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Existential closedness is relative to a class predicate and includes membership in that class. Extensions are represented by injective group homomorphisms, which is equivalent to treating the base group as a subgroup up to isomorphism.",
+    "Finite systems are two finite lists of equations and inequations. Terms with coefficients in G and n variables are represented by FreeGroup (G ⊕ Fin n), and are evaluated using FreeGroup.lift.",
+    "Local nilpotence and local solubility quantify over all Mathlib finitely generated subgroups via Subgroup.FG.",
+    "A π-group requires every element to have finite order and every prime divisor of its order to belong to π. π is represented as Set ℕ; membership of nonprimes is immaterial.",
+    "Characteristic simplicity means every subgroup satisfying Mathlib Subgroup.Characteristic is bottom or top. No Nontrivial hypothesis is imposed, so the trivial group counts as characteristically simple and the π = ∅ case is included.",
+    "The primary question is represented as the conjunction of the four universally quantified positive-answer propositions, with π universally quantified in the locally soluble π-group component, as required by the fixed decomposition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib Group.IsNilpotent describes global nilpotence, and Subgroup.FG describes finite generation, but no combined local predicate was found.",
+     "name": "Kourovka.«8.14».IsLocallyNilpotent",
+     "why_needed": "The statement requires nilpotence of every finitely generated subgroup."
+    },
+    {
+     "closest_existing_considered": "Mathlib IsSolvable describes global solubility, and Subgroup.FG describes finite generation, but no combined local predicate was found.",
+     "name": "Kourovka.«8.14».IsLocallySoluble",
+     "why_needed": "The statement requires solubility of every finitely generated subgroup."
+    },
+    {
+     "closest_existing_considered": "Mathlib Monoid.IsTorsion supplies finite-order elements, and orderOf/Nat.Prime supply the ingredients, but no π-group predicate was found.",
+     "name": "Kourovka.«8.14».IsPiGroup",
+     "why_needed": "The locally soluble π-group class needs finite element orders whose prime divisors lie in a specified set."
+    },
+    {
+     "closest_existing_considered": "Mathlib Subgroup.Characteristic expresses that one subgroup is characteristic, but no characteristically-simple group predicate was found.",
+     "name": "Kourovka.«8.14».IsCharacteristicallySimple",
+     "why_needed": "The conclusion aggregates the condition that the only characteristic subgroups are bottom and top."
+    },
+    {
+     "closest_existing_considered": "Mathlib has general first-order model-theory syntax and FreeGroup word syntax, but no predicate for existential closure in a group class. FreeGroup was reused to avoid introducing a separate bespoke group-term syntax.",
+     "name": "Kourovka.«8.14».IsExistentiallyClosedIn",
+     "why_needed": "The hypothesis requires existential closedness relative to each specified class, for finite systems of group equations and inequations with coefficients."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.14».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.14».parts.b": "/--\nAssume that a group $G$ is existentially closed in one of the four classes\n$L\\mathfrak{N}^{+}$, $L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, or\n$L\\mathfrak{S}$. Is $G$ characteristically simple?\n\nThis asks all four questions simultaneously. The set $\\pi$ is arbitrary. For\n$\\pi = \\varnothing$, the class of $\\pi$-groups consists only of the trivial\ngroup, which is counted as characteristically simple here.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallyNilpotent H ∧ IsMulTorsionFree H) G →\n        IsCharacteristicallySimple G) ∧\n    (∀ π : Set ℕ, ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H ∧ IsPiGroup π H) G →\n        IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H ∧ IsMulTorsionFree H) G →\n        IsCharacteristicallySimple G) ∧\n    (∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H) G →\n        IsCharacteristicallySimple G) := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": "/--\nIs every group existentially closed in $L\\mathfrak{N}^{+}$, the class of\nlocally nilpotent torsion-free groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallyNilpotent H ∧ IsMulTorsionFree H) G →\n        IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble": "/--\nIs every group existentially closed in $L\\mathfrak{S}$, the class of all\nlocally soluble groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H) G →\n        IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": "/--\nFor an arbitrary set $\\pi$ of primes, is every group existentially closed in\n$L\\mathfrak{S}_{\\pi}$, the class of locally soluble $\\pi$-groups,\ncharacteristically simple? For $\\pi = \\varnothing$, this class consists only\nof the trivial group, which is counted as characteristically simple here.\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ π : Set ℕ, ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H ∧ IsPiGroup π H) G →\n        IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": "/--\nIs every group existentially closed in $L\\mathfrak{S}^{+}$, the class of\nlocally soluble torsion-free groups, characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn (fun H _ ↦ IsLocallySoluble H ∧ IsMulTorsionFree H) G →\n        IsCharacteristicallySimple G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.14\n\nby O. H. Kegel\n\nb) Assume a group $G$ is existentially closed in one of the classes $L\\mathfrak{N}^{+}$,\n$L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of, respectively, all locally\nnilpotent torsion-free groups, all locally soluble $\\pi$-groups, all locally soluble\ntorsion-free groups, or all locally soluble groups. Is it true that $G$ is characteristically\nsimple?\n\nThe existential closedness of $G$ is a local property, thus it seems difficult to obtain\nglobal properties of $G$ from it. See also Archive, 8.14 a.\n\nHere a group $G$ in a class $\\mathfrak{X}$ of groups is *existentially closed in $\\mathfrak{X}$*\nif every finite system of equations and inequations with coefficients in $G$ that has a solution\nin some $\\mathfrak{X}$-group containing $G$ already has a solution in $G$. A group is\n*characteristically simple* if its only characteristic subgroups are the trivial subgroup and\nthe whole group. Part a) of the problem is solved and is only cross-referenced to the Archive\nin the notebook, so only part b) is stated here.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.14»\n\nuniverse u\n\nsection Definitions\n\nvariable (G : Type*) [Group G]\n\n/-- A group is *torsion-free* if its only element of finite order is the identity. -/\ndef IsTorsionFree : Prop :=\n  ∀ g : G, IsOfFinOrder g → g = 1\n\n/-- A group is *locally nilpotent* if every finitely generated subgroup is nilpotent. -/\ndef IsLocallyNilpotent : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/-- A group is *locally soluble* if every finitely generated subgroup is soluble. -/\ndef IsLocallySolvable : Prop :=\n  ∀ H : Subgroup G, H.FG → IsSolvable H\n\n/-- For a set of primes $\\pi$, a group is a *$\\pi$-group* if every element has finite order\nand every prime divisor of the order of every element lies in $\\pi$. -/\ndef IsPiGroup (π : Set Nat.Primes) : Prop :=\n  ∀ g : G, IsOfFinOrder g ∧ ∀ p : Nat.Primes, (p : ℕ) ∣ orderOf g → p ∈ π\n\n/-- A group is *characteristically simple* if its only characteristic subgroups are the trivial\nsubgroup and the whole group. With this convention the trivial group is characteristically\nsimple. -/\ndef IsCharacteristicallySimple : Prop :=\n  ∀ H : Subgroup G, H.Characteristic → H = ⊥ ∨ H = ⊤\n\n/-- The class $L\\mathfrak{N}^{+}$ of all locally nilpotent torsion-free groups. -/\ndef LNPlus : Prop :=\n  IsLocallyNilpotent G ∧ IsTorsionFree G\n\n/-- The class $L\\mathfrak{S}_{\\pi}$ of all locally soluble $\\pi$-groups. -/\ndef LSPi (π : Set Nat.Primes) : Prop :=\n  IsLocallySolvable G ∧ IsPiGroup G π\n\n/-- The class $L\\mathfrak{S}^{+}$ of all locally soluble torsion-free groups. -/\ndef LSPlus : Prop :=\n  IsLocallySolvable G ∧ IsTorsionFree G\n\n/-- The class $L\\mathfrak{S}$ of all locally soluble groups. -/\ndef LS : Prop :=\n  IsLocallySolvable G\n\nvariable {G}\n\n/-- A finite system of equations $w = 1$ (for $w \\in E$) and inequations $w \\neq 1$ (for\n$w \\in I$) in $n$ unknowns with coefficients in $G$ has a solution in the group $K$, where the\ncoefficients are transported along `f : G →* K`.\n\nA word $w$ is an element of the free group on `G ⊕ Fin n`: `Sum.inl g` is the constant $g \\in G$\nand `Sum.inr i` is the $i$-th unknown. -/\ndef HasSolution {n : ℕ} {K : Type*} [Group K] (f : G →* K)\n    (E I : Finset (FreeGroup (G ⊕ Fin n))) : Prop :=\n  ∃ x : Fin n → K,\n    (∀ w ∈ E, FreeGroup.lift (Sum.elim f x) w = 1) ∧\n      ∀ w ∈ I, FreeGroup.lift (Sum.elim f x) w ≠ 1\n\n/-- A group $G$ is *existentially closed in the class $\\mathfrak{X}$ of groups* if $G$ belongs to\n$\\mathfrak{X}$ and every finite system of equations and inequations with coefficients in $G$ that\nhas a solution in some $\\mathfrak{X}$-group $H$ containing $G$ (that is, $G$ embeds in $H$)\nalready has a solution in $G$. -/\ndef IsExistentiallyClosedIn (𝔛 : ∀ (H : Type u) [Group H], Prop) (G : Type u) [Group G] :\n    Prop :=\n  𝔛 G ∧ ∀ (H : Type u) [Group H], 𝔛 H → ∀ f : G →* H, Function.Injective f →\n    ∀ (n : ℕ) (E I : Finset (FreeGroup (G ⊕ Fin n))),\n      HasSolution f E I → HasSolution (MonoidHom.id G) E I\n\nend Definitions\n\nsection API\n\nvariable {G : Type*} [Group G]\n\n/-- Every simple group is characteristically simple. -/\n@[category API, AMS 20]\ntheorem IsCharacteristicallySimple.of_isSimpleGroup [IsSimpleGroup G] :\n    IsCharacteristicallySimple G := fun H hH =>\n  haveI := hH\n  IsSimpleGroup.eq_bot_or_eq_top_of_normal H inferInstance\n\n/-- Every nilpotent group is locally nilpotent. -/\n@[category API, AMS 20]\ntheorem IsLocallyNilpotent.of_isNilpotent [Group.IsNilpotent G] : IsLocallyNilpotent G :=\n  fun _ _ => inferInstance\n\n/-- Every soluble group is locally soluble. -/\n@[category API, AMS 20]\ntheorem IsLocallySolvable.of_isSolvable [IsSolvable G] : IsLocallySolvable G :=\n  fun _ _ => inferInstance\n\n/-- A torsion-free $\\pi$-group is trivial. -/\n@[category API, AMS 20]\ntheorem IsPiGroup.subsingleton_of_isTorsionFree {π : Set Nat.Primes} (hπ : IsPiGroup G π)\n    (hG : IsTorsionFree G) : Subsingleton G :=\n  ⟨fun a b => by rw [hG a (hπ a).1, hG b (hπ b).1]⟩\n\nend API\n\n/--\nAssume a group $G$ is existentially closed in one of the classes $L\\mathfrak{N}^{+}$,\n$L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of, respectively, all locally\nnilpotent torsion-free groups, all locally soluble $\\pi$-groups, all locally soluble\ntorsion-free groups, or all locally soluble groups. Is it true that $G$ is characteristically\nsimple?\n\nHere $\\pi$ ranges over all sets of primes.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      (IsExistentiallyClosedIn LNPlus G ∨\n        (∃ π : Set Nat.Primes, IsExistentiallyClosedIn (LSPi · π) G) ∨\n        IsExistentiallyClosedIn LSPlus G ∨\n        IsExistentiallyClosedIn LS G) →\n      IsCharacteristicallySimple G := by\n  sorry\n\n/--\nAssume a group $G$ is existentially closed in the class $L\\mathfrak{N}^{+}$ of all locally\nnilpotent torsion-free groups. Is it true that $G$ is characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LNPlus G → IsCharacteristicallySimple G := by\n  sorry\n\n/--\nLet $\\pi$ be a set of primes. Assume a group $G$ is existentially closed in the class\n$L\\mathfrak{S}_{\\pi}$ of all locally soluble $\\pi$-groups. Is it true that $G$ is\ncharacteristically simple?\n\nFor $\\pi = \\emptyset$ the class $L\\mathfrak{S}_{\\pi}$ consists of the trivial groups only, and\nthe trivial group is characteristically simple with the convention used here.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set Nat.Primes) (G : Type) [Group G],\n      IsExistentiallyClosedIn (LSPi · π) G → IsCharacteristicallySimple G := by\n  sorry\n\n/--\nAssume a group $G$ is existentially closed in the class $L\\mathfrak{S}^{+}$ of all locally\nsoluble torsion-free groups. Is it true that $G$ is characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LSPlus G → IsCharacteristicallySimple G := by\n  sorry\n\n/--\nAssume a group $G$ is existentially closed in the class $L\\mathfrak{S}$ of all locally soluble\ngroups. Is it true that $G$ is characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsExistentiallyClosedIn LS G → IsCharacteristicallySimple G := by\n  sorry\n\nend Kourovka.«8.14»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table matches the source: only part b) is posed (a) is only cross-referenced to the Archive), the closing remark is commentary, and the four class-variants plus the combined question are the natural slots.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Existential closure is formalized via finite systems of equations w = 1 and inequations w ≠ 1 in finitely many unknowns with coefficients in G (words in FreeGroup (G ⊕ Fin n)). Equations u = v are covered by u v⁻¹ = 1, and existential formulas with parameters reduce to such systems via disjunctive normal form, so this matches the model-theoretic definition; it is the definition in the decomposition notes and the standard one (Higman–Scott, Kegel).",
+    "'X-group containing G' is modeled as a group H in the same universe as G together with an injective MonoidHom G →* H. Restricting H to the same universe is harmless for the four classes at hand since they are subgroup-closed and isomorphism-invariant and a finite solution set generates a small subgroup, but the definition IsExistentiallyClosedIn is universe-restricted in general.",
+    "G is required to belong to the class 𝔛 as part of 'existentially closed in 𝔛' (standard convention, also in the decomposition notes).",
+    "Torsion-free is 'no nontrivial element of finite order' (∀ g, IsOfFinOrder g → g = 1), deliberately NOT Mathlib's IsMulTorsionFree (unique roots), which is strictly stronger for non-nilpotent groups and would change the classes L𝔖⁺ (and formally L𝔑⁺).",
+    "Characteristically simple is 'only characteristic subgroups are ⊥ and ⊤' with no Nontrivial requirement. A trivial group is existentially closed in one of the four classes only when the class consists of trivial groups, i.e. only for L𝔖_π with π = ∅; under this convention that degenerate instance is vacuously true and does not distort the answer, whereas the Nontrivial convention would make the conjunction trivially false for degenerate reasons. π is quantified over all Set Nat.Primes without a nonemptiness restriction, as in the source.",
+    "π-group: every element has finite order and all prime divisors of orderOf g lie in π (π : Set Nat.Primes). The IsOfFinOrder conjunct is essential since orderOf g = 0 for elements of infinite order.",
+    "Locally nilpotent / locally soluble use Subgroup.FG together with Mathlib's Group.IsNilpotent / IsSolvable on the subgroup coerced to a type.",
+    "The main slot is stated with a disjunctive hypothesis (∃ π inside the second disjunct) rather than as a conjunction of four statements; these are logically equivalent and the disjunction mirrors the text 'in one of the classes'.",
+    "Groups are quantified over Type (not Type*), following the existing Kourovka files in the repository.",
+    "Four short, fully proved @[category API] lemmas were added as basic tests of the bespoke definitions, per CONTRIBUTING.md."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "IsMulTorsionFree (Mathlib); Monoid.IsTorsionFree is mentioned in a Mathlib docstring but does not exist as a declaration.",
+     "name": "Kourovka.«8.14».IsTorsionFree",
+     "why_needed": "'Torsion-free' for a general (non-abelian) group means no nontrivial element of finite order. Mathlib's `IsMulTorsionFree` is the strictly stronger unique-roots property (e.g. the torsion-free soluble Klein bottle group fails it), so it would misstate the classes L𝔑⁺ and L𝔖⁺. Defined as ∀ g, IsOfFinOrder g → g = 1."
+    },
+    {
+     "closest_existing_considered": "Group.IsNilpotent, Subgroup.FG (used as building blocks).",
+     "name": "Kourovka.«8.14».IsLocallyNilpotent",
+     "why_needed": "Every finitely generated subgroup is nilpotent: ∀ H : Subgroup G, H.FG → Group.IsNilpotent H. Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "IsSolvable, Subgroup.FG (used as building blocks).",
+     "name": "Kourovka.«8.14».IsLocallySolvable",
+     "why_needed": "Every finitely generated subgroup is soluble: ∀ H : Subgroup G, H.FG → IsSolvable H. Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "IsPGroup p G (single prime only); Monoid.IsTorsion.",
+     "name": "Kourovka.«8.14».IsPiGroup",
+     "why_needed": "π-group for a set of primes π : Set Nat.Primes: every element has finite order and every prime divisor of its order lies in π. Mathlib only has IsPGroup for a single prime."
+    },
+    {
+     "closest_existing_considered": "IsSimpleGroup, Subgroup.Characteristic.",
+     "name": "Kourovka.«8.14».IsCharacteristicallySimple",
+     "why_needed": "Only characteristic subgroups are ⊥ and ⊤: ∀ H : Subgroup G, H.Characteristic → H = ⊥ ∨ H = ⊤. Not in Mathlib. No Nontrivial requirement (Robinson/Wikipedia convention); this only matters for the degenerate case π = ∅."
+    },
+    {
+     "closest_existing_considered": "None (conjunctions of the above).",
+     "name": "Kourovka.«8.14».LNPlus / LSPi / LSPlus / LS",
+     "why_needed": "Named predicates for the four classes L𝔑⁺, L𝔖_π, L𝔖⁺, L𝔖 of the statement, to be passed to IsExistentiallyClosedIn and keep the theorem statements readable."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language formulas (Mathlib ModelTheory) — but Mathlib has no language/structure of groups and no notion of existential closedness, so the classical equations/inequations formulation via free groups was used.",
+     "name": "Kourovka.«8.14».HasSolution",
+     "why_needed": "A finite system of equations w = 1 (w ∈ E) and inequations w ≠ 1 (w ∈ I), with E I : Finset (FreeGroup (G ⊕ Fin n)) (Sum.inl = coefficient from G, Sum.inr = unknown), has a solution in a group K with coefficients transported along f : G →* K, evaluated via FreeGroup.lift (Sum.elim f x)."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.BoundedFormula.IsExistential (only a syntactic complexity predicate, no e.c. models); nothing for groups.",
+     "name": "Kourovka.«8.14».IsExistentiallyClosedIn",
+     "why_needed": "G is existentially closed in a class 𝔛 : ∀ (H : Type u) [Group H], Prop if 𝔛 G holds and for every 𝔛-group H with an injective hom f : G →* H, every finite system solvable in H (via f) is solvable in G. Not in Mathlib or the repo."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.14».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ G, (EC in L𝔑⁺ ∨ (∃ π, EC in L𝔖_π) ∨ EC in L𝔖⁺ ∨ EC in L𝔖) → characteristically simple, mirroring the disjunctive hypothesis 'existentially closed in one of the classes' with π implicitly universally quantified. All notions (existential closure in a class, locally nilpotent/soluble, torsion-free, π-group, characteristically simple) are bespoke since Mathlib has none."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "∀ G, IsExistentiallyClosedIn LNPlus G → IsCharacteristicallySimple G, where LNPlus G := IsLocallyNilpotent G ∧ IsTorsionFree G."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "∀ G, IsExistentiallyClosedIn LS G → IsCharacteristicallySimple G, where LS G := IsLocallySolvable G."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "∀ (π : Set Nat.Primes) G, IsExistentiallyClosedIn (LSPi · π) G → IsCharacteristicallySimple G. π is an arbitrary set of primes (no nonemptiness restriction, as in the source); the π = ∅ degenerate case is handled by the documented convention that the trivial group is characteristically simple, so it does not distort the answer."
+    },
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "∀ G, IsExistentiallyClosedIn LSPlus G → IsCharacteristicallySimple G, where LSPlus G := IsLocallySolvable G ∧ IsTorsionFree G."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.14».parts.b": "/--\nAssume a group $G$ is existentially closed in one of the classes $L\\mathfrak{N}^{+}$,\n$L\\mathfrak{S}_{\\pi}$, $L\\mathfrak{S}^{+}$, $L\\mathfrak{S}$ of, respectively, all locally\nnilpotent torsion-free groups, all locally soluble $\\pi$-groups, all locally soluble\ntorsion-free groups, or all locally soluble groups. Is it true that $G$ is characteristically\nsimple?\n\nHere $\\pi$ ranges over all sets of primes.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      (IsExistentiallyClosedIn LNPlus G ∨\n        (∃ π : Set Nat.Primes, IsExistentiallyClosedIn (LSPi · π) G) ∨\n        IsExistentiallyClosedIn LSPlus G ∨\n        IsExistentiallyClosedIn LS G) →\n      IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": "/--\nAssume a group $G$ is existentially closed in the class $L\\mathfrak{N}^{+}$ of all locally\nnilpotent torsion-free groups. Is it true that $G$ is characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LNPlus G → IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble": "/--\nAssume a group $G$ is existentially closed in the class $L\\mathfrak{S}$ of all locally soluble\ngroups. Is it true that $G$ is characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsExistentiallyClosedIn LS G → IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_pi": "/--\nLet $\\pi$ be a set of primes. Assume a group $G$ is existentially closed in the class\n$L\\mathfrak{S}_{\\pi}$ of all locally soluble $\\pi$-groups. Is it true that $G$ is\ncharacteristically simple?\n\nFor $\\pi = \\emptyset$ the class $L\\mathfrak{S}_{\\pi}$ consists of the trivial groups only, and\nthe trivial group is characteristically simple with the convention used here.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_pi : answer(sorry) ↔\n    ∀ (π : Set Nat.Primes) (G : Type) [Group G],\n      IsExistentiallyClosedIn (LSPi · π) G → IsCharacteristicallySimple G := by\n  sorry",
+    "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": "/--\nAssume a group $G$ is existentially closed in the class $L\\mathfrak{S}^{+}$ of all locally\nsoluble torsion-free groups. Is it true that $G$ is characteristically simple?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsExistentiallyClosedIn LSPlus G → IsCharacteristicallySimple G := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«8.14».parts.b": "c01",
+  "kourovka.«8.14».parts.b.variants.locally_nilpotent_torsion_free": "c01",
+  "kourovka.«8.14».parts.b.variants.locally_soluble": "c01",
+  "kourovka.«8.14».parts.b.variants.locally_soluble_pi": "c01",
+  "kourovka.«8.14».parts.b.variants.locally_soluble_torsion_free": "c01"
+ },
+ "id": "kourovka-8.14",
+ "main_attempt": "c01"
+}

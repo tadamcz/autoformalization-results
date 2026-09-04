@@ -1,0 +1,535 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.82\n\nby A. I. Shirshov\n\nCan the class of groups with the $n$th Engel condition\n$[x, \\underbrace{y, \\ldots, y}_{n}] = 1$ be defined by identical relations of the form\n$u = v$, where $u$ and $v$ are words without negative powers of variables? This can be done\nfor $n = 1, 2, 3$ (A. I. Shirshov, *Algebra i Logika* **2**, no. 5 (1963), 5–18).\n\nEditors' comment: this has also been done for $n = 4$ (G. Traustason, *J. Group Theory* **2**,\nno. 1 (1999), 39–46). As remarked by O. Macedońska, this is also true for the class of locally\ngraded $n$-Engel groups, because such a group is locally nilpotent (Y. Kim, A. Rhemtulla,\n*Groups–Korea '94*, de Gruyter, 1995, 189–197) and then an extension of a nilpotent group of\n$n$-bounded class by a group of $n$-bounded exponent (R. G. Burns, Yu. Medvedev,\n*J. Austral. Math. Soc.* **64** (1998), 92–100); a classical result of Mal'cev then implies that\nsuch groups satisfy a positive law.\n\nA *positive word* is an element of the free monoid on countably many variables\n$x_0, x_1, \\ldots$ (the empty word is allowed). A group $G$ *satisfies the positive law* $u = v$\nif $u$ and $v$ take the same value under every assignment of elements of $G$ to the variables.\n\"The class of $n$-Engel groups can be defined by identical relations of the form $u = v$\"\nmeans that there is a set $S$ of positive laws such that a group is $n$-Engel if and only if it\nsatisfies every law in $S$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«2.82»\n\nvariable {G : Type*} [Group G]\n\n/-- The left-normed iterated commutator $[x,\\, {}_n y] = [x, \\underbrace{y, \\ldots, y}_{n}]$,\ndefined by $[x,\\, {}_0 y] = x$ and $[x,\\, {}_{n+1} y] = [[x,\\, {}_n y], y]$, where\n$[a, b] = a^{-1} b^{-1} a b$ is the commutator in the convention of the Kourovka Notebook.\n(Mathlib's `⁅a, b⁆` is `a * b * a⁻¹ * b⁻¹`; for a fixed $n$ the two conventions are not\nobviously equivalent, so the notebook's convention is spelled out.) -/\ndef engelCommutator (x y : G) : ℕ → G\n  | 0 => x\n  | n + 1 => (engelCommutator x y n)⁻¹ * y⁻¹ * engelCommutator x y n * y\n\n/-- A group $G$ satisfies the $n$th Engel condition (is an $n$-Engel group) if\n$[x, \\underbrace{y, \\ldots, y}_{n}] = 1$ for all $x, y \\in G$. -/\ndef IsNEngelGroup (n : ℕ) (G : Type*) [Group G] : Prop :=\n  ∀ x y : G, engelCommutator x y n = 1\n\n/-- A group $G$ satisfies the positive law $u = v$, where $u$ and $v$ are positive words in the\nvariables $x_0, x_1, \\ldots$ (elements of `FreeMonoid ℕ`), if $u$ and $v$ take the same value in\n$G$ under every assignment of elements of $G$ to the variables. -/\ndef SatisfiesPositiveLaw (G : Type*) [Group G] (u v : FreeMonoid ℕ) : Prop :=\n  ∀ f : ℕ → G, FreeMonoid.lift f u = FreeMonoid.lift f v\n\n/-- A group is *locally graded* if every non-trivial finitely generated subgroup has a proper\nsubgroup of finite index (equivalently, a non-trivial finite quotient). -/\ndef IsLocallyGraded (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → H ≠ ⊥ → ∃ K : Subgroup H, K ≠ ⊤ ∧ K.FiniteIndex\n\n@[category API, AMS 20]\ntheorem engelCommutator_one (x y : G) : engelCommutator x y 1 = ⁅x⁻¹, y⁻¹⁆ := by\n  simp [engelCommutator, commutatorElement_def]\n\n/-- The $1$-Engel groups are exactly the abelian groups. -/\n@[category API, AMS 20]\ntheorem isNEngelGroup_one_iff : IsNEngelGroup 1 G ↔ ∀ x y : G, x * y = y * x := by\n  simp only [IsNEngelGroup, engelCommutator_one, commutatorElement_eq_one_iff_mul_comm]\n  exact ⟨fun h x y ↦ by simpa using h x⁻¹ y⁻¹, fun h x y ↦ h x⁻¹ y⁻¹⟩\n\n/-- The positive law $x_0 x_1 = x_1 x_0$ holds in $G$ exactly when $G$ is abelian. -/\n@[category API, AMS 20]\ntheorem satisfiesPositiveLaw_of_mul_of_iff :\n    SatisfiesPositiveLaw G (.of 0 * .of 1) (.of 1 * .of 0) ↔ ∀ x y : G, x * y = y * x := by\n  refine ⟨fun h x y ↦ ?_, fun h f ↦ by simp [h]⟩\n  simpa using h (fun i ↦ if i = 0 then x else y)\n\n/--\nCan the class of groups with the $n$th Engel condition $[x, \\underbrace{y, \\ldots, y}_{n}] = 1$\nbe defined by identical relations of the form $u = v$, where $u$ and $v$ are words without\nnegative powers of variables?\n\nThat is: for every $n \\ge 1$, is there a set $S$ of positive laws such that a group $G$ is\n$n$-Engel if and only if $G$ satisfies every law $u = v$ in $S$?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup n G ↔ ∀ w ∈ S, SatisfiesPositiveLaw G w.1 w.2 := by\n  sorry\n\n/--\nFor $n = 1, 2, 3$ the class of $n$-Engel groups can be defined by identical relations of the\nform $u = v$, where $u$ and $v$ are words without negative powers of variables\n(A. I. Shirshov, *Algebra i Logika* **2**, no. 5 (1963), 5–18).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three (n : ℕ) (hn : 0 < n) (hn' : n ≤ 3) :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup n G ↔ ∀ w ∈ S, SatisfiesPositiveLaw G w.1 w.2 := by\n  sorry\n\n/--\nThe class of $4$-Engel groups can be defined by identical relations of the form $u = v$, where\n$u$ and $v$ are words without negative powers of variables\n(G. Traustason, *J. Group Theory* **2**, no. 1 (1999), 39–46).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup 4 G ↔ ∀ w ∈ S, SatisfiesPositiveLaw G w.1 w.2 := by\n  sorry\n\n/--\nWithin the class of locally graded groups, the $n$-Engel groups can be defined by identical\nrelations of the form $u = v$, where $u$ and $v$ are words without negative powers of variables:\nfor every $n \\ge 1$ there is a set $S$ of positive laws such that a locally graded group $G$ is\n$n$-Engel if and only if $G$ satisfies every law in $S$ (remark of O. Macedońska).\n\nThe editors' justification is that a locally graded $n$-Engel group is locally nilpotent\n(Kim–Rhemtulla), hence an extension of a nilpotent group of $n$-bounded class by a group of\n$n$-bounded exponent (Burns–Medvedev), and hence satisfies a positive law (Mal'cev).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded (n : ℕ) (hn : 0 < n) :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        (IsNEngelGroup n G ↔ ∀ w ∈ S, SatisfiesPositiveLaw G w.1 w.2) := by\n  sorry\n\nend Kourovka.«2.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "1. The note '(defined as in Kourovka/1_40.lean's engelCommutator)' would tie the n-Engel condition to Mathlib's ⁅a,b⁆ = a b a⁻¹ b⁻¹, whereas the notebook uses [a,b] = a⁻¹b⁻¹ab. For fixed n the two conventions are provably equivalent for n ≤ 3 but not obviously for n ≥ 4, so following the hint literally risks stating a subtly different class of groups; I kept the left-normed shape and n copies of y but used the notebook's convention. 2. For the locally graded slot, the editors' sketch (Kim–Rhemtulla, Burns–Medvedev, Mal'cev) literally justifies only that locally graded n-Engel groups satisfy some non-trivial positive law; the 'defined for the class' reading, which the table prescribes and I stated as research solved, additionally needs that a locally graded group satisfying all positive laws of the locally graded n-Engel groups is n-Engel (this does follow from Burns–Macedońska–Medvedev's theorem that locally graded groups satisfying a positive law are nilpotent-by-finite-exponent together with the fact that relatively free groups of a variety satisfying a positive law are groups of fractions of their positive subsemigroups, but the notebook does not spell this out). 3. Minor: the note that Traustason's 1999 result 'depends on the local nilpotence of 4-Engel groups (Havas–Vaughan-Lee)' is chronologically off (Havas–Vaughan-Lee is from 2005); this does not affect the formal statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Commutator convention: the iterated Engel commutator is defined with [a,b] = a⁻¹b⁻¹ab (the convention of the Kourovka Notebook, Shirshov and Traustason), not Mathlib's ⁅a,b⁆ = a b a⁻¹ b⁻¹ used in Kourovka/1_40.lean. I verified by hand that the two conventions give the same class of n-Engel groups for n ≤ 3, but for fixed n ≥ 4 the equivalence is not obvious (e.g. the Mathlib-convention 4-Engel law is equivalent to the law [x,y,y][x,y,y,y]²[x,y,y,y,y] = [x,y,y,y][x,y,y][x,y,y,y] in the standard convention), so the notebook's convention is spelled out to guarantee the class of groups is exactly the notebook's. The API test engelCommutator_one records engelCommutator x y 1 = ⁅x⁻¹, y⁻¹⁆.",
+    "n ranges over ℕ with the hypothesis 0 < n (the statement's 'n-th Engel condition' with n copies of y); n = 0 would give the trivial variety, which is harmlessly positively definable, so the restriction does not change the mathematical content. The n ≤ 3 variant is stated with 0 < n ∧ n ≤ 3.",
+    "Positive words are elements of FreeMonoid ℕ (countably many variables x₀, x₁, …); the empty word (1) is allowed, so laws like xⁿ = 1 count as positive laws. Countably many variables suffice since every law involves finitely many variables.",
+    "The set S of positive laws may be infinite (the statement says 'identical relations', with no finiteness requirement); S is chosen depending only on n, before the group G.",
+    "Groups are quantified over Type (universe 0), as in the other Kourovka files; since laws are inherited by subgroups and invariant under isomorphism, this does not change the content.",
+    "IsLocallyGraded G := ∀ H : Subgroup G, H.FG → H ≠ ⊥ → ∃ K : Subgroup H, K ≠ ⊤ ∧ K.FiniteIndex, i.e. every non-trivial finitely generated subgroup has a proper subgroup of finite index (equivalent to having a non-trivial finite quotient).",
+    "For the locally graded slot the biconditional is restricted to locally graded groups (S may depend on n only), following the table; the weaker reading ('such groups satisfy a positive law') is only described in the docstring.",
+    "Three small provable API theorems (category API) test the bespoke definitions: engelCommutator_one, isNEngelGroup_one_iff (1-Engel = abelian) and satisfiesPositiveLaw_of_mul_of_iff (the law x₀x₁ = x₁x₀ holds iff G is abelian)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Kourovka.«1.40».engelCommutator (uses Mathlib's ⁅a,b⁆ = a b a⁻¹ b⁻¹; lives in another problem file and Kourovka files do not cross-import); Mathlib's commutatorElement.",
+     "name": "Kourovka.«2.82».engelCommutator",
+     "why_needed": "Left-normed iterated commutator [x, y, …, y] with n copies of y; no such definition in Mathlib or FormalConjecturesForMathlib. Defined with the notebook's convention [a,b] = a⁻¹b⁻¹ab (see modeling decisions)."
+    },
+    {
+     "closest_existing_considered": "LieAlgebra.IsEngelian / Kourovka.«1.40».IsEngelGroup (the latter is the unbounded Engel condition ∃ n, not a fixed n).",
+     "name": "Kourovka.«2.82».IsNEngelGroup",
+     "why_needed": "The n-th Engel condition ∀ x y, [x, y, …, y] = 1 (n copies of y). Mathlib has Engel notions only for Lie algebras (Mathlib.Algebra.Lie.Engel), not for groups."
+    },
+    {
+     "closest_existing_considered": "FreeMonoid.lift (used inside the definition); FreeGroup.lift (inappropriate since it would allow negative powers).",
+     "name": "Kourovka.«2.82».SatisfiesPositiveLaw",
+     "why_needed": "A group satisfies the identical relation u = v for positive words u v : FreeMonoid ℕ if FreeMonoid.lift f u = FreeMonoid.lift f v for all f : ℕ → G. Mathlib has no notion of a group satisfying a (positive) law / variety of groups."
+    },
+    {
+     "closest_existing_considered": "Subgroup.FG, Subgroup.FiniteIndex (used as building blocks); no residual-finiteness or local-gradedness predicate exists in Mathlib.",
+     "name": "Kourovka.«2.82».IsLocallyGraded",
+     "why_needed": "Locally graded groups (every non-trivial finitely generated subgroup has a proper subgroup of finite index) are not in Mathlib or the repo."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.82»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ n, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ), ∀ (G : Type) [Group G], IsNEngelGroup n G ↔ ∀ w ∈ S, SatisfiesPositiveLaw G w.1 w.2. Positive words are elements of the free monoid on countably many variables (empty word allowed); a law u = v holds in G iff FreeMonoid.lift f u = FreeMonoid.lift f v for every assignment f : ℕ → G. The biconditional over all groups constrains S non-vacuously (S = ∅ would force every group, e.g. S₃, to be n-Engel)."
+    },
+    "kourovka.«2.82».variants.locally_graded": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "For every n ≥ 1 there is a set S of positive laws such that for every locally graded group G (every non-trivial finitely generated subgroup has a proper subgroup of finite index), G is n-Engel iff G satisfies every law in S; S is chosen before G, and the biconditional is restricted to locally graded groups, following the text's 'defined ... for the class' reading as the table instructs. The weaker reading (locally graded n-Engel groups satisfy some non-trivial positive law) is only mentioned in the docstring, not stated."
+    },
+    "kourovka.«2.82».variants.n_eq_four": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same definability proposition as a plain theorem for n = 4 (Traustason 1999), category research solved."
+    },
+    "kourovka.«2.82».variants.n_le_three": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same definability proposition as a plain theorem for n with 0 < n ≤ 3 (Shirshov 1963), category research solved."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.82»": "/--\nCan the class of groups with the $n$th Engel condition $[x, \\underbrace{y, \\ldots, y}_{n}] = 1$\nbe defined by identical relations of the form $u = v$, where $u$ and $v$ are words without\nnegative powers of variables?\n\nThat is: for every $n \\ge 1$, is there a set $S$ of positive laws such that a group $G$ is\n$n$-Engel if and only if $G$ satisfies every law $u = v$ in $S$?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup n G ↔ ∀ w ∈ S, SatisfiesPositiveLaw G w.1 w.2 := by\n  sorry",
+    "kourovka.«2.82».variants.locally_graded": "/--\nWithin the class of locally graded groups, the $n$-Engel groups can be defined by identical\nrelations of the form $u = v$, where $u$ and $v$ are words without negative powers of variables:\nfor every $n \\ge 1$ there is a set $S$ of positive laws such that a locally graded group $G$ is\n$n$-Engel if and only if $G$ satisfies every law in $S$ (remark of O. Macedońska).\n\nThe editors' justification is that a locally graded $n$-Engel group is locally nilpotent\n(Kim–Rhemtulla), hence an extension of a nilpotent group of $n$-bounded class by a group of\n$n$-bounded exponent (Burns–Medvedev), and hence satisfies a positive law (Mal'cev).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded (n : ℕ) (hn : 0 < n) :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        (IsNEngelGroup n G ↔ ∀ w ∈ S, SatisfiesPositiveLaw G w.1 w.2) := by\n  sorry",
+    "kourovka.«2.82».variants.n_eq_four": "/--\nThe class of $4$-Engel groups can be defined by identical relations of the form $u = v$, where\n$u$ and $v$ are words without negative powers of variables\n(G. Traustason, *J. Group Theory* **2**, no. 1 (1999), 39–46).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup 4 G ↔ ∀ w ∈ S, SatisfiesPositiveLaw G w.1 w.2 := by\n  sorry",
+    "kourovka.«2.82».variants.n_le_three": "/--\nFor $n = 1, 2, 3$ the class of $n$-Engel groups can be defined by identical relations of the\nform $u = v$, where $u$ and $v$ are words without negative powers of variables\n(A. I. Shirshov, *Algebra i Logika* **2**, no. 5 (1963), 5–18).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three (n : ℕ) (hn : 0 < n) (hn' : n ≤ 3) :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup n G ↔ ∀ w ∈ S, SatisfiesPositiveLaw G w.1 w.2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.82\n\nby A. I. Shirshov\n\nCan the class of groups satisfying the $n$th Engel condition be defined by identities\n$u = v$ in which $u$ and $v$ are words without negative powers of variables?\n\nThe cases $n = 1, 2, 3$ were proved by Shirshov, and the case $n = 4$ was proved by\nTraustason. The editors also record the corresponding result within the class of locally\ngraded groups.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«2.82»\n\n/-- The left-normed iterated commutator $[x,\\,{}_n y]$, with\n$[x,\\,{}_0 y] = x$ and $[x,\\,{}_{n+1} y] = [[x,\\,{}_n y],y]$. -/\ndef engelCommutator {G : Type*} [Group G] (x y : G) : ℕ → G\n  | 0 => x\n  | n + 1 => ⁅engelCommutator x y n, y⁆\n\n/-- A group satisfies the $n$th Engel condition if $[x,\\,{}_n y]=1$ for all $x,y$. -/\ndef IsNEngel (n : ℕ) (G : Type*) [Group G] : Prop :=\n  ∀ x y : G, engelCommutator x y n = 1\n\n/-- A group satisfies a set of positive identities on countably many variables if every\nidentity holds under every assignment of those variables. The elements of `FreeMonoid ℕ`\nare precisely words with no negative powers; the identity element represents the empty word. -/\ndef SatisfiesPositiveIdentities (G : Type*) [Group G]\n    (S : Set (FreeMonoid ℕ × FreeMonoid ℕ)) : Prop :=\n  ∀ p ∈ S, ∀ f : ℕ → G, FreeMonoid.lift f p.1 = FreeMonoid.lift f p.2\n\n/-- The class of $n$-Engel groups is definable by positive identities. -/\ndef PositivelyDefinableEngel (n : ℕ) : Prop :=\n  ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ), ∀ (G : Type) [Group G],\n    IsNEngel n G ↔ SatisfiesPositiveIdentities G S\n\n/-- A group is locally graded if every nontrivial finitely generated subgroup has a proper\nsubgroup of finite index. -/\ndef IsLocallyGraded (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, Group.FG H → H ≠ ⊥ →\n    ∃ K : Subgroup H, K ≠ ⊤ ∧ K.FiniteIndex\n\n/--\nCan the class of groups satisfying the $n$th Engel identity\n$[x,\\underbrace{y,\\ldots,y}_{n}]=1$ be defined, for every $n$, by a possibly infinite\nset of identities $u=v$, where $u$ and $v$ are words without negative powers of variables?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔ ∀ n : ℕ, PositivelyDefinableEngel n := by\n  sorry\n\n/--\nFor each $1 \\leq n \\leq 3$, the class of groups satisfying the $n$th Engel identity is\ndefinable by a possibly infinite set of identities $u=v$ in words without negative powers.\nThis was proved by A. I. Shirshov.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three :\n    ∀ n : ℕ, 1 ≤ n → n ≤ 3 → PositivelyDefinableEngel n := by\n  sorry\n\n/--\nThe class of groups satisfying the fourth Engel identity is definable by a possibly infinite\nset of identities $u=v$ in words without negative powers. This was proved by G. Traustason.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four : PositivelyDefinableEngel 4 := by\n  sorry\n\n/--\nFor every $n$, within the class of locally graded groups, the groups satisfying the $n$th\nEngel identity are exactly those satisfying some fixed, possibly infinite set of identities\n$u=v$ in words without negative powers of variables.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded :\n    ∀ n : ℕ, ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        (IsNEngel n G ↔ SatisfiesPositiveIdentities G S) := by\n  sorry\n\nend Kourovka.«2.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Positive words are elements of `FreeMonoid ℕ`, giving countably many variables and allowing the empty word; evaluation under an assignment uses `FreeMonoid.lift`.",
+    "A set of identities defines the class extensionally: for every group, the n-Engel condition is equivalent to satisfaction of every identity under every variable assignment.",
+    "The main and locally graded statements quantify over all `n : ℕ`; this includes n = 0, whose trivial-group class is positively definable and therefore does not alter the intended open question for positive n.",
+    "Local gradedness is modeled directly by its standard definition: every nontrivial finitely generated subgroup has a proper finite-index subgroup.",
+    "The locally graded result uses one set of positive identities for each n and restricts the defining biconditional to locally graded groups."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Kourovka.«1.40».engelCommutator has the same recursion, but it is in another conjecture module and standard problem files import only `FormalConjecturesUtil`; Mathlib has no matching Engel recursion.",
+     "name": "Kourovka.«2.82».engelCommutator",
+     "why_needed": "Defines the left-normed iterated Engel commutator used by every slot."
+    },
+    {
+     "closest_existing_considered": "Mathlib and FormalConjecturesForMathlib have no fixed-n Engel-group predicate; Kourovka 1.40 only defines the element-dependent Engel condition.",
+     "name": "Kourovka.«2.82».IsNEngel",
+     "why_needed": "Packages the fixed n-Engel identity uniformly over groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `FreeMonoid` and `FreeMonoid.lift` but no predicate for satisfaction of families of positive laws.",
+     "name": "Kourovka.«2.82».SatisfiesPositiveIdentities",
+     "why_needed": "Expresses universal satisfaction of a set of positive-word equations under all assignments."
+    },
+    {
+     "closest_existing_considered": "No positive-law class-definability predicate was found in Mathlib, FormalConjecturesForMathlib, or nearby conjecture files.",
+     "name": "Kourovka.«2.82».PositivelyDefinableEngel",
+     "why_needed": "Packages the repeated class-definability biconditional for the main theorem and finite-n variants."
+    },
+    {
+     "closest_existing_considered": "Mathlib supplies `Group.FG` and `Subgroup.FiniteIndex`, but no locally graded group predicate; none was found in FormalConjecturesForMathlib or existing conjecture files.",
+     "name": "Kourovka.«2.82».IsLocallyGraded",
+     "why_needed": "The editors' variant requires restricting the class-defining biconditional to locally graded groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.82»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.locally_graded": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.n_eq_four": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.n_le_three": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.82»": "/--\nCan the class of groups satisfying the $n$th Engel identity\n$[x,\\underbrace{y,\\ldots,y}_{n}]=1$ be defined, for every $n$, by a possibly infinite\nset of identities $u=v$, where $u$ and $v$ are words without negative powers of variables?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔ ∀ n : ℕ, PositivelyDefinableEngel n := by\n  sorry",
+    "kourovka.«2.82».variants.locally_graded": "/--\nFor every $n$, within the class of locally graded groups, the groups satisfying the $n$th\nEngel identity are exactly those satisfying some fixed, possibly infinite set of identities\n$u=v$ in words without negative powers of variables.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded :\n    ∀ n : ℕ, ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        (IsNEngel n G ↔ SatisfiesPositiveIdentities G S) := by\n  sorry",
+    "kourovka.«2.82».variants.n_eq_four": "/--\nThe class of groups satisfying the fourth Engel identity is definable by a possibly infinite\nset of identities $u=v$ in words without negative powers. This was proved by G. Traustason.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four : PositivelyDefinableEngel 4 := by\n  sorry",
+    "kourovka.«2.82».variants.n_le_three": "/--\nFor each $1 \\leq n \\leq 3$, the class of groups satisfying the $n$th Engel identity is\ndefinable by a possibly infinite set of identities $u=v$ in words without negative powers.\nThis was proved by A. I. Shirshov.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three :\n    ∀ n : ℕ, 1 ≤ n → n ≤ 3 → PositivelyDefinableEngel n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.82\n\nby A. I. Shirshov\n\nCan the class of groups with the $n$th Engel condition $[x, y, \\ldots, y] = 1$ ($n$ copies\nof $y$) be defined by identical relations of the form $u = v$, where $u$ and $v$ are words\nwithout negative powers of variables (positive laws)?\n\nThis can be done for $n = 1, 2, 3$ (A. I. Shirshov, *Algebra i Logika* **2** (1963), no. 5,\n5–18) and for $n = 4$ (G. Traustason, *J. Group Theory* **2** (1999), no. 1, 39–46).\nAs remarked by O. Macedońska, it is also true for the class of locally graded $n$-Engel\ngroups: by Kim–Rhemtulla such a group is locally nilpotent, by Burns–Medvedev it is then an\nextension of a nilpotent group of $n$-bounded class by a group of $n$-bounded exponent, and a\nclassical result of Mal'cev then implies that such groups satisfy a positive law.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 2.82.\n-/\n\nnamespace Kourovka.«2.82»\n\nvariable {G : Type*} [Group G]\n\n/-- The iterated commutator $[x,\\, {}_n y]$, defined by $[x,\\, {}_0 y] = x$ and\n$[x,\\, {}_{n+1} y] = [[x,\\, {}_n y], y]$. -/\ndef engelCommutator (x y : G) : ℕ → G\n  | 0 => x\n  | n + 1 => ⁅engelCommutator x y n, y⁆\n\n/-- A group $G$ is an $n$-Engel group if it satisfies the $n$th Engel condition\n$[x, \\underbrace{y, \\ldots, y}_{n}] = 1$ for all $x, y \\in G$. -/\ndef IsNEngelGroup (n : ℕ) (G : Type*) [Group G] : Prop :=\n  ∀ x y : G, engelCommutator x y n = 1\n\n/-- A *positive word* is a word without negative powers of variables, i.e. an element of\nthe free monoid `FreeMonoid ℕ` on the countably many variables $x_0, x_1, x_2, \\ldots$.\nThe identical relation (law) $u = v$ between positive words $u$ and $v$ holds in a group\n$G$ if $u$ and $v$ take the same value under every assignment of the variables in $G$.\n(The empty word is allowed; in a group the law $u = 1$ is equivalent to the law $u x = x$ for a\nfresh variable $x$, so this does not affect which classes are definable.) -/\ndef SatisfiesPositiveLaw (G : Type*) [Group G] (u v : FreeMonoid ℕ) : Prop :=\n  ∀ f : ℕ → G, FreeMonoid.lift f u = FreeMonoid.lift f v\n\n/-- A group $G$ is *locally graded* if every non-trivial finitely generated subgroup of $G$\nhas a proper subgroup of finite index. -/\ndef IsLocallyGraded (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → H ≠ ⊥ → ∃ K : Subgroup H, K ≠ ⊤ ∧ K.FiniteIndex\n\n@[category test, AMS 20]\ntheorem engelCommutator_one (x y : G) : engelCommutator x y 1 = ⁅x, y⁆ := rfl\n\n/-- The $1$-Engel groups are exactly the abelian groups. -/\n@[category test, AMS 20]\ntheorem isNEngelGroup_one_iff : IsNEngelGroup 1 G ↔ ∀ x y : G, x * y = y * x := by\n  simp [IsNEngelGroup, engelCommutator, commutatorElement_eq_one_iff_mul_comm]\n\n/-- An abelian group satisfies the positive law $x_0 x_1 = x_1 x_0$. -/\n@[category test, AMS 20]\ntheorem satisfiesPositiveLaw_of_comm (h : ∀ x y : G, x * y = y * x) :\n    SatisfiesPositiveLaw G (.of 0 * .of 1) (.of 1 * .of 0) := by\n  intro f\n  simp [h]\n\n/--\nCan the class of groups with the $n$th Engel condition $[x, \\underbrace{y, \\ldots, y}_{n}] = 1$\nbe defined by identical relations of the form $u = v$, where $u$ and $v$ are words without\nnegative powers of variables?\n\nThat is, is it true that for every $n \\geq 1$ there is a set $S$ of pairs $(u, v)$ of positive\nwords such that, for every group $G$, $G$ is $n$-Engel if and only if every law $u = v$ with\n$(u, v) \\in S$ holds in $G$? (For $n = 0$ the $0$th Engel condition $x = 1$ defines the class\nof trivial groups, which is defined by the positive law $x_0 = x_1$; we follow the intended\nreading $n \\geq 1$.)\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup n G ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry\n\n/--\nFor $n = 1, 2, 3$ the class of $n$-Engel groups can be defined by identical relations\n$u = v$ between positive words (A. I. Shirshov, *Algebra i Logika* **2** (1963), no. 5, 5–18).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three :\n    ∀ n ∈ ({1, 2, 3} : Set ℕ), ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup n G ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry\n\n/--\nThe class of $4$-Engel groups can be defined by identical relations $u = v$ between positive\nwords (G. Traustason, *J. Group Theory* **2** (1999), no. 1, 39–46).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup 4 G ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry\n\n/--\nWithin the class of locally graded groups, the $n$-Engel groups can be defined by identical\nrelations $u = v$ between positive words (O. Macedońska): for every $n \\geq 1$ there is a set\n$S$ of pairs of positive words such that a locally graded group $G$ is $n$-Engel if and only\nif every law $u = v$ with $(u, v) \\in S$ holds in $G$.\n\nThe editors' justification: by Kim–Rhemtulla a locally graded $n$-Engel group is locally\nnilpotent, by Burns–Medvedev it is then an extension of a nilpotent group of $n$-bounded\nclass by a group of $n$-bounded exponent, and by a classical result of Mal'cev such groups\nsatisfy a positive law.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded :\n    ∀ n : ℕ, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        (IsNEngelGroup n G ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2) := by\n  sorry\n\nend Kourovka.«2.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The table is consistent with the source. Minor remark: the editors' comment literally only argues that locally graded n-Engel groups satisfy a positive law, but the stronger 'defined by positive laws within locally graded groups' reading prescribed by the table is indeed a consequence (variety generated by locally graded n-Engel groups ⊆ N_c B_e ⇒ has a positive law ⇒ is defined by its positive laws), so the slot is correctly tagged research solved.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Positive words are elements of FreeMonoid ℕ, i.e. words in countably many variables x₀, x₁, …; the empty word is allowed (harmless: in a group the law u = 1 is equivalent to u·x = x for a fresh variable x, so the definable classes are unchanged). Pairs in S with u = v as words are allowed (trivial laws hold in every group, so again harmless).",
+    "The defining set S of positive laws is an arbitrary (possibly infinite) Set of pairs of words, quantified before G, so the biconditional over all groups genuinely constrains S (S = ∅ would force every group to be n-Engel).",
+    "n is restricted to n ≥ 1 in the main problem and the locally graded variant (the intended range of 'nth Engel condition'); n = 0 would give the class of trivial groups, definable by x₀ = x₁, so including it would not change truth values.",
+    "Groups are quantified over `Type` (universe 0) as in the other Kourovka files; this is faithful since a variety is determined by its countable relatively free groups.",
+    "Locally graded is formalized as: every finitely generated subgroup H ≠ ⊥ has a subgroup K : Subgroup H with K ≠ ⊤ and K.FiniteIndex (equivalent to H having a non-trivial finite quotient, via the normal core).",
+    "The locally graded variant is stated with the biconditional restricted to locally graded groups (the text's 'defined ... for the class' reading), as the decomposition table prescribes; I checked that this strong reading follows from the cited results plus the classical Mal'cev/Ore argument that a variety satisfying a positive law is defined by its positive laws (the variety generated by locally graded n-Engel groups lies in some N_c B_e, hence has a positive law).",
+    "Three short `@[category test]` lemmas are included as basic API for the bespoke definitions: engelCommutator x y 1 = ⁅x, y⁆, 1-Engel ↔ abelian, and abelian groups satisfy the positive law x₀x₁ = x₁x₀."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Kourovka.«1.40».engelCommutator (in another problem file's namespace); Mathlib's commutatorElement ⁅x, y⁆ (only a single commutator).",
+     "name": "Kourovka.«2.82».engelCommutator",
+     "why_needed": "Left-normed iterated commutator [x, y, …, y] (n copies of y); Mathlib has no iterated Engel commutator. Same definition as Kourovka.«1.40».engelCommutator, which cannot be imported from a problem file."
+    },
+    {
+     "closest_existing_considered": "Kourovka.«1.40».IsEngelGroup (unbounded Engel condition, a different notion); Mathlib's Group.IsNilpotent (different class).",
+     "name": "Kourovka.«2.82».IsNEngelGroup",
+     "why_needed": "The nth Engel condition ∀ x y, [x, y, …, y] = 1 (n copies of y) defining the class of n-Engel groups; not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "FreeMonoid.lift (used as the evaluation map); FreeGroup.lift (would allow negative powers, hence unsuitable for positive laws).",
+     "name": "Kourovka.«2.82».SatisfiesPositiveLaw",
+     "why_needed": "Mathlib has no notion of a group law / identical relation. A positive word is an element of FreeMonoid ℕ (words without negative powers in countably many variables); the law u = v holds in G iff FreeMonoid.lift f u = FreeMonoid.lift f v for every assignment f : ℕ → G."
+    },
+    {
+     "closest_existing_considered": "Subgroup.FG and Subgroup.FiniteIndex (used as building blocks); Mathlib has no residually finite / locally graded predicate.",
+     "name": "Kourovka.«2.82».IsLocallyGraded",
+     "why_needed": "Locally graded groups (every non-trivial finitely generated subgroup has a proper subgroup of finite index) are not in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.82»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ n ≥ 1, ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ), ∀ (G : Type) [Group G], IsNEngelGroup n G ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2. Needed local definitions of the left-normed Engel commutator (as in Kourovka/1_40.lean), n-Engel groups, and of a positive law u = v holding in a group (Mathlib has no notion of group laws)."
+    },
+    "kourovka.«2.82».variants.locally_graded": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Plain theorem (research solved): ∀ n ≥ 1, ∃ S, ∀ locally graded G, (IsNEngelGroup n G ↔ G satisfies all laws in S). Needed a local definition IsLocallyGraded (every non-trivial finitely generated subgroup has a proper subgroup of finite index), built from Subgroup.FG and Subgroup.FiniteIndex. The weaker reading (locally graded n-Engel groups satisfy some non-trivial positive law) is not stated as a declaration, per the table."
+    },
+    "kourovka.«2.82».variants.n_eq_four": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Plain theorem (research solved, Traustason 1999): the definability statement for n = 4."
+    },
+    "kourovka.«2.82».variants.n_le_three": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Plain theorem (research solved, Shirshov 1963): the same definability statement for all n ∈ ({1, 2, 3} : Set ℕ)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.82»": "/--\nCan the class of groups with the $n$th Engel condition $[x, \\underbrace{y, \\ldots, y}_{n}] = 1$\nbe defined by identical relations of the form $u = v$, where $u$ and $v$ are words without\nnegative powers of variables?\n\nThat is, is it true that for every $n \\geq 1$ there is a set $S$ of pairs $(u, v)$ of positive\nwords such that, for every group $G$, $G$ is $n$-Engel if and only if every law $u = v$ with\n$(u, v) \\in S$ holds in $G$? (For $n = 0$ the $0$th Engel condition $x = 1$ defines the class\nof trivial groups, which is defined by the positive law $x_0 = x_1$; we follow the intended\nreading $n \\geq 1$.)\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup n G ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry",
+    "kourovka.«2.82».variants.locally_graded": "/--\nWithin the class of locally graded groups, the $n$-Engel groups can be defined by identical\nrelations $u = v$ between positive words (O. Macedońska): for every $n \\geq 1$ there is a set\n$S$ of pairs of positive words such that a locally graded group $G$ is $n$-Engel if and only\nif every law $u = v$ with $(u, v) \\in S$ holds in $G$.\n\nThe editors' justification: by Kim–Rhemtulla a locally graded $n$-Engel group is locally\nnilpotent, by Burns–Medvedev it is then an extension of a nilpotent group of $n$-bounded\nclass by a group of $n$-bounded exponent, and by a classical result of Mal'cev such groups\nsatisfy a positive law.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded :\n    ∀ n : ℕ, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        (IsNEngelGroup n G ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2) := by\n  sorry",
+    "kourovka.«2.82».variants.n_eq_four": "/--\nThe class of $4$-Engel groups can be defined by identical relations $u = v$ between positive\nwords (G. Traustason, *J. Group Theory* **2** (1999), no. 1, 39–46).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup 4 G ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry",
+    "kourovka.«2.82».variants.n_le_three": "/--\nFor $n = 1, 2, 3$ the class of $n$-Engel groups can be defined by identical relations\n$u = v$ between positive words (A. I. Shirshov, *Algebra i Logika* **2** (1963), no. 5, 5–18).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three :\n    ∀ n ∈ ({1, 2, 3} : Set ℕ), ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup n G ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.82\n\nby A. I. Shirshov\n\nCan the class of groups with the $n$th Engel condition\n$[x, \\underbrace{y, \\ldots, y}_{n}] = 1$ be defined by identical relations of the\nform $u = v$, where $u$ and $v$ are words without negative powers of variables?\nThis can be done for $n = 1, 2, 3$ (A. I. Shirshov, *Algebra i Logika* **2**,\nno. 5 (1963), 5–18).\n\nEditors' comment: this has also been done for $n = 4$ (G. Traustason,\n*J. Group Theory* **2**, no. 1 (1999), 39–46). As remarked by O. Macedońska, this\nis also true for the class of locally graded $n$-Engel groups, because by\nKim–Rhemtulla such a group is locally nilpotent, by Burns–Medvedev it is then an\nextension of a nilpotent group of $n$-bounded class by a group of $n$-bounded\nexponent, and a classical result of Mal'cev then implies that such groups satisfy\na positive law.\n\nA law $u = v$ with $u, v$ positive words (elements of the free monoid on countably\nmany variables) is a *positive law*. A class of groups is *defined* by a set $S$ of\npositive laws if a group belongs to the class exactly when it satisfies every law\nin $S$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«2.82»\n\nvariable {G : Type*} [Group G]\n\n/-- The iterated commutator $[x,\\, {}_n y]$, defined by $[x,\\, {}_0 y] = x$ and\n$[x,\\, {}_{n+1} y] = [[x,\\, {}_n y], y]$. -/\ndef engelCommutator (x y : G) : ℕ → G\n  | 0 => x\n  | n + 1 => ⁅engelCommutator x y n, y⁆\n\n/-- A group $G$ is an $n$-Engel group if it satisfies the $n$th Engel condition\n$[x, \\underbrace{y, \\ldots, y}_{n}] = 1$ for all $x, y \\in G$.\n\nMathlib's commutator `⁅a, b⁆` is $a b a^{-1} b^{-1}$; the class of groups satisfying the\n$n$th Engel condition is the same for this convention and for $[a, b] = a^{-1} b^{-1} a b$. -/\ndef IsNEngelGroup (G : Type*) [Group G] (n : ℕ) : Prop :=\n  ∀ x y : G, engelCommutator x y n = 1\n\n/-- A group $G$ satisfies the positive law $u = v$, where $u$ and $v$ are words in the\nvariables $x_0, x_1, \\ldots$ without negative powers (elements of `FreeMonoid ℕ`), if\n$u$ and $v$ take the same value in $G$ under every assignment of the variables. -/\ndef SatisfiesPositiveLaw (G : Type*) [Group G] (u v : FreeMonoid ℕ) : Prop :=\n  ∀ φ : ℕ → G, FreeMonoid.lift φ u = FreeMonoid.lift φ v\n\n/-- A group $G$ is locally graded if every non-trivial finitely generated subgroup of\n$G$ has a proper subgroup of finite index. -/\ndef IsLocallyGraded (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → H ≠ ⊥ → ∃ K : Subgroup H, K ≠ ⊤ ∧ K.FiniteIndex\n\n/-- A group is $1$-Engel if and only if it is abelian. -/\n@[category test, AMS 20]\ntheorem isNEngelGroup_one_iff : IsNEngelGroup G 1 ↔ ∀ x y : G, x * y = y * x := by\n  simp [IsNEngelGroup, engelCommutator, commutatorElement_eq_one_iff_mul_comm]\n\n/-- Every commutative group satisfies the positive law $x_0 x_1 = x_1 x_0$. -/\n@[category test, AMS 20]\ntheorem satisfiesPositiveLaw_mul_comm (G : Type*) [CommGroup G] :\n    SatisfiesPositiveLaw G (FreeMonoid.of 0 * FreeMonoid.of 1)\n      (FreeMonoid.of 1 * FreeMonoid.of 0) := by\n  intro φ\n  simp [mul_comm]\n\n/-- The positive law $x_0 x_1 = x_1 x_0$ defines the class of $1$-Engel groups. -/\n@[category test, AMS 20]\ntheorem isNEngelGroup_one_iff_satisfiesPositiveLaw (G : Type*) [Group G] :\n    IsNEngelGroup G 1 ↔\n      SatisfiesPositiveLaw G (FreeMonoid.of 0 * FreeMonoid.of 1)\n        (FreeMonoid.of 1 * FreeMonoid.of 0) := by\n  rw [isNEngelGroup_one_iff]\n  constructor\n  · intro h φ\n    simp [h]\n  · intro h x y\n    have := h (fun i => if i = 0 then x else y)\n    simpa using this\n\n/--\nCan the class of groups with the $n$th Engel condition\n$[x, \\underbrace{y, \\ldots, y}_{n}] = 1$ be defined by identical relations of the form\n$u = v$, where $u$ and $v$ are words without negative powers of variables?\n\nThat is: for every $n$, is there a set $S$ of pairs of positive words such that a\ngroup is $n$-Engel if and only if it satisfies every law $u = v$ with $(u, v) \\in S$?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup G n ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry\n\n/--\nFor $n = 1, 2, 3$ the class of $n$-Engel groups can be defined by identical relations\n$u = v$ with $u$ and $v$ words without negative powers of variables\n(A. I. Shirshov, *Algebra i Logika* **2**, no. 5 (1963), 5–18).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three (n : ℕ) (hn₁ : 1 ≤ n) (hn₃ : n ≤ 3) :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup G n ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry\n\n/--\nThe class of $4$-Engel groups can be defined by identical relations $u = v$ with $u$\nand $v$ words without negative powers of variables\n(G. Traustason, *J. Group Theory* **2**, no. 1 (1999), 39–46).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup G 4 ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry\n\n/--\nFor every $n$, the class of locally graded $n$-Engel groups can be defined, within the\nclass of locally graded groups, by identical relations $u = v$ with $u$ and $v$ words\nwithout negative powers of variables: there is a set $S$ of positive laws such that a\nlocally graded group is $n$-Engel if and only if it satisfies every law in $S$\n(remark of O. Macedońska).\n\nThe justification sketched by the editors (Kim–Rhemtulla, Burns–Medvedev, Mal'cev) directly\nyields only that every locally graded $n$-Engel group satisfies a non-trivial positive law;\nthe statement here follows the text's \"defined ... for the class\" reading.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded (n : ℕ) :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        (IsNEngelGroup G n ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2) := by\n  sorry\n\nend Kourovka.«2.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. One observation for the record: the editors' comment on locally graded groups is justified in the text only via 'such groups satisfy a positive law', which is weaker than definability; the table already flags this and prescribes the definability reading, which I followed (the biconditional version does appear to follow from Burns–Macedońska–Medvedev-type results on positive laws in locally graded groups, so the 'research solved' tag seems appropriate).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Positive words are modelled as elements of FreeMonoid ℕ (countably many variables x₀, x₁, …), with the empty word allowed. This is immaterial for definability: a law u = 1 is equivalent in groups to the nonempty positive law u·z = z.",
+    "engelCommutator uses Mathlib's commutator ⁅a, b⁆ = a b a⁻¹ b⁻¹ (as in Kourovka/1_40.lean and as the decomposition notes require). Because ⁅a,b⁆ = [a⁻¹, b⁻¹] in the a⁻¹b⁻¹ab convention, the resulting law ∀ x y, ⁅x, y, …, y⁆ = 1 is the standard n-Engel law after the substitution y ↦ y⁻¹ composed with inversion at each step; one checks that the image sets Im((β_y ∘ inv)^k) and Im(β_{y⁻¹}^k) (β_y(a) = [a,y]) differ only by inversion and conjugation by y^k, so both conventions define the same class of n-Engel groups for every n. The docstring records this; a reviewer may want to double-check it.",
+    "The main slot quantifies over all n : ℕ (implicit universal quantifier). For n = 0 the class is the trivial groups, which is defined by the positive law x₀ = x₁ (checked in a scratch example), so including n = 0 does not change the truth value; the n ≤ 3 variant is restricted to 1 ≤ n ≤ 3 as in the source.",
+    "Groups are quantified over `Type` (universe 0), following the other Kourovka files. Both the n-Engel condition and satisfaction of laws are determined by finitely generated (hence countable) subgroups, so this loses nothing.",
+    "IsLocallyGraded is defined as: every non-trivial finitely generated subgroup H has a proper subgroup K : Subgroup H of finite index (K ≠ ⊤ ∧ K.FiniteIndex). This is equivalent to the 'non-trivial finite quotient' formulation.",
+    "Three small @[category test] lemmas (proved) check the bespoke definitions: 1-Engel ⟺ abelian, commutative groups satisfy x₀x₁ = x₁x₀, and that law defines the 1-Engel class. They are not slots.",
+    "The locally graded slot follows the table's instruction to use the biconditional restricted to locally graded groups; the docstring notes that the editors' sketched argument literally yields only that locally graded n-Engel groups satisfy a non-trivial positive law."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Kourovka.«1.40».engelCommutator (not importable from a problem file); Mathlib's LieAlgebra Engel material (Lie algebras only, not groups).",
+     "name": "Kourovka.«2.82».engelCommutator",
+     "why_needed": "Left-normed iterated commutator [x, y, …, y] (n copies of y); Mathlib has no group-theoretic Engel commutator. Copied verbatim from Kourovka/1_40.lean (problem files cannot import each other)."
+    },
+    {
+     "closest_existing_considered": "Kourovka.«1.40».IsEngelGroup (unbounded Engel condition with n depending on x, y — a different class).",
+     "name": "Kourovka.«2.82».IsNEngelGroup",
+     "why_needed": "The n-th Engel condition ∀ x y, engelCommutator x y n = 1 (bounded Engel class), which is not in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "FreeMonoid.lift (used as the evaluation map); no existing 'law'/'identity' predicate in Mathlib or the repo.",
+     "name": "Kourovka.«2.82».SatisfiesPositiveLaw",
+     "why_needed": "A group satisfies the positive law u = v (u, v ∈ FreeMonoid ℕ) iff FreeMonoid.lift φ u = FreeMonoid.lift φ v for every assignment φ : ℕ → G. Mathlib has no notion of a group/semigroup law or identity."
+    },
+    {
+     "closest_existing_considered": "Subgroup.FG, Subgroup.FiniteIndex (used as building blocks); no locally graded predicate exists.",
+     "name": "Kourovka.«2.82».IsLocallyGraded",
+     "why_needed": "Locally graded groups (every non-trivial finitely generated subgroup has a proper subgroup of finite index) are needed for the editors' relativized variant; absent from Mathlib and the repo."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.82»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ n, ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ), ∀ (G : Type) [Group G], IsNEngelGroup G n ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2. Positive words are elements of the free monoid on countably many variables; a law u = v holds in G iff FreeMonoid.lift φ u = FreeMonoid.lift φ v for every assignment φ : ℕ → G. The biconditional over all groups constrains S, so the statement is non-vacuous."
+    },
+    "kourovka.«2.82».variants.locally_graded": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Plain theorem (research solved), following the table's 'defined ... for the class' reading: for every n there is a set S of positive laws such that for every locally graded group G, G is n-Engel iff G satisfies all laws in S. The weaker reading (locally graded n-Engel groups satisfy a non-trivial positive law) is recorded only in the docstring, not as a declaration."
+    },
+    "kourovka.«2.82».variants.n_eq_four": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Plain theorem (research solved): there is a set S of positive laws defining the class of 4-Engel groups."
+    },
+    "kourovka.«2.82».variants.n_le_three": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Plain theorem (research solved): for n with 1 ≤ n ≤ 3 there is a set S of positive laws defining the class of n-Engel groups (same body as the main slot, no answer(sorry))."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.82»": "/--\nCan the class of groups with the $n$th Engel condition\n$[x, \\underbrace{y, \\ldots, y}_{n}] = 1$ be defined by identical relations of the form\n$u = v$, where $u$ and $v$ are words without negative powers of variables?\n\nThat is: for every $n$, is there a set $S$ of pairs of positive words such that a\ngroup is $n$-Engel if and only if it satisfies every law $u = v$ with $(u, v) \\in S$?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup G n ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry",
+    "kourovka.«2.82».variants.locally_graded": "/--\nFor every $n$, the class of locally graded $n$-Engel groups can be defined, within the\nclass of locally graded groups, by identical relations $u = v$ with $u$ and $v$ words\nwithout negative powers of variables: there is a set $S$ of positive laws such that a\nlocally graded group is $n$-Engel if and only if it satisfies every law in $S$\n(remark of O. Macedońska).\n\nThe justification sketched by the editors (Kim–Rhemtulla, Burns–Medvedev, Mal'cev) directly\nyields only that every locally graded $n$-Engel group satisfies a non-trivial positive law;\nthe statement here follows the text's \"defined ... for the class\" reading.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded (n : ℕ) :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        (IsNEngelGroup G n ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2) := by\n  sorry",
+    "kourovka.«2.82».variants.n_eq_four": "/--\nThe class of $4$-Engel groups can be defined by identical relations $u = v$ with $u$\nand $v$ words without negative powers of variables\n(G. Traustason, *J. Group Theory* **2**, no. 1 (1999), 39–46).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup G 4 ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry",
+    "kourovka.«2.82».variants.n_le_three": "/--\nFor $n = 1, 2, 3$ the class of $n$-Engel groups can be defined by identical relations\n$u = v$ with $u$ and $v$ words without negative powers of variables\n(A. I. Shirshov, *Algebra i Logika* **2**, no. 5 (1963), 5–18).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three (n : ℕ) (hn₁ : 1 ≤ n) (hn₃ : n ≤ 3) :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngelGroup G n ↔ ∀ p ∈ S, SatisfiesPositiveLaw G p.1 p.2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.82\n\nby A. I. Shirshov\n\nCan the class of groups satisfying the $n$th Engel identity\n$[x,\\underbrace{y,\\ldots,y}_{n}]=1$ be defined by identities $u=v$ in which $u$ and $v$\nare words without negative powers of the variables?\n\nThe positive result for $n=1,2,3$ is due to A. I. Shirshov. The case $n=4$ is due to\nG. Traustason. The editors also record a positive result among locally graded $n$-Engel groups,\nfollowing a remark of O. Macedońska.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 2.82.\n-/\n\nnamespace Kourovka.«2.82»\n\nvariable {G : Type*} [Group G]\n\n/-- The left-normed iterated commutator $[x,\\underbrace{y,\\ldots,y}_{n}]$, with\n$[x,\\underbrace{y,\\ldots,y}_{0}]=x$. -/\ndef engelCommutator (x y : G) : ℕ → G\n  | 0 => x\n  | n + 1 => ⁅engelCommutator x y n, y⁆\n\n/-- The class of groups satisfying the $n$th Engel identity is definable by a possibly infinite\nset of positive identities. Positive words are represented by the free monoid on countably many\nvariables; in particular, the empty word is allowed. -/\ndef IsPositiveLawDefinable (n : ℕ) : Prop :=\n  ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n    ∀ (G : Type) [Group G],\n      (∀ x y : G, engelCommutator x y n = 1) ↔\n        ∀ law ∈ S, ∀ assignment : ℕ → G,\n          FreeMonoid.lift assignment law.1 = FreeMonoid.lift assignment law.2\n\n/-- A group is locally graded if every nontrivial finitely generated subgroup has a proper\nsubgroup of finite index. -/\ndef IsLocallyGradedGroup (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → H ≠ ⊥ →\n    ∃ K : Subgroup H, K < ⊤ ∧ K.FiniteIndex\n\n/--\nCan the class of groups satisfying the $n$th Engel identity\n$[x,\\underbrace{y,\\ldots,y}_{n}]=1$ be defined, for every $n \\geq 1$, by a possibly infinite\nset of identities $u=v$, where $u$ and $v$ are words without negative powers of the variables?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, 1 ≤ n → IsPositiveLawDefinable n := by\n  sorry\n\nnamespace variants\n\n/--\nFor each $n=1,2,3$, the class of groups satisfying the $n$th Engel identity is definable by a\npossibly infinite set of identities $u=v$ between words without negative powers of the variables.\nThis was proved by A. I. Shirshov.\n-/\n@[category research solved, AMS 20]\ntheorem n_le_three :\n    ∀ n : ℕ, 1 ≤ n → n ≤ 3 → IsPositiveLawDefinable n := by\n  sorry\n\n/--\nThe class of groups satisfying the fourth Engel identity is definable by a possibly infinite set\nof identities $u=v$ between words without negative powers of the variables. This was proved by\nG. Traustason.\n-/\n@[category research solved, AMS 20]\ntheorem n_eq_four : IsPositiveLawDefinable 4 := by\n  sorry\n\n/--\nFor every $n \\geq 1$, among locally graded groups the class satisfying the $n$th Engel identity\nis definable by a possibly infinite set of identities $u=v$ between words without negative powers\nof the variables. Thus, for each $n$, the same set of positive identities works for every locally\ngraded group.\n-/\n@[category research solved, AMS 20]\ntheorem locally_graded :\n    ∀ n : ℕ, 1 ≤ n →\n      ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n        ∀ (G : Type) [Group G], IsLocallyGradedGroup G →\n          ((∀ x y : G, engelCommutator x y n = 1) ↔\n            ∀ law ∈ S, ∀ assignment : ℕ → G,\n              FreeMonoid.lift assignment law.1 = FreeMonoid.lift assignment law.2) := by\n  sorry\n\nend variants\n\nend Kourovka.«2.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Positive words are elements of `FreeMonoid ℕ`, giving countably many variables and allowing the empty word; a positive identity is a pair of such words.",
+    "A set of laws is allowed to be infinite. Satisfaction universally quantifies over assignments `ℕ → G`, and the existential set of laws is chosen before the group.",
+    "The implicit Engel parameter is restricted to `n ≥ 1`, following the decomposition's intended reading.",
+    "Locally graded means that every nontrivial finitely generated subgroup has a proper finite-index subgroup. The solved local variant uses one law set for all locally graded groups at each fixed `n` and states the requested biconditional only among those groups."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Kourovka.«1.40».engelCommutator` in another problem file; the same recursion is reproduced locally rather than adding a dependency between problem modules.",
+     "name": "Kourovka.«2.82».engelCommutator",
+     "why_needed": "Needed to state the left-normed fixed-length Engel identity."
+    },
+    {
+     "closest_existing_considered": "No positive-law or positive-identity definability predicate was found in Mathlib or FormalConjecturesForMathlib; `FreeMonoid` and `FreeMonoid.lift` supply the underlying existing primitives.",
+     "name": "Kourovka.«2.82».IsPositiveLawDefinable",
+     "why_needed": "Packages the exact second-order assertion that one set of positive identities defines the n-Engel class uniformly over all groups."
+    },
+    {
+     "closest_existing_considered": "No locally graded group predicate was found in Mathlib or FormalConjecturesForMathlib; Mathlib's `Subgroup.FG` and `Subgroup.FiniteIndex` directly express its standard definition.",
+     "name": "Kourovka.«2.82».IsLocallyGradedGroup",
+     "why_needed": "Needed to restrict the editors' solved variant to locally graded groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.82»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.locally_graded": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.n_eq_four": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.n_le_three": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.82»": "/--\nCan the class of groups satisfying the $n$th Engel identity\n$[x,\\underbrace{y,\\ldots,y}_{n}]=1$ be defined, for every $n \\geq 1$, by a possibly infinite\nset of identities $u=v$, where $u$ and $v$ are words without negative powers of the variables?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, 1 ≤ n → IsPositiveLawDefinable n := by\n  sorry",
+    "kourovka.«2.82».variants.locally_graded": "/--\nFor every $n \\geq 1$, among locally graded groups the class satisfying the $n$th Engel identity\nis definable by a possibly infinite set of identities $u=v$ between words without negative powers\nof the variables. Thus, for each $n$, the same set of positive identities works for every locally\ngraded group.\n-/\n@[category research solved, AMS 20]\ntheorem locally_graded :\n    ∀ n : ℕ, 1 ≤ n →\n      ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n        ∀ (G : Type) [Group G], IsLocallyGradedGroup G →\n          ((∀ x y : G, engelCommutator x y n = 1) ↔\n            ∀ law ∈ S, ∀ assignment : ℕ → G,\n              FreeMonoid.lift assignment law.1 = FreeMonoid.lift assignment law.2) := by\n  sorry",
+    "kourovka.«2.82».variants.n_eq_four": "/--\nThe class of groups satisfying the fourth Engel identity is definable by a possibly infinite set\nof identities $u=v$ between words without negative powers of the variables. This was proved by\nG. Traustason.\n-/\n@[category research solved, AMS 20]\ntheorem n_eq_four : IsPositiveLawDefinable 4 := by\n  sorry",
+    "kourovka.«2.82».variants.n_le_three": "/--\nFor each $n=1,2,3$, the class of groups satisfying the $n$th Engel identity is definable by a\npossibly infinite set of identities $u=v$ between words without negative powers of the variables.\nThis was proved by A. I. Shirshov.\n-/\n@[category research solved, AMS 20]\ntheorem n_le_three :\n    ∀ n : ℕ, 1 ≤ n → n ≤ 3 → IsPositiveLawDefinable n := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjectures.Kourovka.«1_40»\n\n/-!\n# Conjecture 2.82\n\nby A. I. Shirshov\n\nCan the class of groups satisfying the $n$th Engel identity\n$[x, y, \\ldots, y] = 1$, with $n$ copies of $y$, be defined by identities\n$u = v$ in which $u$ and $v$ are words without negative powers of the\nvariables?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«2.82»\n\n/-- A group is locally graded if every nontrivial finitely generated subgroup\nhas a proper subgroup of finite index. -/\ndef IsLocallyGraded (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H ≠ ⊥ → Group.FG H →\n    ∃ K : Subgroup H, K ≠ ⊤ ∧ K.FiniteIndex\n\n/--\nCan the class of groups satisfying the $n$th Engel identity\n$[x, y, \\ldots, y] = 1$, with $n$ copies of $y$, be defined, for every $n$,\nby a set of identities $u = v$ in positive words? Here positive words are\nelements of the free monoid on countably many variables, and an identity is\nrequired to hold under every assignment of those variables in the group.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        (∀ x y : G, Kourovka.«1.40».engelCommutator x y n = 1) ↔\n          ∀ p ∈ S, ∀ f : ℕ → G,\n            FreeMonoid.lift f p.1 = FreeMonoid.lift f p.2 := by\n  sorry\n\n/--\nFor each $1 \\leq n \\leq 3$, Shirshov proved that the class of groups satisfying\nthe $n$th Engel identity is defined by a set of identities between positive\nwords, holding under every assignment of their countably many variables.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three :\n    ∀ n : ℕ, 1 ≤ n → n ≤ 3 →\n      ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n        ∀ (G : Type) [Group G],\n          (∀ x y : G, Kourovka.«1.40».engelCommutator x y n = 1) ↔\n            ∀ p ∈ S, ∀ f : ℕ → G,\n              FreeMonoid.lift f p.1 = FreeMonoid.lift f p.2 := by\n  sorry\n\n/--\nTraustason proved that the class of groups satisfying the fourth Engel\nidentity is defined by a set of identities between positive words, holding\nunder every assignment of their countably many variables.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        (∀ x y : G, Kourovka.«1.40».engelCommutator x y 4 = 1) ↔\n          ∀ p ∈ S, ∀ f : ℕ → G,\n            FreeMonoid.lift f p.1 = FreeMonoid.lift f p.2 := by\n  sorry\n\n/--\nFor every $n$, the class of locally graded groups satisfying the $n$th Engel\nidentity can be defined, among locally graded groups, by a set of identities\nbetween positive words, holding under every assignment of their countably\nmany variables.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded :\n    ∀ n : ℕ, ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        ((∀ x y : G, Kourovka.«1.40».engelCommutator x y n = 1) ↔\n          ∀ p ∈ S, ∀ f : ℕ → G,\n            FreeMonoid.lift f p.1 = FreeMonoid.lift f p.2) := by\n  sorry\n\nend Kourovka.«2.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Positive words are elements of `FreeMonoid ℕ`, giving countably many variables and allowing the empty word; a law is evaluated by `FreeMonoid.lift` under every assignment `ℕ → G`.",
+    "The main and locally graded statements quantify over all `n : ℕ`. Thus `n = 0` is included as the harmless trivial-group variety described in the decomposition notes.",
+    "The `n ≤ 3` solved variant is restricted by both `1 ≤ n` and `n ≤ 3`.",
+    "A locally graded group is modeled by the standard proper finite-index subgroup characterization: every nontrivial finitely generated subgroup has a proper subgroup of finite index.",
+    "The locally graded result uses one set of laws for each `n`, uniformly over all locally graded groups, and states the required biconditional only under the locally graded hypothesis."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `Group.FG` and `Subgroup.FiniteIndex` supply the constituent notions, but Mathlib has no combined locally graded group predicate.",
+     "name": "Kourovka.«2.82».IsLocallyGraded",
+     "why_needed": "The locally graded solved variant requires a predicate for locally graded groups, and no such predicate was found in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.82»": {
+     "outcome": "formalized",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.locally_graded": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.n_eq_four": {
+     "outcome": "formalized",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.n_le_three": {
+     "outcome": "formalized",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.82»": "/--\nCan the class of groups satisfying the $n$th Engel identity\n$[x, y, \\ldots, y] = 1$, with $n$ copies of $y$, be defined, for every $n$,\nby a set of identities $u = v$ in positive words? Here positive words are\nelements of the free monoid on countably many variables, and an identity is\nrequired to hold under every assignment of those variables in the group.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        (∀ x y : G, Kourovka.«1.40».engelCommutator x y n = 1) ↔\n          ∀ p ∈ S, ∀ f : ℕ → G,\n            FreeMonoid.lift f p.1 = FreeMonoid.lift f p.2 := by\n  sorry",
+    "kourovka.«2.82».variants.locally_graded": "/--\nFor every $n$, the class of locally graded groups satisfying the $n$th Engel\nidentity can be defined, among locally graded groups, by a set of identities\nbetween positive words, holding under every assignment of their countably\nmany variables.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded :\n    ∀ n : ℕ, ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        ((∀ x y : G, Kourovka.«1.40».engelCommutator x y n = 1) ↔\n          ∀ p ∈ S, ∀ f : ℕ → G,\n            FreeMonoid.lift f p.1 = FreeMonoid.lift f p.2) := by\n  sorry",
+    "kourovka.«2.82».variants.n_eq_four": "/--\nTraustason proved that the class of groups satisfying the fourth Engel\nidentity is defined by a set of identities between positive words, holding\nunder every assignment of their countably many variables.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        (∀ x y : G, Kourovka.«1.40».engelCommutator x y 4 = 1) ↔\n          ∀ p ∈ S, ∀ f : ℕ → G,\n            FreeMonoid.lift f p.1 = FreeMonoid.lift f p.2 := by\n  sorry",
+    "kourovka.«2.82».variants.n_le_three": "/--\nFor each $1 \\leq n \\leq 3$, Shirshov proved that the class of groups satisfying\nthe $n$th Engel identity is defined by a set of identities between positive\nwords, holding under every assignment of their countably many variables.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three :\n    ∀ n : ℕ, 1 ≤ n → n ≤ 3 →\n      ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n        ∀ (G : Type) [Group G],\n          (∀ x y : G, Kourovka.«1.40».engelCommutator x y n = 1) ↔\n            ∀ p ∈ S, ∀ f : ℕ → G,\n              FreeMonoid.lift f p.1 = FreeMonoid.lift f p.2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.82\n\nby A. I. Shirshov\n\nCan the class of groups with the $n$th Engel condition\n$[x, \\underbrace{y, \\ldots, y}_{n}] = 1$ be defined by identical relations of the\nform $u = v$, where $u$ and $v$ are words without negative powers of variables?\nThis can be done for $n = 1, 2, 3$ (A. I. Shirshov, *Algebra i Logika* **2**, no. 5\n(1963), 5–18).\n\n*Editors' comment:* This has also been done for $n = 4$ (G. Traustason,\n*J. Group Theory* **2**, no. 1 (1999), 39–46). As remarked by O. Macedońska, this is\nalso true for the class of locally graded $n$-Engel groups because by\n(Y. Kim, A. Rhemtulla, in *Groups–Korea '94*, de Gruyter, Berlin, 1995, 189–197) such a\ngroup is locally nilpotent and then by (R. G. Burns, Yu. Medvedev,\n*J. Austral. Math. Soc.* **64** (1998), 92–100) such a group is an extension of a\nnilpotent group of $n$-bounded class by a group of $n$-bounded exponent; then a\nclassical result of Mal'cev implies that such groups satisfy a positive law.\n\nA word without negative powers of variables (a *positive word*) is an element of the\nfree monoid on a countable set of variables, and an identical relation $u = v$ between\npositive words is a *positive law*. A group $G$ satisfies the positive law $u = v$ if\n$u$ and $v$ take the same value in $G$ under every assignment of the variables.\nMathlib's commutator `⁅a, b⁆ = a * b * a⁻¹ * b⁻¹` differs from the notebook's\n$[a, b] = a^{-1} b^{-1} a b$, but the two conventions give the same class of\n$n$-Engel groups.\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 2.82.\n- A. I. Shirshov, *On some groups which are nearly Engel*, Algebra i Logika **2**,\n  no. 5 (1963), 5–18 (Russian).\n- G. Traustason, *Semigroup identities in 4-Engel groups*,\n  J. Group Theory **2** (1999), no. 1, 39–46.\n- R. G. Burns, Yu. Medvedev, *A note on Engel groups and local nilpotence*,\n  J. Austral. Math. Soc. **64** (1998), 92–100.\n-/\n\nnamespace Kourovka.«2.82»\n\nvariable {G : Type*} [Group G]\n\n/-- The iterated commutator $[x,\\, {}_n y]$, defined by $[x,\\, {}_0 y] = x$ and\n$[x,\\, {}_{n+1} y] = [[x,\\, {}_n y], y]$. -/\ndef engelCommutator (x y : G) : ℕ → G\n  | 0 => x\n  | n + 1 => ⁅engelCommutator x y n, y⁆\n\n/-- A group $G$ satisfies the $n$th Engel condition (is *$n$-Engel*) if\n$[x, \\underbrace{y, \\ldots, y}_{n}] = 1$ for all $x, y \\in G$. -/\ndef IsNEngel (n : ℕ) (G : Type*) [Group G] : Prop :=\n  ∀ x y : G, engelCommutator x y n = 1\n\n/-- A group $G$ satisfies the positive law $u = v$, where $u$ and $v$ are words without\nnegative powers in the variables $x_0, x_1, \\ldots$ (elements of `FreeMonoid ℕ`), if\n$u$ and $v$ take the same value in $G$ under every assignment of the variables. -/\ndef SatisfiesPositiveLaw (G : Type*) [Group G] (u v : FreeMonoid ℕ) : Prop :=\n  ∀ f : ℕ → G, FreeMonoid.lift f u = FreeMonoid.lift f v\n\n/-- A group is *locally graded* if every non-trivial finitely generated subgroup has a\nproper subgroup of finite index. -/\ndef IsLocallyGraded (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → H ≠ ⊥ → ∃ K : Subgroup H, K ≠ ⊤ ∧ K.FiniteIndex\n\n@[category test, AMS 20]\ntheorem isNEngel_zero_iff : IsNEngel 0 G ↔ Subsingleton G := by\n  simp only [IsNEngel, engelCommutator]\n  exact ⟨fun h => ⟨fun a b => (h a a).trans (h b b).symm⟩,\n    fun h x _ => Subsingleton.elim x 1⟩\n\n@[category test, AMS 20]\ntheorem isNEngel_one_iff : IsNEngel 1 G ↔ IsMulCommutative G := by\n  simp only [IsNEngel, engelCommutator, commutatorElement_eq_one_iff_mul_comm]\n  exact ⟨fun h => ⟨⟨h⟩⟩, fun h => h.is_comm.comm⟩\n\n@[category test, AMS 20]\ntheorem satisfiesPositiveLaw_refl (u : FreeMonoid ℕ) : SatisfiesPositiveLaw G u u :=\n  fun _ => rfl\n\n@[category test, AMS 20]\ntheorem satisfiesPositiveLaw_swap_iff :\n    SatisfiesPositiveLaw G (.of 0 * .of 1) (.of 1 * .of 0) ↔ IsMulCommutative G := by\n  simp only [SatisfiesPositiveLaw, map_mul, FreeMonoid.lift_eval_of]\n  refine ⟨fun h => ⟨⟨fun a b => ?_⟩⟩, fun h f => h.is_comm.comm _ _⟩\n  simpa using h (fun i => if i = 0 then a else b)\n\n/--\nCan the class of groups with the $n$th Engel condition\n$[x, \\underbrace{y, \\ldots, y}_{n}] = 1$ be defined by identical relations of the form\n$u = v$, where $u$ and $v$ are words without negative powers of variables?\n\nThat is: is it true that for every $n \\geq 1$ there is a set $S$ of positive laws\n$u = v$ such that a group is $n$-Engel if and only if it satisfies every law in $S$?\nThe case $n = 0$ is excluded as degenerate: the $0$th Engel condition $x = 1$ defines\nthe class of trivial groups, which is defined by the positive law $x = y$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngel n G ↔ ∀ l ∈ S, SatisfiesPositiveLaw G l.1 l.2 := by\n  sorry\n\n/--\nFor $n = 1, 2, 3$ the class of $n$-Engel groups can be defined by identical relations\n$u = v$ between words without negative powers of variables (A. I. Shirshov, 1963).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three :\n    ∀ n ∈ ({1, 2, 3} : Set ℕ), ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngel n G ↔ ∀ l ∈ S, SatisfiesPositiveLaw G l.1 l.2 := by\n  sorry\n\n/--\nThe class of $4$-Engel groups can be defined by identical relations $u = v$ between\nwords without negative powers of variables (G. Traustason, 1999).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngel 4 G ↔ ∀ l ∈ S, SatisfiesPositiveLaw G l.1 l.2 := by\n  sorry\n\n/--\nAs remarked by O. Macedońska, the answer is positive for the class of locally graded\n$n$-Engel groups: for every $n \\geq 1$ there is a set $S$ of identical relations $u = v$\nbetween words without negative powers of variables such that a locally graded group is\n$n$-Engel if and only if it satisfies every law in $S$.\n\nThe editors' justification: a locally graded $n$-Engel group is locally nilpotent\n(Kim–Rhemtulla), hence an extension of a nilpotent group of $n$-bounded class by a\ngroup of $n$-bounded exponent (Burns–Medvedev), and such groups satisfy a positive law\nby a classical result of Mal'cev.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded :\n    ∀ n : ℕ, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        (IsNEngel n G ↔ ∀ l ∈ S, SatisfiesPositiveLaw G l.1 l.2) := by\n  sorry\n\nend Kourovka.«2.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. One remark for reviewers (already anticipated by the table's notes): the editors' cited chain of results (Kim–Rhemtulla, Burns–Medvedev, Mal'cev) literally justifies only that locally graded n-Engel groups satisfy some non-trivial positive law, whereas the text's phrase 'this is also true for the class of locally graded n-Engel groups' is the stronger definability statement; per the table, the locally_graded slot states the stronger reading, with the biconditional restricted to locally graded groups.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Variables of positive words range over ℕ (countably many variables); positive words are elements of FreeMonoid ℕ, so the empty word (the constant 1) is allowed. As the table notes, this does not change the truth value since ℤ is n-Engel for n ≥ 1, so no definable S can contain a law u = 1 with u non-empty.",
+    "A set of laws is S : Set (FreeMonoid ℕ × FreeMonoid ℕ); 'defined by S' is the biconditional IsNEngel n G ↔ ∀ l ∈ S, SatisfiesPositiveLaw G l.1 l.2 over all groups G : Type (universe Type, as in the other Kourovka files). S = ∅ would force every group to be n-Engel, so the answer is constrained.",
+    "The main statement and the locally graded variant quantify over n with the hypothesis 0 < n (the notebook's 'n-th Engel condition' intends n ≥ 1). The n = 0 case is degenerate (the law x = 1 defines trivial groups, definable by the positive law x = y), so including or excluding it does not change the truth value; the exclusion is explained in the docstring.",
+    "Mathlib's commutator convention ⁅a, b⁆ = a b a⁻¹ b⁻¹ is used (as in Kourovka/1_40.lean) instead of the notebook's a⁻¹ b⁻¹ a b. The class of n-Engel groups is the same under both conventions (the two Engel maps x ↦ [x,y] are conjugate to each other via inversion and conjugation by y, both of which commute with the iteration), noted in the module docstring.",
+    "IsLocallyGraded uses the 'proper subgroup of finite index in every non-trivial finitely generated subgroup' formulation (K : Subgroup H, K ≠ ⊤ ∧ K.FiniteIndex), which is equivalent to 'non-trivial finite quotient'.",
+    "The n_le_three variant is stated as ∀ n ∈ ({1, 2, 3} : Set ℕ), … following the source's literal list.",
+    "Test lemmas (category test) are included to validate the bespoke definitions: IsNEngel 0 G ↔ Subsingleton G, IsNEngel 1 G ↔ IsMulCommutative G, reflexive laws always hold, and the law x₀x₁ = x₁x₀ ↔ IsMulCommutative G."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Kourovka.«1.40».engelCommutator (same definition, other problem file); Mathlib's commutatorElement ⁅a, b⁆ (used as the building block).",
+     "name": "Kourovka.«2.82».engelCommutator",
+     "why_needed": "Left-normed iterated commutator [x, y, …, y]; Mathlib has no group-theoretic Engel commutator (only Lie-algebra Engel notions). Copied verbatim from Kourovka/1_40.lean, which lives in a different namespace and cannot be imported by a problem file."
+    },
+    {
+     "closest_existing_considered": "Kourovka.«1.40».IsEngelGroup (unbounded Engel condition, different notion); Mathlib's LieAlgebra.IsEngelian (Lie algebras, not groups).",
+     "name": "Kourovka.«2.82».IsNEngel",
+     "why_needed": "The n-th Engel condition ∀ x y, [x, y, …, y] = 1 (n copies of y) as a predicate on groups; not in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "FreeMonoid.lift (used as the evaluation map); FreeGroup.lift (would allow negative powers, which the statement excludes); Mathlib congruences/varieties (none for laws in groups).",
+     "name": "Kourovka.«2.82».SatisfiesPositiveLaw",
+     "why_needed": "A group satisfies the identical relation u = v between words without negative powers of variables (u v : FreeMonoid ℕ) iff FreeMonoid.lift f u = FreeMonoid.lift f v for every assignment f : ℕ → G. Mathlib has no notion of a group satisfying a (positive) law."
+    },
+    {
+     "closest_existing_considered": "Subgroup.FG and Subgroup.FiniteIndex (used as building blocks); no locally graded / residually finite-type notion in Mathlib matches.",
+     "name": "Kourovka.«2.82».IsLocallyGraded",
+     "why_needed": "Locally graded groups (every non-trivial finitely generated subgroup has a proper subgroup of finite index) are needed for the editors' variant and are absent from Mathlib and the repo."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.82»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "answer(sorry) ↔ ∀ n, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ), ∀ (G : Type) [Group G], IsNEngel n G ↔ ∀ l ∈ S, SatisfiesPositiveLaw G l.1 l.2. Positive words are elements of the free monoid on countably many variables; IsNEngel is the left-normed n-Engel law via engelCommutator (as in Kourovka/1_40.lean). The n = 0 case is excluded and the exclusion is explained in the docstring (0-Engel = trivial groups, definable by x = y, so the truth value is unaffected)."
+    },
+    "kourovka.«2.82».variants.locally_graded": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Plain theorem (research solved): ∀ n, 0 < n → ∃ S, ∀ (G : Type) [Group G], IsLocallyGraded G → (IsNEngel n G ↔ all laws in S hold). Follows the text's 'defined ... for the class' reading with the biconditional restricted to locally graded groups; the weaker 'satisfies a positive law' reading from the editors' justification is only described in the docstring, not stated as a declaration."
+    },
+    "kourovka.«2.82».variants.n_eq_four": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Plain theorem (research solved, Traustason 1999): ∃ S, ∀ G, IsNEngel 4 G ↔ all laws in S hold."
+    },
+    "kourovka.«2.82».variants.n_le_three": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Plain theorem (research solved, Shirshov 1963): ∀ n ∈ ({1,2,3} : Set ℕ), ∃ S, ∀ G, IsNEngel n G ↔ all laws in S hold."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.82»": "/--\nCan the class of groups with the $n$th Engel condition\n$[x, \\underbrace{y, \\ldots, y}_{n}] = 1$ be defined by identical relations of the form\n$u = v$, where $u$ and $v$ are words without negative powers of variables?\n\nThat is: is it true that for every $n \\geq 1$ there is a set $S$ of positive laws\n$u = v$ such that a group is $n$-Engel if and only if it satisfies every law in $S$?\nThe case $n = 0$ is excluded as degenerate: the $0$th Engel condition $x = 1$ defines\nthe class of trivial groups, which is defined by the positive law $x = y$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngel n G ↔ ∀ l ∈ S, SatisfiesPositiveLaw G l.1 l.2 := by\n  sorry",
+    "kourovka.«2.82».variants.locally_graded": "/--\nAs remarked by O. Macedońska, the answer is positive for the class of locally graded\n$n$-Engel groups: for every $n \\geq 1$ there is a set $S$ of identical relations $u = v$\nbetween words without negative powers of variables such that a locally graded group is\n$n$-Engel if and only if it satisfies every law in $S$.\n\nThe editors' justification: a locally graded $n$-Engel group is locally nilpotent\n(Kim–Rhemtulla), hence an extension of a nilpotent group of $n$-bounded class by a\ngroup of $n$-bounded exponent (Burns–Medvedev), and such groups satisfy a positive law\nby a classical result of Mal'cev.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded :\n    ∀ n : ℕ, 0 < n → ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G], IsLocallyGraded G →\n        (IsNEngel n G ↔ ∀ l ∈ S, SatisfiesPositiveLaw G l.1 l.2) := by\n  sorry",
+    "kourovka.«2.82».variants.n_eq_four": "/--\nThe class of $4$-Engel groups can be defined by identical relations $u = v$ between\nwords without negative powers of variables (G. Traustason, 1999).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four :\n    ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngel 4 G ↔ ∀ l ∈ S, SatisfiesPositiveLaw G l.1 l.2 := by\n  sorry",
+    "kourovka.«2.82».variants.n_le_three": "/--\nFor $n = 1, 2, 3$ the class of $n$-Engel groups can be defined by identical relations\n$u = v$ between words without negative powers of variables (A. I. Shirshov, 1963).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three :\n    ∀ n ∈ ({1, 2, 3} : Set ℕ), ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ),\n      ∀ (G : Type) [Group G],\n        IsNEngel n G ↔ ∀ l ∈ S, SatisfiesPositiveLaw G l.1 l.2 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.82\n\nby A. I. Shirshov\n\nCan the class of groups satisfying the $n$th Engel identity\n$[x, y, \\ldots, y] = 1$, with $n$ copies of $y$, be defined by identities\n$u = v$ in which $u$ and $v$ are words without negative powers of the\nvariables? Shirshov proved this for $n = 1, 2, 3$, and Traustason later\nproved it for $n = 4$. The editors also record the corresponding result\namong locally graded groups.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 2.82.\n-/\n\nnamespace Kourovka.«2.82»\n\n/-- The left-normed iterated commutator $[x,\\, {}_n y]$, defined by\n$[x,\\, {}_0 y] = x$ and $[x,\\, {}_{n+1} y] = [[x,\\, {}_n y], y]$. -/\ndef engelCommutator {G : Type*} [Group G] (x y : G) : ℕ → G\n  | 0 => x\n  | n + 1 => ⁅engelCommutator x y n, y⁆\n\n/-- A group satisfies the $n$th Engel condition if\n$[x,\\, {}_n y] = 1$ for every $x$ and $y$. -/\ndef IsNEngel (n : ℕ) (G : Type*) [Group G] : Prop :=\n  ∀ x y : G, engelCommutator x y n = 1\n\n/-- A group satisfies a set of positive identities if every pair of words has equal\nvalues under every assignment of the countably many variables. Elements of\n`FreeMonoid ℕ` are words with no negative powers; the empty word is allowed. -/\ndef SatisfiesPositiveLaws (G : Type*) [Group G]\n    (S : Set (FreeMonoid ℕ × FreeMonoid ℕ)) : Prop :=\n  ∀ law ∈ S, ∀ assignment : ℕ → G,\n    FreeMonoid.lift assignment law.1 = FreeMonoid.lift assignment law.2\n\n/-- A group is locally graded if every nontrivial finitely generated subgroup has a\nproper subgroup of finite index. -/\ndef IsLocallyGraded (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H ≠ ⊥ → H.FG →\n    ∃ K : Subgroup H, K ≠ ⊤ ∧ K.FiniteIndex\n\n/-- The $n$th Engel groups are definable by a set of positive identities. -/\ndef PositivelyDefinesNEngel (n : ℕ) : Prop :=\n  ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ), ∀ (G : Type) [Group G],\n    IsNEngel n G ↔ SatisfiesPositiveLaws G S\n\n/-- Among locally graded groups, the $n$th Engel groups are definable by a set of\npositive identities. -/\ndef PositivelyDefinesNEngelAmongLocallyGraded (n : ℕ) : Prop :=\n  ∃ S : Set (FreeMonoid ℕ × FreeMonoid ℕ), ∀ (G : Type) [Group G],\n    IsLocallyGraded G → (IsNEngel n G ↔ SatisfiesPositiveLaws G S)\n\n/--\nCan the class of groups with the $n$th Engel condition\n$[x, y, \\ldots, y] = 1$, with $n$ copies of $y$, be defined by identities\n$u = v$, where $u$ and $v$ are words without negative powers of variables?\n\nThe quantifier includes $n = 0$; in that case the Engel identity defines the\ntrivial groups and is itself positively definable.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, PositivelyDefinesNEngel n := by\n  sorry\n\n/--\nFor each $n$ with $1 \\leq n \\leq 3$, the class of groups satisfying the\n$n$th Engel identity is definable by identities $u = v$ between words\nwithout negative powers of variables (Shirshov, 1963).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three :\n    ∀ n : ℕ, 1 ≤ n → n ≤ 3 → PositivelyDefinesNEngel n := by\n  sorry\n\n/--\nThe class of groups satisfying the fourth Engel identity\n$[x, y, y, y, y] = 1$ is definable by identities $u = v$ between words\nwithout negative powers of variables (Traustason, 1999).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four : PositivelyDefinesNEngel 4 := by\n  sorry\n\n/--\nFor every $n$, among locally graded groups the class satisfying the $n$th\nEngel identity is definable by identities $u = v$ between words without\nnegative powers of variables. Here locally graded means that every nontrivial\nfinitely generated subgroup has a proper subgroup of finite index.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded :\n    ∀ n : ℕ, PositivelyDefinesNEngelAmongLocallyGraded n := by\n  sorry\n\nend Kourovka.«2.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Positive words are elements of `FreeMonoid ℕ`, giving countably many variables and allowing the empty word. A positive identity is a pair of such words, evaluated under every assignment via `FreeMonoid.lift`.",
+    "The defining set of positive identities is chosen before quantifying over groups, and definition means a biconditional for every group.",
+    "The main statement quantifies over every `n : ℕ`, including the harmless `n = 0` case described in the decomposition. The Shirshov variant explicitly restricts to `1 ≤ n ≤ 3`.",
+    "Local gradedness is modeled by its standard equivalent formulation: every nontrivial finitely generated subgroup has a proper subgroup of finite index.",
+    "In the locally graded variant, the biconditional is restricted to locally graded groups; no weaker extra declaration about merely satisfying one nontrivial positive law is added."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Kourovka.«1.40».engelCommutator` in another conjecture file; no reusable Mathlib or FormalConjecturesForMathlib definition was found.",
+     "name": "Kourovka.«2.82».engelCommutator",
+     "why_needed": "States the left-normed iterated Engel commutator with the required zero boundary case."
+    },
+    {
+     "closest_existing_considered": "The variable-bound Engel-group predicates in Kourovka/1_40.lean do not express a fixed uniform n.",
+     "name": "Kourovka.«2.82».IsNEngel",
+     "why_needed": "Packages the universally quantified fixed-n Engel identity."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `FreeMonoid` and `FreeMonoid.lift`, but no predicate for satisfaction of sets of positive group laws was found.",
+     "name": "Kourovka.«2.82».SatisfiesPositiveLaws",
+     "why_needed": "Expresses satisfaction of a possibly infinite set of identities between positive words under all variable assignments."
+    },
+    {
+     "closest_existing_considered": "No locally graded group predicate was found in Mathlib, FormalConjecturesForMathlib, or existing conjecture files; `Subgroup.FG` and `Subgroup.FiniteIndex` supply its components.",
+     "name": "Kourovka.«2.82».IsLocallyGraded",
+     "why_needed": "The editors' solved variant requires restricting the biconditional to locally graded groups."
+    },
+    {
+     "closest_existing_considered": "No existing positive-law definability predicate was found.",
+     "name": "Kourovka.«2.82».PositivelyDefinesNEngel",
+     "why_needed": "Packages the repeated exact definability proposition used by the open problem and both finite-n solved variants."
+    },
+    {
+     "closest_existing_considered": "No existing relativized positive-law definability predicate was found.",
+     "name": "Kourovka.«2.82».PositivelyDefinesNEngelAmongLocallyGraded",
+     "why_needed": "Packages the relativized definability proposition for the editors' locally graded variant."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.82»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.locally_graded": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.n_eq_four": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.82».variants.n_le_three": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.82»": "/--\nCan the class of groups with the $n$th Engel condition\n$[x, y, \\ldots, y] = 1$, with $n$ copies of $y$, be defined by identities\n$u = v$, where $u$ and $v$ are words without negative powers of variables?\n\nThe quantifier includes $n = 0$; in that case the Engel identity defines the\ntrivial groups and is itself positively definable.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.82» : answer(sorry) ↔\n    ∀ n : ℕ, PositivelyDefinesNEngel n := by\n  sorry",
+    "kourovka.«2.82».variants.locally_graded": "/--\nFor every $n$, among locally graded groups the class satisfying the $n$th\nEngel identity is definable by identities $u = v$ between words without\nnegative powers of variables. Here locally graded means that every nontrivial\nfinitely generated subgroup has a proper subgroup of finite index.\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.locally_graded :\n    ∀ n : ℕ, PositivelyDefinesNEngelAmongLocallyGraded n := by\n  sorry",
+    "kourovka.«2.82».variants.n_eq_four": "/--\nThe class of groups satisfying the fourth Engel identity\n$[x, y, y, y, y] = 1$ is definable by identities $u = v$ between words\nwithout negative powers of variables (Traustason, 1999).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_eq_four : PositivelyDefinesNEngel 4 := by\n  sorry",
+    "kourovka.«2.82».variants.n_le_three": "/--\nFor each $n$ with $1 \\leq n \\leq 3$, the class of groups satisfying the\n$n$th Engel identity is definable by identities $u = v$ between words\nwithout negative powers of variables (Shirshov, 1963).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«2.82».variants.n_le_three :\n    ∀ n : ℕ, 1 ≤ n → n ≤ 3 → PositivelyDefinesNEngel n := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«2.82»": "c01",
+  "kourovka.«2.82».variants.locally_graded": "c01",
+  "kourovka.«2.82».variants.n_eq_four": "c01",
+  "kourovka.«2.82».variants.n_le_three": "c01"
+ },
+ "id": "kourovka-2.82",
+ "main_attempt": "c01"
+}

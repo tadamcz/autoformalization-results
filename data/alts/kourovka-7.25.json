@@ -1,0 +1,648 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.25\n\nby A. V. Kuznetsov\n\nWords in the alphabet $x, x^{-1}, y, y^{-1}, z, z^{-1}, \\ldots$ are regarded as operations, that\nis, as functions in the variables $x, y, z, \\ldots$ on a group $G$. A word $A$ is *expressible in\nwords $B_1, \\ldots, B_n$ on the group $G$* if $A$ can be constructed from the words\n$B_1, \\ldots, B_n$ and variables by means of finitely many substitutions of words one into another\nand replacements of a word by another word which is identically equal to it on $G$. A list of words\nis *functionally complete on $G$* if every word can be expressed on $G$ in words from this list. A\nword $B$ is a *Schaeffer word on $G$* if every word can be expressed on $G$ in $B$.\n\nProblem 7.25 asks whether there exists an algorithm which decides\n\n- a) by a word $B$, whether it is a Schaeffer word on every group (examples of such words are\n  $xy^{-1}$, $x^{-1}y^2z$ and $x^{-1}y^{-1}zx$);\n- b) by a list of words, whether it is functionally complete on every group;\n- c) by words $A, B_1, \\ldots, B_n$, whether $A$ is expressible in $B_1, \\ldots, B_n$ on every\n  group (a problem from Kuznetsov's 1971 paper, p. 112);\n- d) the same for every finite group (for finite groups, for example, $x^{-1}$ is expressible in\n  $xy$). For a fixed finite group such an algorithm exists.\n\nFormalisation notes. The variables are $x_0, x_1, x_2, \\ldots$, indexed by `ℕ`, and a word is a\n`List (ℕ × Bool)`, the letter `(i, true)` being $x_i$ and `(i, false)` being $x_i^{-1}$. A word\nand its free reduction are identically equal on every group, so expressibility is defined on\n`FreeGroup ℕ`, and a word `w` is expressible if and only if `FreeGroup.mk w` is. A word has\nfinitely many letters and its operation on `G` depends only on the variables occurring in it, so\nwords are evaluated at assignments `ℕ → G` of all the variables. \"On every group\" means that for\neach group `G` separately there is a construction of $A$ from $B_1, \\ldots, B_n$ using\nidentities of `G`; the construction may depend on `G`. An algorithm deciding a property of\nwords is a computable predicate (`ComputablePred`) on the words, encoded as lists.\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 7.25\n- A. V. Kuznetsov, *Matem. Issledovaniya*, Kishinëv, **6**, no. 4 (1971), 75–122 (Russian)\n-/\n\nnamespace Kourovka.«7.25»\n\n/-- A word in the alphabet $x_0, x_0^{-1}, x_1, x_1^{-1}, \\ldots$: the letter `(i, true)` is the\nvariable $x_i$ and the letter `(i, false)` is its inverse $x_i^{-1}$. Up to free reduction,\nthe word `w` is the element `FreeGroup.mk w` of `FreeGroup ℕ`. -/\nabbrev Word := List (ℕ × Bool)\n\nvariable (G : Type*) [Group G]\n\n/-- Two words `A` and `B` are *identically equal on the group `G`* if they define the same\nfunction of the variables $x_0, x_1, \\ldots$ on `G`, that is, for every assignment `v : ℕ → G`\nof the variables the values of `A` and `B` at `v` agree. -/\ndef IdenticallyEqualOn (A B : FreeGroup ℕ) : Prop :=\n  ∀ v : ℕ → G, FreeGroup.lift v A = FreeGroup.lift v B\n\n/-- `Expressible G S A` means that the word `A` is *expressible in the words of `S` on the group\n`G`*: `A` can be constructed from the words of `S` and the variables by finitely many\nsubstitutions of words one into another and replacements of a word by another word which is\nidentically equal to it on `G`.\n\n* `var`: every variable $x_i$ is expressible.\n* `mem`: every word of `S` is expressible.\n* `subst`: substituting expressible words `σ i` for the variables $x_i$ of an expressible word\n  `A` gives the expressible word `FreeGroup.lift σ A`.\n* `replace`: an expressible word may be replaced by a word identically equal to it on `G`. -/\ninductive Expressible (S : Set (FreeGroup ℕ)) : FreeGroup ℕ → Prop\n  | var (i : ℕ) : Expressible S (FreeGroup.of i)\n  | mem {B : FreeGroup ℕ} (hB : B ∈ S) : Expressible S B\n  | subst {A : FreeGroup ℕ} {σ : ℕ → FreeGroup ℕ} (hA : Expressible S A)\n      (hσ : ∀ i, Expressible S (σ i)) : Expressible S (FreeGroup.lift σ A)\n  | replace {A A' : FreeGroup ℕ} (hA : Expressible S A) (h : IdenticallyEqualOn G A A') :\n      Expressible S A'\n\n/-- A set `S` of words is *functionally complete on the group `G`* if every word can be\nexpressed on `G` in words from `S`. -/\ndef IsFunctionallyCompleteOn (S : Set (FreeGroup ℕ)) : Prop :=\n  ∀ A : FreeGroup ℕ, Expressible G S A\n\n/-- A word `B` is a *Schaeffer word on the group `G`* if every word can be expressed on `G`\nin `B`. -/\ndef IsSchaefferWordOn (B : FreeGroup ℕ) : Prop :=\n  IsFunctionallyCompleteOn G {B}\n\n/-- Each of the words $B_1, \\ldots, B_n$ of a list `L` is expressible in $B_1, \\ldots, B_n$\non `G`. -/\n@[category API, AMS 3 8 20]\ntheorem expressible_of_mem {L : List Word} {B : Word} (hB : B ∈ L) :\n    Expressible G (FreeGroup.mk '' {B | B ∈ L}) (FreeGroup.mk B) :=\n  .mem ⟨B, hB, rfl⟩\n\n/-- On every group, the word $x_0^{n+1}$ is expressible in $x_0 x_1$. -/\n@[category test, AMS 3 8 20]\ntheorem expressible_pow (n : ℕ) :\n    Expressible G {FreeGroup.of 0 * FreeGroup.of 1} (FreeGroup.of 0 ^ (n + 1)) := by\n  induction n with\n  | zero => simpa using Expressible.var (G := G) (S := {FreeGroup.of 0 * FreeGroup.of 1}) 0\n  | succ n ih =>\n    have h := Expressible.subst (G := G)\n      (σ := fun i => if i = 0 then FreeGroup.of 0 ^ (n + 1) else FreeGroup.of 0)\n      (.mem (Set.mem_singleton (FreeGroup.of 0 * FreeGroup.of 1)))\n      (fun i => by dsimp only; split_ifs <;> [exact ih; exact .var 0])\n    simpa [pow_succ] using h\n\n/-- The example from the statement of part d): on every finite group, $x^{-1}$ is expressible\nin $xy$. Indeed, on a finite group `G` the word $x_0^{-1}$ is identically equal to\n$x_0^{2|G| - 1}$. -/\n@[category test, AMS 3 8 20]\ntheorem expressible_inv_of_finite [Finite G] :\n    Expressible G {FreeGroup.of 0 * FreeGroup.of 1} (FreeGroup.of 0)⁻¹ := by\n  refine (expressible_pow G (2 * Nat.card G - 2)).replace fun v => ?_\n  have hc : 1 ≤ Nat.card G := Nat.card_pos\n  have h2 : 2 * Nat.card G - 2 + 1 = 2 * Nat.card G - 1 := by omega\n  simp only [map_pow, map_inv, FreeGroup.lift_apply_of, h2]\n  refine eq_inv_of_mul_eq_one_left ?_\n  rw [← pow_succ, Nat.sub_add_cancel (by omega), pow_mul', pow_card_eq_one', one_pow]\n\n/--\nDoes there exist an algorithm which decides by a word $B$ whether it is a Schaeffer word on\nevery group?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.a : answer(sorry) ↔\n    ComputablePred fun B : Word =>\n      ∀ (G : Type) [Group G], IsSchaefferWordOn G (FreeGroup.mk B) := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides by a list of words $B_1, \\ldots, B_n$ whether it is\nfunctionally complete on every group?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.b : answer(sorry) ↔\n    ComputablePred fun L : List Word =>\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G (FreeGroup.mk '' {B | B ∈ L}) := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides by words $A, B_1, \\ldots, B_n$ whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every group?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.c : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G],\n        Expressible G (FreeGroup.mk '' {B | B ∈ p.2}) (FreeGroup.mk p.1) := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides by words $A, B_1, \\ldots, B_n$ whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every finite group?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.d : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G] [Finite G],\n        Expressible G (FreeGroup.mk '' {B | B ∈ p.2}) (FreeGroup.mk p.1) := by\n  sorry\n\nend Kourovka.«7.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's reading of d) as the finite-group analogue of c) is the most natural one given the illustrating example concerns expressibility; the finite-group analogues of a) and b) would be subordinate variants and were not added.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Words are identified with elements of FreeGroup ℕ for the semantics: a word and its free reduction are identically equal on every group, and the expressibility closure is closed under such replacement, so a word w is expressible iff FreeGroup.mk w is (closure on words and on reduced words correspond exactly). Algorithm inputs remain literal words (List (ℕ × Bool)) so that ComputablePred applies.",
+    "Substitution is modeled as simultaneous substitution FreeGroup.lift σ A with every σ i expressible (for all i : ℕ). This is equivalent to the notebook's 'substitutions of words one into another' (single-variable substitutions): single substitution is a special case (σ i = x_i elsewhere, variables being expressible), and simultaneous substitution is obtained from single ones by renaming through fresh variables, which exist since a word uses finitely many of the countably many variables.",
+    "Words are evaluated at total assignments v : ℕ → G of all variables; 'identically equal on G' is equality of these functions. Since a word depends only on the finitely many variables occurring in it, this agrees with regarding it as a function of those variables.",
+    "Groups are quantified as `(G : Type) [Group G]` (repository convention). This loses nothing: Expressible depends on G only through the laws G satisfies, and the countably generated relatively free group of the variety generated by any group (a group in Type 0) satisfies exactly the same laws.",
+    "The quantifier ∀ G is inside the decided predicate (outside Expressible), so the derivation and the identities used may depend on G, as the decomposition notes require; the test theorem expressible_inv_of_finite illustrates such a G-dependent derivation (x^{-1} ≡ x^{2|G|-1} on finite G).",
+    "Part d) is formalized only as the finite-group analogue of part c), following the decomposition table; finite-group analogues of a) and b) were not added as separate declarations.",
+    "The sets of basic words are given as lists (possibly empty, n ≥ 0) via FreeGroup.mk '' {B | B ∈ L}; the empty list is an admissible input (then A is expressible iff it is identically equal on G to a variable).",
+    "AMS tags 3 (logic: decidability), 8 (general algebraic systems: functional completeness/clones) and 20 (group theory) were used."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FreeGroup ℕ (used for the semantics, via FreeGroup.mk), and the type `List (ℕ × Bool)` underlying FreeGroup in Mathlib.",
+     "name": "Kourovka.«7.25».Word",
+     "why_needed": "The algorithm's input must be a finite syntactic object on a Primcodable type: a word in the alphabet x, x^{-1}, y, y^{-1}, … is a `List (ℕ × Bool)` (variables indexed by ℕ, Bool = sign). `FreeGroup ℕ` has no Primcodable instance in Mathlib and is a quotient, so it is not directly usable as the domain of ComputablePred."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift (used inside); no Mathlib predicate for 'G satisfies the law A = B'.",
+     "name": "Kourovka.«7.25».IdenticallyEqualOn",
+     "why_needed": "The notebook's notion of two words being identically equal on G: ∀ v : ℕ → G, FreeGroup.lift v A = FreeGroup.lift v B. Mathlib has no notion of a group satisfying a law/identity in this form."
+    },
+    {
+     "closest_existing_considered": "Subgroup.closure / Submonoid.closure (wrong: closure under group operations, not under substitution and G-identities); FreeGroup.lift for substitution (used as the substitution operation).",
+     "name": "Kourovka.«7.25».Expressible",
+     "why_needed": "The notebook's bespoke expressibility relation (clone-like closure of a set of words and the variables under substitution and replacement by identically-equal words on G). Nothing in Mathlib or FormalConjecturesForMathlib models clones/functional completeness/term-function closure."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "Kourovka.«7.25».IsFunctionallyCompleteOn",
+     "why_needed": "Notebook's definition: every word expressible in S on G (∀ A : FreeGroup ℕ, Expressible G S A)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "Kourovka.«7.25».IsSchaefferWordOn",
+     "why_needed": "Notebook's definition: B is a Schaeffer (Sheffer) word on G if {B} is functionally complete on G."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.25».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "answer(sorry) ↔ ComputablePred (fun B : Word => ∀ (G : Type) [Group G], IsSchaefferWordOn G (FreeGroup.mk B)), where Word = List (ℕ × Bool) is a word in the alphabet x_i^{±1} and IsSchaefferWordOn G B says every word is Expressible in {B} on G. The quantifier over G sits inside the decided predicate, so derivations may depend on G. The listed examples are only mentioned in the module docstring as stated facts."
+    },
+    "kourovka.«7.25».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "answer(sorry) ↔ ComputablePred (fun L : List Word => ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G (FreeGroup.mk '' {B | B ∈ L})); lists of arbitrary length n ≥ 0 are inputs."
+    },
+    "kourovka.«7.25».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "answer(sorry) ↔ ComputablePred (fun p : Word × List Word => ∀ (G : Type) [Group G], Expressible G (FreeGroup.mk '' {B | B ∈ p.2}) (FreeGroup.mk p.1)); Expressible is the inductive closure of the B_i and the variables under substitution and replacement by words identically equal on G, with G quantified outside."
+    },
+    "kourovka.«7.25».parts.d": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Finite-group analogue of c), as fixed by the decomposition table: same predicate with ∀ (G : Type) [Group G] [Finite G]. The notebook's parenthetical example (x^{-1} expressible in xy on every finite group) is proved in the file as a `category test` theorem `expressible_inv_of_finite`, confirming the definition captures G-dependent derivations; the remark about a fixed finite group is not formalized (stated fact)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.25».parts.a": "/--\nDoes there exist an algorithm which decides by a word $B$ whether it is a Schaeffer word on\nevery group?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.a : answer(sorry) ↔\n    ComputablePred fun B : Word =>\n      ∀ (G : Type) [Group G], IsSchaefferWordOn G (FreeGroup.mk B) := by\n  sorry",
+    "kourovka.«7.25».parts.b": "/--\nDoes there exist an algorithm which decides by a list of words $B_1, \\ldots, B_n$ whether it is\nfunctionally complete on every group?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.b : answer(sorry) ↔\n    ComputablePred fun L : List Word =>\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G (FreeGroup.mk '' {B | B ∈ L}) := by\n  sorry",
+    "kourovka.«7.25».parts.c": "/--\nDoes there exist an algorithm which decides by words $A, B_1, \\ldots, B_n$ whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every group?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.c : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G],\n        Expressible G (FreeGroup.mk '' {B | B ∈ p.2}) (FreeGroup.mk p.1) := by\n  sorry",
+    "kourovka.«7.25».parts.d": "/--\nDoes there exist an algorithm which decides by words $A, B_1, \\ldots, B_n$ whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every finite group?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.d : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G] [Finite G],\n        Expressible G (FreeGroup.mk '' {B | B ∈ p.2}) (FreeGroup.mk p.1) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.25\n\nby A. V. Kuznetsov\n\nThis problem asks whether several properties concerning the composition of word\noperations are decidable, either uniformly over all groups or uniformly over all\nfinite groups.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.25»\n\n/-- A word in countably many variables is a finite list of signed variable indices.\nThe sign `true` denotes a positive occurrence and `false` an inverse occurrence. -/\nabbrev Word := List (ℕ × Bool)\n\nnamespace Word\n\n/-- The inverse of a word, obtained by reversing it and changing every sign. -/\ndef inv (w : Word) : Word :=\n  w.reverse.map fun letter ↦ (letter.1, !letter.2)\n\n/-- Evaluation of a word as a word operation on a group. -/\ndef eval {G : Type*} [Group G] (w : Word) (x : ℕ → G) : G :=\n  (w.map fun letter ↦ if letter.2 then x letter.1 else (x letter.1)⁻¹).prod\n\n/-- Simultaneous substitution of a word for each variable in a word. -/\ndef subst (w : Word) (σ : ℕ → Word) : Word :=\n  w.flatMap fun letter ↦ if letter.2 then σ letter.1 else (σ letter.1).inv\n\nend Word\n\n/-- `ExpressibleOn G bases target` means that `target` can be obtained on `G` from\n`bases` and variables by finitely many substitutions and replacements by word\noperations identical on `G`. -/\ninductive ExpressibleOn (G : Type*) [Group G] (bases : List Word) : Word → Prop\n  | variable (i : ℕ) : ExpressibleOn G bases [(i, true)]\n  | basic {w : Word} (hw : w ∈ bases) : ExpressibleOn G bases w\n  | replace {u v : Word} (hu : ExpressibleOn G bases u)\n      (h : ∀ x : ℕ → G, u.eval x = v.eval x) : ExpressibleOn G bases v\n  | subst {w : Word} (hw : ExpressibleOn G bases w) (σ : ℕ → Word)\n      (hσ : ∀ i ∈ w.map Prod.fst, ExpressibleOn G bases (σ i)) :\n      ExpressibleOn G bases (w.subst σ)\n\n/-- A list of words is functionally complete on a group if every word is\nexpressible in that list on the group. -/\ndef IsFunctionallyCompleteOn (G : Type*) [Group G] (bases : List Word) : Prop :=\n  ∀ w : Word, ExpressibleOn G bases w\n\n/-- A Schaeffer word on a group is a single word in which every word is\nexpressible on that group. -/\ndef IsSchaefferOn (G : Type*) [Group G] (w : Word) : Prop :=\n  IsFunctionallyCompleteOn G [w]\n\nnamespace parts\n\n/--\nDoes there exist an algorithm which decides, from a word $B$, whether $B$ is a\nSchaeffer word on every group? Here the expressibility construction and the\nidentities used in it may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem a : answer(sorry) ↔ ComputablePred (fun B : Word ↦\n    ∀ (G : Type) [Group G], IsSchaefferOn G B) := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, from a finite list of words,\nwhether the list is functionally complete on every group? The construction may\ndepend on the group.\n-/\n@[category research open, AMS 20]\ntheorem b : answer(sorry) ↔ ComputablePred (fun bases : List Word ↦\n    ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G bases) := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, from words $A,B_1,\\ldots,B_n$ for\narbitrary $n \\geq 0$, whether $A$ is expressible in $B_1,\\ldots,B_n$ on every\ngroup? The finite construction witnessing expressibility may depend on the\ngroup.\n-/\n@[category research open, AMS 20]\ntheorem c : answer(sorry) ↔ ComputablePred (fun input : Word × List Word ↦\n    ∀ (G : Type) [Group G], ExpressibleOn G input.2 input.1) := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, from words $A,B_1,\\ldots,B_n$ for\narbitrary $n \\geq 0$, whether $A$ is expressible in $B_1,\\ldots,B_n$ on every\nfinite group? The finite construction may depend on the finite group.\n-/\n@[category research open, AMS 20]\ntheorem d : answer(sorry) ↔ ComputablePred (fun input : Word × List Word ↦\n    ∀ (G : Type) [Group G] [Fintype G], ExpressibleOn G input.2 input.1) := by\n  sorry\n\nend parts\n\nend Kourovka.«7.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Words are encoded as finite lists of natural-numbered variables with Boolean signs. This gives the algorithmic inputs canonical Mathlib `Primcodable` instances; freely reducible spellings remain separate encodings but are identified by the semantic replacement rule, so the predicates are invariant under free reduction.",
+    "Expressibility is the inductively generated closure of variables and the supplied finite list under semantic replacement on the fixed group and simultaneous word substitution. Only variables occurring in the finite outer word must have expressible substitutions, ensuring each derivation represents finitely many constructions.",
+    "Identity on a group means equality after every assignment of the countable variables into that group.",
+    "The quantifier over groups is outside `ExpressibleOn`, allowing derivations and identity replacements to depend on the group as required.",
+    "Part (d) is modeled as the finite-group analogue of part (c), following the fixed decomposition table. Finiteness is represented by a `Fintype` instance.",
+    "Inputs for parts (c) and (d) are pairs of a target word and an arbitrary finite list of basis words, so the case n = 0 is included."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `FreeGroup ℕ`; it captures words modulo free reduction but has no available `Primcodable` instance needed by `ComputablePred`.",
+     "name": "Kourovka.«7.25».Word",
+     "why_needed": "Provides a computably coded type for finite words over the countable signed alphabet."
+    },
+    {
+     "closest_existing_considered": "Group inversion on `FreeGroup`; unsuitable for the chosen raw computable word encoding.",
+     "name": "Kourovka.«7.25».Word.inv",
+     "why_needed": "Defines syntactic inversion needed when substituting into a negative letter."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`; applicable to quotient free-group words rather than the raw computable encoding.",
+     "name": "Kourovka.«7.25».Word.eval",
+     "why_needed": "Interprets a raw signed word as an operation on an arbitrary group, enabling group-dependent identical equality."
+    },
+    {
+     "closest_existing_considered": "The `Monad FreeGroup` bind operation; unsuitable for raw words and their direct computable encoding.",
+     "name": "Kourovka.«7.25».Word.subst",
+     "why_needed": "Defines simultaneous substitution of words for countably indexed variables."
+    },
+    {
+     "closest_existing_considered": "Universal-algebra term operations/clones and `FreeGroup`; neither supplied the stated group-dependent expressibility relation.",
+     "name": "Kourovka.«7.25».ExpressibleOn",
+     "why_needed": "No Mathlib or repository primitive captures Kuznetsov's finite closure under substitutions and replacements by operations identical on a fixed group."
+    },
+    {
+     "closest_existing_considered": "No matching Mathlib or repository definition was found.",
+     "name": "Kourovka.«7.25».IsFunctionallyCompleteOn",
+     "why_needed": "Names the source's property that every word is expressible from a finite list on a group."
+    },
+    {
+     "closest_existing_considered": "No matching Mathlib or repository definition was found.",
+     "name": "Kourovka.«7.25».IsSchaefferOn",
+     "why_needed": "Names functional completeness for the singleton list generated by one word."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.25».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.d": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.25».parts.a": "/--\nDoes there exist an algorithm which decides, from a word $B$, whether $B$ is a\nSchaeffer word on every group? Here the expressibility construction and the\nidentities used in it may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem a : answer(sorry) ↔ ComputablePred (fun B : Word ↦\n    ∀ (G : Type) [Group G], IsSchaefferOn G B) := by\n  sorry",
+    "kourovka.«7.25».parts.b": "/--\nDoes there exist an algorithm which decides, from a finite list of words,\nwhether the list is functionally complete on every group? The construction may\ndepend on the group.\n-/\n@[category research open, AMS 20]\ntheorem b : answer(sorry) ↔ ComputablePred (fun bases : List Word ↦\n    ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G bases) := by\n  sorry",
+    "kourovka.«7.25».parts.c": "/--\nDoes there exist an algorithm which decides, from words $A,B_1,\\ldots,B_n$ for\narbitrary $n \\geq 0$, whether $A$ is expressible in $B_1,\\ldots,B_n$ on every\ngroup? The finite construction witnessing expressibility may depend on the\ngroup.\n-/\n@[category research open, AMS 20]\ntheorem c : answer(sorry) ↔ ComputablePred (fun input : Word × List Word ↦\n    ∀ (G : Type) [Group G], ExpressibleOn G input.2 input.1) := by\n  sorry",
+    "kourovka.«7.25».parts.d": "/--\nDoes there exist an algorithm which decides, from words $A,B_1,\\ldots,B_n$ for\narbitrary $n \\geq 0$, whether $A$ is expressible in $B_1,\\ldots,B_n$ on every\nfinite group? The finite construction may depend on the finite group.\n-/\n@[category research open, AMS 20]\ntheorem d : answer(sorry) ↔ ComputablePred (fun input : Word × List Word ↦\n    ∀ (G : Type) [Group G] [Fintype G], ExpressibleOn G input.2 input.1) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.25\n\nby A. V. Kuznetsov\n\nFor words in countably many variables, this problem asks whether several\nproperties concerning generation by substitution and group identities are\ndecidable. Parts (a)--(c) concern every group, while part (d) concerns every\nfinite group.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46),\nproblem 7.25.\n-/\n\nnamespace Kourovka.«7.25»\n\n/-- A word in the variables $x_0,x_1,\\ldots$. The Boolean records whether a\nletter occurs with exponent $1$ or $-1$. -/\nabbrev Word := List (ℕ × Bool)\n\n/-- Two words are identically equal on a group $G$ if they have the same value\nunder every assignment of their variables in $G$. -/\ndef IdenticallyEqualOn (G : Type*) [Group G] (u v : FreeGroup ℕ) : Prop :=\n  ∀ f : ℕ → G, FreeGroup.lift f u = FreeGroup.lift f v\n\n/-- `ExpressibleOn G basis w` means that the word `w` can be constructed from\n`basis` and variables by finitely many substitutions of one constructed word\nfor a variable and replacements by words identically equal on $G$.\n\nWords are represented in freely reduced form by `FreeGroup ℕ`. In the\n`substitute` constructor, `FreeGroup.lift (Function.update FreeGroup.of i v) u`\nis the result of substituting `v` for the variable `i` in `u`. -/\ninductive ExpressibleOn (G : Type*) [Group G] (basis : List (FreeGroup ℕ)) :\n    FreeGroup ℕ → Prop\n  | variable (i : ℕ) : ExpressibleOn G basis (FreeGroup.of i)\n  | basis {w : FreeGroup ℕ} (hw : w ∈ basis) : ExpressibleOn G basis w\n  | substitute {u v : FreeGroup ℕ} (i : ℕ)\n      (hu : ExpressibleOn G basis u) (hv : ExpressibleOn G basis v) :\n      ExpressibleOn G basis\n        (FreeGroup.lift (Function.update FreeGroup.of i v) u)\n  | replace {u v : FreeGroup ℕ} (hu : ExpressibleOn G basis u)\n      (h : IdenticallyEqualOn G u v) : ExpressibleOn G basis v\n\n/-- A finite list of words is functionally complete on $G$ if every group word\nis expressible from that list on $G$. -/\ndef FunctionallyCompleteOn (G : Type*) [Group G] (basis : List Word) : Prop :=\n  ∀ w : FreeGroup ℕ, ExpressibleOn G (basis.map FreeGroup.mk) w\n\n/-- A Schaeffer word on $G$ is a one-word functionally complete list on $G$. -/\ndef IsSchaefferOn (G : Type*) [Group G] (w : Word) : Prop :=\n  FunctionallyCompleteOn G [w]\n\nnamespace parts\n\n/--\nDoes there exist an algorithm which, given a word $B$, decides whether $B$ is\na Schaeffer word on every group? For each group separately, every word must be\nconstructible from $B$ and variables by finitely many substitutions and\nreplacements using identities valid on that group.\n-/\n@[category research open, AMS 20]\ntheorem a : answer(sorry) ↔\n    ComputablePred (fun B : Word => ∀ (G : Type) [Group G], IsSchaefferOn G B) := by\n  sorry\n\n/--\nDoes there exist an algorithm which, given a finite list of words, decides\nwhether it is functionally complete on every group? The expression witnessing\ncompleteness may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem b : answer(sorry) ↔\n    ComputablePred\n      (fun basis : List Word => ∀ (G : Type) [Group G], FunctionallyCompleteOn G basis) := by\n  sorry\n\n/--\nDoes there exist an algorithm which, given a word $A$ and an arbitrary finite\nlist $B_1,\\ldots,B_n$ (including the empty list), decides whether $A$ is\nexpressible in that list on every group? The finite construction and the group\nidentities used in it may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem c : answer(sorry) ↔\n    ComputablePred (fun input : Word × List Word =>\n      ∀ (G : Type) [Group G],\n        ExpressibleOn G (input.2.map FreeGroup.mk) (FreeGroup.mk input.1)) := by\n  sorry\n\n/--\nDoes there exist an algorithm which, given a word $A$ and an arbitrary finite\nlist $B_1,\\ldots,B_n$, decides whether $A$ is expressible in that list on every\nfinite group? The construction may depend on the finite group; no single\nuniform expression is required.\n-/\n@[category research open, AMS 20]\ntheorem d : answer(sorry) ↔\n    ComputablePred (fun input : Word × List Word =>\n      ∀ (G : Type) [Group G] [Finite G],\n        ExpressibleOn G (input.2.map FreeGroup.mk) (FreeGroup.mk input.1)) := by\n  sorry\n\nend parts\n\nend Kourovka.«7.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Algorithm inputs are raw finite words `List (ℕ × Bool)`, with `true` interpreted by `FreeGroup.mk` as exponent +1 and `false` as exponent -1. Internally, words are elements of `FreeGroup ℕ`, so free reductions are automatically identified. This raw input representation supplies the `Primcodable` instances required by `ComputablePred`.",
+    "Expressibility is an inductively generated predicate. Its constructors introduce variables and basis words, substitute one already constructed word for one variable in another already constructed word, and replace a constructed word by a word with the same evaluation under every assignment in the fixed group. One substitution per constructor ensures that derivations represent finitely many substitutions.",
+    "The quantifier over groups is outside `ExpressibleOn` in all four questions. Thus the finite derivation and identities used may vary with the group.",
+    "Part (c) takes `Word × List Word`, thereby allowing arbitrary finite lists, including the empty list.",
+    "Part (d) is formalized as the finite-group analogue of part (c), not as additional finite-group analogues of parts (a) and (b). `Finite G` is used rather than selecting a uniform `Fintype` structure."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FreeGroup ℕ` faithfully models words modulo free reduction, but Mathlib provides only a `Countable` instance in the searched API, not the `Primcodable` instance required by `ComputablePred`; raw lists are the natural algorithm input.",
+     "name": "Kourovka.«7.25».Word",
+     "why_needed": "Provides the finite, computably coded input syntax of words required to state algorithmic decidability."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift` provides evaluation, but no searched Mathlib or repository predicate states equality under every variable assignment in one group.",
+     "name": "Kourovka.«7.25».IdenticallyEqualOn",
+     "why_needed": "Expressibility explicitly permits replacement by a word inducing the same operation on a fixed group."
+    },
+    {
+     "closest_existing_considered": "Mathlib has free-group substitution through `FreeGroup.lift` and first-order term substitution, but the search found no clone/term-operation closure modulo the identities of a fixed group.",
+     "name": "Kourovka.«7.25».ExpressibleOn",
+     "why_needed": "The source defines a problem-specific finite closure under variables, basis words, substitutions, and identities valid on a fixed group."
+    },
+    {
+     "closest_existing_considered": "No corresponding universal-algebra or group-word functional-completeness predicate was found.",
+     "name": "Kourovka.«7.25».FunctionallyCompleteOn",
+     "why_needed": "Names the source's property that every word is expressible from a finite list on a fixed group."
+    },
+    {
+     "closest_existing_considered": "No Schaeffer-word definition was found; this is defined directly as singleton functional completeness.",
+     "name": "Kourovka.«7.25».IsSchaefferOn",
+     "why_needed": "Names the source's one-word specialization of functional completeness."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.25».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.d": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.25».parts.a": "/--\nDoes there exist an algorithm which, given a word $B$, decides whether $B$ is\na Schaeffer word on every group? For each group separately, every word must be\nconstructible from $B$ and variables by finitely many substitutions and\nreplacements using identities valid on that group.\n-/\n@[category research open, AMS 20]\ntheorem a : answer(sorry) ↔\n    ComputablePred (fun B : Word => ∀ (G : Type) [Group G], IsSchaefferOn G B) := by\n  sorry",
+    "kourovka.«7.25».parts.b": "/--\nDoes there exist an algorithm which, given a finite list of words, decides\nwhether it is functionally complete on every group? The expression witnessing\ncompleteness may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem b : answer(sorry) ↔\n    ComputablePred\n      (fun basis : List Word => ∀ (G : Type) [Group G], FunctionallyCompleteOn G basis) := by\n  sorry",
+    "kourovka.«7.25».parts.c": "/--\nDoes there exist an algorithm which, given a word $A$ and an arbitrary finite\nlist $B_1,\\ldots,B_n$ (including the empty list), decides whether $A$ is\nexpressible in that list on every group? The finite construction and the group\nidentities used in it may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem c : answer(sorry) ↔\n    ComputablePred (fun input : Word × List Word =>\n      ∀ (G : Type) [Group G],\n        ExpressibleOn G (input.2.map FreeGroup.mk) (FreeGroup.mk input.1)) := by\n  sorry",
+    "kourovka.«7.25».parts.d": "/--\nDoes there exist an algorithm which, given a word $A$ and an arbitrary finite\nlist $B_1,\\ldots,B_n$, decides whether $A$ is expressible in that list on every\nfinite group? The construction may depend on the finite group; no single\nuniform expression is required.\n-/\n@[category research open, AMS 20]\ntheorem d : answer(sorry) ↔\n    ComputablePred (fun input : Word × List Word =>\n      ∀ (G : Type) [Group G] [Finite G],\n        ExpressibleOn G (input.2.map FreeGroup.mk) (FreeGroup.mk input.1)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.25\n\nby A. V. Kuznetsov\n\nA group word is viewed as an operation on a group. A word is expressible in a\nlist of words on a group if it can be constructed from that list and the\nvariables by finitely many substitutions and replacements by words defining\nthe same operation on the group. The problem asks whether several resulting\nproperties of finite lists of words are decidable, either on every group or on\nevery finite group.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46),\nProblem 7.25.\n-/\n\nnamespace Kourovka.«7.25»\n\n/-- A word in countably many group variables. In a letter `(i, inverse)`, the\nBoolean records whether the variable with index $i$ occurs inversely. -/\nabbrev Word := List (ℕ × Bool)\n\n/-- The inverse of a group word, obtained by reversing the word and changing\nthe sign of every letter. -/\ndef Word.inv (w : Word) : Word :=\n  w.reverse.map fun (i, inverse) ↦ (i, !inverse)\n\n/-- Substitute the word `v` for the variable `x` in `w`. Inverse occurrences\nof `x` are replaced by the inverse word. -/\ndef Word.substitute (w : Word) (x : ℕ) (v : Word) : Word :=\n  w.flatMap fun letter@(i, inverse) ↦\n    if i = x then if inverse then v.inv else v else [letter]\n\n/-- Evaluation of a word under an assignment of its variables to elements of\na group. -/\ndef Word.eval {G : Type*} [Group G] (assignment : ℕ → G) : Word → G\n  | [] => 1\n  | (i, inverse) :: w =>\n      (if inverse then (assignment i)⁻¹ else assignment i) * Word.eval assignment w\n\n/-- Two words are identically equal on `G` if they induce the same operation\non `G` for every assignment of their variables. -/\ndef IdenticallyEqualOn (G : Type*) [Group G] (u v : Word) : Prop :=\n  ∀ assignment : ℕ → G, u.eval assignment = v.eval assignment\n\n/-- The words expressible in `basis` on `G`: the finite closure of the basis\nand the variables under substitution of one constructed word into another and\nreplacement by a word identically equal on `G`. -/\ninductive ExpressibleOn (G : Type*) [Group G] (basis : List Word) : Word → Prop\n  | of_mem {w : Word} (hw : w ∈ basis) : ExpressibleOn G basis w\n  | variable (i : ℕ) : ExpressibleOn G basis [(i, false)]\n  | substitute {w v : Word} (i : ℕ) (hw : ExpressibleOn G basis w)\n      (hv : ExpressibleOn G basis v) : ExpressibleOn G basis (w.substitute i v)\n  | replace {u v : Word} (hu : ExpressibleOn G basis u)\n      (huv : IdenticallyEqualOn G u v) : ExpressibleOn G basis v\n\n/-- A list of words is functionally complete on `G` if every group word is\nexpressible in that list on `G`. -/\ndef IsFunctionallyCompleteOn (G : Type*) [Group G] (basis : List Word) : Prop :=\n  ∀ w : Word, ExpressibleOn G basis w\n\n/-- A Schaeffer word on `G` is a one-element functionally complete list. -/\ndef IsSchaefferOn (G : Type*) [Group G] (w : Word) : Prop :=\n  IsFunctionallyCompleteOn G [w]\n\nnamespace parts\n\n/--\nDoes there exist an algorithm which, given a word $B$, decides whether $B$ is\na Schaeffer word on every group? Here the expressibility construction, and the\nidentities used in it, may depend on the group.\n-/\n@[category research open, AMS 20 68]\ntheorem a : answer(sorry) ↔\n    ComputablePred (fun B : Word ↦ ∀ (G : Type) [Group G], IsSchaefferOn G B) := by\n  sorry\n\n/--\nDoes there exist an algorithm which, given a finite list of words, decides\nwhether it is functionally complete on every group? The construction witnessing\nfunctional completeness may depend on the group.\n-/\n@[category research open, AMS 20 68]\ntheorem b : answer(sorry) ↔\n    ComputablePred (fun basis : List Word ↦\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G basis) := by\n  sorry\n\n/--\nDoes there exist an algorithm which, given a word $A$ and an arbitrary finite\nlist $B_1,\\ldots,B_n$ (including the case $n=0$), decides whether $A$ is\nexpressible in that list on every group? The finite construction witnessing\nexpressibility may depend on the group.\n-/\n@[category research open, AMS 20 68]\ntheorem c : answer(sorry) ↔\n    ComputablePred (fun input : Word × List Word ↦\n      ∀ (G : Type) [Group G], ExpressibleOn G input.2 input.1) := by\n  sorry\n\n/--\nDoes there exist an algorithm which, given a word $A$ and an arbitrary finite\nlist $B_1,\\ldots,B_n$ (including the case $n=0$), decides whether $A$ is\nexpressible in that list on every finite group? The group-dependent construction\nis not required to be uniform across the finite groups.\n-/\n@[category research open, AMS 20 68]\ntheorem d : answer(sorry) ↔\n    ComputablePred (fun input : Word × List Word ↦\n      ∀ (G : Type) [Group G] [Finite G], ExpressibleOn G input.2 input.1) := by\n  sorry\n\nend parts\n\nend Kourovka.«7.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Words are represented by raw finite lists of signed natural-numbered variables, `List (ℕ × Bool)`. This gives the countable alphabet a `Primcodable` representation suitable for `ComputablePred`; semantic equality makes the stated properties invariant under free reduction.",
+    "Expressibility is the inductively generated finite closure of the supplied words and positive variable words under substitution of one constructed word for a variable in another and replacement by a semantically identical word on the chosen group.",
+    "Identical equality on a group quantifies over all assignments `ℕ → G`, so it compares the induced word operations rather than merely syntactic words.",
+    "The universal group quantifier is inside each tested predicate but outside `ExpressibleOn`, allowing derivations and identities to depend on the group.",
+    "Part (d) is read as the finite-group analogue of part (c), as specified by the decomposition table; `[Finite G]` expresses finiteness without adding enumeration data.",
+    "Arbitrary finite lists in parts (c) and (d) are encoded as `List Word`, including the empty list."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `FreeGroup ℕ` is the quotient of the same signed-list syntax, but it does not provide the direct `Primcodable` input representation needed here.",
+     "name": "Kourovka.«7.25».Word",
+     "why_needed": "Provides a computably coded syntax for finite words over the countable signed alphabet."
+    },
+    {
+     "closest_existing_considered": "Group inversion on `FreeGroup`, which would move the algorithmic input to a quotient.",
+     "name": "Kourovka.«7.25».Word.inv",
+     "why_needed": "Defines syntactic inversion needed when substituting into an inverse occurrence of a variable."
+    },
+    {
+     "closest_existing_considered": "No applicable group-word substitution operation was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«7.25».Word.substitute",
+     "why_needed": "Formalizes substitution of one group word for a variable in another."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift` gives equivalent semantics on quotient words, but the raw-word evaluator preserves the computable input syntax.",
+     "name": "Kourovka.«7.25».Word.eval",
+     "why_needed": "Interprets a syntactic word as an operation on an arbitrary group."
+    },
+    {
+     "closest_existing_considered": "No existing predicate for equality of group-word operations on a fixed group was found.",
+     "name": "Kourovka.«7.25».IdenticallyEqualOn",
+     "why_needed": "Captures replacement by another word that is identically equal on the particular group."
+    },
+    {
+     "closest_existing_considered": "No universal-algebra clone or term-operation closure matching this definition was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«7.25».ExpressibleOn",
+     "why_needed": "Captures finite construction from variables and a basis by substitutions and group-dependent identity replacements."
+    },
+    {
+     "closest_existing_considered": "No existing functional-completeness predicate for group words was found.",
+     "name": "Kourovka.«7.25».IsFunctionallyCompleteOn",
+     "why_needed": "Names the notebook's predicate that every word is expressible from a finite list on a group."
+    },
+    {
+     "closest_existing_considered": "No existing Schaeffer-word predicate was found.",
+     "name": "Kourovka.«7.25».IsSchaefferOn",
+     "why_needed": "Names functional completeness for a singleton list, matching the notebook's Schaeffer-word terminology."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.25».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.d": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.25».parts.a": "/--\nDoes there exist an algorithm which, given a word $B$, decides whether $B$ is\na Schaeffer word on every group? Here the expressibility construction, and the\nidentities used in it, may depend on the group.\n-/\n@[category research open, AMS 20 68]\ntheorem a : answer(sorry) ↔\n    ComputablePred (fun B : Word ↦ ∀ (G : Type) [Group G], IsSchaefferOn G B) := by\n  sorry",
+    "kourovka.«7.25».parts.b": "/--\nDoes there exist an algorithm which, given a finite list of words, decides\nwhether it is functionally complete on every group? The construction witnessing\nfunctional completeness may depend on the group.\n-/\n@[category research open, AMS 20 68]\ntheorem b : answer(sorry) ↔\n    ComputablePred (fun basis : List Word ↦\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G basis) := by\n  sorry",
+    "kourovka.«7.25».parts.c": "/--\nDoes there exist an algorithm which, given a word $A$ and an arbitrary finite\nlist $B_1,\\ldots,B_n$ (including the case $n=0$), decides whether $A$ is\nexpressible in that list on every group? The finite construction witnessing\nexpressibility may depend on the group.\n-/\n@[category research open, AMS 20 68]\ntheorem c : answer(sorry) ↔\n    ComputablePred (fun input : Word × List Word ↦\n      ∀ (G : Type) [Group G], ExpressibleOn G input.2 input.1) := by\n  sorry",
+    "kourovka.«7.25».parts.d": "/--\nDoes there exist an algorithm which, given a word $A$ and an arbitrary finite\nlist $B_1,\\ldots,B_n$ (including the case $n=0$), decides whether $A$ is\nexpressible in that list on every finite group? The group-dependent construction\nis not required to be uniform across the finite groups.\n-/\n@[category research open, AMS 20 68]\ntheorem d : answer(sorry) ↔\n    ComputablePred (fun input : Word × List Word ↦\n      ∀ (G : Type) [Group G] [Finite G], ExpressibleOn G input.2 input.1) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.25\n\nby A. V. Kuznetsov\n\nWe associate with words in the alphabet $x, x^{-1}, y, y^{-1}, z, z^{-1}, \\ldots$ operations\nwhich are understood as functions in the variables $x, y, z, \\ldots$. We say that a word $A$\n*is expressible in words $B_1, \\ldots, B_n$ on the group $G$* if $A$ can be constructed from\nthe words $B_1, \\ldots, B_n$ and variables by means of finitely many substitutions of words one\ninto another and replacements of a word by another word which is identically equal to it on\n$G$. A list of words is said to be *functionally complete on $G$* if every word can be\nexpressed on $G$ in words from this list. A word $B$ is called a *Schaeffer word on $G$* if\nevery word can be expressed on $G$ in $B$. Does there exist an algorithm which decides\n\na) by a word $B$, whether it is a Schaeffer word on every group? (Examples of such words\nare $xy^{-1}$, $x^{-1}y^2z$, $x^{-1}y^{-1}zx$.)\n\nb) by a list of words, whether it is functionally complete on every group?\n\nc) by words $A, B_1, \\ldots, B_n$, whether $A$ is expressible in $B_1, \\ldots, B_n$ on every\ngroup?\n\nd) the same for every finite group? (For finite groups, for example, $x^{-1}$ is\nexpressible in $xy$.) For a fixed finite group an algorithm exists.\n\nIn this file the variables are $x_0, x_1, x_2, \\ldots$, indexed by `ℕ`, and a word is a list\nof letters `(i, b)`, where `(i, true)` stands for $x_i$ and `(i, false)` for $x_i^{-1}$.\n\"Expressible on every group\" means that for every group $G$ separately there is a derivation\nas above; the derivation (and the identities of $G$ that it uses) may depend on $G$.\nThe existence of an algorithm is formalised as `ComputablePred`.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.25»\n\n/-- A word in the alphabet $x_0, x_0^{-1}, x_1, x_1^{-1}, x_2, x_2^{-1}, \\ldots$: a list of\nletters `(i, b)`, where `(i, true)` is the variable $x_i$ and `(i, false)` is its inverse\n$x_i^{-1}$. -/\nabbrev Word := List (ℕ × Bool)\n\nnamespace Word\n\n/-- The one-letter word consisting of the variable $x_i$. -/\ndef var (i : ℕ) : Word := [(i, true)]\n\n/-- The operation on the group `G` associated with the word `w`: its value at an assignment\n`v` of elements of `G` to the variables is the product of the letters of `w` evaluated at `v`,\nwhere the letter `(i, true)` evaluates to `v i` and `(i, false)` to `(v i)⁻¹`. -/\ndef eval {G : Type*} [Group G] (w : Word) (v : ℕ → G) : G :=\n  FreeGroup.lift v (FreeGroup.mk w)\n\n/-- Substitution of the words `c i` for the variables $x_i$ in the word `w`: every letter\n$x_i$ of `w` is replaced by the word `c i`, and every letter $x_i^{-1}$ by the formal\ninverse `FreeGroup.invRev (c i)` of that word. -/\ndef subst (c : ℕ → Word) (w : Word) : Word :=\n  w.flatMap fun l => if l.2 then c l.1 else FreeGroup.invRev (c l.1)\n\nend Word\n\n/-- Two words are *identically equal on the group `G`* if they define the same operation\non `G`, i.e. they take the same value at every assignment of the variables in `G`. -/\ndef IdenticallyEqualOn (G : Type*) [Group G] (w w' : Word) : Prop :=\n  ∀ v : ℕ → G, w.eval v = w'.eval v\n\n/-- `IsExpressibleOn G Bs A` means that the word `A` *is expressible in the words `Bs` on the\ngroup `G`*: `A` can be constructed from the words in `Bs` and the variables by finitely many\nsubstitutions of words one into another and replacements of a word by another word which is\nidentically equal to it on `G`. -/\ninductive IsExpressibleOn (G : Type*) [Group G] (Bs : List Word) : Word → Prop\n  /-- Every variable $x_i$ is expressible. -/\n  | var (i : ℕ) : IsExpressibleOn G Bs (Word.var i)\n  /-- Every word of the list `Bs` is expressible. -/\n  | base {B : Word} (hB : B ∈ Bs) : IsExpressibleOn G Bs B\n  /-- Substituting expressible words into an expressible word gives an expressible word. -/\n  | subst {w : Word} {c : ℕ → Word} (hw : IsExpressibleOn G Bs w)\n      (hc : ∀ i, IsExpressibleOn G Bs (c i)) : IsExpressibleOn G Bs (w.subst c)\n  /-- A word identically equal on `G` to an expressible word is expressible. -/\n  | congr {w w' : Word} (hw : IsExpressibleOn G Bs w) (h : IdenticallyEqualOn G w w') :\n      IsExpressibleOn G Bs w'\n\n/-- A list of words `Bs` is *functionally complete on the group `G`* if every word is\nexpressible in the words of `Bs` on `G`. -/\ndef IsFunctionallyCompleteOn (G : Type*) [Group G] (Bs : List Word) : Prop :=\n  ∀ A : Word, IsExpressibleOn G Bs A\n\n/-- A word `B` is a *Schaeffer word on the group `G`* if every word is expressible in `B`\non `G`. -/\ndef IsSchaefferWordOn (G : Type*) [Group G] (B : Word) : Prop :=\n  IsFunctionallyCompleteOn G [B]\n\n/-- The word $xy^{-1}$ (with $x = x_0$, $y = x_1$) defines the operation\n$(x, y) \\mapsto xy^{-1}$. -/\n@[category test, AMS 3 20]\ntheorem eval_example {G : Type*} [Group G] (v : ℕ → G) :\n    Word.eval [(0, true), (1, false)] v = v 0 * (v 1)⁻¹ := by\n  simp [Word.eval, FreeGroup.lift_mk]\n\n/-- The word $x^{-1}$ is expressible in $xy^{-1}$ on every group: substituting $x$ for $y$\ngives $xx^{-1}$, which is identically equal to the empty word $1$; substituting $1$ for $x$\nand $x$ for $y$ in $xy^{-1}$ gives $x^{-1}$. -/\n@[category test, AMS 3 20]\ntheorem isExpressibleOn_inv_example (G : Type*) [Group G] :\n    IsExpressibleOn G [[(0, true), (1, false)]] [(0, false)] := by\n  have h₁ : IsExpressibleOn G [[(0, true), (1, false)]] [(0, true), (0, false)] :=\n    .subst (w := [(0, true), (1, false)]) (c := fun _ => Word.var 0) (.base (by simp))\n      (fun _ => .var 0)\n  have h₂ : IsExpressibleOn G [[(0, true), (1, false)]] [] :=\n    .congr h₁ (fun v => by simp [Word.eval, FreeGroup.lift_mk])\n  exact .subst (w := [(0, true), (1, false)]) (c := fun i => if i = 0 then [] else Word.var 0)\n    (.base (by simp)) (fun i => by\n      dsimp only\n      split\n      · exact h₂\n      · exact .var 0)\n\n/--\nDoes there exist an algorithm which decides, by a word $B$, whether it is a Schaeffer word\non every group?\n\nExamples of words that are Schaeffer words on every group: $xy^{-1}$, $x^{-1}y^2z$,\n$x^{-1}y^{-1}zx$.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.a : answer(sorry) ↔\n    ComputablePred fun B : Word => ∀ (G : Type) [Group G], IsSchaefferWordOn G B := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, by a list of words $B_1, \\ldots, B_n$, whether it\nis functionally complete on every group?\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.b : answer(sorry) ↔\n    ComputablePred fun Bs : List Word =>\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G Bs := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, by words $A, B_1, \\ldots, B_n$, whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every group?\n\nThe input is the pair `(A, [B₁, …, Bₙ])`; the list may be empty.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.c : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G], IsExpressibleOn G p.2 p.1 := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, by words $A, B_1, \\ldots, B_n$, whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every finite group?\n\nThis is \"the same for every finite group\" of the notebook, read as the finite-group analogue\nof part c). For finite groups, for example, $x^{-1}$ is expressible in $xy$ (on a finite\ngroup $G$ one has $x^{-1} = x^{|G| - 1}$, so the derivation depends on $G$).\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.d : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G] [Finite G], IsExpressibleOn G p.2 p.1 := by\n  sorry\n\nend Kourovka.«7.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. I agree with reading d) as the finite-group analogue of c). One observation only: since functional completeness on G is equivalent to expressibility of the finitely many basic words (x^{-1} and xy) — and with G-dependent derivations, 'complete on every group' is still a single instance of c) via the pair of inputs — parts a) and b) are formally reducible to c); the table already notes this and the parts are stated co-equally as posed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Words are raw words `List (ℕ × Bool)` over countably many variables x_0, x_1, … (indexed by ℕ), with (i,true) = x_i and (i,false) = x_i^{-1}, matching Mathlib's `FreeGroup.mk` convention. Free reduction is not built in; it is subsumed by the `congr` rule since freely equal words are identically equal on every group.",
+    "Substitution is simultaneous: `subst` replaces every variable x_i by `c i` for a family `c : ℕ → Word` all of whose members are expressible. This is equivalent to finitely many single substitutions of one word into another because variables (hence renamings) are always expressible and a word involves finitely many variables.",
+    "Replacement by an identically equal word is applied to the whole word (`congr`); replacing a subword by an identically equal one yields an identically equal whole word, so nothing is lost.",
+    "'On every group' is `∀ (G : Type) [Group G]`, quantified outside `IsExpressibleOn`, so the derivation and identities may depend on G (as the notes require and as the x^{-1}-in-xy example for finite groups confirms). Restricting G to universe `Type` is harmless: expressibility on G depends only on the identities of G, and every variety of groups is generated by a countable (Type-0) group.",
+    "Existence of an algorithm is formalised as `ComputablePred` on the `Primcodable` type of inputs (`Word`, `List Word`, `Word × List Word`), following FormalConjectures/Paper/BranchingVAS.lean.",
+    "In c) and d) the list of B_i may be empty (n = 0); in b) the list may be empty as well.",
+    "Part d) is read as the finite-group analogue of c) only, following the decomposition table; `[Finite G]` is used for 'finite group'.",
+    "AMS tags 3 (logic/computability) and 20 (group theory) are used for all statements.",
+    "Two `@[category test]` theorems with proofs are included as API tests of the bespoke definitions: the operation of xy^{-1}, and that x^{-1} is expressible in xy^{-1} on every group (a step toward the notebook's example that xy^{-1} is a Schaeffer word)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FreeGroup ℕ` (reduced words) — but it has no `Primcodable` instance, which `ComputablePred` needs; `List (ℕ × Bool)` is also Mathlib's own representation of free-group words (`FreeGroup.mk`).",
+     "name": "Kourovka.«7.25».Word (abbrev for List (ℕ × Bool))",
+     "why_needed": "The problem is about words in the alphabet x, x^{-1}, y, y^{-1}, …, and the decision problems need a `Primcodable` input type; `List (ℕ × Bool)` is exactly the raw words (letter (i,true) = x_i, (i,false) = x_i^{-1}) and inherits `Primcodable`."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.of` (lives in the free group, not on raw words).",
+     "name": "Kourovka.«7.25».Word.var",
+     "why_needed": "The one-letter word x_i, used for the 'variables' clause of expressibility."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift` / `FreeGroup.lift_mk` — used directly; the wrapper only fixes the interface on raw words.",
+     "name": "Kourovka.«7.25».Word.eval",
+     "why_needed": "The operation on G associated with a word: `FreeGroup.lift v (FreeGroup.mk w)`, i.e. the product of the letters evaluated at the assignment v."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`/`FreeGroup.map` into `FreeGroup ℕ` (works only on the free group, not on raw words); `FreeGroup.invRev` is reused for the formal inverse.",
+     "name": "Kourovka.«7.25».Word.subst",
+     "why_needed": "Substitution of words for variables in a raw word (letter x_i ↦ c i, letter x_i^{-1} ↦ `FreeGroup.invRev (c i)`), needed for the 'substitutions of words one into another' clause."
+    },
+    {
+     "closest_existing_considered": "No Mathlib notion of word identities of a group / equational theory of a group was found.",
+     "name": "Kourovka.«7.25».IdenticallyEqualOn",
+     "why_needed": "'Identically equal on G': two words define the same operation on G (equal at every assignment ℕ → G)."
+    },
+    {
+     "closest_existing_considered": "Clone-theoretic notions (clone generated by a set of operations) — not present in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«7.25».IsExpressibleOn (inductive Prop)",
+     "why_needed": "The notebook's notion of expressibility: closure of the given words and the variables under substitution and under replacement by G-identically-equal words. Constructors: var, base, subst, congr."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«7.25».IsFunctionallyCompleteOn",
+     "why_needed": "Every word expressible in the words of the list on G."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«7.25».IsSchaefferWordOn",
+     "why_needed": "Every word expressible in the single word B on G (the notebook's spelling 'Schaeffer' is kept)."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.25».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun B : Word => ∀ (G : Type) [Group G], IsSchaefferWordOn G B`, with `IsSchaefferWordOn G B := ∀ A, IsExpressibleOn G [B] A`. Quantifier over G is outside expressibility, as required; the listed examples are recorded in the docstring as facts, not formalized as questions."
+    },
+    "kourovka.«7.25».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as decidability (`ComputablePred`) of `fun Bs : List Word => ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G Bs`, where functional completeness is expressibility of every word in the words of the list."
+    },
+    "kourovka.«7.25».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as decidability of `fun p : Word × List Word => ∀ (G : Type) [Group G], IsExpressibleOn G p.2 p.1`; the list of B_i may be empty (n ≥ 0), and the derivation may depend on G."
+    },
+    "kourovka.«7.25».parts.d": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Read, per the decomposition table, as the finite-group analogue of c): decidability of `fun p => ∀ (G : Type) [Group G] [Finite G], IsExpressibleOn G p.2 p.1`. The reading of 'the same' is noted in the docstring."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.25».parts.a": "/--\nDoes there exist an algorithm which decides, by a word $B$, whether it is a Schaeffer word\non every group?\n\nExamples of words that are Schaeffer words on every group: $xy^{-1}$, $x^{-1}y^2z$,\n$x^{-1}y^{-1}zx$.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.a : answer(sorry) ↔\n    ComputablePred fun B : Word => ∀ (G : Type) [Group G], IsSchaefferWordOn G B := by\n  sorry",
+    "kourovka.«7.25».parts.b": "/--\nDoes there exist an algorithm which decides, by a list of words $B_1, \\ldots, B_n$, whether it\nis functionally complete on every group?\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.b : answer(sorry) ↔\n    ComputablePred fun Bs : List Word =>\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G Bs := by\n  sorry",
+    "kourovka.«7.25».parts.c": "/--\nDoes there exist an algorithm which decides, by words $A, B_1, \\ldots, B_n$, whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every group?\n\nThe input is the pair `(A, [B₁, …, Bₙ])`; the list may be empty.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.c : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G], IsExpressibleOn G p.2 p.1 := by\n  sorry",
+    "kourovka.«7.25».parts.d": "/--\nDoes there exist an algorithm which decides, by words $A, B_1, \\ldots, B_n$, whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every finite group?\n\nThis is \"the same for every finite group\" of the notebook, read as the finite-group analogue\nof part c). For finite groups, for example, $x^{-1}$ is expressible in $xy$ (on a finite\ngroup $G$ one has $x^{-1} = x^{|G| - 1}$, so the derivation depends on $G$).\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.d : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G] [Finite G], IsExpressibleOn G p.2 p.1 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.25\n\nby A. V. Kuznetsov\n\nA group word is regarded as an operation in its variables. A word is expressible\nfrom a list of words on a group if it can be obtained from the listed words and\nvariables by finitely many substitutions and by replacements with words that\ninduce the same operation on that group. The problem asks whether several\ncorresponding properties, quantified separately over all groups or all finite\ngroups, are decidable.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46),\nProblem 7.25.\n-/\n\nnamespace Kourovka.«7.25»\n\n/-- A word in countably many variables. In a letter `(i, inverse)`, the Boolean\nrecords whether the variable with index $i$ occurs with exponent $-1$ rather\nthan $1$. -/\nabbrev Word := List (ℕ × Bool)\n\n/-- The inverse of a word, as a literal word. -/\ndef Word.inverse : Word → Word :=\n  List.reverse ∘ List.map fun (i, inverse) ↦ (i, !inverse)\n\n/-- The value of a word under an assignment of its variables to a group. -/\ndef Word.eval {G : Type*} [Group G] (assignment : ℕ → G) : Word → G\n  | [] => 1\n  | (i, inverse) :: w =>\n      (if inverse then (assignment i)⁻¹ else assignment i) * Word.eval assignment w\n\n/-- Substitute the word `B` for the variable indexed by `i` in `A`. Occurrences\nof the inverse of that variable are replaced by the inverse word. -/\ndef Word.substituteAt (A : Word) (i : ℕ) (B : Word) : Word :=\n  A.flatMap fun (j, inverse) ↦\n    if j = i then if inverse then B.inverse else B else [(j, inverse)]\n\n/-- `ExpressibleOn G generators A` means that $A$ can be constructed on $G$\nfrom the listed words and variables by finitely many substitutions of words\ninto one another and replacements by words inducing identical functions on\n$G$. -/\ninductive ExpressibleOn (G : Type*) [Group G] (generators : List Word) : Word → Prop\n  | variable (i : ℕ) : ExpressibleOn G generators [(i, false)]\n  | generator {B : Word} (hB : B ∈ generators) : ExpressibleOn G generators B\n  | substitute {A B : Word} (i : ℕ) (hA : ExpressibleOn G generators A)\n      (hB : ExpressibleOn G generators B) :\n      ExpressibleOn G generators (A.substituteAt i B)\n  | replace {A C : Word} (hA : ExpressibleOn G generators A)\n      (hAC : ∀ assignment : ℕ → G, A.eval assignment = C.eval assignment) :\n      ExpressibleOn G generators C\n\n/-- A list of words is functionally complete on $G$ if every word is\nexpressible from that list on $G$. -/\ndef IsFunctionallyCompleteOn (G : Type*) [Group G] (generators : List Word) : Prop :=\n  ∀ A : Word, ExpressibleOn G generators A\n\n/-- A Schaeffer word on $G$ is a single word from which every word is\nexpressible on $G$. -/\ndef IsSchaefferOn (G : Type*) [Group G] (B : Word) : Prop :=\n  IsFunctionallyCompleteOn G [B]\n\n/--\nDoes there exist an algorithm which decides, from a word $B$, whether $B$ is a\nSchaeffer word on every group? Here the construction witnessing expressibility\nmay depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    ComputablePred fun B : Word ↦ ∀ (G : Type) [Group G], IsSchaefferOn G B := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, from a finite list of words,\nwhether that list is functionally complete on every group? Here the\nconstruction witnessing expressibility may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    ComputablePred fun generators : List Word ↦\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G generators := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, from a word $A$ and a finite list\n$B_1,\\ldots,B_n$ (allowing $n=0$), whether $A$ is expressible in those words on\nevery group? The construction and the identities used may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem parts.c : answer(sorry) ↔\n    ComputablePred fun input : Word × List Word ↦\n      ∀ (G : Type) [Group G], ExpressibleOn G input.2 input.1 := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, from a word $A$ and a finite list\n$B_1,\\ldots,B_n$ (allowing $n=0$), whether $A$ is expressible in those words on\nevery finite group? Expressibility is considered separately on each finite\ngroup, so its construction may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem parts.d : answer(sorry) ↔\n    ComputablePred fun input : Word × List Word ↦\n      ∀ (G : Type) [Group G] [Finite G], ExpressibleOn G input.2 input.1 := by\n  sorry\n\nend Kourovka.«7.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Words are literal finite lists over the countable signed alphabet, represented by `List (ℕ × Bool)`. This matches the algorithmic input and supplies the `Primcodable` instance required by `ComputablePred`; Mathlib's quotient-based `FreeGroup ℕ` does not have that instance.",
+    "Expressibility is the inductive finite closure of variables and the supplied finite list under substitution of one expressible word for one variable in another expressible word, and under replacement by words whose evaluations agree for every assignment into the chosen group.",
+    "Inverse occurrences in substitution are replaced by the literal inverse word (reverse order with every sign toggled).",
+    "The quantifier over groups is outside `ExpressibleOn` in every slot, allowing derivations and identities to depend on the group. Part (d) uses `[Finite G]` and is read as the finite-group analogue of part (c), as fixed by the decomposition.",
+    "Parts (c) and (d) encode `(A, B₁, …, Bₙ)` as `Word × List Word`, so `n = 0` is included."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FreeGroup ℕ` models freely reduced group words but is quotient-based and lacks the `Primcodable` instance required by `ComputablePred`.",
+     "name": "Word",
+     "why_needed": "Provides a literal, effectively coded syntax for finite words over countably many variables and their inverses, suitable as input to `ComputablePred`."
+    },
+    {
+     "closest_existing_considered": "Group inversion on `FreeGroup`, which is unavailable on the chosen raw syntax.",
+     "name": "Word.inverse",
+     "why_needed": "Defines the literal inverse needed when substituting into an inverse occurrence of a variable."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`; it evaluates quotient free-group elements rather than the effectively coded literal syntax used here.",
+     "name": "Word.eval",
+     "why_needed": "States when two literal words induce identical functions on a particular group."
+    },
+    {
+     "closest_existing_considered": "The `FreeGroup` monad bind formalizes simultaneous substitution on quotient words, but the quotient type is unsuitable for `ComputablePred` inputs.",
+     "name": "Word.substituteAt",
+     "why_needed": "Formalizes one finite substitution of a word into another, including inverse occurrences."
+    },
+    {
+     "closest_existing_considered": "Free-group substitution via monad bind and generic generated-closure patterns; neither includes group-dependent replacement by identical word operations.",
+     "name": "ExpressibleOn",
+     "why_needed": "No Mathlib or repository primitive captures the finite closure under word substitution and replacement by identities valid on a chosen group."
+    },
+    {
+     "closest_existing_considered": "No existing clone or functional-completeness predicate for group words was found.",
+     "name": "IsFunctionallyCompleteOn",
+     "why_needed": "Names the source's property that every word is expressible from a finite list on a group."
+    },
+    {
+     "closest_existing_considered": "No existing Schaeffer-word predicate was found.",
+     "name": "IsSchaefferOn",
+     "why_needed": "Names the singleton-list specialization of functional completeness used in part (a)."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.25».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«7.25».parts.d": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.25».parts.a": "/--\nDoes there exist an algorithm which decides, from a word $B$, whether $B$ is a\nSchaeffer word on every group? Here the construction witnessing expressibility\nmay depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    ComputablePred fun B : Word ↦ ∀ (G : Type) [Group G], IsSchaefferOn G B := by\n  sorry",
+    "kourovka.«7.25».parts.b": "/--\nDoes there exist an algorithm which decides, from a finite list of words,\nwhether that list is functionally complete on every group? Here the\nconstruction witnessing expressibility may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    ComputablePred fun generators : List Word ↦\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G generators := by\n  sorry",
+    "kourovka.«7.25».parts.c": "/--\nDoes there exist an algorithm which decides, from a word $A$ and a finite list\n$B_1,\\ldots,B_n$ (allowing $n=0$), whether $A$ is expressible in those words on\nevery group? The construction and the identities used may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem parts.c : answer(sorry) ↔\n    ComputablePred fun input : Word × List Word ↦\n      ∀ (G : Type) [Group G], ExpressibleOn G input.2 input.1 := by\n  sorry",
+    "kourovka.«7.25».parts.d": "/--\nDoes there exist an algorithm which decides, from a word $A$ and a finite list\n$B_1,\\ldots,B_n$ (allowing $n=0$), whether $A$ is expressible in those words on\nevery finite group? Expressibility is considered separately on each finite\ngroup, so its construction may depend on the group.\n-/\n@[category research open, AMS 20]\ntheorem parts.d : answer(sorry) ↔\n    ComputablePred fun input : Word × List Word ↦\n      ∀ (G : Type) [Group G] [Finite G], ExpressibleOn G input.2 input.1 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.25\n\nby A. V. Kuznetsov\n\nWe associate with words in the alphabet $x, x^{-1}, y, y^{-1}, z, z^{-1}, \\ldots$\noperations which are understood as functions in the variables $x, y, z, \\ldots$.\nA word $A$ *is expressible in words $B_1, \\ldots, B_n$ on the group $G$* if $A$ can\nbe constructed from the words $B_1, \\ldots, B_n$ and variables by means of finitely\nmany substitutions of words one into another and replacements of a word by another\nword which is identically equal to it on $G$. A list of words is *functionally\ncomplete on $G$* if every word can be expressed on $G$ in words from this list.\nA word $B$ is a *Schaeffer word on $G$* if every word can be expressed on $G$ in $B$.\n\nDoes there exist an algorithm which decides\n\na) by a word $B$, whether it is a Schaeffer word on every group? (Examples of such\n   words: $xy^{-1}$, $x^{-1}y^2z$, $x^{-1}y^{-1}zx$.)\n\nb) by a list of words, whether it is functionally complete on every group?\n\nc) by words $A, B_1, \\ldots, B_n$, whether $A$ is expressible in $B_1, \\ldots, B_n$\n   on every group?\n\nd) the same for every finite group? (For finite groups, for example, $x^{-1}$ is\n   expressible in $xy$.) For a fixed finite group an algorithm exists.\n\n## Formalisation\n\nThe variables are $x_0, x_1, x_2, \\ldots$. A word is a list of letters\n$(i, b) \\in \\mathbb{N} \\times \\{\\mathrm{true}, \\mathrm{false}\\}$, where $(i, \\mathrm{true})$\nstands for $x_i$ and $(i, \\mathrm{false})$ for $x_i^{-1}$; this is the convention of\n`FreeGroup.mk`. The operation defined by a word on a group $G$ is its evaluation at an\nassignment $\\mathbb{N} \\to G$ of the variables. Expressibility on $G$ is the inductive\nclosure described above (`ExpressibleOn`), and the phrase \"on every group\" quantifies\nover $G$ outside expressibility, so the construction of $A$ may depend on $G$. The\nexistence of an algorithm is formalised by `ComputablePred`. Part d) is read as the\nfinite-group analogue of the immediately preceding part c).\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 7.25.\n- A. V. Kuznetsov, *Matem. Issledovaniya*, Kishinëv, **6**, no. 4 (1971), 75–122 (Russian).\n- A. G. Kurosh, *Theory of Groups*, Moscow, Nauka, 1967, p. 435 (Russian).\n-/\n\nnamespace Kourovka.«7.25»\n\n/-- A word in the alphabet $x_0^{\\pm 1}, x_1^{\\pm 1}, x_2^{\\pm 1}, \\ldots$: a list of\nletters $(i, b)$, where $(i, \\mathrm{true})$ stands for $x_i$ and $(i, \\mathrm{false})$\nfor $x_i^{-1}$. -/\nabbrev Word := List (ℕ × Bool)\n\nvariable {G : Type*} [Group G]\n\n/-- The operation on $G$ defined by the word `w`: the value of `w` when the variable\n$x_i$ is given the value `v i`. -/\ndef Word.eval (w : Word) (v : ℕ → G) : G :=\n  FreeGroup.lift v (FreeGroup.mk w)\n\n/-- Two words are *identically equal on $G$* if they define the same operation on $G$,\ni.e. they take the same value for every assignment of the variables in $G$. -/\ndef IdenticallyEqualOn (G : Type*) [Group G] (A A' : Word) : Prop :=\n  ∀ v : ℕ → G, A.eval v = A'.eval v\n\n/-- Substitution of the word `C` for the variable $x_i$ in the word `A`: every letter\n$x_i$ of `A` is replaced by `C` and every letter $x_i^{-1}$ by the formal inverse\n`FreeGroup.invRev C` of `C`; all other letters are kept. -/\ndef Word.subst (A : Word) (i : ℕ) (C : Word) : Word :=\n  A.flatMap fun l => if l.1 = i then (if l.2 then C else FreeGroup.invRev C) else [l]\n\n/-- `ExpressibleOn G Bs A` says that the word `A` *is expressible in the words* `Bs`\n*on the group* `G`: `A` can be constructed from the words in `Bs` and the variables\nby finitely many substitutions of words one into another and replacements of a word\nby another word which is identically equal to it on `G`. -/\ninductive ExpressibleOn (G : Type*) [Group G] (Bs : List Word) : Word → Prop\n  /-- Each of the given words `Bs` is expressible. -/\n  | of {B : Word} (hB : B ∈ Bs) : ExpressibleOn G Bs B\n  /-- Each variable $x_i$ is expressible. -/\n  | var (i : ℕ) : ExpressibleOn G Bs [(i, true)]\n  /-- Substituting an expressible word for a variable in an expressible word gives an\n  expressible word. -/\n  | subst {A C : Word} (i : ℕ) (hA : ExpressibleOn G Bs A) (hC : ExpressibleOn G Bs C) :\n      ExpressibleOn G Bs (A.subst i C)\n  /-- A word identically equal on `G` to an expressible word is expressible. -/\n  | replace {A A' : Word} (hA : ExpressibleOn G Bs A) (h : IdenticallyEqualOn G A A') :\n      ExpressibleOn G Bs A'\n\n/-- A list of words `Bs` is *functionally complete on $G$* if every word can be expressed\non $G$ in words from `Bs`. -/\ndef IsFunctionallyCompleteOn (G : Type*) [Group G] (Bs : List Word) : Prop :=\n  ∀ A : Word, ExpressibleOn G Bs A\n\n/-- A word `B` is a *Schaeffer word on $G$* if every word can be expressed on $G$ in `B`. -/\ndef IsSchaefferWordOn (G : Type*) [Group G] (B : Word) : Prop :=\n  IsFunctionallyCompleteOn G [B]\n\n/-- Substituting `C` for $x_i$ in `A` defines the composite operation: evaluate `A` at\nthe assignment in which $x_i$ takes the value of `C`. -/\n@[category API, AMS 3 20]\ntheorem Word.eval_subst (A : Word) (i : ℕ) (C : Word) (v : ℕ → G) :\n    (A.subst i C).eval v = A.eval (Function.update v i (C.eval v)) := by\n  induction A with\n  | nil => rfl\n  | cons l A ih =>\n    obtain ⟨j, b⟩ := l\n    simp only [Word.subst, List.flatMap_cons, Word.eval] at ih ⊢\n    have h1 : FreeGroup.mk ((j, b) :: A) = FreeGroup.mk [(j, b)] * FreeGroup.mk A := rfl\n    rw [← FreeGroup.mul_mk, map_mul, ih, h1, map_mul]\n    congr 1\n    by_cases hj : j = i\n    · subst hj\n      cases b\n      · rw [if_pos rfl, if_neg Bool.false_ne_true, ← FreeGroup.inv_mk, map_inv]\n        simp\n      · simp\n    · simp [hj]\n\n/-- Substituting the variable $x_0$ for $x_1$ in the word $x_0 x_1^{-1}$ gives $x_0 x_0^{-1}$. -/\n@[category test, AMS 3 20]\ntheorem subst_example :\n    Word.subst [(0, true), (1, false)] 1 [(0, true)] = [(0, true), (0, false)] := by\n  decide\n\n/-- Every word in a list is expressible in that list on every group. -/\n@[category test, AMS 3 20]\ntheorem expressibleOn_of_mem (Bs : List Word) {B : Word} (hB : B ∈ Bs) :\n    ExpressibleOn G Bs B :=\n  .of hB\n\n/-- The word $x_0 x_1 x_1^{-1}$ is expressible in the empty list of words on every group,\nsince it is identically equal to the variable $x_0$. -/\n@[category test, AMS 3 20]\ntheorem expressibleOn_nil_example :\n    ExpressibleOn G [] [(0, true), (1, true), (1, false)] :=\n  .replace (.var 0) fun v => by simp [Word.eval]\n\n/--\nDoes there exist an algorithm which decides by a word $B$ whether it is a Schaeffer word\non every group? Here $B$ is a Schaeffer word on the group $G$ if every word can be\nexpressed on $G$ in $B$, and \"on every group\" means that for every group $G$ separately\nevery word can be constructed from $B$ and the variables by finitely many substitutions\nand replacements by words identically equal on $G$.\n\nExamples of words which are Schaeffer on every group are $xy^{-1}$, $x^{-1}y^2z$ and\n$x^{-1}y^{-1}zx$.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.a : answer(sorry) ↔\n    ComputablePred fun B : Word => ∀ (G : Type) [Group G], IsSchaefferWordOn G B := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides by a list of words $B_1, \\ldots, B_n$ whether\nit is functionally complete on every group, i.e. whether for every group $G$ every word\ncan be expressed on $G$ in words from the list?\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.b : answer(sorry) ↔\n    ComputablePred fun Bs : List Word =>\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G Bs := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides by words $A, B_1, \\ldots, B_n$ whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every group, i.e. whether for every group $G$ the word\n$A$ can be constructed from $B_1, \\ldots, B_n$ and the variables by finitely many\nsubstitutions of words one into another and replacements of a word by another word\nidentically equal to it on $G$? (This is a problem from A. V. Kuznetsov, *Matem.\nIssledovaniya* **6**, no. 4 (1971), p. 112.)\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.c : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G], ExpressibleOn G p.2 p.1 := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides by words $A, B_1, \\ldots, B_n$ whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every finite group? (For finite groups, for example,\n$x^{-1}$ is expressible in $xy$: on a finite group $G$ one has $x^{-1} = x^{|G| - 1}$.)\nFor a fixed finite group an algorithm exists.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.d : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G] [Finite G], ExpressibleOn G p.2 p.1 := by\n  sorry\n\nend Kourovka.«7.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None substantive. The table's reading of d) as the finite analogue of c) is the most natural (the illustrating example is about expressibility); the finite analogues of a)/b) would be immediate variants but are not separate slots, so they were not added.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Words are literal strings `List (ℕ × Bool)` over countably many variables x_0, x_1, …, with (i,true) = x_i and (i,false) = x_i^{-1} (the `FreeGroup.mk` convention). Free reduction is not built in; it is covered by the 'replacement by an identically equal word' rule, which the notebook allows.",
+    "Substitution is single-variable substitution `Word.subst A i C` (replace x_i by C, x_i^{-1} by the formal inverse `FreeGroup.invRev C`). With infinitely many variables, iterated single-variable substitutions generate exactly the simultaneous ones (rename to fresh variables first), so the closure agrees with the notebook's 'substitutions of words one into another'. The API lemma `Word.eval_subst` confirms substitution is composition of the associated operations.",
+    "'Identically equal on G' is `∀ v : ℕ → G, A.eval v = A'.eval v` (all assignments of the variables in G).",
+    "'On every group' is `∀ (G : Type) [Group G]` placed inside the predicate handed to `ComputablePred`, so the derivation may depend on G (matching the notes, and the finite-group example x^{-1} = x^{|G|-1}). Restricting to universe `Type` loses nothing: `ExpressibleOn G` depends on G only through its set of identities, which coincides with that of a countable subgroup of G.",
+    "Lists of words are `List Word` (so n ≥ 0; the empty list is allowed in b), c), d)); tuples (A, B_1,…,B_n) are `Word × List Word`. Encodings are the standard Primcodable instances; decidability is insensitive to the choice of natural encoding.",
+    "'Existence of an algorithm' is `ComputablePred` (Mathlib's partial-recursive-function based notion); `answer(True)` means an algorithm exists.",
+    "Part d) is formalized only as the finite-group analogue of c), as the decomposition table prescribes; the finite-group analogues of a) and b) are not stated as separate declarations.",
+    "The examples in a) and d) and the remark 'for a fixed finite group an algorithm exists' are recorded in docstrings as asserted facts and not formalized (they would require nontrivial proofs). Small `category test`/`API` lemmas were added to sanity-check `Word.subst`, `Word.eval` and `ExpressibleOn` instead."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FreeGroup ℕ; FreeMonoid (ℕ × Bool); the raw word type List (α × Bool) used by FreeGroup.mk (which is exactly what is used, with the same sign convention).",
+     "name": "Kourovka.«7.25».Word (abbrev for List (ℕ × Bool))",
+     "why_needed": "The problem's objects are words (strings) in the alphabet x_i^{±1}; a decidability question needs a Primcodable input type, which `List (ℕ × Bool)` has. `FreeGroup ℕ` has no Primcodable instance and would identify words up to free reduction (harmless mathematically, but not literally 'words')."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift / FreeGroup.mk (used directly in the definition).",
+     "name": "Kourovka.«7.25».Word.eval",
+     "why_needed": "The operation on G defined by a word: `FreeGroup.lift v (FreeGroup.mk w)`. Thin wrapper to give the problem's 'words as functions in the variables' a name."
+    },
+    {
+     "closest_existing_considered": "Equality in FreeGroup ℕ (too strong: only captures identities of the free group), MulEquiv/laws in varieties (not in Mathlib).",
+     "name": "Kourovka.«7.25».IdenticallyEqualOn",
+     "why_needed": "Two words define the same operation on G (∀ assignment ℕ → G). Mathlib has no notion of a word identity holding in a specific group with a countable variable set in this form."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.map / FreeGroup.lift into FreeGroup ℕ (acts on free-group elements, not on literal words; not Primcodable-friendly).",
+     "name": "Kourovka.«7.25».Word.subst",
+     "why_needed": "Substitution of a word for a variable in a word (replacing x_i by C and x_i^{-1} by the formal inverse `FreeGroup.invRev C`). Verified by the API lemma `Word.eval_subst` to be composition of the defined operations."
+    },
+    {
+     "closest_existing_considered": "Subgroup.closure / Submonoid.closure (wrong kind of closure), Mathlib has no clone or term-operation closure.",
+     "name": "Kourovka.«7.25».ExpressibleOn",
+     "why_needed": "The notebook's inductive closure: words B_i and variables are expressible; closed under substitution of an expressible word for a variable in an expressible word and under replacement by a word identically equal on G. No clone/closure-of-term-operations notion exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (Post/Sheffer completeness of function algebras is absent).",
+     "name": "Kourovka.«7.25».IsFunctionallyCompleteOn, Kourovka.«7.25».IsSchaefferWordOn",
+     "why_needed": "Direct transcriptions of the notebook's definitions ('every word can be expressed on G in words from this list' / 'in B')."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.25».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun B : Word => ∀ (G : Type) [Group G], IsSchaefferWordOn G B`, where `IsSchaefferWordOn G B := ∀ A, ExpressibleOn G [B] A`. The quantifier over G sits inside the predicate (outside expressibility), so the derivation may depend on G, as the notes require. The listed examples are recorded in the docstring as asserted facts, not formalized as questions."
+    },
+    "kourovka.«7.25».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun Bs : List Word => ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G Bs`, with `IsFunctionallyCompleteOn G Bs := ∀ A, ExpressibleOn G Bs A`. Lists of any length n ≥ 0 are admitted; n = 1 recovers part a)."
+    },
+    "kourovka.«7.25».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ComputablePred fun p : Word × List Word => ∀ (G : Type) [Group G], ExpressibleOn G p.2 p.1`, i.e. decidability of the set of tuples (A, B_1, …, B_n) (n ≥ 0) such that A is expressible in the B_i on every group, with G-dependent constructions."
+    },
+    "kourovka.«7.25».parts.d": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Read, per the decomposition table, as the finite-group analogue of c): `answer(sorry) ↔ ComputablePred fun p : Word × List Word => ∀ (G : Type) [Group G] [Finite G], ExpressibleOn G p.2 p.1`. The parenthetical example and the remark about a fixed finite group are recorded in the docstring as facts, not formalized."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.25».parts.a": "/--\nDoes there exist an algorithm which decides by a word $B$ whether it is a Schaeffer word\non every group? Here $B$ is a Schaeffer word on the group $G$ if every word can be\nexpressed on $G$ in $B$, and \"on every group\" means that for every group $G$ separately\nevery word can be constructed from $B$ and the variables by finitely many substitutions\nand replacements by words identically equal on $G$.\n\nExamples of words which are Schaeffer on every group are $xy^{-1}$, $x^{-1}y^2z$ and\n$x^{-1}y^{-1}zx$.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.a : answer(sorry) ↔\n    ComputablePred fun B : Word => ∀ (G : Type) [Group G], IsSchaefferWordOn G B := by\n  sorry",
+    "kourovka.«7.25».parts.b": "/--\nDoes there exist an algorithm which decides by a list of words $B_1, \\ldots, B_n$ whether\nit is functionally complete on every group, i.e. whether for every group $G$ every word\ncan be expressed on $G$ in words from the list?\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.b : answer(sorry) ↔\n    ComputablePred fun Bs : List Word =>\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G Bs := by\n  sorry",
+    "kourovka.«7.25».parts.c": "/--\nDoes there exist an algorithm which decides by words $A, B_1, \\ldots, B_n$ whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every group, i.e. whether for every group $G$ the word\n$A$ can be constructed from $B_1, \\ldots, B_n$ and the variables by finitely many\nsubstitutions of words one into another and replacements of a word by another word\nidentically equal to it on $G$? (This is a problem from A. V. Kuznetsov, *Matem.\nIssledovaniya* **6**, no. 4 (1971), p. 112.)\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.c : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G], ExpressibleOn G p.2 p.1 := by\n  sorry",
+    "kourovka.«7.25».parts.d": "/--\nDoes there exist an algorithm which decides by words $A, B_1, \\ldots, B_n$ whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every finite group? (For finite groups, for example,\n$x^{-1}$ is expressible in $xy$: on a finite group $G$ one has $x^{-1} = x^{|G| - 1}$.)\nFor a fixed finite group an algorithm exists.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«7.25».parts.d : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G] [Finite G], ExpressibleOn G p.2 p.1 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.25\n\nby A. V. Kuznetsov\n\nWe associate with words in the alphabet $x, x^{-1}, y, y^{-1}, z, z^{-1}, \\ldots$ operations\nwhich are understood as functions in the variables $x, y, z, \\ldots$. A word $A$ is\n*expressible in words $B_1, \\ldots, B_n$ on the group $G$* if $A$ can be constructed from\nthe words $B_1, \\ldots, B_n$ and variables by means of finitely many substitutions of words\none into another and replacements of a word by another word which is identically equal to it\non $G$. A list of words is *functionally complete on $G$* if every word can be expressed on\n$G$ in words from this list. A word $B$ is a *Schaeffer word on $G$* if every word can be\nexpressed on $G$ in $B$.\n\nDoes there exist an algorithm which decides\n\n- a) by a word $B$, whether it is a Schaeffer word on every group?\n  (Examples of such words: $xy^{-1}$, $x^{-1}y^2z$, $x^{-1}y^{-1}zx$.)\n- b) by a list of words, whether it is functionally complete on every group?\n- c) by words $A, B_1, \\ldots, B_n$, whether $A$ is expressible in $B_1, \\ldots, B_n$ on every\n  group?\n- d) the same for every finite group? (For finite groups, for example, $x^{-1}$ is expressible\n  in $xy$.) For a fixed finite group an algorithm exists.\n\nIn this file a word is a list of letters $x_i^{\\pm 1}$, encoded as pairs `(i, b)` with\n`b = true` for $x_i$ and `b = false` for $x_i^{-1}$; this is the word representation used by\n`FreeGroup`. Substitution of words into a word replaces each letter $x_i$ by the word\nsubstituted for $x_i$ and each letter $x_i^{-1}$ by the formal inverse of that word, so that\nit corresponds to composition of the associated functions (`Word.eval_subst`). The\nquantifier over the group $G$ is placed outside expressibility: the construction of $A$, and\nthe identities of $G$ that it uses, may depend on $G$. The existence of an algorithm is\nformalised as `ComputablePred`.\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 7.25\n- A. V. Kuznetsov, *Matem. Issledovaniya*, Kishinëv, **6**, no. 4 (1971), 75–122 (Russian)\n-/\n\nnamespace Kourovka.«7.25»\n\n/-- A word in the alphabet $x_0, x_0^{-1}, x_1, x_1^{-1}, \\ldots$: a list of letters\n`(i, b)`, where `(i, true)` stands for $x_i$ and `(i, false)` for $x_i^{-1}$. -/\nabbrev Word : Type := List (ℕ × Bool)\n\n/-- The word consisting of the single letter $x_i$. -/\ndef Word.var (i : ℕ) : Word := [(i, true)]\n\n/-- The function on a group `G` associated with a word: the value of the word `w` at the\nassignment `v` of elements of `G` to the variables. -/\ndef Word.eval {G : Type*} [Group G] (w : Word) (v : ℕ → G) : G :=\n  FreeGroup.lift v (FreeGroup.mk w)\n\n/-- Substitution of the words `σ i` for the variables $x_i$ in the word `w`: every letter\n$x_i$ is replaced by `σ i` and every letter $x_i^{-1}$ by the formal inverse of `σ i`. -/\ndef Word.subst (w : Word) (σ : ℕ → Word) : Word :=\n  w.flatMap fun l => cond l.2 (σ l.1) (FreeGroup.invRev (σ l.1))\n\n/-- Two words are identically equal on the group `G` if they define the same function\non `G`. -/\ndef Word.IdenticallyEqualOn (G : Type*) [Group G] (w w' : Word) : Prop :=\n  ∀ v : ℕ → G, w.eval v = w'.eval v\n\n/-- `IsExpressibleOn G Bs A` says that the word `A` is expressible in the words of the list\n`Bs` on the group `G`: `A` can be constructed from the words in `Bs` and the variables by\nfinitely many substitutions of words one into another and replacements of a word by\nanother word which is identically equal to it on `G`. -/\ninductive IsExpressibleOn (G : Type*) [Group G] (Bs : List Word) : Word → Prop\n  /-- Each of the given words is expressible. -/\n  | basic {B : Word} (hB : B ∈ Bs) : IsExpressibleOn G Bs B\n  /-- Each variable is expressible. -/\n  | var (i : ℕ) : IsExpressibleOn G Bs (Word.var i)\n  /-- Substituting expressible words into an expressible word gives an expressible word. -/\n  | subst {W : Word} (σ : ℕ → Word) (hW : IsExpressibleOn G Bs W)\n      (hσ : ∀ i, IsExpressibleOn G Bs (σ i)) : IsExpressibleOn G Bs (W.subst σ)\n  /-- A word identically equal on `G` to an expressible word is expressible. -/\n  | replace {W W' : Word} (hW : IsExpressibleOn G Bs W) (h : Word.IdenticallyEqualOn G W W') :\n      IsExpressibleOn G Bs W'\n\n/-- A list of words `Bs` is functionally complete on the group `G` if every word is\nexpressible in the words of `Bs` on `G`. -/\ndef IsFunctionallyCompleteOn (G : Type*) [Group G] (Bs : List Word) : Prop :=\n  ∀ A : Word, IsExpressibleOn G Bs A\n\n/-- A word `B` is a Schaeffer word on the group `G` if every word is expressible in `B`\non `G`. -/\ndef IsSchaefferWordOn (G : Type*) [Group G] (B : Word) : Prop :=\n  IsFunctionallyCompleteOn G [B]\n\nsection API\n\nvariable {G : Type*} [Group G]\n\n/-- The function associated with the variable $x_i$ is the $i$-th projection. -/\n@[category API, AMS 8 20]\ntheorem Word.eval_var (i : ℕ) (v : ℕ → G) : (Word.var i).eval v = v i := by\n  simp [Word.eval, Word.var, FreeGroup.lift_mk]\n\n/-- The function associated with a concatenation is the product of the functions. -/\n@[category API, AMS 8 20]\ntheorem Word.eval_append (w₁ w₂ : Word) (v : ℕ → G) :\n    (w₁ ++ w₂).eval v = w₁.eval v * w₂.eval v := by\n  simp [Word.eval, ← FreeGroup.mul_mk]\n\n/-- The function associated with the formal inverse of a word is the inverse of the\nfunction. -/\n@[category API, AMS 8 20]\ntheorem Word.eval_invRev (w : Word) (v : ℕ → G) :\n    Word.eval (FreeGroup.invRev w) v = (w.eval v)⁻¹ := by\n  rw [Word.eval, Word.eval, ← FreeGroup.inv_mk, map_inv]\n\n/-- Substitution of words into a word corresponds to composition of the associated\nfunctions. -/\n@[category API, AMS 8 20]\ntheorem Word.eval_subst (w : Word) (σ : ℕ → Word) (v : ℕ → G) :\n    (w.subst σ).eval v = w.eval fun i => (σ i).eval v := by\n  induction w with\n  | nil => simp [Word.eval, Word.subst, FreeGroup.lift_mk]\n  | cons l w ih =>\n    obtain ⟨i, b⟩ := l\n    rw [Word.subst, List.flatMap_cons, Word.eval_append, ← Word.subst, ih]\n    cases b\n    · rw [cond_false, Word.eval_invRev]\n      simp [Word.eval, FreeGroup.lift_mk]\n    · simp [Word.eval, FreeGroup.lift_mk]\n\nend API\n\n/--\nDoes there exist an algorithm which decides, by a word $B$, whether it is a Schaeffer word on\nevery group?\n\nThat is, is the set of words $B$ such that $B$ is a Schaeffer word on every group $G$ a\ncomputable predicate on words?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.a : answer(sorry) ↔\n    ComputablePred fun B : Word => ∀ (G : Type) [Group G], IsSchaefferWordOn G B := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, by a list of words $B_1, \\ldots, B_n$, whether\nit is functionally complete on every group?\n\nThat is, is the set of lists of words $B_1, \\ldots, B_n$ such that $B_1, \\ldots, B_n$ is\nfunctionally complete on every group $G$ a computable predicate on lists of words?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.b : answer(sorry) ↔\n    ComputablePred fun Bs : List Word =>\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G Bs := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, by words $A, B_1, \\ldots, B_n$, whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every group?\n\nThat is, is the set of pairs $(A, (B_1, \\ldots, B_n))$ such that $A$ is expressible in\n$B_1, \\ldots, B_n$ on every group $G$ a computable predicate on such pairs?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.c : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G], IsExpressibleOn G p.2 p.1 := by\n  sorry\n\n/--\nDoes there exist an algorithm which decides, by words $A, B_1, \\ldots, B_n$, whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every finite group?\n\nThat is, is the set of pairs $(A, (B_1, \\ldots, B_n))$ such that $A$ is expressible in\n$B_1, \\ldots, B_n$ on every finite group $G$ a computable predicate on such pairs? The\nconstruction of $A$ may depend on the finite group $G$: for example, $x^{-1}$ is expressible\nin $xy$ on every finite group, as $x^{-1} = x^{|G|-1}$ on $G$.\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.d : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G] [Finite G], IsExpressibleOn G p.2 p.1 := by\n  sorry\n\nsection Tests\n\n/-- The word $xy^{-1}$ is a Schaeffer word on every group. This is the first of the\nexamples given in the statement of the problem. -/\n@[category test, AMS 8 20]\ntheorem isSchaefferWordOn_xyinv (G : Type*) [Group G] :\n    IsSchaefferWordOn G [(0, true), (1, false)] := by\n  set B : Word := [(0, true), (1, false)] with hBdef\n  have hB : IsExpressibleOn G [B] B := .basic (List.mem_singleton_self B)\n  -- the empty word: $xx^{-1} = 1$\n  have hone : IsExpressibleOn G [B] [] := by\n    refine .replace (.subst (fun _ => Word.var 0) hB fun _ => .var 0) fun v => ?_\n    simp [Word.eval, Word.subst, Word.var, FreeGroup.invRev, FreeGroup.lift_mk, hBdef]\n  -- $x^{-1}$: substitute the empty word for $x$ and $x$ for $y$ in $xy^{-1}$\n  have hinv : IsExpressibleOn G [B] [(0, false)] := by\n    have := IsExpressibleOn.subst (fun i => if i = 0 then [] else Word.var 0) hB\n      fun i => by dsimp only; split_ifs <;> [exact hone; exact .var 0]\n    exact this\n  -- $y^{-1}$\n  have hinv1 : IsExpressibleOn G [B] [(1, false)] :=\n    IsExpressibleOn.subst (fun _ => Word.var 1) hinv fun _ => .var 1\n  -- $xy$: substitute $y^{-1}$ for $y$ in $xy^{-1}$\n  have hxy : IsExpressibleOn G [B] [(0, true), (1, true)] := by\n    have := IsExpressibleOn.subst (fun i => if i = 0 then Word.var 0 else [(1, false)]) hB\n      fun i => by dsimp only; split_ifs <;> [exact .var 0; exact hinv1]\n    exact this\n  -- $x^{-1}y$: substitute $x^{-1}$ for $x$ and $y^{-1}$ for $y$ in $xy^{-1}$\n  have hxinvy : IsExpressibleOn G [B] [(0, false), (1, true)] := by\n    have := IsExpressibleOn.subst (fun i => if i = 0 then [(0, false)] else [(1, false)]) hB\n      fun i => by dsimp only; split_ifs <;> [exact hinv; exact hinv1]\n    exact this\n  intro w\n  induction w with\n  | nil => exact hone\n  | cons l w ih =>\n    obtain ⟨i, b⟩ := l\n    cases b\n    · have := IsExpressibleOn.subst (fun j => if j = 0 then Word.var i else w) hxinvy\n        fun j => by dsimp only; split_ifs <;> [exact .var i; exact ih]\n      simpa [Word.subst, Word.var, FreeGroup.invRev] using this\n    · have := IsExpressibleOn.subst (fun j => if j = 0 then Word.var i else w) hxy\n        fun j => by dsimp only; split_ifs <;> [exact .var i; exact ih]\n      simpa [Word.subst, Word.var] using this\n\n/-- On every finite group $G$, the word $x^{-1}$ is expressible in $xy$, since\n$x^{-1} = x^{2|G|-1}$ on $G$. This is the example given in part d) of the problem. -/\n@[category test, AMS 8 20]\ntheorem isExpressibleOn_inv_of_finite (G : Type*) [Group G] [Finite G] :\n    IsExpressibleOn G [[(0, true), (1, true)]] [(0, false)] := by\n  set B : Word := [(0, true), (1, true)] with hBdef\n  have hB : IsExpressibleOn G [B] B := .basic (List.mem_singleton_self B)\n  -- the powers $x^{k+1}$ are expressible in $xy$\n  have hpow : ∀ k, IsExpressibleOn G [B] (List.replicate (k + 1) (0, true)) := by\n    intro k\n    induction k with\n    | zero => exact .var 0\n    | succ k ih =>\n      have := IsExpressibleOn.subst (fun i => if i = 0 then List.replicate (k + 1) (0, true)\n        else Word.var 0) hB fun i => by dsimp only; split_ifs <;> [exact ih; exact .var 0]\n      simpa [Word.subst, Word.var, hBdef, List.replicate_succ'] using this\n  have hcard : 1 ≤ Nat.card G := Nat.one_le_iff_ne_zero.mpr Nat.card_pos.ne'\n  refine .replace (hpow (2 * Nat.card G - 2)) fun v => ?_\n  have h2 : 2 * Nat.card G - 2 + 1 = 2 * Nat.card G - 1 := by omega\n  simp only [Word.eval, FreeGroup.lift_mk, List.map_replicate, List.prod_replicate, h2,\n    List.map_cons, List.map_nil, List.prod_cons, List.prod_nil, mul_one]\n  simp only [cond_true, cond_false]\n  apply eq_inv_of_mul_eq_one_left\n  rw [← pow_succ, Nat.sub_add_cancel (by omega), pow_mul, pow_card_eq_one']\n\n/-- On the infinite cyclic group, the empty word is not expressible in the empty list of\nwords: every word expressible in no words takes the value $1$ when all variables are set\nto the generator $1 \\in \\mathbb{Z}$. -/\n@[category test, AMS 8 20]\ntheorem not_isExpressibleOn_nil_nil :\n    ¬ IsExpressibleOn (Multiplicative ℤ) [] [] := by\n  have key : ∀ W, IsExpressibleOn (Multiplicative ℤ) [] W →\n      W.eval (fun _ => Multiplicative.ofAdd (1 : ℤ)) = Multiplicative.ofAdd 1 := by\n    intro W hW\n    induction hW with\n    | basic hB => simp at hB\n    | var i => simp [Word.eval_var]\n    | subst σ _ _ ih ihσ => rw [Word.eval_subst]; simp only [ihσ]; exact ih\n    | replace _ h ih => rw [← h, ih]\n  intro h\n  have := key [] h\n  simp only [Word.eval, FreeGroup.lift_mk, List.map_nil, List.prod_nil] at this\n  exact one_ne_zero (ofAdd_eq_one.mp this.symm)\n\nend Tests\n\nend Kourovka.«7.25»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. One remark: parts a) and b) are, as the table notes, reducible to c), so the four statements are not logically independent, but they are stated as posed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Words are unreduced lists of letters (List (ℕ × Bool)) rather than FreeGroup elements. Since a word and its free reduction are identically equal on every group, and reduction/`FreeGroup.mk` are computable, the decidability questions are unaffected; this keeps the input of the algorithm literally 'a word'.",
+    "The substitution rule is simultaneous substitution σ : ℕ → Word into all variables, requiring every σ i to be expressible. Since variables are expressible, this contains single-variable substitution, and with infinitely many variables single substitutions plus renaming generate simultaneous ones, so the closure is the same as the notebook's 'finitely many substitutions of words one into another'.",
+    "Substituting a word U for x_i replaces letters x_i^{-1} by the formal inverse FreeGroup.invRev U; Word.eval_subst shows this equals composition of the associated functions, which is the intended meaning of substitution of operations.",
+    "'Identically equal on G' is ∀ v : ℕ → G, eval w v = eval w' v (assignments to all countably many variables; words depend on finitely many).",
+    "'On every group' is ∀ (G : Type) [Group G], outside the expressibility predicate (as in existing Kourovka files, which use Type). Restricting to universe 0 loses nothing: expressibility on G depends only on the identities of G, and every group has a countable group (the relatively free group of its variety on countably many generators) with the same identities.",
+    "'Does there exist an algorithm' is formalized as ComputablePred (Mathlib's computability theory) on Word, List Word and Word × List Word with the standard Primcodable instances; answer(True) means an algorithm exists.",
+    "Part d) is formalized only as the finite-group analogue of part c), as prescribed by the decomposition table; the finite-group analogues of a) and b) are not stated.",
+    "The empty word and the empty list of words are allowed as inputs (they are words / lists in the ordinary sense); this does not change the decidability questions.",
+    "Additional API lemmas (Word.eval_var/eval_append/eval_invRev/eval_subst) and tests (xy^{-1} is a Schaeffer word on every group; x^{-1} expressible in xy on every finite group; a negative example) are included with full proofs to validate the bespoke definitions, following the repository's request for basic API tests."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FreeGroup ℕ (elements are reduced words, but it is a quotient with no Primcodable instance, and the notebook speaks of words, not free-group elements); FreeMonoid (ℕ × Bool) (equivalent but less convenient than the FreeGroup word representation).",
+     "name": "Kourovka.«7.25».Word (abbrev for List (ℕ × Bool)) and Word.var",
+     "why_needed": "The notebook's words over the alphabet x, x^{-1}, y, y^{-1}, … with countably many variables; a concrete, Primcodable input type is needed for ComputablePred. Letter (i, true) is x_i, (i, false) is x_i^{-1}."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift itself (used in the definition); no Mathlib notion of the term function of an unreduced word.",
+     "name": "Kourovka.«7.25».Word.eval",
+     "why_needed": "The function on a group G associated with a word ('words … understood as functions in variables'); defined as FreeGroup.lift v (FreeGroup.mk w)."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift (fun i => FreeGroup.mk (σ i)) gives the same operation modulo free reduction but lands in FreeGroup, not in words.",
+     "name": "Kourovka.«7.25».Word.subst",
+     "why_needed": "Substitution of words for variables in a word (x_i ↦ σ i, x_i^{-1} ↦ formal inverse of σ i), the 'substitutions of words one into another' of the statement. Word.eval_subst proves it is composition of the associated functions."
+    },
+    {
+     "closest_existing_considered": "No Mathlib notion of a group identity/law holding in a group in this form (varieties of groups are not in Mathlib).",
+     "name": "Kourovka.«7.25».Word.IdenticallyEqualOn",
+     "why_needed": "Two words defining the same function on G ('identically equal on G')."
+    },
+    {
+     "closest_existing_considered": "Subgroup.closure / Submonoid.closure (wrong kind of closure: not closed under substitution); Mathlib has no clone theory.",
+     "name": "Kourovka.«7.25».IsExpressibleOn",
+     "why_needed": "Kuznetsov's expressibility: inductive closure of the given words and the variables under substitution and replacement by identically equal words on G. Nothing on clones / functional completeness / term-operation closure exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "Kourovka.«7.25».IsFunctionallyCompleteOn, Kourovka.«7.25».IsSchaefferWordOn",
+     "why_needed": "Direct transcriptions of 'functionally complete on G' (every word expressible in the list) and 'Schaeffer word on G' (functionally complete singleton list)."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.25».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "answer(sorry) ↔ ComputablePred (fun B : Word => ∀ (G : Type) [Group G], IsSchaefferWordOn G B), where IsSchaefferWordOn G B := every word is expressible in [B] on G. Words are List (ℕ × Bool) (the FreeGroup word encoding of the alphabet x_i^{±1}), with the standard Primcodable instance. The quantifier over G is outside expressibility as required by the notes."
+    },
+    "kourovka.«7.25».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "answer(sorry) ↔ ComputablePred (fun Bs : List Word => ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G Bs). Lists of arbitrary length n ≥ 0 are allowed as inputs."
+    },
+    "kourovka.«7.25».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "answer(sorry) ↔ ComputablePred (fun p : Word × List Word => ∀ (G : Type) [Group G], IsExpressibleOn G p.2 p.1), with IsExpressibleOn the inductive closure of the B_i and the variables under substitution of words into words and replacement by words identically equal on G."
+    },
+    "kourovka.«7.25».parts.d": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Finite-group analogue of c) as fixed by the decomposition table: answer(sorry) ↔ ComputablePred (fun p : Word × List Word => ∀ (G : Type) [Group G] [Finite G], IsExpressibleOn G p.2 p.1). The construction may depend on G (quantifier outside), matching the parenthetical example, which is verified as a test theorem (isExpressibleOn_inv_of_finite)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.25».parts.a": "/--\nDoes there exist an algorithm which decides, by a word $B$, whether it is a Schaeffer word on\nevery group?\n\nThat is, is the set of words $B$ such that $B$ is a Schaeffer word on every group $G$ a\ncomputable predicate on words?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.a : answer(sorry) ↔\n    ComputablePred fun B : Word => ∀ (G : Type) [Group G], IsSchaefferWordOn G B := by\n  sorry",
+    "kourovka.«7.25».parts.b": "/--\nDoes there exist an algorithm which decides, by a list of words $B_1, \\ldots, B_n$, whether\nit is functionally complete on every group?\n\nThat is, is the set of lists of words $B_1, \\ldots, B_n$ such that $B_1, \\ldots, B_n$ is\nfunctionally complete on every group $G$ a computable predicate on lists of words?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.b : answer(sorry) ↔\n    ComputablePred fun Bs : List Word =>\n      ∀ (G : Type) [Group G], IsFunctionallyCompleteOn G Bs := by\n  sorry",
+    "kourovka.«7.25».parts.c": "/--\nDoes there exist an algorithm which decides, by words $A, B_1, \\ldots, B_n$, whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every group?\n\nThat is, is the set of pairs $(A, (B_1, \\ldots, B_n))$ such that $A$ is expressible in\n$B_1, \\ldots, B_n$ on every group $G$ a computable predicate on such pairs?\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.c : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G], IsExpressibleOn G p.2 p.1 := by\n  sorry",
+    "kourovka.«7.25».parts.d": "/--\nDoes there exist an algorithm which decides, by words $A, B_1, \\ldots, B_n$, whether $A$ is\nexpressible in $B_1, \\ldots, B_n$ on every finite group?\n\nThat is, is the set of pairs $(A, (B_1, \\ldots, B_n))$ such that $A$ is expressible in\n$B_1, \\ldots, B_n$ on every finite group $G$ a computable predicate on such pairs? The\nconstruction of $A$ may depend on the finite group $G$: for example, $x^{-1}$ is expressible\nin $xy$ on every finite group, as $x^{-1} = x^{|G|-1}$ on $G$.\n-/\n@[category research open, AMS 3 8 20]\ntheorem kourovka.«7.25».parts.d : answer(sorry) ↔\n    ComputablePred fun p : Word × List Word =>\n      ∀ (G : Type) [Group G] [Finite G], IsExpressibleOn G p.2 p.1 := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«7.25».parts.a": "c08",
+  "kourovka.«7.25».parts.b": "c08",
+  "kourovka.«7.25».parts.c": "c08",
+  "kourovka.«7.25».parts.d": "c08"
+ },
+ "id": "kourovka-7.25",
+ "main_attempt": "c08"
+}

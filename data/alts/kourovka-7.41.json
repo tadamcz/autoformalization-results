@@ -1,0 +1,583 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.41\n\nby Yu. I. Merzlyakov\n\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nThe classes $\\overline{SI}$ and $\\overline{SN}$ are those of Kurosh (*The Theory of Groups*,\nVol. II, Chapter XIV). A *normal system* of a group $G$ is a set $\\Sigma$ of subgroups of $G$\nwhich contains $1$ and $G$, is linearly ordered by inclusion, is complete (it contains the union\nand the intersection of every non-empty subset of its members), and is such that for every *jump*\n$A \\subset B$ of $\\Sigma$ (that is, $A, B \\in \\Sigma$ and no member of $\\Sigma$ lies strictly\nbetween $A$ and $B$) the subgroup $A$ is normal in $B$. The quotients $B/A$ over the jumps are\nthe *factors* of the system. An *invariant system* is a normal system all of whose members are\nnormal in $G$. A system is *solvable* if all its factors are abelian. A system $\\Sigma'$ is a\n*refinement* of $\\Sigma$ if $\\Sigma \\subseteq \\Sigma'$.\n\n- $G$ is an $\\overline{SN}$-group if every normal system of $G$ can be refined to a solvable\n  normal system.\n- $G$ is an $\\overline{SI}$-group if every invariant system of $G$ can be refined to a solvable\n  invariant system.\n\nThese are not the classes $SN^*$ and $SI^*$ defined by ascending series: for those the\ninclusion $SI^* \\subseteq SN^*$ is trivial, whereas for $\\overline{SI}$ and $\\overline{SN}$ the\nhypothesis only concerns invariant systems, so no refinement of an arbitrary normal system is\nprovided directly.\n\nA group is *linear* if it is isomorphic to a subgroup of $\\mathrm{GL}_n(F)$ for some $n \\ge 0$\nand some field $F$. No restriction is placed on $F$ or on $G$ (in particular $G$ need not be\nfinitely generated).\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 7.41\n- A. G. Kurosh, *The Theory of Groups*, Vol. II, Chelsea, New York, 1960, Chapter XIV\n-/\n\nuniverse u\n\nnamespace Kourovka.«7.41»\n\nvariable {G : Type*} [Group G]\n\n/-- The subgroups `A` and `B` form a *jump* of the set `S` of subgroups of `G`: `A < B` and no\nmember of `S` lies strictly between `A` and `B`. -/\ndef IsJump (S : Set (Subgroup G)) (A B : Subgroup G) : Prop :=\n  A < B ∧ ∀ C ∈ S, ¬ (A < C ∧ C < B)\n\n/-- A *normal system* of `G` in the sense of Kurosh: a set `S` of subgroups of `G` which contains\n`⊥` and `⊤`, is linearly ordered by inclusion, is complete (closed under the union and the\nintersection of every non-empty subset), and is such that `A` is normal in `B` for every jump\n`(A, B)` of `S`. -/\nstructure IsNormalSystem (S : Set (Subgroup G)) : Prop where\n  bot_mem : ⊥ ∈ S\n  top_mem : ⊤ ∈ S\n  isChain : IsChain (· ≤ ·) S\n  sSup_mem : ∀ T ⊆ S, T.Nonempty → sSup T ∈ S\n  sInf_mem : ∀ T ⊆ S, T.Nonempty → sInf T ∈ S\n  normal_of_isJump : ∀ A ∈ S, ∀ B ∈ S, IsJump S A B → (A.subgroupOf B).Normal\n\n/-- An *invariant system* of `G`: a normal system all of whose members are normal in `G`. -/\ndef IsInvariantSystem (S : Set (Subgroup G)) : Prop :=\n  IsNormalSystem S ∧ ∀ A ∈ S, A.Normal\n\n/-- A set `S` of subgroups of `G` has abelian factors if for every jump `(A, B)` of `S` the\nfactor `B / A` is abelian, i.e. `⁅x, y⁆ ∈ A` for all `x, y ∈ B`. A normal system with abelian\nfactors is called *solvable*. -/\ndef HasAbelianFactors (S : Set (Subgroup G)) : Prop :=\n  ∀ A ∈ S, ∀ B ∈ S, IsJump S A B → ∀ x ∈ B, ∀ y ∈ B, ⁅x, y⁆ ∈ A\n\n/-- `G` is an $\\overline{SN}$-group if every normal system of `G` can be refined to a normal\nsystem with abelian factors. -/\ndef IsSNBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ S : Set (Subgroup G), IsNormalSystem S →\n    ∃ S' : Set (Subgroup G), S ⊆ S' ∧ IsNormalSystem S' ∧ HasAbelianFactors S'\n\n/-- `G` is an $\\overline{SI}$-group if every invariant system of `G` can be refined to an\ninvariant system with abelian factors. -/\ndef IsSIBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ S : Set (Subgroup G), IsInvariantSystem S →\n    ∃ S' : Set (Subgroup G), S ⊆ S' ∧ IsInvariantSystem S' ∧ HasAbelianFactors S'\n\n/-- `G` is a *linear group* if it is isomorphic to a subgroup of `GL n F` for some `n` and some\nfield `F`. -/\ndef IsLinearGroup (G : Type u) [Group G] : Prop :=\n  ∃ (n : ℕ) (F : Type u) (_ : Field F) (f : G →* GL (Fin n) F), Function.Injective f\n\n/-- The trivial system `{⊥, ⊤}` is an invariant system of every group. -/\n@[category test, AMS 20]\ntheorem isInvariantSystem_pair : IsInvariantSystem ({⊥, ⊤} : Set (Subgroup G)) := by\n  have hnormal : ∀ A ∈ ({⊥, ⊤} : Set (Subgroup G)), A.Normal := by\n    rintro A (rfl | rfl) <;> infer_instance\n  refine ⟨⟨by simp, by simp, ?_, ?_, ?_, ?_⟩, hnormal⟩\n  · rintro A (rfl | rfl) B (rfl | rfl) _ <;> simp\n  · intro T hT hne\n    by_cases h : ⊤ ∈ T\n    · simp [top_unique (le_sSup h)]\n    · have : sSup T = ⊥ := le_bot_iff.mp <| sSup_le fun C hC => by\n        rcases hT hC with rfl | rfl\n        · exact le_rfl\n        · exact absurd hC h\n      simp [this]\n  · intro T hT hne\n    by_cases h : ⊥ ∈ T\n    · simp [bot_unique (sInf_le h)]\n    · have : sInf T = ⊤ := top_unique <| le_sInf fun C hC => by\n        rcases hT hC with rfl | rfl\n        · exact absurd hC h\n        · exact le_rfl\n      simp [this]\n  · intro A hA B _ _\n    haveI := hnormal A hA\n    infer_instance\n\n/-- Every abelian group is an $\\overline{SN}$-group. -/\n@[category test, AMS 20]\ntheorem IsSNBarGroup.of_isMulCommutative [IsMulCommutative G] : IsSNBarGroup G :=\n  fun S hS => ⟨S, subset_rfl, hS, fun A _ _ _ _ x _ y _ =>\n    (commutatorElement_eq_one_iff_mul_comm.mpr (mul_comm x y)).symm ▸ A.one_mem⟩\n\n/-- Every abelian group is an $\\overline{SI}$-group. -/\n@[category test, AMS 20]\ntheorem IsSIBarGroup.of_isMulCommutative [IsMulCommutative G] : IsSIBarGroup G :=\n  fun S hS => ⟨S, subset_rfl, hS, fun A _ _ _ _ x _ y _ =>\n    (commutatorElement_eq_one_iff_mul_comm.mpr (mul_comm x y)).symm ▸ A.one_mem⟩\n\n/-- The general linear group `GL n F` over a field `F` is a linear group. -/\n@[category test, AMS 20]\ntheorem isLinearGroup_generalLinearGroup (n : ℕ) (F : Type u) [Field F] :\n    IsLinearGroup (GL (Fin n) F) :=\n  ⟨n, F, inferInstance, MonoidHom.id _, fun _ _ h => h⟩\n\n/--\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nThat is, if $G$ is isomorphic to a subgroup of $\\mathrm{GL}_n(F)$ for some $n$ and some field\n$F$, and every invariant system of $G$ can be refined to an invariant system with abelian\nfactors, can every normal system of $G$ be refined to a normal system with abelian factors?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry\n\nend Kourovka.«7.41»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (Kurosh's convention for the bar classes, arbitrary field, no finite generation) match my reading of the statement and were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Bar classes follow Kurosh (Theory of Groups Vol. II): SI-bar refines every invariant system to a *solvable invariant* system (not merely a solvable normal system); SN-bar refines every normal system to a solvable normal system. Refinement means set inclusion S ⊆ S'. A reviewer should confirm this reading of \\overline{SI} against Kurosh/Plotkin/Robinson.",
+    "Normal systems are taken to be complete (closed under sSup and sInf of nonempty subsets) with ⊥ and ⊤ as members, and normality is required only at jumps of the system (A < B with no member of S strictly between), matching Kurosh's definition and Robinson's equivalent notion of 'series'. Completeness is essential: without it a dense chain would vacuously have abelian factors.",
+    "'Abelian factor' at a jump (A, B) is expressed as ⁅x, y⁆ ∈ A for all x, y ∈ B, equivalent to B/A abelian given A normal in B.",
+    "IsLinearGroup G asks for an injective group hom G →* GL (Fin n) F with n : ℕ arbitrary (n = 0 only contributes the trivial group, which is linear anyway) and F an arbitrary field in the same universe as G (Type, since the theorem quantifies G : Type). Restricting F to the universe of G loses no generality, since a linear group embeds in GL_n over the subfield generated by the matrix entries, whose cardinality is bounded by that of G.",
+    "The theorem quantifies over G : Type, following the repository's convention in other Kourovka files.",
+    "Four short @[category test] lemmas were added as API sanity checks for the bespoke definitions ({⊥,⊤} is an invariant system; abelian groups are SN-bar and SI-bar; GL n F is linear). They are fully proved."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "CovBy (⋖) on Subgroup G, or CovBy in the subtype ↥S",
+     "name": "Kourovka.«7.41».IsJump",
+     "why_needed": "A jump of a chain of subgroups S (A < B with no member of S strictly between) is relative to S; Mathlib's CovBy on Subgroup G would require no subgroup at all between A and B, which is the wrong notion."
+    },
+    {
+     "closest_existing_considered": "CompositionSeries, RelSeries, Subgroup.derivedSeries / IsSolvable, IsChain",
+     "name": "Kourovka.«7.41».IsNormalSystem",
+     "why_needed": "Kurosh's normal system: a complete (closed under sSup/sInf of nonempty subsets) chain of subgroups containing ⊥ and ⊤ with A normal in B at every jump. Mathlib has no transfinite/complete-chain series of subgroups."
+    },
+    {
+     "closest_existing_considered": "IsNormalSystem plus Subgroup.Normal (no combined notion exists)",
+     "name": "Kourovka.«7.41».IsInvariantSystem",
+     "why_needed": "Kurosh's invariant system: a normal system all of whose members are normal in G."
+    },
+    {
+     "closest_existing_considered": "IsMulCommutative (B ⧸ A.subgroupOf B), Subgroup.commutator",
+     "name": "Kourovka.«7.41».HasAbelianFactors",
+     "why_needed": "'Solvable system': every factor B/A over a jump (A,B) is abelian, expressed as ⁅x, y⁆ ∈ A for all x, y ∈ B."
+    },
+    {
+     "closest_existing_considered": "IsSolvable (finite derived series) — far too strong",
+     "name": "Kourovka.«7.41».IsSNBarGroup",
+     "why_needed": "Kurosh's SN-bar class: every normal system can be refined (superset) to a normal system with abelian factors. Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "IsSolvable; no hyperabelian or SI-type class exists in Mathlib",
+     "name": "Kourovka.«7.41».IsSIBarGroup",
+     "why_needed": "Kurosh's SI-bar class: every invariant system can be refined to an invariant system with abelian factors. Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Matrix.GeneralLinearGroup, LinearMap.GeneralLinearGroup, Representation (faithful representation not packaged as a group predicate)",
+     "name": "Kourovka.«7.41».IsLinearGroup",
+     "why_needed": "'Linear group' = isomorphic to a subgroup of GL_n(F) for some n and some field F; Mathlib has GL but no predicate for a group being linear."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.41»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G, with Kurosh's normal/invariant systems, jumps, abelian factors, refinement (superset) and the bar classes defined in the file; no primitives for these exist in Mathlib or FormalConjecturesForMathlib."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.41»": "/--\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nThat is, if $G$ is isomorphic to a subgroup of $\\mathrm{GL}_n(F)$ for some $n$ and some field\n$F$, and every invariant system of $G$ can be refined to an invariant system with abelian\nfactors, can every normal system of $G$ be refined to a normal system with abelian factors?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.41\n\nby Yu. I. Merzlyakov\n\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nThe classes $\\overline{SI}$ and $\\overline{SN}$ are Kurosh's classes of generalized\nsolvable groups (A. G. Kurosh, *The Theory of Groups*, Vol. II, §§56–57).\n\nA *normal system* of a group $G$ is a set $\\mathfrak{A}$ of subgroups of $G$ which\ncontains $1$ and $G$, is linearly ordered by inclusion, is *complete* (the union and the\nintersection of any subset of $\\mathfrak{A}$ belong to $\\mathfrak{A}$), and is such that\n$A$ is normal in $B$ for every *jump* $A < B$ of $\\mathfrak{A}$, i.e. for every pair of\nmembers with no member of $\\mathfrak{A}$ strictly between them. An *invariant system* is a\nnormal system all of whose members are normal in $G$. A normal (invariant) system is\n*solvable* if every factor $B/A$ at a jump is abelian. A *refinement* of a system is a\nsystem containing it.\n\nA group is an $\\overline{SN}$-group if every normal system of it can be refined to a\nsolvable normal system, and an $\\overline{SI}$-group if every invariant system of it can be\nrefined to a solvable invariant system.\n\nA group is *linear* if it is isomorphic to a subgroup of $\\mathrm{GL}_n(F)$ for some\n$n \\geq 0$ and some field $F$; no restriction is placed on $F$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nuniverse u\n\nnamespace Kourovka.«7.41»\n\nvariable {G : Type*} [Group G]\n\n/-- A pair $(A, B)$ of members of a set $\\mathfrak{A}$ of subgroups of $G$ is a *jump* of\n$\\mathfrak{A}$ if $A < B$ and no member of $\\mathfrak{A}$ lies strictly between $A$ and $B$. -/\ndef IsJump (𝔄 : Set (Subgroup G)) (A B : Subgroup G) : Prop :=\n  A ∈ 𝔄 ∧ B ∈ 𝔄 ∧ A < B ∧ ∀ C ∈ 𝔄, ¬ (A < C ∧ C < B)\n\n/-- A set $\\mathfrak{A}$ of subgroups of $G$ is a *normal system* of $G$ (in the sense of\nKurosh) if it contains $1$ and $G$, is linearly ordered by inclusion, is complete (the union\nand the intersection of any subset of $\\mathfrak{A}$ belong to $\\mathfrak{A}$), and $A$ is\nnormal in $B$ for every jump $A < B$ of $\\mathfrak{A}$.\n\nFor a linearly ordered set $S$ of subgroups, the union of $S$ is a subgroup and equals\n`sSup S`, and the intersection of $S$ is `sInf S`. -/\nstructure IsNormalSystem (𝔄 : Set (Subgroup G)) : Prop where\n  bot_mem : ⊥ ∈ 𝔄\n  top_mem : ⊤ ∈ 𝔄\n  isChain : IsChain (· ≤ ·) 𝔄\n  sSup_mem : ∀ S ⊆ 𝔄, sSup S ∈ 𝔄\n  sInf_mem : ∀ S ⊆ 𝔄, sInf S ∈ 𝔄\n  normal_of_isJump : ∀ A B, IsJump 𝔄 A B → (A.subgroupOf B).Normal\n\n/-- A set $\\mathfrak{A}$ of subgroups of $G$ is an *invariant system* of $G$ (in the sense of\nKurosh) if it is a normal system all of whose members are normal in $G$. -/\nstructure IsInvariantSystem (𝔄 : Set (Subgroup G)) : Prop extends IsNormalSystem 𝔄 where\n  normal : ∀ A ∈ 𝔄, A.Normal\n\n/-- A set $\\mathfrak{A}$ of subgroups of $G$ is *solvable* if the factor $B/A$ of every jump\n$A < B$ of $\\mathfrak{A}$ is abelian, i.e. $[B, B] \\le A$. -/\ndef IsSolvableSystem (𝔄 : Set (Subgroup G)) : Prop :=\n  ∀ A B, IsJump 𝔄 A B → ⁅B, B⁆ ≤ A\n\n/-- A group $G$ is an $\\overline{SN}$-group (in the sense of Kurosh) if every normal system\nof $G$ can be refined to a solvable normal system of $G$. -/\ndef IsSNBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ 𝔄 : Set (Subgroup G), IsNormalSystem 𝔄 →\n    ∃ 𝔅 : Set (Subgroup G), 𝔄 ⊆ 𝔅 ∧ IsNormalSystem 𝔅 ∧ IsSolvableSystem 𝔅\n\n/-- A group $G$ is an $\\overline{SI}$-group (in the sense of Kurosh) if every invariant\nsystem of $G$ can be refined to a solvable invariant system of $G$. -/\ndef IsSIBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ 𝔄 : Set (Subgroup G), IsInvariantSystem 𝔄 →\n    ∃ 𝔅 : Set (Subgroup G), 𝔄 ⊆ 𝔅 ∧ IsInvariantSystem 𝔅 ∧ IsSolvableSystem 𝔅\n\n/-- A group $G$ is *linear* if it is isomorphic to a subgroup of $\\mathrm{GL}_n(F)$ for some\n$n \\geq 0$ and some field $F$, i.e. if there is an injective group homomorphism\n$G \\to \\mathrm{GL}_n(F)$. -/\ndef IsLinearGroup (G : Type u) [Group G] : Prop :=\n  ∃ (n : ℕ) (F : Type u) (_ : Field F) (φ : G →* GL (Fin n) F), Function.Injective φ\n\n/-- The system $\\{1, G\\}$ is an invariant system of $G$. -/\n@[category test, AMS 20]\ntheorem isInvariantSystem_pair : IsInvariantSystem ({⊥, ⊤} : Set (Subgroup G)) where\n  bot_mem := by simp\n  top_mem := by simp\n  isChain := IsChain.pair bot_le\n  sSup_mem S hS := by\n    by_cases h : ⊤ ∈ S\n    · exact Or.inr (top_le_iff.1 (le_sSup h))\n    · refine Or.inl (sSup_eq_bot.2 fun A hA => ?_)\n      rcases hS hA with rfl | rfl\n      · rfl\n      · exact (h hA).elim\n  sInf_mem S hS := by\n    by_cases h : ⊥ ∈ S\n    · exact Or.inl (le_bot_iff.1 (sInf_le h))\n    · refine Or.inr (sInf_eq_top.2 fun A hA => ?_)\n      rcases hS hA with rfl | rfl\n      · exact (h hA).elim\n      · rfl\n  normal_of_isJump A B hAB := by\n    obtain ⟨hA, hB, hlt, -⟩ := hAB\n    rcases hA with rfl | rfl <;> rcases hB with rfl | rfl\n    · exact absurd hlt (lt_irrefl _)\n    · rw [Subgroup.bot_subgroupOf]\n      infer_instance\n    · exact absurd hlt not_lt_bot\n    · exact absurd hlt (lt_irrefl _)\n  normal A hA := by\n    rcases hA with rfl | rfl <;> infer_instance\n\n/-- Every $\\overline{SN}$-group has a solvable normal system, i.e. it is an $SN$-group. -/\n@[category API, AMS 20]\ntheorem IsSNBarGroup.exists_isSolvableSystem (h : IsSNBarGroup G) :\n    ∃ 𝔄 : Set (Subgroup G), IsNormalSystem 𝔄 ∧ IsSolvableSystem 𝔄 :=\n  let ⟨𝔅, _, h𝔅, hs⟩ := h _ isInvariantSystem_pair.toIsNormalSystem\n  ⟨𝔅, h𝔅, hs⟩\n\n/-- Every $\\overline{SI}$-group has a solvable invariant system, i.e. it is an $SI$-group. -/\n@[category API, AMS 20]\ntheorem IsSIBarGroup.exists_isSolvableSystem (h : IsSIBarGroup G) :\n    ∃ 𝔄 : Set (Subgroup G), IsInvariantSystem 𝔄 ∧ IsSolvableSystem 𝔄 :=\n  let ⟨𝔅, _, h𝔅, hs⟩ := h _ isInvariantSystem_pair\n  ⟨𝔅, h𝔅, hs⟩\n\n/-- In an abelian group every set of subgroups is solvable. -/\n@[category test, AMS 20]\ntheorem isSolvableSystem_of_isMulCommutative [IsMulCommutative G] (𝔄 : Set (Subgroup G)) :\n    IsSolvableSystem 𝔄 := fun _ _ _ =>\n  Subgroup.commutator_le.2 fun g₁ _ g₂ _ => by\n    rw [commutatorElement_eq_one_iff_mul_comm.2 (mul_comm g₁ g₂)]\n    exact one_mem _\n\n/-- Every abelian group is an $\\overline{SN}$-group. -/\n@[category test, AMS 20]\ntheorem isSNBarGroup_of_isMulCommutative [IsMulCommutative G] : IsSNBarGroup G :=\n  fun 𝔄 h => ⟨𝔄, subset_rfl, h, isSolvableSystem_of_isMulCommutative 𝔄⟩\n\n/-- Every abelian group is an $\\overline{SI}$-group. -/\n@[category test, AMS 20]\ntheorem isSIBarGroup_of_isMulCommutative [IsMulCommutative G] : IsSIBarGroup G :=\n  fun 𝔄 h => ⟨𝔄, subset_rfl, h, isSolvableSystem_of_isMulCommutative 𝔄⟩\n\n/-- Every group of matrices is linear. -/\n@[category test, AMS 20]\ntheorem isLinearGroup_generalLinearGroup (n : ℕ) (F : Type u) [Field F] : IsLinearGroup (GL (Fin n) F) :=\n  ⟨n, F, inferInstance, MonoidHom.id _, fun _ _ h => h⟩\n\n/--\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nHere a group is *linear* if it embeds in $\\mathrm{GL}_n(F)$ for some $n$ and some field\n$F$; it is an $\\overline{SI}$-group if every invariant system of it can be refined to a\nsolvable invariant system, and an $\\overline{SN}$-group if every normal system of it can be\nrefined to a solvable normal system (Kurosh, *The Theory of Groups*, Vol. II, §57).\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry\n\nend Kourovka.«7.41»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot table and its reading (Kurosh's bar classes, arbitrary field, no finite generation) match the source and Kurosh's definitions; the statement is a yes/no question and is formalized with `answer(sorry) ↔ …`.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Bar classes follow Kurosh's convention exactly as in the decomposition notes: SI-bar = every invariant system (all members normal in G) has a solvable *invariant* refinement; SN-bar = every normal system (normality only at jumps) has a solvable *normal* refinement. These are not the ascending-series classes SI*/SN*.",
+    "Completeness is stated as closure of the system under `sSup` and `sInf` of *all* subsets (not just nonempty ones); for the empty subset this just gives ⊥, ⊤ ∈ 𝔄, which Kurosh requires anyway, so it is equivalent to his definition. For a chain of subgroups `sSup S` is the set-theoretic union, matching Kurosh's 'union'.",
+    "Abelian factor B/A at a jump is encoded as ⁅B, B⁆ ≤ A (equivalent to B/A abelian since A ≤ B and A is normal in B at a jump).",
+    "Normality at a jump is `(A.subgroupOf B).Normal`, i.e. A normal in B (not in G).",
+    "Linear group: injective group homomorphism into `GL (Fin n) F` with `F` a `Field` (arbitrary characteristic, not necessarily finitely generated group, n ≥ 0 allowed). The field F is taken in the same universe as G (`Type` in the theorem). This is WLOG: if G embeds in GL_n(F) then it embeds in GL_n(K) for the subfield K generated by the matrix entries, which has cardinality ≤ max(ℵ₀, |G|) and hence is equivalent to a type in the universe of G.",
+    "Groups are quantified as `G : Type` (universe 0), as in the existing Kourovka files (e.g. 1_40).",
+    "Definitions are kept in the problem file (as in Kourovka/1_40.lean) rather than FormalConjecturesForMathlib, since the task restricts writing to the candidate file; a reviewer may prefer moving them to FormalConjecturesForMathlib/GroupTheory.",
+    "Small `@[category test]`/`@[category API]` lemmas with short proofs were added to sanity-check the definitions ({⊥,⊤} is an invariant system; SN-bar/SI-bar groups have solvable systems; abelian groups are SN-bar and SI-bar; GL_n(F) is linear)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`CovBy` (⋖) on the subtype ↥𝔄; rejected as less readable and requiring subtype coercions.",
+     "name": "Kourovka.«7.41».IsJump",
+     "why_needed": "Kurosh's notion of a jump (A < B with no member of the system strictly between) is needed to speak of the factors of a system; nothing in Mathlib captures it for a `Set (Subgroup G)`."
+    },
+    {
+     "closest_existing_considered": "`CompositionSeries`, `RelSeries`, `IsChain` (used as a component).",
+     "name": "Kourovka.«7.41».IsNormalSystem",
+     "why_needed": "Kurosh's normal system (complete linearly ordered set of subgroups containing 1 and G, with normality at jumps). Mathlib only has finite `CompositionSeries`/`RelSeries`, not arbitrary complete chains."
+    },
+    {
+     "closest_existing_considered": "`IsNormalSystem` plus `Subgroup.Normal` (it extends the former).",
+     "name": "Kourovka.«7.41».IsInvariantSystem",
+     "why_needed": "Kurosh's invariant system: a normal system whose members are all normal in G."
+    },
+    {
+     "closest_existing_considered": "`IsMulCommutative (B ⧸ A.subgroupOf B)`; equivalent given A ≤ B, but needs the normality instance at each jump.",
+     "name": "Kourovka.«7.41».IsSolvableSystem",
+     "why_needed": "'All factors B/A at jumps are abelian', encoded as ⁅B, B⁆ ≤ A to avoid carrying a `Normal` instance for the quotient."
+    },
+    {
+     "closest_existing_considered": "`IsSolvable` (finite derived series) — far too restrictive.",
+     "name": "Kourovka.«7.41».IsSNBarGroup",
+     "why_needed": "Kurosh's class $\\overline{SN}$: every normal system refines to a solvable normal system. Not in Mathlib (Mathlib has only `IsSolvable`)."
+    },
+    {
+     "closest_existing_considered": "`IsSolvable`; hyperabelian/ascending-series notions do not exist in Mathlib either and would in any case be the wrong (SI*) class.",
+     "name": "Kourovka.«7.41».IsSIBarGroup",
+     "why_needed": "Kurosh's class $\\overline{SI}$: every invariant system refines to a solvable invariant system. Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "`Matrix.GeneralLinearGroup` (used as the target), `MonoidHom` injectivity.",
+     "name": "Kourovka.«7.41».IsLinearGroup",
+     "why_needed": "A group is linear if it embeds in GL_n(F) for some n and some field F. No such predicate exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.41»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G`, with the bar classes defined following Kurosh (Theory of Groups, Vol. II, §§56–57): a normal system is a set of subgroups containing ⊥ and ⊤, linearly ordered by inclusion, closed under sSup/sInf of arbitrary subsets (unions/intersections), with A normal in B at every jump A < B; an invariant system is a normal system all of whose members are normal in G; solvable means ⁅B,B⁆ ≤ A at every jump (B/A abelian); refinement is set inclusion. SI-bar: every invariant system has a solvable invariant refinement; SN-bar: every normal system has a solvable normal refinement. Linear: injective hom into GL (Fin n) F for some n and some field F (no restriction on F, G not assumed finitely generated). Neither Mathlib nor FormalConjecturesForMathlib has normal/invariant systems, the Kurosh classes, or a `linear group` predicate, so these were added in the problem file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.41»": "/--\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nHere a group is *linear* if it embeds in $\\mathrm{GL}_n(F)$ for some $n$ and some field\n$F$; it is an $\\overline{SI}$-group if every invariant system of it can be refined to a\nsolvable invariant system, and an $\\overline{SN}$-group if every normal system of it can be\nrefined to a solvable normal system (Kurosh, *The Theory of Groups*, Vol. II, §57).\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.41\n\nby Yu. I. Merzlyakov\n\nJohn S. Wilson asks whether every linear $\\overline{SI}$-group is an\n$\\overline{SN}$-group.\n\nThe bars refer to Kurosh's classes defined using refinements of complete\nsubgroup systems, rather than to the classes defined by ascending series.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.41»\n\nuniverse u\n\nvariable {G : Type u} [Group G]\n\n/-- A complete subgroup system in $G$ is a chain of subgroups containing $1$\nand $G$ and closed under arbitrary intersections and generated unions. -/\ndef IsCompleteSubgroupSystem (S : Set (Subgroup G)) : Prop :=\n  ⊥ ∈ S ∧ ⊤ ∈ S ∧ IsChain (· ≤ ·) S ∧\n    (∀ T : Set (Subgroup G), T ⊆ S → sInf T ∈ S) ∧\n    (∀ T : Set (Subgroup G), T ⊆ S → sSup T ∈ S)\n\n/-- A jump in a subgroup system is a consecutive strict pair of its members. -/\ndef IsJump (S : Set (Subgroup G)) (A B : Subgroup G) : Prop :=\n  A ∈ S ∧ B ∈ S ∧ A < B ∧ ¬ ∃ C ∈ S, A < C ∧ C < B\n\n/-- A subgroup system has abelian factors if $[B,B] \\leq A$ at every jump\n$A < B$, equivalently, whenever the factor is defined, $B/A$ is abelian. -/\ndef HasAbelianFactors (S : Set (Subgroup G)) : Prop :=\n  ∀ ⦃A B : Subgroup G⦄, IsJump S A B → ⁅B, B⁆ ≤ A\n\n/-- An invariant system is a complete subgroup system all of whose members are\nnormal in the ambient group. -/\ndef IsInvariantSystem (S : Set (Subgroup G)) : Prop :=\n  IsCompleteSubgroupSystem S ∧ ∀ H ∈ S, H.Normal\n\n/-- A normal system is a complete subgroup system in which, at every jump\n$A < B$, the lower member $A$ is normal in $B$. The latter condition is\nexpressed by $B \\leq N_G(A)$. -/\ndef IsNormalSystem (S : Set (Subgroup G)) : Prop :=\n  IsCompleteSubgroupSystem S ∧\n    ∀ ⦃A B : Subgroup G⦄, IsJump S A B → B ≤ A.normalizer\n\n/-- A group is in Kurosh's class $\\overline{SI}$ if every invariant system has\nan invariant refinement with abelian factors. -/\ndef IsSIBarGroup (G : Type u) [Group G] : Prop :=\n  ∀ S : Set (Subgroup G), IsInvariantSystem S →\n    ∃ T : Set (Subgroup G), IsInvariantSystem T ∧ S ⊆ T ∧ HasAbelianFactors T\n\n/-- A group is in Kurosh's class $\\overline{SN}$ if every normal system has a\nnormal refinement with abelian factors. -/\ndef IsSNBarGroup (G : Type u) [Group G] : Prop :=\n  ∀ S : Set (Subgroup G), IsNormalSystem S →\n    ∃ T : Set (Subgroup G), IsNormalSystem T ∧ S ⊆ T ∧ HasAbelianFactors T\n\n/-- A linear group is a group that embeds in $\\operatorname{GL}_n(F)$ for some\nnatural number $n$ and some field $F$. -/\ndef IsLinearGroup (G : Type u) [Group G] : Prop :=\n  ∃ (n : ℕ) (F : Type u) (_ : Field F),\n    ∃ f : G →* GL (Fin n) F, Function.Injective f\n\n/--\n(John S. Wilson.) Is every linear $\\overline{SI}$-group an\n$\\overline{SN}$-group?\n\nHere the field and the dimension in \"linear\" are arbitrary. No finite\ngeneration assumption is imposed.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry\n\nend Kourovka.«7.41»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented a complete subgroup system as a set of subgroups containing bottom and top, linearly ordered by inclusion, and closed under arbitrary lattice infima and suprema.",
+    "Represented a jump as a consecutive strict pair A < B in the system.",
+    "Expressed normality of A in B by B ≤ A.normalizer, and expressed abelianness of the jump factor B/A by ⁅B, B⁆ ≤ A.",
+    "Interpreted refinement as inclusion of subgroup systems, requiring an invariant refinement for SI-bar and a normal refinement for SN-bar.",
+    "Represented linearity by an injective group homomorphism into GL (Fin n) F for some natural n and arbitrary field F; no characteristic, finiteness, or finite-generation restrictions were imposed."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's IsChain and the CompleteLattice instance on Subgroup.",
+     "name": "IsCompleteSubgroupSystem",
+     "why_needed": "Mathlib has subgroup lattices and chains but no Kurosh complete subgroup-system predicate."
+    },
+    {
+     "closest_existing_considered": "Mathlib order successor predicates and finite RelSeries; neither describes jumps internal to an arbitrary set-valued chain.",
+     "name": "IsJump",
+     "why_needed": "The Kurosh definitions impose conditions at consecutive members of possibly non-well-ordered complete subgroup systems."
+    },
+    {
+     "closest_existing_considered": "Mathlib's subgroup commutator and quotient-group APIs.",
+     "name": "HasAbelianFactors",
+     "why_needed": "No existing predicate states that every jump factor of an arbitrary complete subgroup system is abelian."
+    },
+    {
+     "closest_existing_considered": "Subgroup.Normal together with IsChain.",
+     "name": "IsInvariantSystem",
+     "why_needed": "No existing notion combines completeness of a subgroup chain with ambient normality of every member."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalizer and finite subgroup-series notions.",
+     "name": "IsNormalSystem",
+     "why_needed": "No existing notion captures Kurosh normal systems, where the lower member is normal in the upper member at each jump."
+    },
+    {
+     "closest_existing_considered": "Searches for SI-bar, invariant systems, subgroup series, and refinement found no matching primitive.",
+     "name": "IsSIBarGroup",
+     "why_needed": "Kurosh's barred SI class is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Searches for SN-bar, normal systems, subgroup series, and refinement found no matching primitive.",
+     "name": "IsSNBarGroup",
+     "why_needed": "Kurosh's barred SN class is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Matrix.GeneralLinearGroup (notation GL) and injective group homomorphisms.",
+     "name": "IsLinearGroup",
+     "why_needed": "No general predicate was found for abstract groups embedding into GL_n over some arbitrary field."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.41»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.41»": "/--\n(John S. Wilson.) Is every linear $\\overline{SI}$-group an\n$\\overline{SN}$-group?\n\nHere the field and the dimension in \"linear\" are arbitrary. No finite\ngeneration assumption is imposed.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.41\n\nby Yu. I. Merzlyakov\n\nIs every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nHere the barred classes are defined using complete systems in the sense of Kurosh, rather than\nascending series. An invariant system is a complete linearly ordered system of subgroups, all of\nwhich are normal in the ambient group. A normal system only requires the lower subgroup to be\nnormal in the upper subgroup at each jump. The relevant refinements have abelian factors at every\njump.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.41»\n\nvariable {G : Type*} [Group G]\n\n/-- A complete subgroup system is a collection of subgroups closed under arbitrary infima and\nsuprema. In particular, it contains the trivial subgroup and the whole group. -/\nabbrev SubgroupSystem (G : Type*) [Group G] := CompleteSublattice (Subgroup G)\n\n/-- A subgroup system is linearly ordered when any two of its members are comparable by\ninclusion. -/\ndef IsLinearlyOrdered (S : SubgroupSystem G) : Prop :=\n  ∀ A ∈ S, ∀ B ∈ S, A ≤ B ∨ B ≤ A\n\n/-- The pair $A < B$ is a jump in a subgroup system if no member of the system lies strictly\nbetween $A$ and $B$. -/\ndef IsJump (S : SubgroupSystem G) (A B : Subgroup G) : Prop :=\n  A ∈ S ∧ B ∈ S ∧ A < B ∧ ¬ ∃ C ∈ S, A < C ∧ C < B\n\n/-- The subgroup $A$ is normal in the subgroup $B$ of the same ambient group. -/\ndef IsNormalIn (A B : Subgroup G) : Prop :=\n  A ≤ B ∧ ∀ a ∈ A, ∀ b ∈ B, b * a * b⁻¹ ∈ A\n\n/-- An invariant system is a complete linearly ordered system of subgroups, each normal in the\nambient group. -/\ndef IsInvariantSystem (S : SubgroupSystem G) : Prop :=\n  IsLinearlyOrdered S ∧ ∀ A ∈ S, A.Normal\n\n/-- A normal system is a complete linearly ordered system in which, at every jump, the lower\nsubgroup is normal in the upper subgroup. -/\ndef IsNormalSystem (S : SubgroupSystem G) : Prop :=\n  IsLinearlyOrdered S ∧ ∀ A B, IsJump S A B → IsNormalIn A B\n\n/-- The factor associated to $A < B$ is abelian. Elementwise, this says that every commutator of\nelements of $B$ lies in $A$. -/\ndef IsAbelianFactor (A B : Subgroup G) : Prop :=\n  ∀ x ∈ B, ∀ y ∈ B, ⁅x, y⁆ ∈ A\n\n/-- Every factor at a jump of the system is abelian. -/\ndef HasAbelianFactors (S : SubgroupSystem G) : Prop :=\n  ∀ A B, IsJump S A B → IsAbelianFactor A B\n\n/-- The system $T$ refines $S$ if every member of $S$ is also a member of $T$. -/\ndef Refines (T S : SubgroupSystem G) : Prop :=\n  ∀ A ∈ S, A ∈ T\n\n/-- A group is an $\\overline{SI}$-group if every invariant system has an invariant refinement\nwhose factors are abelian. -/\ndef IsSIBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ S : SubgroupSystem G, IsInvariantSystem S →\n    ∃ T : SubgroupSystem G, IsInvariantSystem T ∧ Refines T S ∧ HasAbelianFactors T\n\n/-- A group is an $\\overline{SN}$-group if every normal system has a normal refinement whose\nfactors are abelian. -/\ndef IsSNBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ S : SubgroupSystem G, IsNormalSystem S →\n    ∃ T : SubgroupSystem G, IsNormalSystem T ∧ Refines T S ∧ HasAbelianFactors T\n\n/-- A group is linear if it embeds in $\\operatorname{GL}_n(F)$ for some natural number $n$ and\nsome field $F$. -/\ndef IsLinearGroup (G : Type*) [Group G] : Prop :=\n  ∃ (F : Type) (_ : Field F) (n : ℕ)\n    (ρ : G →* Matrix.GeneralLinearGroup (Fin n) F), Function.Injective ρ\n\n/--\nIs every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nThe systems here are complete subgroup systems in Kurosh's convention; they are not the ascending\nseries used to define the hyperabelian classes $SI^*$ and $SN^*$. The field and the degree of the\nlinear representation are unrestricted, and the group is not assumed to be finitely generated.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry\n\nend Kourovka.«7.41»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A complete subgroup system is represented by `CompleteSublattice (Subgroup G)` together with an explicit totality predicate. Closure under arbitrary suprema and infima includes the bottom and top subgroups and models Kurosh completeness.",
+    "A jump is a consecutive strict pair of members: there is no system member strictly between its endpoints.",
+    "An invariant refinement is required to remain invariant, and a normal refinement is required to remain normal; refinement itself is inclusion of the original system's members in the refined system.",
+    "Relative normality is stated elementwise inside the common ambient group. Abelianity of a jump factor B/A is stated equivalently by requiring every commutator of elements of B to lie in A.",
+    "Linearity means the existence of an injective group homomorphism into `Matrix.GeneralLinearGroup (Fin n) F` for some natural number n and arbitrary field F. No finite-generation, characteristic, or field-cardinality restriction is imposed."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `CompleteSublattice (Subgroup G)`, used as the underlying representation.",
+     "name": "SubgroupSystem",
+     "why_needed": "Kurosh complete subgroup systems are not represented by a dedicated Mathlib type."
+    },
+    {
+     "closest_existing_considered": "`IsTotal` and pairwise order predicates; an explicit memberwise predicate is clearer for a sublattice carrier.",
+     "name": "IsLinearlyOrdered",
+     "why_needed": "A Kurosh system must be a chain, while `CompleteSublattice` alone does not impose totality."
+    },
+    {
+     "closest_existing_considered": "Mathlib order-cover and Jordan–Hölder APIs, which do not provide the needed predicate for arbitrary complete subgroup systems.",
+     "name": "IsJump",
+     "why_needed": "The normality and factor conditions apply to consecutive members of a possibly non-discrete complete system."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.Normal` and subgroup `comap`/quotient constructions.",
+     "name": "IsNormalIn",
+     "why_needed": "Mathlib's `Subgroup.Normal` expresses normality in the ambient group, not normality of one ambient subgroup inside another."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.Normal` combined with `CompleteSublattice`.",
+     "name": "IsInvariantSystem",
+     "why_needed": "Mathlib has no predicate for Kurosh invariant complete systems."
+    },
+    {
+     "closest_existing_considered": "Finite normal/composition series and Jordan–Hölder APIs, which do not model arbitrary complete systems.",
+     "name": "IsNormalSystem",
+     "why_needed": "Mathlib has no predicate for Kurosh normal complete systems with relative normality only at jumps."
+    },
+    {
+     "closest_existing_considered": "`QuotientGroup` and `IsMulCommutative`; the equivalent commutator containment formulation is used.",
+     "name": "IsAbelianFactor",
+     "why_needed": "A direct predicate is needed for abelian jump factors without constructing a quotient with local normality instances."
+    },
+    {
+     "closest_existing_considered": "Composition-series/Jordan–Hölder APIs, which concern finite maximal chains.",
+     "name": "HasAbelianFactors",
+     "why_needed": "Mathlib has no factor predicate over all jumps of an arbitrary complete subgroup system."
+    },
+    {
+     "closest_existing_considered": "Set inclusion of the carriers, which this definition directly expresses.",
+     "name": "Refines",
+     "why_needed": "Mathlib has no refinement relation for complete subgroup systems."
+    },
+    {
+     "closest_existing_considered": "Solvable and ascending-series notions; these are not faithful because the barred class quantifies over every invariant complete system.",
+     "name": "IsSIBarGroup",
+     "why_needed": "The Kurosh barred SI class is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Solvable, subnormal-series, and ascending-series notions; these do not quantify over every normal complete system.",
+     "name": "IsSNBarGroup",
+     "why_needed": "The Kurosh barred SN class is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "`Matrix.GeneralLinearGroup` and injective `MonoidHom`, which are used to define the predicate.",
+     "name": "IsLinearGroup",
+     "why_needed": "No existing repository predicate was found for an abstract group admitting a faithful finite-dimensional representation over some arbitrary field."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.41»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.41»": "/--\nIs every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nThe systems here are complete subgroup systems in Kurosh's convention; they are not the ascending\nseries used to define the hyperabelian classes $SI^*$ and $SN^*$. The field and the degree of the\nlinear representation are unrestricted, and the group is not assumed to be finitely generated.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.41\n\nby Yu. I. Merzlyakov\n\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nThe classes $\\overline{SI}$ and $\\overline{SN}$ are Kurosh's classes of generalized solvable\ngroups. A *system* of subgroups of a group $G$ is a set of subgroups of $G$ that is linearly\nordered by inclusion and *complete*: the union and the intersection of every subset of the\nsystem again belong to the system (in particular the system contains $1$ and $G$). A *jump* of\na system is a pair $A < B$ of its members with no member strictly between them, and the\n*factors* of the system are the quotients $B/A$ over its jumps. A system is *normal* if $A$ is\nnormal in $B$ for every jump $A < B$, and *invariant* if in addition every member is normal in\n$G$. A normal (invariant) system is *solvable* if all its factors are abelian. A system\n$\\mathfrak{B}$ *refines* a system $\\mathfrak{A}$ if $\\mathfrak{A} \\subseteq \\mathfrak{B}$.\n\n* $G$ is an $\\overline{SN}$-group if every normal system of $G$ can be refined to a solvable\n  normal system.\n* $G$ is an $\\overline{SI}$-group if every invariant system of $G$ can be refined to a solvable\n  invariant system.\n\nSystems are arbitrary complete chains of subgroups, not necessarily well-ordered. So these\nclasses are not the classes $SN^*$ and $SI^*$ (hyperabelian groups) defined by ascending series.\n\nA group is *linear* if it is isomorphic to a subgroup of $\\mathrm{GL}_n(F)$ for some $n$ and\nsome field $F$. No restriction is placed on the field or on the group.\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 7.41\n* A. G. Kurosh, *The Theory of Groups*, Vol. II, Chelsea, New York, 1960\n* D. J. S. Robinson, *Finiteness Conditions and Generalized Soluble Groups*, Part 1,\n  Springer, 1972, Chapter 1\n-/\n\nnamespace Kourovka.«7.41»\n\nopen Matrix\n\nuniverse u\n\nvariable {G : Type*} [Group G]\n\n/-- A *complete system* of subgroups of `G` (Kurosh): a set of subgroups of `G` that is linearly\nordered by inclusion and closed under suprema and infima of all its subsets. For a chain of\nsubgroups the supremum of a non-empty subset is its union and the infimum is its intersection,\nand `sSup ∅ = ⊥`, `sInf ∅ = ⊤`, so a complete system contains `⊥` and `⊤`. -/\nstructure IsCompleteSystem (𝔄 : Set (Subgroup G)) : Prop where\n  isChain : IsChain (· ≤ ·) 𝔄\n  sSup_mem : ∀ S ⊆ 𝔄, sSup S ∈ 𝔄\n  sInf_mem : ∀ S ⊆ 𝔄, sInf S ∈ 𝔄\n\n/-- `(A, B)` is a *jump* of the system `𝔄`: `A < B` are members of `𝔄` and no member of `𝔄`\nlies strictly between them. The *factor* of the jump is the quotient `B ⧸ A`. -/\ndef IsJump (𝔄 : Set (Subgroup G)) (A B : Subgroup G) : Prop :=\n  A ∈ 𝔄 ∧ B ∈ 𝔄 ∧ A < B ∧ ∀ C ∈ 𝔄, ¬ (A < C ∧ C < B)\n\n/-- A *normal system* of `G` (Kurosh): a complete system in which `A` is a normal subgroup of `B`\nfor every jump `(A, B)`. -/\nstructure IsNormalSystem (𝔄 : Set (Subgroup G)) : Prop extends IsCompleteSystem 𝔄 where\n  normal_of_isJump : ∀ A B, IsJump 𝔄 A B → (A.subgroupOf B).Normal\n\n/-- An *invariant system* of `G` (Kurosh): a normal system all of whose members are normal\nsubgroups of `G`. -/\nstructure IsInvariantSystem (𝔄 : Set (Subgroup G)) : Prop extends IsNormalSystem 𝔄 where\n  normal : ∀ A ∈ 𝔄, A.Normal\n\n/-- The system `𝔄` has abelian factors: for every jump `(A, B)` of `𝔄` the factor `B ⧸ A` is\nabelian, i.e. `⁅B, B⁆ ≤ A`. A normal (invariant) system with abelian factors is a *solvable*\nnormal (invariant) system in Kurosh's terminology. -/\ndef HasAbelianFactors (𝔄 : Set (Subgroup G)) : Prop :=\n  ∀ A B, IsJump 𝔄 A B → ⁅B, B⁆ ≤ A\n\n/-- `G` is an $\\overline{SN}$-group: every normal system of `G` can be refined to a normal system\nwith abelian factors. -/\ndef IsSNBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ 𝔄 : Set (Subgroup G), IsNormalSystem 𝔄 →\n    ∃ 𝔅, 𝔄 ⊆ 𝔅 ∧ IsNormalSystem 𝔅 ∧ HasAbelianFactors 𝔅\n\n/-- `G` is an $\\overline{SI}$-group: every invariant system of `G` can be refined to an invariant\nsystem with abelian factors. -/\ndef IsSIBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ 𝔄 : Set (Subgroup G), IsInvariantSystem 𝔄 →\n    ∃ 𝔅, 𝔄 ⊆ 𝔅 ∧ IsInvariantSystem 𝔅 ∧ HasAbelianFactors 𝔅\n\n/-- `G` is a *linear group*: it is isomorphic to a subgroup of $\\mathrm{GL}_n(F)$ for some\n`n : ℕ` and some field `F`. Taking `F` in the universe of `G` loses no generality: the subfield\ngenerated by the matrix entries of the image of `G` has cardinality at most `max #G ℵ₀`. -/\ndef IsLinearGroup (G : Type u) [Group G] : Prop :=\n  ∃ (n : ℕ) (F : Type u) (_ : Field F) (f : G →* GL (Fin n) F), Function.Injective f\n\n/-- A complete system contains the trivial subgroup. -/\n@[category API, AMS 20]\ntheorem IsCompleteSystem.bot_mem {𝔄 : Set (Subgroup G)} (h : IsCompleteSystem 𝔄) : ⊥ ∈ 𝔄 := by\n  simpa using h.sSup_mem ∅ (Set.empty_subset _)\n\n/-- A complete system contains the whole group. -/\n@[category API, AMS 20]\ntheorem IsCompleteSystem.top_mem {𝔄 : Set (Subgroup G)} (h : IsCompleteSystem 𝔄) : ⊤ ∈ 𝔄 := by\n  simpa using h.sInf_mem ∅ (Set.empty_subset _)\n\n/-- The two-element system `{⊥, ⊤}` is an invariant system of every group. -/\n@[category test, AMS 20]\ntheorem isInvariantSystem_pair : IsInvariantSystem ({⊥, ⊤} : Set (Subgroup G)) where\n  isChain := by\n    rintro A (rfl | rfl) B (rfl | rfl) _\n    · exact Or.inl le_rfl\n    · exact Or.inl bot_le\n    · exact Or.inr bot_le\n    · exact Or.inl le_rfl\n  sSup_mem S hS := by\n    by_cases hT : ⊤ ∈ S\n    · exact Or.inr (top_le_iff.mp (le_sSup hT))\n    · refine Or.inl (le_bot_iff.mp (sSup_le fun A hA => ?_))\n      rcases hS hA with rfl | rfl\n      · exact le_rfl\n      · exact absurd hA hT\n  sInf_mem S hS := by\n    by_cases hB : ⊥ ∈ S\n    · exact Or.inl (le_bot_iff.mp (sInf_le hB))\n    · refine Or.inr (top_le_iff.mp (le_sInf fun A hA => ?_))\n      rcases hS hA with rfl | rfl\n      · exact absurd hA hB\n      · exact le_rfl\n  normal_of_isJump A B hAB := by\n    rcases hAB.1 with rfl | rfl\n    · infer_instance\n    · infer_instance\n  normal A hA := by\n    rcases hA with rfl | rfl\n    · infer_instance\n    · infer_instance\n\n/--\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nHere a group is linear if it is isomorphic to a subgroup of $\\mathrm{GL}_n(F)$ for some $n$ and\nsome field $F$; it is an $\\overline{SI}$-group if every invariant system of subgroups can be\nrefined to an invariant system with abelian factors, and an $\\overline{SN}$-group if every normal\nsystem of subgroups can be refined to a normal system with abelian factors.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry\n\nend Kourovka.«7.41»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's single slot and its notes (Kurosh's bar classes with arbitrary complete systems, arbitrary field, no finite-generation assumption) were followed exactly.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "SI-bar is read per Kurosh: every invariant system can be refined to a solvable *invariant* system (the refinement must again consist of G-normal subgroups). If a reviewer believes Kurosh/Wilson only require a solvable normal refinement, change `IsInvariantSystem 𝔅` to `IsNormalSystem 𝔅` in `IsSIBarGroup`; under the present reading neither inclusion between SI-bar and SN-bar is trivial, matching the notes.",
+    "A 'system' is a chain of subgroups closed under sSup and sInf of *all* subsets (Kurosh's completeness). For a chain, sSup of a non-empty subset is the set-theoretic union (Subgroup.mem_sSup_of_directedOn), and sSup ∅ = ⊥, sInf ∅ = ⊤ encode Kurosh's requirement that the system contain 1 and G. Systems are not required to be well-ordered, so these are not the ascending-series classes SN*/SI*.",
+    "A jump is defined directly (A < B in 𝔄 with no member of 𝔄 strictly between) rather than via `CovBy` on the subtype; the factor B/A is never formed as a quotient type. 'B/A abelian' is encoded as ⁅B, B⁆ ≤ A (Subgroup.commutator_le shows this is exactly ∀ x y ∈ B, [x,y] ∈ A), avoiding the need for a Normal instance on the quotient.",
+    "'A normal in B' at a jump is `(A.subgroupOf B).Normal`, the standard Mathlib idiom.",
+    "Invariant systems are defined as normal systems all of whose members are normal in G (literally Kurosh's definition; the jump-normality clause is then redundant but harmless).",
+    "Refinement is set inclusion 𝔄 ⊆ 𝔅 of systems, as in Kurosh.",
+    "Linear group: ∃ n : ℕ, ∃ field F, ∃ injective group hom G →* GL (Fin n) F. The field F is taken in the same universe as G (Type u for G : Type u); this loses no generality since the subfield generated by the matrix entries of the image of G has cardinality ≤ max(#G, ℵ₀). No characteristic, finiteness, or finite-generation restriction is imposed, per the notes. The main theorem quantifies over G : Type, following the repository's convention.",
+    "Two API lemmas (⊥, ⊤ ∈ every complete system) and one test (the two-element system {⊥, ⊤} is an invariant system of any group) are included with proofs, as CONTRIBUTING.md asks for basic API tests of bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `CompositionSeries` / `RelSeries` (finite only) and `IsAscendingCentralSeries` (ℕ-indexed only); `IsChain` is used as a component.",
+     "name": "Kourovka.«7.41».IsCompleteSystem",
+     "why_needed": "Kurosh's complete system of subgroups: a chain of subgroups closed under sSup and sInf of all subsets (hence containing ⊥ and ⊤). Needed as the carrier notion for normal/invariant systems, which may be transfinite and not well-ordered."
+    },
+    {
+     "closest_existing_considered": "`CovBy` (`⋖`), which works on the whole lattice rather than inside the subset 𝔄; using it on the subtype ↥𝔄 was judged less readable.",
+     "name": "Kourovka.«7.41».IsJump",
+     "why_needed": "A jump (A, B) of a system: A < B members with no member strictly between; the factors of a system are the quotients over jumps."
+    },
+    {
+     "closest_existing_considered": "No Mathlib notion of (transfinite) normal series / serial subgroups exists; `Subgroup.Normal` and `Subgroup.subgroupOf` are used as components.",
+     "name": "Kourovka.«7.41».IsNormalSystem",
+     "why_needed": "Kurosh's normal system: complete system with A normal in B at every jump."
+    },
+    {
+     "closest_existing_considered": "Same as above; nothing in Mathlib models chains of normal subgroups with jump structure.",
+     "name": "Kourovka.«7.41».IsInvariantSystem",
+     "why_needed": "Kurosh's invariant system: normal system all of whose members are normal in G."
+    },
+    {
+     "closest_existing_considered": "`IsSolvable` / `derivedSeries` (finite derived length only) and `IsMulCommutative (B ⧸ A.subgroupOf B)` (requires a Normal instance on the quotient); `Subgroup.commutator` bracket is used instead.",
+     "name": "Kourovka.«7.41».HasAbelianFactors",
+     "why_needed": "All factors B/A over jumps are abelian (⁅B, B⁆ ≤ A); this is Kurosh's 'solvable' system when combined with normality."
+    },
+    {
+     "closest_existing_considered": "`IsSolvable` (finite series only) — not equivalent.",
+     "name": "Kourovka.«7.41».IsSNBarGroup",
+     "why_needed": "Kurosh's class SN-bar: every normal system refines to a normal system with abelian factors."
+    },
+    {
+     "closest_existing_considered": "`IsSolvable` — not equivalent; no hyperabelian/SI-type class in Mathlib or the repo.",
+     "name": "Kourovka.«7.41».IsSIBarGroup",
+     "why_needed": "Kurosh's class SI-bar: every invariant system refines to an invariant system with abelian factors."
+    },
+    {
+     "closest_existing_considered": "`Matrix.GeneralLinearGroup` / `GL` (used as a component); no `IsLinear`-style predicate exists in Mathlib or FormalConjecturesForMathlib (only `diagonalSubgroup` helpers).",
+     "name": "Kourovka.«7.41».IsLinearGroup",
+     "why_needed": "A group isomorphic to a subgroup of GL_n(F) for some n and some field F."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.41»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G, with Kurosh's complete-chain systems, jumps, normal/invariant systems, abelian factors, refinement-as-superset, and linearity over an arbitrary field, all defined in the file since Mathlib and FormalConjecturesForMathlib have no notion of (transfinite, non-well-ordered) normal/invariant systems or of linear groups."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.41»": "/--\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nHere a group is linear if it is isomorphic to a subgroup of $\\mathrm{GL}_n(F)$ for some $n$ and\nsome field $F$; it is an $\\overline{SI}$-group if every invariant system of subgroups can be\nrefined to an invariant system with abelian factors, and an $\\overline{SN}$-group if every normal\nsystem of subgroups can be refined to a normal system with abelian factors.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.41\n\nby Yu. I. Merzlyakov\n\nIs every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.41»\n\nvariable {G : Type*} [Group G]\n\n/-- A complete subgroup system is a set of subgroups which is linearly ordered by\ninclusion and is closed under arbitrary infima and suprema. In particular, it\ncontains both the trivial subgroup and the whole group. -/\ndef IsCompleteSubgroupSystem (S : Set (Subgroup G)) : Prop :=\n  IsChain (· ≤ ·) S ∧\n    ∀ T : Set (Subgroup G), T ⊆ S → sInf T ∈ S ∧ sSup T ∈ S\n\n/-- A pair $A < B$ is a jump of a subgroup system if there is no member of the\nsystem strictly between $A$ and $B$. -/\ndef IsJump (S : Set (Subgroup G)) (A B : Subgroup G) : Prop :=\n  A ∈ S ∧ B ∈ S ∧ A < B ∧ ¬∃ C ∈ S, A < C ∧ C < B\n\n/-- An invariant system is a complete subgroup system every member of which is\nnormal in the whole group. -/\ndef IsInvariantSystem (S : Set (Subgroup G)) : Prop :=\n  IsCompleteSubgroupSystem S ∧ ∀ A ∈ S, A.Normal\n\n/-- A normal system is a complete subgroup system such that at every jump the\nlower subgroup is normal in the upper subgroup. -/\ndef IsNormalSystem (S : Set (Subgroup G)) : Prop :=\n  IsCompleteSubgroupSystem S ∧\n    ∀ A B : Subgroup G, IsJump S A B → (A.subgroupOf B).Normal\n\n/-- A subgroup system has abelian factors if, at every jump $A < B$, the factor\n$B/A$ is abelian. Normality is included so that this factor is defined; the\ncommutator condition says precisely that it is abelian. -/\ndef HasAbelianFactors (S : Set (Subgroup G)) : Prop :=\n  ∀ A B : Subgroup G, IsJump S A B →\n    (A.subgroupOf B).Normal ∧ ∀ x y : B, ⁅(x : G), (y : G)⁆ ∈ A\n\n/-- An $\\overline{SI}$-group is one in which every invariant system has an\ninvariant refinement with abelian factors. -/\ndef IsSIBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ S : Set (Subgroup G), IsInvariantSystem S →\n    ∃ T : Set (Subgroup G), S ⊆ T ∧ IsInvariantSystem T ∧ HasAbelianFactors T\n\n/-- An $\\overline{SN}$-group is one in which every normal system has a normal\nrefinement with abelian factors. -/\ndef IsSNBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ S : Set (Subgroup G), IsNormalSystem S →\n    ∃ T : Set (Subgroup G), S ⊆ T ∧ IsNormalSystem T ∧ HasAbelianFactors T\n\n/-- A group is linear if it has a faithful finite-dimensional representation\nover some field. -/\ndef IsLinearGroup (G : Type*) [Group G] : Prop :=\n  ∃ (n : ℕ) (F : Type) (_ : Field F)\n    (ρ : G →* Matrix.GeneralLinearGroup (Fin n) F), Function.Injective ρ\n\n/--\n(John S. Wilson). Is every linear $\\overline{SI}$-group an\n$\\overline{SN}$-group?\n\nHere subgroup systems are complete linearly ordered sets of subgroups.\nInvariant systems consist of subgroups normal in the whole group, while in a\nnormal system the lower subgroup is normal in the upper subgroup at every\njump. Refinements are again invariant systems or normal systems, respectively.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry\n\nend Kourovka.«7.41»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A complete subgroup system is represented by a set of subgroups that is a chain under inclusion and is closed under arbitrary ambient infima and suprema; closure of the empty subfamily forces the whole and trivial subgroups to belong to the system.",
+    "A jump is a pair of members A < B with no member strictly between them. A normal system requires A to be normal in B at every such jump, rather than requiring an ascending-series presentation.",
+    "An abelian factor B/A is expressed by normality of A in B together with the equivalent commutator condition that every commutator of elements of B lies in A.",
+    "A refinement is set inclusion. Refinements of invariant systems are required to remain invariant systems, and refinements of normal systems are required to remain normal systems.",
+    "Linearity is expressed by an injective homomorphism into GL(Fin n, F) for some natural number n and arbitrary field F; this is equivalent to being isomorphic to a subgroup of a finite-dimensional general linear group."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's Set.IsChain and complete-lattice operations sInf/sSup supply the components, but CompleteSublattice does not also encode the required chain/system notion.",
+     "name": "IsCompleteSubgroupSystem",
+     "why_needed": "Kurosh's complete linearly ordered subgroup systems are not represented by an existing repository predicate."
+    },
+    {
+     "closest_existing_considered": "Mathlib strict order and interval predicates exist, but no subgroup-system jump predicate was found.",
+     "name": "IsJump",
+     "why_needed": "Normality and factor conditions in a possibly transfinite complete system apply to consecutive pairs, requiring an explicit jump predicate."
+    },
+    {
+     "closest_existing_considered": "Mathlib has Subgroup.Normal but no predicate combining it with a complete subgroup chain.",
+     "name": "IsInvariantSystem",
+     "why_needed": "The barred SI class quantifies over complete subgroup systems whose members are all normal in the ambient group."
+    },
+    {
+     "closest_existing_considered": "Mathlib has Subgroup.subgroupOf and Subgroup.Normal, but no Kurosh normal-system predicate.",
+     "name": "IsNormalSystem",
+     "why_needed": "The barred SN class quantifies over complete subgroup systems with normality at each jump."
+    },
+    {
+     "closest_existing_considered": "Mathlib quotient groups and IsMulCommutative were considered; the direct normality-plus-commutator criterion avoids dependent quotient typeclass plumbing and exactly characterizes abelian jump factors.",
+     "name": "HasAbelianFactors",
+     "why_needed": "Both barred classes require refinements whose factors at all jumps are abelian."
+    },
+    {
+     "closest_existing_considered": "Mathlib's solvable-group and derived-series notions describe finite or ascending-series conditions and are not the barred SI condition.",
+     "name": "IsSIBarGroup",
+     "why_needed": "The Kurosh barred SI class is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's solvable-group and derived-series notions do not quantify over all Kurosh normal systems and their refinements.",
+     "name": "IsSNBarGroup",
+     "why_needed": "The Kurosh barred SN class is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides Matrix.GeneralLinearGroup and monoid homomorphisms, from which the standard faithful-representation definition is built.",
+     "name": "IsLinearGroup",
+     "why_needed": "No group-level predicate for existence of a faithful finite-dimensional representation over some arbitrary field was found."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.41»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.41»": "/--\n(John S. Wilson). Is every linear $\\overline{SI}$-group an\n$\\overline{SN}$-group?\n\nHere subgroup systems are complete linearly ordered sets of subgroups.\nInvariant systems consist of subgroups normal in the whole group, while in a\nnormal system the lower subgroup is normal in the upper subgroup at every\njump. Refinements are again invariant systems or normal systems, respectively.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.41\n\nby Yu. I. Merzlyakov\n\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nHere $\\overline{SI}$ and $\\overline{SN}$ are Kurosh's classes of generalized soluble groups.\nA *normal system* of a group $G$ is a set $\\mathfrak{A}$ of subgroups of $G$ which contains\n$1$ and $G$, is linearly ordered by inclusion, is complete (the union and the intersection of\nevery subset of $\\mathfrak{A}$ belong to $\\mathfrak{A}$), and in which $A$ is normal in $B$\nfor every *jump* $A < B$ of $\\mathfrak{A}$ (a pair of members of $\\mathfrak{A}$ with no member\nof $\\mathfrak{A}$ strictly between them). The quotients $B/A$ over the jumps are the *factors*\nof the system. An *invariant system* is a normal system all of whose members are normal in\n$G$. A system is *soluble* if all of its factors are abelian, and $\\mathfrak{B}$ is a\n*refinement* of $\\mathfrak{A}$ if $\\mathfrak{A} \\subseteq \\mathfrak{B}$.\n\n* $G$ is an $\\overline{SN}$-group if every normal system of $G$ can be refined to a soluble\n  normal system.\n* $G$ is an $\\overline{SI}$-group if every invariant system of $G$ can be refined to a soluble\n  invariant system.\n\nA group is *linear* if it is isomorphic to a subgroup of $GL_n(F)$ for some $n \\ge 0$ and some\nfield $F$ (of arbitrary characteristic).\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n* A. G. Kurosh, *The Theory of Groups*, Vol. II, Chapter XIV.\n-/\n\nuniverse u\n\nnamespace Kourovka.«7.41»\n\nvariable {G : Type*} [Group G]\n\n/-- `A < B` is a *jump* of a set `𝔄` of subgroups of `G`: `A` and `B` belong to `𝔄`, `A < B`,\nand no member of `𝔄` lies strictly between `A` and `B`. -/\ndef IsJump (𝔄 : Set (Subgroup G)) (A B : Subgroup G) : Prop :=\n  A ∈ 𝔄 ∧ B ∈ 𝔄 ∧ A < B ∧ ∀ C ∈ 𝔄, ¬ (A < C ∧ C < B)\n\n/-- A set `𝔄` of subgroups of `G` is a *normal system* of `G` (in the sense of Kurosh) if it\ncontains `⊥` and `⊤`, is linearly ordered by inclusion, is complete (it contains the union\n`sSup S` and the intersection `sInf S` of every subset `S ⊆ 𝔄`), and `A` is a normal subgroup of\n`B` for every jump `A < B` of `𝔄`. -/\nstructure IsNormalSystem (𝔄 : Set (Subgroup G)) : Prop where\n  bot_mem : ⊥ ∈ 𝔄\n  top_mem : ⊤ ∈ 𝔄\n  isChain : IsChain (· ≤ ·) 𝔄\n  sSup_mem : ∀ S ⊆ 𝔄, sSup S ∈ 𝔄\n  sInf_mem : ∀ S ⊆ 𝔄, sInf S ∈ 𝔄\n  normal_of_isJump : ∀ A B, IsJump 𝔄 A B → (A.subgroupOf B).Normal\n\n/-- A set `𝔄` of subgroups of `G` is an *invariant system* of `G` if it is a normal system all\nof whose members are normal subgroups of `G`. -/\nstructure IsInvariantSystem (𝔄 : Set (Subgroup G)) : Prop extends IsNormalSystem 𝔄 where\n  normal : ∀ A ∈ 𝔄, A.Normal\n\n/-- A set `𝔄` of subgroups of `G` has *abelian factors* if for every jump `A < B` of `𝔄` the\nfactor `B / A` is abelian, i.e. `⁅B, B⁆ ≤ A`. A normal system with abelian factors is called\n*soluble*. -/\ndef HasAbelianFactors (𝔄 : Set (Subgroup G)) : Prop :=\n  ∀ A B, IsJump 𝔄 A B → ⁅B, B⁆ ≤ A\n\n/-- A group `G` is an $\\overline{SN}$-group if every normal system of `G` can be refined to a\nsoluble normal system, i.e. is contained in a normal system with abelian factors. -/\ndef IsSNBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ 𝔄 : Set (Subgroup G), IsNormalSystem 𝔄 →\n    ∃ 𝔅 : Set (Subgroup G), 𝔄 ⊆ 𝔅 ∧ IsNormalSystem 𝔅 ∧ HasAbelianFactors 𝔅\n\n/-- A group `G` is an $\\overline{SI}$-group if every invariant system of `G` can be refined to a\nsoluble invariant system, i.e. is contained in an invariant system with abelian factors. -/\ndef IsSIBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ 𝔄 : Set (Subgroup G), IsInvariantSystem 𝔄 →\n    ∃ 𝔅 : Set (Subgroup G), 𝔄 ⊆ 𝔅 ∧ IsInvariantSystem 𝔅 ∧ HasAbelianFactors 𝔅\n\n/-- A group `G` is *linear* if it embeds into $GL_n(F)$ for some `n : ℕ` and some field `F`.\n\nThe field `F` is taken in the same universe as `G`; this is no loss of generality, since the\nsubfield generated by the matrix entries of the image of `G` has cardinality at most\n`max ℵ₀ #G`. -/\ndef IsLinearGroup (G : Type u) [Group G] : Prop :=\n  ∃ (F : Type u) (_ : Field F) (n : ℕ) (φ : G →* GL (Fin n) F), Function.Injective φ\n\n/-- The trivial system `{⊥, ⊤}` is an invariant system of every group `G`. -/\n@[category test, AMS 20]\ntheorem isInvariantSystem_pair : IsInvariantSystem ({⊥, ⊤} : Set (Subgroup G)) where\n  bot_mem := by simp\n  top_mem := by simp\n  isChain := by\n    rintro A (rfl | rfl) B (rfl | rfl) _ <;> simp\n  sSup_mem S hS := by\n    by_cases h : ⊤ ∈ S\n    · simp [top_unique (le_sSup h)]\n    · have : sSup S = ⊥ := le_bot_iff.mp <| sSup_le fun x hx ↦ by\n        rcases hS hx with rfl | rfl\n        · exact le_rfl\n        · exact absurd hx h\n      simp [this]\n  sInf_mem S hS := by\n    by_cases h : ⊥ ∈ S\n    · simp [bot_unique (sInf_le h)]\n    · have : sInf S = ⊤ := top_unique <| le_sInf fun x hx ↦ by\n        rcases hS hx with rfl | rfl\n        · exact absurd hx h\n        · exact le_rfl\n      simp [this]\n  normal_of_isJump A B hAB := by\n    rcases hAB.1 with rfl | rfl\n    · rw [Subgroup.bot_subgroupOf]; infer_instance\n    · exact absurd hAB.2.2.1 not_top_lt\n  normal A hA := by\n    rcases hA with rfl | rfl <;> infer_instance\n\n/-- Every abelian group is an $\\overline{SN}$-group: each of its normal systems already has\nabelian factors. -/\n@[category test, AMS 20]\ntheorem isSNBarGroup_of_commGroup (G : Type*) [CommGroup G] : IsSNBarGroup G := by\n  intro 𝔄 h𝔄\n  refine ⟨𝔄, le_rfl, h𝔄, fun A B _ ↦ Subgroup.commutator_le.mpr fun g₁ _ g₂ _ ↦ ?_⟩\n  rw [commutatorElement_eq_one_iff_mul_comm.mpr (mul_comm g₁ g₂)]\n  exact A.one_mem\n\n/-- Every abelian group is an $\\overline{SI}$-group: each of its invariant systems already has\nabelian factors. -/\n@[category test, AMS 20]\ntheorem isSIBarGroup_of_commGroup (G : Type*) [CommGroup G] : IsSIBarGroup G := by\n  intro 𝔄 h𝔄\n  refine ⟨𝔄, le_rfl, h𝔄, fun A B _ ↦ Subgroup.commutator_le.mpr fun g₁ _ g₂ _ ↦ ?_⟩\n  rw [commutatorElement_eq_one_iff_mul_comm.mpr (mul_comm g₁ g₂)]\n  exact A.one_mem\n\n/-- The general linear group $GL_n(F)$ over a field $F$ is a linear group. -/\n@[category test, AMS 20]\ntheorem isLinearGroup_generalLinearGroup (F : Type u) [Field F] (n : ℕ) :\n    IsLinearGroup (GL (Fin n) F) :=\n  ⟨F, inferInstance, n, MonoidHom.id _, fun _ _ h ↦ h⟩\n\n/--\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nThat is, if a group $G$ is isomorphic to a subgroup of $GL_n(F)$ for some $n$ and some field $F$,\nand every invariant system of $G$ can be refined to an invariant system with abelian factors,\nmust every normal system of $G$ be refinable to a normal system with abelian factors?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry\n\nend Kourovka.«7.41»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition and its notes (Kurosh bar-class convention, arbitrary field, no finite generation) match my reading of the statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "SI-bar requires the refinement to be an invariant (not merely normal) soluble system, and SN-bar requires the refinement to be a normal soluble system — following Kurosh (Theory of Groups, Vol. II) and Robinson (Finiteness Conditions and Generalized Soluble Groups, Part 1). Under this reading the inclusion SI-bar ⊆ SN-bar is non-trivial in both directions, as the decomposition notes require. A reviewer should confirm this reading of Kurosh's $\\overline{SI}$ definition.",
+    "Normal systems are required to be complete (closed under sSup and sInf of every subset; for a chain these are the union and intersection), following Kurosh's definition; ⊥ ∈ 𝔄 and ⊤ ∈ 𝔄 are listed as explicit fields although they also follow from completeness applied to the empty subset.",
+    "Jumps are defined relative to the system (no member of 𝔄 strictly between A and B), not via lattice covering ⋖.",
+    "'Abelian factor' at a jump A < B is encoded as ⁅B, B⁆ ≤ A, which is equivalent to B/A abelian (and implies A ⊴ B).",
+    "Linear group: injective group hom into GL (Fin n) F for a field F (not division ring/commutative ring), n : ℕ arbitrary (n = 0 harmlessly allowed). The field F is placed in the same universe as G; this is no loss of generality (the subfield generated by matrix entries has cardinality ≤ max(ℵ₀, #G)). The main theorem quantifies over G : Type, matching other Kourovka files.",
+    "The trivial group satisfies both classes vacuously (no jumps), so it is not a degenerate counterexample; {⊥, ⊤} is proven to be an invariant system to certify non-vacuity of the hypotheses."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "CovBy / WCovBy on Subgroup G (wrong: relative to the full lattice); CompositionSeries (finite only).",
+     "name": "Kourovka.«7.41».IsJump",
+     "why_needed": "A jump A < B of a system of subgroups (no member of the system strictly between A and B). Needed to express normality at jumps and factors of a system; Mathlib's CovBy (⋖) is covering in the whole subgroup lattice, not relative to the system."
+    },
+    {
+     "closest_existing_considered": "CompositionSeries, IsSolvable (derived series), Subgroup.IsSubnormal-type notions — all finite/ascending only.",
+     "name": "Kourovka.«7.41».IsNormalSystem",
+     "why_needed": "Kurosh's normal system: a set of subgroups containing ⊥ and ⊤, linearly ordered (IsChain), complete (closed under sSup and sInf of all subsets, which for a chain are union and intersection), with A normal in B at every jump. Mathlib has no transfinite/complete series notion."
+    },
+    {
+     "closest_existing_considered": "IsNormalSystem plus Subgroup.Normal (combined here as a structure extension).",
+     "name": "Kourovka.«7.41».IsInvariantSystem",
+     "why_needed": "Kurosh's invariant system: a normal system all of whose members are normal in G."
+    },
+    {
+     "closest_existing_considered": "IsMulCommutative (B ⧸ A.subgroupOf B) — requires a normality instance, so not directly usable inside a predicate over arbitrary jumps.",
+     "name": "Kourovka.«7.41».HasAbelianFactors",
+     "why_needed": "All factors B/A at jumps are abelian, expressed as ⁅B, B⁆ ≤ A (equivalent to B/A abelian given A ⊴ B; avoids needing a Normal instance to form the quotient)."
+    },
+    {
+     "closest_existing_considered": "IsSolvable (far too strong; finite derived series).",
+     "name": "Kourovka.«7.41».IsSNBarGroup",
+     "why_needed": "Kurosh's class SN-bar: every normal system can be refined (⊆) to a normal system with abelian factors."
+    },
+    {
+     "closest_existing_considered": "IsSolvable; no hyperabelian or generalized-soluble class exists in Mathlib.",
+     "name": "Kourovka.«7.41».IsSIBarGroup",
+     "why_needed": "Kurosh's class SI-bar: every invariant system can be refined (⊆) to an invariant system with abelian factors."
+    },
+    {
+     "closest_existing_considered": "Matrix.GeneralLinearGroup (the target group, used in the definition); FormalConjecturesForMathlib/LinearAlgebra/GeneralLinearGroup.lean only defines diagonal subgroups.",
+     "name": "Kourovka.«7.41».IsLinearGroup",
+     "why_needed": "G is linear iff it embeds (injective MonoidHom) into GL (Fin n) F for some n and some field F. No such predicate exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.41»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G, with Kurosh's normal/invariant systems (complete chains containing ⊥ and ⊤, normality at jumps), refinement as set inclusion, and abelian factors as ⁅B, B⁆ ≤ A at every jump. Field arbitrary, G not assumed finitely generated. Bespoke definitions were needed because neither Mathlib nor FormalConjecturesForMathlib has linear groups as a property or Kurosh-style (transfinite, complete) normal/invariant systems."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.41»": "/--\n(John S. Wilson). Is every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nThat is, if a group $G$ is isomorphic to a subgroup of $GL_n(F)$ for some $n$ and some field $F$,\nand every invariant system of $G$ can be refined to an invariant system with abelian factors,\nmust every normal system of $G$ be refinable to a normal system with abelian factors?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.41\n\nby Yu. I. Merzlyakov\n\nIs every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nThe bars refer to Kurosh's classes defined using refinements of complete systems\nof subgroups. They do not refer to the ascending-series classes $SI^*$ and\n$SN^*$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.41»\n\nvariable {G : Type*} [Group G]\n\n/-- A complete subgroup system is a linearly ordered set of subgroups closed\nunder arbitrary infima and suprema. In particular, it contains $\\bot$ and\n$\\top$. -/\ndef IsCompleteSubgroupSystem (S : Set (Subgroup G)) : Prop :=\n  IsChain (· ≤ ·) S ∧\n    ∀ T : Set (Subgroup G), T ⊆ S → sInf T ∈ S ∧ sSup T ∈ S\n\n/-- A jump from $A$ to $B$ in a subgroup system is a strict inclusion with no\nmember of the system strictly between them. -/\ndef IsJump (S : Set (Subgroup G)) (A B : Subgroup G) : Prop :=\n  A ∈ S ∧ B ∈ S ∧ A < B ∧\n    ∀ C ∈ S, ¬ (A < C ∧ C < B)\n\n/-- An invariant system is a complete subgroup system all of whose members are\nnormal in the ambient group. -/\ndef IsInvariantSystem (S : Set (Subgroup G)) : Prop :=\n  IsCompleteSubgroupSystem S ∧ ∀ A ∈ S, A.Normal\n\n/-- A normal system is a complete subgroup system such that at every jump\n$A < B$, the subgroup $A$ is normal in $B$. -/\ndef IsNormalSystem (S : Set (Subgroup G)) : Prop :=\n  IsCompleteSubgroupSystem S ∧\n    ∀ A B, IsJump S A B → (A.comap B.subtype).Normal\n\n/-- A subgroup system has abelian factors if, at every jump $A < B$, the\nfactor $B/A$ is abelian. This is expressed by requiring every commutator of\nelements of $B$ to lie in $A$. -/\ndef HasAbelianFactors (S : Set (Subgroup G)) : Prop :=\n  ∀ A B, IsJump S A B → ∀ x ∈ B, ∀ y ∈ B, ⁅x, y⁆ ∈ A\n\n/-- A group belongs to Kurosh's class $\\overline{SI}$ if every invariant system\ncan be refined to an invariant system with abelian factors. Refinement means\ninclusion of the original system in the new one. -/\ndef IsSIBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ S : Set (Subgroup G), IsInvariantSystem S →\n    ∃ T : Set (Subgroup G), S ⊆ T ∧ IsInvariantSystem T ∧ HasAbelianFactors T\n\n/-- A group belongs to Kurosh's class $\\overline{SN}$ if every normal system can\nbe refined to a normal system with abelian factors. Refinement means inclusion\nof the original system in the new one. -/\ndef IsSNBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ S : Set (Subgroup G), IsNormalSystem S →\n    ∃ T : Set (Subgroup G), S ⊆ T ∧ IsNormalSystem T ∧ HasAbelianFactors T\n\n/-- A linear group is a group isomorphic to a subgroup of $GL_n(F)$ for some\nnatural number $n$ and some field $F$. -/\ndef IsLinearGroup (G : Type*) [Group G] : Prop :=\n  ∃ (n : ℕ) (F : Type) (_ : Field F)\n    (H : Subgroup (Matrix.GeneralLinearGroup (Fin n) F)), Nonempty (G ≃* H)\n\n/--\nIs every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nHere the field and dimension in the linear representation are arbitrary. The\ngroup is not assumed to be finite or finitely generated. The barred classes\nare defined by refinements of complete subgroup systems, rather than by\nascending series.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry\n\nend Kourovka.«7.41»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A subgroup system is represented as a set of subgroups that is linearly ordered by inclusion and closed under infima and suprema of all of its subsets; closure for the empty subset ensures that the trivial subgroup and whole group are included.",
+    "A jump is a consecutive strict pair A < B in the system, with no system member strictly between them.",
+    "For a normal system, normality of A in its jump successor B is represented by normality of A.comap B.subtype as a subgroup of B.",
+    "A refinement is represented by inclusion of the original set of subgroups in the refining set, and the refining system is required to be of the same kind (invariant or normal).",
+    "An abelian jump factor B/A is represented proof-independently by requiring every commutator of two elements of B to belong to A; under the system's jump-normality condition this is equivalent to B/A being abelian.",
+    "Linearity means that for some natural number n and arbitrary field F, the group is multiplicatively isomorphic to a subgroup of Matrix.GeneralLinearGroup (Fin n) F. No characteristic, finiteness, or finite-generation restriction is imposed."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's IsChain and the CompleteLattice structure on Subgroup provide the ingredients but not the combined notion.",
+     "name": "IsCompleteSubgroupSystem",
+     "why_needed": "Kurosh's complete linearly ordered subgroup systems are not available as a Mathlib or repository abstraction."
+    },
+    {
+     "closest_existing_considered": "Mathlib order-theoretic chain APIs exist, but no suitable subgroup-system jump predicate was found.",
+     "name": "IsJump",
+     "why_needed": "The barred classes constrain factors at consecutive members of a complete subgroup system."
+    },
+    {
+     "closest_existing_considered": "Subgroup.Normal and IsCompleteSubgroupSystem provide the ingredients; no existing combined notion was found.",
+     "name": "IsInvariantSystem",
+     "why_needed": "The Kurosh invariant-system notion requires every member of a complete subgroup system to be normal in the ambient group."
+    },
+    {
+     "closest_existing_considered": "Subgroup.Normal applied to A.comap B.subtype expresses the local normality, but no existing normal-system abstraction was found.",
+     "name": "IsNormalSystem",
+     "why_needed": "The Kurosh normal-system notion requires normality in the successor at each jump, distinct from ambient normality and from ascending normal series."
+    },
+    {
+     "closest_existing_considered": "Mathlib has quotient groups, IsMulCommutative, and subgroup commutators, but no predicate for abelian factors of an arbitrary complete subgroup system.",
+     "name": "HasAbelianFactors",
+     "why_needed": "The classes require all jump factors of a subgroup system to be abelian."
+    },
+    {
+     "closest_existing_considered": "Mathlib's solvability and derived-series APIs concern indexed ascending or descending series and do not model refinement of every invariant system.",
+     "name": "IsSIBarGroup",
+     "why_needed": "Kurosh's barred SI class is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's solvability and central-series APIs do not model refinement of every normal system.",
+     "name": "IsSNBarGroup",
+     "why_needed": "Kurosh's barred SN class is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Matrix.GeneralLinearGroup supplies GL_n(F), while MulEquiv and Subgroup express the embedding up to isomorphism; no combined linear-group predicate was found.",
+     "name": "IsLinearGroup",
+     "why_needed": "No existing predicate was found for an abstract group being isomorphic to a subgroup of GL_n(F) for some finite n and arbitrary field F."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.41»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.41»": "/--\nIs every linear $\\overline{SI}$-group an $\\overline{SN}$-group?\n\nHere the field and dimension in the linear representation are arbitrary. The\ngroup is not assumed to be finite or finitely generated. The barred classes\nare defined by refinements of complete subgroup systems, rather than by\nascending series.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.41» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsLinearGroup G → IsSIBarGroup G → IsSNBarGroup G := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«7.41»": "c05"
+ },
+ "id": "kourovka-7.41",
+ "main_attempt": "c05"
+}

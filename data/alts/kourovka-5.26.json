@@ -1,0 +1,448 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 5.26\n\nby H. Koch\n\nLet $G$ be a finite $p$-group with the minimal number of generators $d$, and let $r_1$\n(respectively, $r_2$) be the minimal number of defining relations on $d$ generators in the\nsense of representing $G$ as a factor-group of a free discrete group (pro-$p$-group). It is\nwell known that always $r_2 > d^2/4$. For each prime number $p$ denote by $c(p)$ the exact\nupper bound for the numbers $b(p)$ with the property that $r_2 \\geq b(p)d^2$ for all finite\n$p$-groups.\n\na) It is obvious that $r_1 \\geq r_2$. Find a $p$-group with $r_1 > r_2$.\n\nb) *Conjecture:* $\\lim_{p \\to \\infty} c(p) = 1/4$. It is proved (J. Wisliceny,\n*Math. Nachr.*, **102** (1981), 57–78) that $\\lim_{d \\to \\infty} r_2 / d^2 = 1/4$.\n\n## Formalisation notes\n\n* $d = d(G)$ is `Group.rank G`, the minimal size of a generating set of $G$.\n* $r_1(G)$ is `discreteRelationRank G`: the minimum, over all surjections\n  $\\varphi \\colon F_d \\to G$ from the free (discrete) group on $d$ generators, of the minimal\n  number of normal generators of $\\ker \\varphi$.\n* $r_2(G)$ is `proPRelationRank p G`: the minimal number of relators of a pro-$p$ presentation\n  of $G$ on $d$ generators. Mathlib has no free pro-$p$ groups, so this is formalised through\n  the standard identity $r_2(G) = \\dim_{\\mathbb{F}_p} H^2(G, \\mathbb{F}_p)$ for the relation\n  rank of a minimal pro-$p$ presentation of a finite $p$-group (see e.g. Koch, *Galois theory\n  of $p$-extensions*, §4, or Neukirch–Schmidt–Wingberg, *Cohomology of number fields*,\n  Cor. 3.9.5).\n* $c(p)$ is `c p`: the supremum of the set of $b \\in \\mathbb{R}$ with $r_2(G) \\geq b \\, d(G)^2$\n  for every finite $p$-group $G$. This set contains $0$ and is bounded above by $1$ (take\n  $G = \\mathbb{Z}/p$), so the supremum is a genuine one.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Filter Topology\n\nnamespace Kourovka.«5.26»\n\n/--\nThe minimal number $r_1(G)$ of defining relations of a finite group $G$ on $d = d(G)$\ngenerators, where $G$ is represented as a factor-group of the free (discrete) group $F_d$ on\n$d$ generators. That is, the minimum over all surjective homomorphisms\n$\\varphi \\colon F_d \\to G$ and all finite sets $S \\subseteq F_d$ whose normal closure is\n$\\ker \\varphi$ of the cardinality of $S$.\n-/\nnoncomputable def discreteRelationRank (G : Type*) [Group G] [Finite G] : ℕ :=\n  sInf {r : ℕ | ∃ (φ : FreeGroup (Fin (Group.rank G)) →* G)\n    (S : Finset (FreeGroup (Fin (Group.rank G)))),\n    Function.Surjective φ ∧ S.card = r ∧ Subgroup.normalClosure (S : Set _) = φ.ker}\n\n/--\nThe minimal number $r_2(G)$ of defining relations of a finite $p$-group $G$ on $d = d(G)$\ngenerators, where $G$ is represented as a factor-group of the free pro-$p$ group on $d$\ngenerators. For a finite $p$-group this relation rank equals\n$\\dim_{\\mathbb{F}_p} H^2(G, \\mathbb{F}_p)$, which is how it is defined here.\n-/\nnoncomputable def proPRelationRank (p : ℕ) (G : Type) [Group G] : ℕ :=\n  Module.finrank (ZMod p) (groupCohomology.H2 (Rep.trivial (ZMod p) G (ZMod p)))\n\n/-- The trivial group has no relations. -/\n@[category test, AMS 20]\ntheorem discreteRelationRank_of_subsingleton (G : Type*) [Group G] [Subsingleton G] :\n    discreteRelationRank G = 0 := by\n  have hrank : Group.rank G = 0 := by\n    apply Nat.eq_zero_of_le_zero\n    simpa using Group.rank_le (G := G) (S := ∅) (Subsingleton.elim _ _)\n  have : IsEmpty (Fin (Group.rank G)) := by rw [hrank]; infer_instance\n  refine Nat.sInf_eq_zero.2 (Or.inl ⟨1, ∅, fun g => ⟨1, Subsingleton.elim _ _⟩, rfl, ?_⟩)\n  exact Subsingleton.elim _ _\n\n/-- The trivial group has no relations. -/\n@[category test, AMS 20]\ntheorem proPRelationRank_of_subsingleton (p : ℕ) [Fact p.Prime] (G : Type) [Group G]\n    [Subsingleton G] : proPRelationRank p G = 0 := by\n  have := ModuleCat.isZero_iff_subsingleton.1\n    (isZero_groupCohomology_succ_of_subsingleton (Rep.trivial (ZMod p) G (ZMod p)) 1)\n  exact Module.finrank_zero_of_subsingleton\n\n/--\nFor a prime $p$, $c(p)$ is the exact upper bound (supremum) of the numbers $b$ such that\n$r_2(G) \\geq b \\, d(G)^2$ for all finite $p$-groups $G$.\n-/\nnoncomputable def c (p : ℕ) : ℝ :=\n  sSup {b : ℝ | ∀ (G : Type) [Group G] [Finite G], IsPGroup p G →\n    (proPRelationRank p G : ℝ) ≥ b * (Group.rank G : ℝ) ^ 2}\n\n/--\nIt is obvious that $r_1 \\geq r_2$. Find a $p$-group with $r_1 > r_2$.\n\nFormalised as the existence of a prime $p$ and a finite $p$-group $G$ with\n$r_1(G) > r_2(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ) (G : Type) (_ : Group G) (_ : Finite G),\n      p.Prime ∧ IsPGroup p G ∧ proPRelationRank p G < discreteRelationRank G := by\n  sorry\n\n/--\n*Conjecture:* $\\lim_{p \\to \\infty} c(p) = 1/4$, where $c(p)$ is the exact upper bound of the\nnumbers $b$ such that $r_2 \\geq b \\, d^2$ for all finite $p$-groups, and the limit is taken\nover prime numbers $p$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Tendsto c (atTop ⊓ 𝓟 {p : ℕ | p.Prime}) (𝓝 (1 / 4)) := by\n  sorry\n\nend Kourovka.«5.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's reading (part (a) as an existence Prop; part (b) as a limit along primes of c(p) := sSup{b | ∀ finite p-group G, r₂ ≥ b d²}; r₂ via dim H²(G,F_p)) matches the statement and was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "r₂(G) is formalised as dim_{F_p} H²(G, F_p) (Mathlib's groupCohomology of the trivial representation on ZMod p), not literally via free pro-p groups, which Mathlib lacks. This equality with the relation rank of a minimal pro-p presentation is standard (Koch; Serre, Galois Cohomology I.4.3; NSW Cor. 3.9.5) and is the equivalence named in the decomposition table. For finite G, H²(G, F_p) is finite-dimensional, so finrank is the true dimension.",
+    "r₁(G) minimises over all surjections F_d → G (all presentations on d = d(G) generators), and counts relators as a Finset (distinct elements). The defining set is nonempty (ker φ is finitely generated by Schreier), so sInf is a genuine minimum.",
+    "d(G) is Group.rank G (Mathlib's minimal number of generators), which is 0 for the trivial group; hence the trivial group imposes no constraint in c(p), consistent with the table's note.",
+    "c p is defined for all p : ℕ but only its values at primes matter; the limit in part (b) is taken along the filter atTop ⊓ 𝓟 {p | p.Prime}, following the repository idiom (e.g. GreensOpenProblems/27). For prime p the set in the sSup is nonempty and bounded above by 1 (G = ℤ/p has d = 1, r₂ = 1), so Real.sSup is the genuine supremum.",
+    "Part (a), a 'find an example' problem, is stated as an existence Prop (∃ prime p, finite p-group G with r₂(G) < r₁(G)) with ∧ rather than →, per the table; 'It is obvious that r₁ ≥ r₂' is treated as background.",
+    "Groups are quantified over Type (as in the other Kourovka files); Rep (ZMod p) G forces G to live in the same universe as ZMod p anyway.",
+    "Two @[category test] lemmas (both relation ranks vanish for the trivial group) are included as basic API for the bespoke definitions, as CONTRIBUTING.md asks; they are fully proved."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Group.rank (only minimal number of generators), PresentedGroup (a group constructed from relators, but no minimality/count notion), Subgroup.normalClosure.",
+     "name": "Kourovka.«5.26».discreteRelationRank",
+     "why_needed": "r₁(G): minimal number of defining relations of G on d(G) generators as a quotient of the free discrete group F_d. Defined as sInf of |S| over surjections φ : FreeGroup (Fin (Group.rank G)) →* G and Finsets S with Subgroup.normalClosure S = φ.ker. Neither Mathlib nor FormalConjecturesForMathlib has a notion of relation rank / minimal number of relators."
+    },
+    {
+     "closest_existing_considered": "groupCohomology / groupCohomology.H2 (used), ProfiniteGrp (no free pro-p object or closed normal closure API).",
+     "name": "Kourovka.«5.26».proPRelationRank",
+     "why_needed": "r₂(G): minimal number of relations of G on d(G) generators as a quotient of the free pro-p group. Mathlib has no free pro-p groups or pro-p completions, so it is defined via the standard identity r₂(G) = dim_{F_p} H²(G, F_p), as Module.finrank (ZMod p) (groupCohomology.H2 (Rep.trivial (ZMod p) G (ZMod p))). This is the equivalence explicitly given in the decomposition table notes."
+    },
+    {
+     "closest_existing_considered": "sSup / iInf on ℝ directly in the theorem statement; a named definition keeps the two slots readable and matches the statement's notation.",
+     "name": "Kourovka.«5.26».c",
+     "why_needed": "c(p): the exact upper bound of the b with r₂(G) ≥ b·d(G)² for all finite p-groups G; defined as a real sSup over that set. Problem-specific constant with no Mathlib analogue."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«5.26».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∃ prime p and finite p-group G with proPRelationRank p G < discreteRelationRank G, i.e. r₁(G) > r₂(G), using bespoke definitions of r₁ (min number of normal generators of ker φ over all surjections F_d → G, d = Group.rank G) and r₂ (dim_{F_p} H²(G, F_p), the standard identity for the relation rank of a minimal pro-p presentation, as allowed by the table notes). 'It is obvious that r₁ ≥ r₂' is treated as background."
+    },
+    "kourovka.«5.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Tendsto c (atTop ⊓ 𝓟 {p | p.Prime}) (𝓝 (1/4)) with c p := sSup {b : ℝ | ∀ finite p-group G, (r₂ G : ℝ) ≥ b * (Group.rank G)^2}. The set is nonempty (b = 0) and bounded above (G = ℤ/p gives b ≤ 1), so Real.sSup is the genuine supremum; the trivial group (d = 0) imposes no constraint. The cited facts r₂ > d²/4 and Wisliceny's theorem are only quoted in the docstring."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«5.26».parts.a": "/--\nIt is obvious that $r_1 \\geq r_2$. Find a $p$-group with $r_1 > r_2$.\n\nFormalised as the existence of a prime $p$ and a finite $p$-group $G$ with\n$r_1(G) > r_2(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ) (G : Type) (_ : Group G) (_ : Finite G),\n      p.Prime ∧ IsPGroup p G ∧ proPRelationRank p G < discreteRelationRank G := by\n  sorry",
+    "kourovka.«5.26».parts.b": "/--\n*Conjecture:* $\\lim_{p \\to \\infty} c(p) = 1/4$, where $c(p)$ is the exact upper bound of the\nnumbers $b$ such that $r_2 \\geq b \\, d^2$ for all finite $p$-groups, and the limit is taken\nover prime numbers $p$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Tendsto c (atTop ⊓ 𝓟 {p : ℕ | p.Prime}) (𝓝 (1 / 4)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 5.26\n\nby H. Koch\n\nFor a finite $p$-group $G$, compare the minimum numbers of relations in a presentation on a\nminimal generating set when the presenting group is free discrete or free pro-$p$. Also determine\nthe asymptotic best universal lower bound for the pro-$p$ relation rank.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«5.26»\n\n/-- The minimum cardinality of a finite generating tuple of a group. -/\nnoncomputable def generatorRank (G : Type*) [Group G] : ℕ :=\n  sInf {n : ℕ | ∃ x : Fin n → G, Subgroup.closure (Set.range x) = ⊤}\n\n/-- The minimum number of defining relations among presentations of `G` by the free discrete\ngroup on `generatorRank G` generators. A tuple defines the kernel when its normal closure is the\nkernel. -/\nnoncomputable def discreteRelationRank (G : Type*) [Group G] : ℕ :=\n  sInf {n : ℕ | ∃ φ : FreeGroup (Fin (generatorRank G)) →* G,\n    Function.Surjective φ ∧ ∃ r : Fin n → FreeGroup (Fin (generatorRank G)),\n      Subgroup.normalClosure (Set.range r) = φ.ker}\n\n/-- For a prime `p`, the relation rank of a finite $p$-group in the pro-$p$ sense, expressed by\nthe equivalent formula $\\dim_{\\mathbb F_p} H^2(G, \\mathbb F_p)$ with trivial coefficients. -/\nnoncomputable def proPRelationRank (p : Nat.Primes) (G : Type) [Group G] : ℕ :=\n  letI : Fact (Nat.Prime (p : ℕ)) := ⟨p.property⟩\n  Module.finrank (ZMod (p : ℕ))\n    (groupCohomology (Rep.trivial (ZMod (p : ℕ)) G (ZMod (p : ℕ))) 2)\n\n/-- For a prime $p$, the exact upper bound of the real numbers $b$ such that every finite\n$p$-group $G$ satisfies $r_2(G) \\geq b d(G)^2$. -/\nnoncomputable def c (p : Nat.Primes) : ℝ :=\n  sSup {b : ℝ | ∀ (G : Type) [Group G] [Finite G], IsPGroup (p : ℕ) G →\n    (proPRelationRank p G : ℝ) ≥ b * (generatorRank G : ℝ) ^ 2}\n\n/--\nFind a finite $p$-group for which the minimum number $r_1$ of relations in a discrete\npresentation on the minimal number of generators is strictly greater than the corresponding\nminimum number $r_2$ in a pro-$p$ presentation.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : Nat.Primes) (G : Type) (_ : Group G) (_ : Finite G),\n      IsPGroup (p : ℕ) G ∧ discreteRelationRank G > proPRelationRank p G := by\n  sorry\n\n/--\nFor each prime $p$, let $c(p)$ be the supremum of the real numbers $b$ such that\n$r_2(G) \\geq b d(G)^2$ for every finite $p$-group $G$. The conjecture is\n$\\lim_{p \\to \\infty} c(p) = 1/4$, where the limit is taken along the primes.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Filter.Tendsto c\n      (Filter.comap ((↑) : Nat.Primes → ℕ) Filter.atTop)\n      (nhds (1 / 4 : ℝ)) := by\n  sorry\n\nend Kourovka.«5.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented primes by the subtype `Nat.Primes`, so primality is intrinsic and the limit can be taken using the pullback of `Filter.atTop` along the coercion to `ℕ`.",
+    "Defined the minimal number of generators as the infimum of lengths of finite tuples whose ranges generate the whole group.",
+    "Defined the discrete relation rank by minimizing over all surjections from the free discrete group on the minimal number of generators and all tuples whose normal closure equals the kernel.",
+    "Used the equivalence specified in the decomposition and standard for finite p-groups: the pro-p relation rank is `dim_{𝔽_p} H²(G, 𝔽_p)` with trivial coefficients, implemented using Mathlib's `groupCohomology`.",
+    "Defined `c(p)` literally as the real supremum of all universal lower-bound constants. The trivial group is included and imposes the tautological constraint `0 ≥ b * 0`, as intended.",
+    "Formalized part (a)'s request to find an example directly as an existence proposition, in accordance with the fixed decomposition, rather than as a yes/no `answer(sorry)` statement."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Subgroup.closure` supplies the generating condition, but Mathlib and FormalConjecturesForMathlib do not package its minimum finite tuple cardinality as a group invariant.",
+     "name": "Kourovka.«5.26».generatorRank",
+     "why_needed": "The statement requires the minimum number of generators of a group; no existing group-generator-rank invariant was found."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FreeGroup`, `PresentedGroup`, `MonoidHom.ker`, and `Subgroup.normalClosure` provide the ingredients, but no invariant minimizing normal generators of kernels across presentations was found.",
+     "name": "Kourovka.«5.26».discreteRelationRank",
+     "why_needed": "Part (a) requires the minimum number of discrete defining relators over presentations on a minimal generating set."
+    },
+    {
+     "closest_existing_considered": "Mathlib has no free pro-p group presentation API. Its `groupCohomology` does provide the equivalent `H²(G, 𝔽_p)` object, so the new definition only takes its `Module.finrank`.",
+     "name": "Kourovka.«5.26».proPRelationRank",
+     "why_needed": "Both slots require the pro-p relation rank as a numerical invariant."
+    },
+    {
+     "closest_existing_considered": "Mathlib's real `sSup` directly implements the exact upper bound, but no pre-existing invariant specializes it to finite p-group relation ranks.",
+     "name": "Kourovka.«5.26».c",
+     "why_needed": "Part (b) defines a problem-specific optimal universal lower-bound constant for each prime."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«5.26».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«5.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«5.26».parts.a": "/--\nFind a finite $p$-group for which the minimum number $r_1$ of relations in a discrete\npresentation on the minimal number of generators is strictly greater than the corresponding\nminimum number $r_2$ in a pro-$p$ presentation.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : Nat.Primes) (G : Type) (_ : Group G) (_ : Finite G),\n      IsPGroup (p : ℕ) G ∧ discreteRelationRank G > proPRelationRank p G := by\n  sorry",
+    "kourovka.«5.26».parts.b": "/--\nFor each prime $p$, let $c(p)$ be the supremum of the real numbers $b$ such that\n$r_2(G) \\geq b d(G)^2$ for every finite $p$-group $G$. The conjecture is\n$\\lim_{p \\to \\infty} c(p) = 1/4$, where the limit is taken along the primes.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Filter.Tendsto c\n      (Filter.comap ((↑) : Nat.Primes → ℕ) Filter.atTop)\n      (nhds (1 / 4 : ℝ)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 5.26\n\nby H. Koch\n\nLet $G$ be a finite $p$-group with the minimal number of generators $d$, and let $r_1$\n(respectively, $r_2$) be the minimal number of defining relations on $d$ generators in the\nsense of representing $G$ as a factor-group of a free discrete group (pro-$p$-group). It is\nwell known that always $r_2 > d^2/4$. For each prime number $p$ denote by $c(p)$ the exact\nupper bound for the numbers $b(p)$ with the property that $r_2 \\geq b(p) d^2$ for all finite\n$p$-groups.\n\na) It is obvious that $r_1 \\geq r_2$. Find a $p$-group with $r_1 > r_2$.\n\nb) *Conjecture:* $\\lim_{p \\to \\infty} c(p) = 1/4$. It is proved (J. Wisliceny,\n*Math. Nachr.* **102** (1981), 57–78) that $\\lim_{d \\to \\infty} r_2 / d^2 = 1/4$.\n\nFree pro-$p$ groups are not available in Mathlib. We therefore use the standard identification\n$r_2 = \\dim_{\\mathbb{F}_p} H^2(G, \\mathbb{F}_p)$ of the minimal number of relations of a\nfinite $p$-group $G$ (as a pro-$p$ group on $d$ generators) with the dimension of its second\ncohomology group with coefficients in the trivial module $\\mathbb{F}_p$; see J.-P. Serre,\n*Galois Cohomology*, Chapter I, §4.3, or H. Koch, *Galois Theory of $p$-Extensions*,\nChapter 3.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Filter Topology\n\nnamespace Kourovka.«5.26»\n\nvariable (G : Type) [Group G]\n\n/--\nThe number $r_1$ of the statement: the minimal number of defining relations of a finitely\ngenerated group $G$ on $d = d(G)$ generators, where $d(G)$ is the minimal number of generators\nof $G$ (`Group.rank G`), in the sense of representing $G$ as a factor-group of the free\ndiscrete group on $d$ generators. That is, the least $r$ such that $G$ is isomorphic to\n$F_d / \\langle\\langle w_1, \\dots, w_r \\rangle\\rangle$ for some words $w_1, \\dots, w_r \\in F_d$.\nFor a finite group $G$ such presentations exist, so the infimum is a genuine minimum.\n-/\nnoncomputable def discreteRelationRank [Group.FG G] : ℕ :=\n  sInf {r : ℕ | ∃ rels : Finset (FreeGroup (Fin (Group.rank G))), rels.card = r ∧\n    Nonempty (PresentedGroup (rels : Set (FreeGroup (Fin (Group.rank G)))) ≃* G)}\n\n/--\nThe number $r_2$ of the statement: for a finite $p$-group $G$ this is the minimal number of\ndefining relations of $G$ on $d = d(G)$ generators, in the sense of representing $G$ as a\nfactor-group of the free pro-$p$ group on $d$ generators. It is formalized via the standard\nidentification $r_2 = \\dim_{\\mathbb{F}_p} H^2(G, \\mathbb{F}_p)$, where $\\mathbb{F}_p$ is the\ntrivial $G$-module.\n-/\nnoncomputable def proPRelationRank (p : ℕ) : ℕ :=\n  Module.finrank (ZMod p) (groupCohomology.H2 (Rep.trivial (ZMod p) G (ZMod p)))\n\n/--\nThe number $c(p)$ of the statement: the exact upper bound (supremum) of the real numbers $b$\nsuch that $r_2(G) \\geq b \\cdot d(G)^2$ for all finite $p$-groups $G$. The trivial group has\n$d = 0$ and imposes no constraint; for a prime $p$ the cyclic group of order $p$ (with $d = 1$\nand $r_2 = 1$) shows that the set of such $b$ is bounded above, so the supremum is genuine.\n-/\nnoncomputable def c (p : ℕ) : ℝ :=\n  sSup {b : ℝ | ∀ (G : Type) [Group G] [Finite G], IsPGroup p G →\n    b * (Group.rank G : ℝ) ^ 2 ≤ proPRelationRank G p}\n\n/--\nIf $G \\cong F_{d(G)} / \\langle\\langle \\mathrm{rels} \\rangle\\rangle$ for a finite set of\nrelators, then $r_1(G)$ is at most the number of relators.\n-/\n@[category API, AMS 20]\ntheorem discreteRelationRank_le [Group.FG G] (rels : Finset (FreeGroup (Fin (Group.rank G))))\n    (e : PresentedGroup (rels : Set (FreeGroup (Fin (Group.rank G)))) ≃* G) :\n    discreteRelationRank G ≤ rels.card :=\n  Nat.sInf_le ⟨rels, rfl, ⟨e⟩⟩\n\n/--\nLet $G$ be a finite $p$-group with the minimal number of generators $d$, and let $r_1$\n(respectively, $r_2$) be the minimal number of defining relations on $d$ generators in the\nsense of representing $G$ as a factor-group of a free discrete group (pro-$p$-group).\nIt is obvious that $r_1 \\geq r_2$. Find a $p$-group with $r_1 > r_2$.\n\nFormalized as the existence of a prime $p$ and a finite $p$-group $G$ with $r_1(G) > r_2(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ) (G : Type) (_ : Group G) (_ : Finite G), p.Prime ∧ IsPGroup p G ∧\n      proPRelationRank G p < discreteRelationRank G := by\n  sorry\n\n/--\nFor each prime number $p$ denote by $c(p)$ the exact upper bound for the numbers $b(p)$ with\nthe property that $r_2 \\geq b(p) d^2$ for all finite $p$-groups.\n*Conjecture:* $\\lim_{p \\to \\infty} c(p) = 1/4$, the limit being taken over the primes $p$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Tendsto c (atTop ⊓ 𝓟 {p : ℕ | p.Prime}) (𝓝 (1 / 4)) := by\n  sorry\n\nend Kourovka.«5.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's two slots match the two labelled parts of the problem; the background remarks (r₁ ≥ r₂ obvious, r₂ > d²/4, Wisliceny's theorem) are correctly identified as cited facts rather than questions and are only reproduced in the module docstring.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "r₂ is defined as dim_{𝔽_p} H²(G, 𝔽_p) (Module.finrank (ZMod p) (groupCohomology.H2 (Rep.trivial (ZMod p) G (ZMod p)))) rather than literally via the free pro-p group on d generators, which Mathlib lacks. For finite p-groups this equals the minimal number of relations of a pro-p presentation on d(G) generators (Serre, Galois Cohomology I §4.3; Koch, Galois Theory of p-Extensions); the decomposition table explicitly names this equivalent. For finite G the cohomology is finite-dimensional, so finrank is not a junk value.",
+    "d(G) is Mathlib's Group.rank G (minimal size of a generating Finset), with the Group.FG instance coming from Finite G.",
+    "r₁ is defined via PresentedGroup: the least r such that G is isomorphic to FreeGroup (Fin (Group.rank G)) modulo the normal closure of a Finset of r relators (multiplicities of relators are irrelevant). For finite G the set of such r is nonempty, so sInf is a true minimum; for non-finitely-presented infinite groups the definition would return sInf ∅ = 0, but the statements only apply it to finite groups.",
+    "c p is defined for every natural p (as sSup of a set of reals) so that the limit can be taken along the repo's standard filter atTop ⊓ 𝓟 {p : ℕ | p.Prime}; for non-prime p the value is meaningless but filtered out. For prime p the set is nonempty (b = 0) and bounded above (b ≤ 1 from the cyclic group of order p, d = 1, r₂ = 1), so sSup is genuine. The trivial group (d = 0, r₂ = 0) imposes no constraint, matching the table's note.",
+    "Part a is a 'find an example' problem and is formalized as an existence Prop (∃ p G, p.Prime ∧ IsPGroup p G ∧ r₂ < r₁) per the decomposition table, not with answer(sorry). It is stated with G : Type (universe 0), which is forced by Rep (ZMod p) G living in a single universe and is harmless since any finite group has a copy in Type.",
+    "The inequality r₁ > r₂ is written as proPRelationRank G p < discreteRelationRank G (Mathlib style prefers <).",
+    "An additional easy API lemma discreteRelationRank_le (category API) is included as a basic sanity test of the bespoke definition; it is fully proved."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "PresentedGroup and Subgroup.normalClosure (used as building blocks); Group.rank (generator count only); no relation-rank / deficiency notion exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«5.26».discreteRelationRank",
+     "why_needed": "The notebook's r₁: the minimal number of relators in a presentation of G on exactly d(G) generators as a quotient of the free discrete group. Mathlib has FreeGroup, PresentedGroup, and Group.rank but no notion of 'minimal number of relators on a minimal generating set'."
+    },
+    {
+     "closest_existing_considered": "groupCohomology.H2 and Rep.trivial (used directly); no pro-p group / profinite completion machinery is available in Mathlib or the repo.",
+     "name": "Kourovka.«5.26».proPRelationRank",
+     "why_needed": "The notebook's r₂: the minimal number of relations of G as a quotient of the free pro-p group on d generators. Free pro-p groups do not exist in Mathlib, so this is formalized by the standard identification r₂ = dim_{𝔽_p} H²(G, 𝔽_p) using groupCohomology.H2 with the trivial representation."
+    },
+    {
+     "closest_existing_considered": "sSup on ℝ (used); no existing definition captures this constant.",
+     "name": "Kourovka.«5.26».c",
+     "why_needed": "The notebook's c(p): the supremum of all b with r₂(G) ≥ b·d(G)² for every finite p-group G. Problem-specific constant needed to state the limit conjecture."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«5.26».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as the existence of a prime p and a finite p-group G (Finite G, IsPGroup p G) with r₂(G) < r₁(G), using bespoke definitions discreteRelationRank (r₁) and proPRelationRank (r₂). Category research open, as the problem carries no star."
+    },
+    "kourovka.«5.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Tendsto c (atTop ⊓ 𝓟 {p | p.Prime}) (𝓝 (1/4 : ℝ)), where c p := sSup {b : ℝ | ∀ finite p-group G, b * d(G)^2 ≤ r₂(G)} with d = Group.rank and r₂ = proPRelationRank. Surrounding remarks (r₂ > d²/4, Wisliceny's theorem) are recorded in the module docstring as background only."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«5.26».parts.a": "/--\nLet $G$ be a finite $p$-group with the minimal number of generators $d$, and let $r_1$\n(respectively, $r_2$) be the minimal number of defining relations on $d$ generators in the\nsense of representing $G$ as a factor-group of a free discrete group (pro-$p$-group).\nIt is obvious that $r_1 \\geq r_2$. Find a $p$-group with $r_1 > r_2$.\n\nFormalized as the existence of a prime $p$ and a finite $p$-group $G$ with $r_1(G) > r_2(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ) (G : Type) (_ : Group G) (_ : Finite G), p.Prime ∧ IsPGroup p G ∧\n      proPRelationRank G p < discreteRelationRank G := by\n  sorry",
+    "kourovka.«5.26».parts.b": "/--\nFor each prime number $p$ denote by $c(p)$ the exact upper bound for the numbers $b(p)$ with\nthe property that $r_2 \\geq b(p) d^2$ for all finite $p$-groups.\n*Conjecture:* $\\lim_{p \\to \\infty} c(p) = 1/4$, the limit being taken over the primes $p$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Tendsto c (atTop ⊓ 𝓟 {p : ℕ | p.Prime}) (𝓝 (1 / 4)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 5.26\n\nby H. Koch\n\nFor a finite $p$-group, compare the minimum numbers of relations in presentations on a\nminimal generating set by a free discrete group and by a free pro-$p$ group. Also determine the\nasymptotic best universal lower bound for the latter number of relations.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«5.26»\n\n/-- The minimum number of generators of a group. -/\nnoncomputable def generatorRank (G : Type*) [Group G] : ℕ :=\n  sInf {d : ℕ | ∃ f : Fin d → G, Subgroup.closure (Set.range f) = ⊤}\n\n/-- The minimum number of discrete defining relations in a presentation of `G` on a minimal\nnumber of generators. Thus the relations normally generate the kernel of a surjection from the\nfree discrete group. -/\nnoncomputable def discreteRelationRank (G : Type*) [Group G] : ℕ :=\n  sInf {r : ℕ | ∃ φ : FreeGroup (Fin (generatorRank G)) →* G,\n    Function.Surjective φ ∧ ∃ rels : Fin r → FreeGroup (Fin (generatorRank G)),\n      Subgroup.normalClosure (Set.range rels) = φ.ker}\n\n/-- The degree-one coboundary map for group cohomology with trivial coefficients in\n$\\mathbb F_p$. -/\ndef coboundaryOne (p : ℕ) (G : Type*) [Group G] [Fact p.Prime] :\n    (G → ZMod p) →ₗ[ZMod p] (G × G → ZMod p) where\n  toFun f xy := f xy.2 - f (xy.1 * xy.2) + f xy.1\n  map_add' f g := by\n    ext xy\n    simp\n    abel\n  map_smul' a f := by\n    ext xy\n    simp\n    ring\n\n/-- The degree-two coboundary map for group cohomology with trivial coefficients in\n$\\mathbb F_p$. Its kernel is the space of degree-two cocycles. -/\ndef coboundaryTwo (p : ℕ) (G : Type*) [Group G] [Fact p.Prime] :\n    (G × G → ZMod p) →ₗ[ZMod p] (G × G × G → ZMod p) where\n  toFun f xyz := f (xyz.2.1, xyz.2.2) - f (xyz.1 * xyz.2.1, xyz.2.2) +\n    f (xyz.1, xyz.2.1 * xyz.2.2) - f (xyz.1, xyz.2.1)\n  map_add' f g := by\n    ext xyz\n    simp\n    abel\n  map_smul' a f := by\n    ext xyz\n    simp\n    ring\n\n/-- The second cohomology vector space $H^2(G,\\mathbb F_p)$ for the trivial action, expressed as\n$2$-cocycles modulo $2$-coboundaries. -/\nabbrev secondCohomology (p : ℕ) (G : Type*) [Group G] [Fact p.Prime] :=\n  let Z2 := LinearMap.ker (coboundaryTwo p G)\n  let d1 : (G → ZMod p) →ₗ[ZMod p] Z2 :=\n    (coboundaryOne p G).codRestrict Z2 (by\n      intro f\n      rw [LinearMap.mem_ker]\n      ext xyz\n      simp [coboundaryOne, coboundaryTwo, mul_assoc]\n      abel)\n  Z2 ⧸ LinearMap.range d1\n\n/-- The pro-$p$ relation rank of a finite $p$-group, using its equivalent description as\n$\\dim_{\\mathbb F_p} H^2(G,\\mathbb F_p)$. -/\nnoncomputable def proPRelationRank (p : ℕ) (hp : p.Prime) (G : Type*) [Group G] : ℕ := by\n  letI : Fact p.Prime := ⟨hp⟩\n  exact Module.finrank (ZMod p) (secondCohomology p G)\n\n/-- The exact upper bound on real numbers $b$ such that\n$r_2(G) \\geq b\\,d(G)^2$ for every finite $p$-group $G$. -/\nnoncomputable def c (p : ℕ) (hp : p.Prime) : ℝ :=\n  sSup {b : ℝ | ∀ (G : Type) (_ : Group G) (_ : Finite G), IsPGroup p G →\n    (proPRelationRank p hp G : ℝ) ≥ b * (generatorRank G : ℝ) ^ 2}\n\n/--\nFind a finite $p$-group for which the minimum number $r_1$ of discrete defining relations on a\nminimal set of generators is strictly greater than the corresponding minimum number $r_2$ of\npro-$p$ defining relations.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ) (hp : p.Prime) (G : Type) (_ : Group G) (_ : Finite G),\n      IsPGroup p G ∧ discreteRelationRank G > proPRelationRank p hp G := by\n  sorry\n\n/--\nFor each prime $p$, let $c(p)$ be the exact upper bound of the real numbers $b$ such that\n$r_2(G) \\geq b\\,d(G)^2$ for every finite $p$-group $G$. Then\n$\\lim_{p \\to \\infty} c(p) = 1/4$, where the limit is taken through the primes.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Filter.Tendsto (fun p : Nat.Primes ↦ c p p.prop)\n      (Filter.comap (fun p : Nat.Primes ↦ (p : ℕ)) Filter.atTop)\n      (nhds (1 / 4 : ℝ)) := by\n  sorry\n\nend Kourovka.«5.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The minimal generator number is the infimum of natural numbers d for which a map Fin d → G generates G.",
+    "The discrete relation rank minimizes the number of normal generators of the kernel over all surjections FreeGroup (Fin d) →* G, with d the minimal generator number.",
+    "Because Mathlib and FormalConjecturesForMathlib have no free pro-p group or group-cohomology relation-rank primitive, the pro-p relation rank is modeled by the equivalent invariant dim_{F_p} H²(G,F_p). H² is defined using the standard inhomogeneous degree-one and degree-two coboundary maps for the trivial action.",
+    "The exact upper bound c(p) is represented literally by sSup of all real b satisfying the bound for every finite p-group; the trivial group is included and imposes no restriction because its generator rank is zero.",
+    "The limit in part b uses Filter.atTop pulled back to Nat.Primes along the coercion to ℕ, so it is a limit through primes."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Subgroup.closure provides generation, but no repository-wide minimal generator-rank invariant was found.",
+     "name": "generatorRank",
+     "why_needed": "The statement requires the minimal number of generators of a group."
+    },
+    {
+     "closest_existing_considered": "Mathlib has FreeGroup, PresentedGroup, and Subgroup.normalClosure, but no invariant minimizing normal generators of presentation kernels.",
+     "name": "discreteRelationRank",
+     "why_needed": "The statement requires the minimum number of discrete relators in presentations on a minimal generating set."
+    },
+    {
+     "closest_existing_considered": "No group cohomology cochain differential for this setting was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "coboundaryOne",
+     "why_needed": "Needed to construct degree-two coboundaries for the explicit H² model."
+    },
+    {
+     "closest_existing_considered": "No group cohomology cochain differential for this setting was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "coboundaryTwo",
+     "why_needed": "Needed to define degree-two cocycles as the kernel of the standard group-cohomology differential."
+    },
+    {
+     "closest_existing_considered": "Mathlib has general homological-algebra infrastructure but no directly usable group H² with trivial finite-field coefficients.",
+     "name": "secondCohomology",
+     "why_needed": "Needed for the equivalent description of pro-p relation rank as dim H²(G,F_p)."
+    },
+    {
+     "closest_existing_considered": "A free pro-p presentation definition was considered, but no free pro-p group primitive was found; the source decomposition explicitly permits the equivalent H² dimension.",
+     "name": "proPRelationRank",
+     "why_needed": "The statement's r₂ invariant must be represented; free pro-p groups are unavailable."
+    },
+    {
+     "closest_existing_considered": "Real.sSup exists and is used directly inside this problem-specific wrapper.",
+     "name": "c",
+     "why_needed": "Part b names the best universal lower-bound constant for each prime."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«5.26».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«5.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«5.26».parts.a": "/--\nFind a finite $p$-group for which the minimum number $r_1$ of discrete defining relations on a\nminimal set of generators is strictly greater than the corresponding minimum number $r_2$ of\npro-$p$ defining relations.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ) (hp : p.Prime) (G : Type) (_ : Group G) (_ : Finite G),\n      IsPGroup p G ∧ discreteRelationRank G > proPRelationRank p hp G := by\n  sorry",
+    "kourovka.«5.26».parts.b": "/--\nFor each prime $p$, let $c(p)$ be the exact upper bound of the real numbers $b$ such that\n$r_2(G) \\geq b\\,d(G)^2$ for every finite $p$-group $G$. Then\n$\\lim_{p \\to \\infty} c(p) = 1/4$, where the limit is taken through the primes.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Filter.Tendsto (fun p : Nat.Primes ↦ c p p.prop)\n      (Filter.comap (fun p : Nat.Primes ↦ (p : ℕ)) Filter.atTop)\n      (nhds (1 / 4 : ℝ)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 5.26\n\nby H. Koch\n\nLet $d(G)$ be the least number of generators of a finite $p$-group $G$. Let\n$r_1(G)$ be the least number of relations in a presentation of $G$ on $d(G)$\ngenerators as a quotient of a free discrete group. Let $r_2(G)$ be the\ncorresponding number for a free pro-$p$ group.\n\nFor every prime $p$, let $c(p)$ be the supremum of the real numbers $b$ such\nthat $r_2(G) \\geq b d(G)^2$ for every finite $p$-group $G$. The problem asks\nfor a group with $r_1(G)>r_2(G)$ and conjectures that $c(p)$ tends to $1/4$ as\n$p$ tends to infinity through the primes.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«5.26»\nopen scoped Topology\n\n\nopen Filter\n\n/-- The minimal number $d(G)$ of generators of a group $G$. -/\nnoncomputable def generatorRank (G : Type) [Group G] : ℕ :=\n  sInf {d : ℕ | ∃ generators : Fin d → G,\n    Subgroup.closure (Set.range generators) = ⊤}\n\n/--\nThe minimal number $r_1(G)$ of defining relations in a presentation of $G$ on\n$d(G)$ generators as a quotient of the free discrete group. The relations\nnormally generate the kernel of the presenting surjection.\n-/\nnoncomputable def discreteRelationRank (G : Type) [Group G] : ℕ :=\n  sInf {r : ℕ | ∃ (φ : FreeGroup (Fin (generatorRank G)) →* G)\n    (relations : Fin r → FreeGroup (Fin (generatorRank G))),\n    Function.Surjective φ ∧\n      Subgroup.normalClosure (Set.range relations) = MonoidHom.ker φ}\n\n/--\nFor a prime $p$, the minimal number $r_2(G)$ of defining relations on $d(G)$\ngenerators as a quotient of the free pro-$p$ group. For a finite $p$-group\nthis is equivalently $\\dim_{\\mathbb F_p} H^2(G,\\mathbb F_p)$, which is used as\nthe definition here.\n-/\nnoncomputable def proPRelationRank (p : ℕ) (G : Type) [Group G] : ℕ :=\n  Module.finrank (ZMod p)\n    (groupCohomology (Rep.trivial (ZMod p) G (ZMod p)) 2)\n\n/--\nFor a prime $p$, $c(p)$ is the exact upper bound of the real numbers $b$ such\nthat $r_2(G) \\geq b d(G)^2$ for every finite $p$-group $G$. The trivial group,\nfor which $d(G)=0$, imposes no additional restriction.\n-/\nnoncomputable def c (p : Nat.Primes) : ℝ :=\n  sSup {b : ℝ | ∀ (G : Type) [Group G] [Finite G], IsPGroup p G →\n    (proPRelationRank p G : ℝ) ≥ b * (generatorRank G : ℝ) ^ 2}\n\n/--\nFind a finite $p$-group $G$ for which the minimal number $r_1(G)$ of relations\nin a discrete presentation on the minimal number of generators is strictly\ngreater than the corresponding minimal number $r_2(G)$ for a pro-$p$\npresentation.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ), p.Prime ∧ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      IsPGroup p G ∧ discreteRelationRank G > proPRelationRank p G := by\n  sorry\n\n/--\nConjecture: if $c(p)$ is the exact upper bound of the $b$ such that\n$r_2(G) \\geq b d(G)^2$ for every finite $p$-group $G$, then\n$\\lim_{p \\to \\infty} c(p)=1/4$, where $p$ tends to infinity through the\nprimes.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Tendsto c (comap (fun p : Nat.Primes ↦ (p : ℕ)) atTop) (𝓝 (1 / 4 : ℝ)) := by\n  sorry\n\nend Kourovka.«5.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The pro-p relation rank r₂ is defined using the equivalence specified in the decomposition: dim_{F_p} H²(G, F_p), implemented as the finrank of Mathlib's ordinary group cohomology with the trivial ZMod p representation.",
+    "The discrete relation rank r₁ minimizes over surjections from the free discrete group on d(G) generators and finite indexed families whose normal closure equals the kernel.",
+    "The limit through primes uses Nat.Primes with the source filter obtained by pulling back Filter.atTop on ℕ along the coercion Nat.Primes → ℕ.",
+    "Definitions quantify over Type (universe 0), which contains representatives of every isomorphism class of finite groups and is required by the same-universe parameters of Mathlib's group cohomology construction with ZMod p."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Subgroup.closure and FreeGroup.range_lift_eq_closure provide the generation predicate but not its minimum.",
+     "name": "Kourovka.«5.26».generatorRank",
+     "why_needed": "The statement requires the minimal cardinality of a finite generating family of a group; no project or Mathlib definition for this group invariant was found."
+    },
+    {
+     "closest_existing_considered": "PresentedGroup and Subgroup.normalClosure model a fixed presentation, but do not minimize relation counts over presenting surjections.",
+     "name": "Kourovka.«5.26».discreteRelationRank",
+     "why_needed": "The statement requires the minimum number of normal generators of the kernel among free discrete presentations on a minimal generating family; no existing invariant was found."
+    },
+    {
+     "closest_existing_considered": "Mathlib's groupCohomology and Rep.trivial suffice to define the equivalent invariant dim_{F_p} H²(G,F_p); no free pro-p group presentation API was found.",
+     "name": "Kourovka.«5.26».proPRelationRank",
+     "why_needed": "The numerical pro-p relation rank invariant is not packaged in Mathlib or the repository."
+    },
+    {
+     "closest_existing_considered": "Real sSup supplies the exact-upper-bound operation, but the constrained family itself is problem-specific.",
+     "name": "Kourovka.«5.26».c",
+     "why_needed": "The prime-dependent exact upper bound c(p) is specific to this problem and must be defined to state its conjectured limit."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«5.26».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«5.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«5.26».parts.a": "/--\nFind a finite $p$-group $G$ for which the minimal number $r_1(G)$ of relations\nin a discrete presentation on the minimal number of generators is strictly\ngreater than the corresponding minimal number $r_2(G)$ for a pro-$p$\npresentation.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ), p.Prime ∧ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      IsPGroup p G ∧ discreteRelationRank G > proPRelationRank p G := by\n  sorry",
+    "kourovka.«5.26».parts.b": "/--\nConjecture: if $c(p)$ is the exact upper bound of the $b$ such that\n$r_2(G) \\geq b d(G)^2$ for every finite $p$-group $G$, then\n$\\lim_{p \\to \\infty} c(p)=1/4$, where $p$ tends to infinity through the\nprimes.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Tendsto c (comap (fun p : Nat.Primes ↦ (p : ℕ)) atTop) (𝓝 (1 / 4 : ℝ)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 5.26\n\nby H. Koch\n\nLet $d$ be the minimum number of generators of a finite $p$-group $G$. Let $r_1(G)$ and\n$r_2(G)$ be the minimum numbers of defining relations in presentations of $G$ on $d$\ngenerators as a quotient of, respectively, the free discrete group and the free pro-$p$ group.\nProblem 5.26 asks whether $r_1(G)>r_2(G)$ can occur and conjectures an asymptotic value for the\nbest universal lower bound on $r_2(G)/d^2$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 5.26.\n-/\n\nnamespace Kourovka.«5.26»\n\n/-- The minimum number $r_1(G)$ of defining relations in a presentation of a finitely generated\ngroup $G$ as a quotient of the free discrete group on `Group.rank G` generators. -/\nnoncomputable def discreteRelationNumber (G : Type) [Group G] [Group.FG G] : ℕ :=\n  sInf {n : ℕ | ∃ (f : FreeGroup (Fin (Group.rank G)) →* G) (R : Finset (FreeGroup (Fin (Group.rank G)))),\n    Function.Surjective f ∧ R.card = n ∧ Subgroup.normalClosure (R : Set _) = f.ker}\n\n/-- For a prime $p$, the minimum number $r_2(G)$ of defining relations in a pro-$p$\npresentation of a finite $p$-group $G$. This is expressed through the equivalent formula\n$r_2(G)=\\dim_{\\mathbb F_p} H^2(G,\\mathbb F_p)$, with trivial coefficients. -/\nnoncomputable def proPRelationNumber (p : ℕ) (hp : p.Prime) (G : Type) [Group G] : ℕ :=\n  letI : Fact p.Prime := ⟨hp⟩\n  Module.finrank (ZMod p) (groupCohomology (Rep.trivial (ZMod p) G (ZMod p)) 2)\n\n/-- For a prime $p$, the exact upper bound $c(p)$ of the real numbers $b$ such that\n$r_2(G)\\geq b\\,d(G)^2$ for every finite $p$-group $G$. Its value away from primes is irrelevant. -/\nnoncomputable def c (p : ℕ) : ℝ :=\n  if hp : p.Prime then\n    sSup {b : ℝ | ∀ (G : Type) (_ : Group G) (_ : Finite G),\n      IsPGroup p G → (proPRelationNumber p hp G : ℝ) ≥ b * (Group.rank G : ℝ) ^ 2}\n  else 0\n\n/--\nFind a finite $p$-group $G$ for which the minimum number $r_1(G)$ of relations in a\ndiscrete presentation on the minimum number of generators is strictly greater than the minimum\nnumber $r_2(G)$ of relations in a pro-$p$ presentation on that many generators.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : ∃ (p : ℕ) (hp : p.Prime) (G : Type) (_ : Group G) (_ : Finite G),\n    IsPGroup p G ∧ discreteRelationNumber G > proPRelationNumber p hp G := by\n  sorry\n\n/--\nFor each prime $p$, let $c(p)$ be the exact upper bound of the real numbers $b$ such that\n$r_2(G)\\geq b\\,d(G)^2$ for every finite $p$-group $G$, where $d(G)$ is the minimum number of\ngenerators. The conjecture is\n$$\\lim_{p\\to\\infty,\\ p\\text{ prime}} c(p)=\\frac14.$$\n-/\n@[category research open, AMS 20]\ntheorem parts.b :\n    Filter.Tendsto c (Filter.atTop ⊓ Filter.principal {p : ℕ | p.Prime})\n      (nhds (1 / 4 : ℝ)) := by\n  sorry\n\nend Kourovka.«5.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used Mathlib's `Group.rank G` for the minimal number d of generators.",
+    "Defined r₁ as the minimum cardinality of a finite set whose normal closure is the kernel of a surjection from `FreeGroup (Fin (Group.rank G))` to G, minimizing over all such surjections.",
+    "Used the stated equivalent characterization r₂(G) = dim_{𝔽_p} H²(G, 𝔽_p), implemented with `ZMod p`, Mathlib group cohomology, and the trivial representation.",
+    "Defined c(p) literally as the real supremum of universal lower-bound constants. Its value was set to zero for nonprimes because the conjectured limit uses `atTop ⊓ principal {p | p.Prime}` and therefore only observes prime inputs.",
+    "Included the trivial finite p-group in the universal quantifier for c(p); its d = 0 inequality imposes no restriction, as required."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Group.rank`, `FreeGroup`, `PresentedGroup`, and `Subgroup.normalClosure`; these provide the ingredients but not the relation-number invariant.",
+     "name": "Kourovka.«5.26».discreteRelationNumber",
+     "why_needed": "Mathlib has the minimum generator count `Group.rank` and free groups, but no invariant for the minimum number of normal kernel generators among discrete presentations on a fixed minimal generating set."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `groupCohomology`, `Rep.trivial`, and `Module.finrank`; these faithfully supply the equivalent characterization but not a named r₂ invariant.",
+     "name": "Kourovka.«5.26».proPRelationNumber",
+     "why_needed": "No free pro-p group or pro-p presentation relation-number invariant was found, so the source's equivalent H² dimension characterization was packaged as the required numerical invariant."
+    },
+    {
+     "closest_existing_considered": "Real `sSup` and prime-restricted filters; these are used directly to implement the problem-specific function.",
+     "name": "Kourovka.«5.26».c",
+     "why_needed": "The problem introduces the prime-dependent exact upper bound c(p), which has no existing library definition."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«5.26».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«5.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«5.26».parts.a": "/--\nFind a finite $p$-group $G$ for which the minimum number $r_1(G)$ of relations in a\ndiscrete presentation on the minimum number of generators is strictly greater than the minimum\nnumber $r_2(G)$ of relations in a pro-$p$ presentation on that many generators.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : ∃ (p : ℕ) (hp : p.Prime) (G : Type) (_ : Group G) (_ : Finite G),\n    IsPGroup p G ∧ discreteRelationNumber G > proPRelationNumber p hp G := by\n  sorry",
+    "kourovka.«5.26».parts.b": "/--\nFor each prime $p$, let $c(p)$ be the exact upper bound of the real numbers $b$ such that\n$r_2(G)\\geq b\\,d(G)^2$ for every finite $p$-group $G$, where $d(G)$ is the minimum number of\ngenerators. The conjecture is\n$$\\lim_{p\\to\\infty,\\ p\\text{ prime}} c(p)=\\frac14.$$\n-/\n@[category research open, AMS 20]\ntheorem parts.b :\n    Filter.Tendsto c (Filter.atTop ⊓ Filter.principal {p : ℕ | p.Prime})\n      (nhds (1 / 4 : ℝ)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 5.26\n\nby H. Koch\n\nLet $G$ be a finite $p$-group with the minimal number of generators $d$, and let $r_1$\n(respectively, $r_2$) be the minimal number of defining relations on $d$ generators in the\nsense of representing $G$ as a factor-group of a free discrete group (pro-$p$-group). It is\nwell known that always $r_2 > d^2/4$. For each prime number $p$ denote by $c(p)$ the exact\nupper bound for the numbers $b(p)$ with the property that $r_2 \\geq b(p) d^2$ for all finite\n$p$-groups.\n\na) It is obvious that $r_1 \\geq r_2$. Find a $p$-group with $r_1 > r_2$.\n\nb) Conjecture: $\\lim_{p \\to \\infty} c(p) = 1/4$. It is proved (J. Wisliceny,\n*Math. Nachr.* **102** (1981), 57--78) that $\\lim_{d \\to \\infty} r_2 / d^2 = 1/4$.\n\nThe free pro-$p$ group is not available in Mathlib. We therefore use the standard fact that,\nfor a finite $p$-group $G$ (indeed for any finitely generated pro-$p$ group), the minimal\nnumber of relations of $G$ on $d(G)$ generators as a quotient of a free pro-$p$ group equals\n$\\dim_{\\mathbb{F}_p} H^2(G, \\mathbb{F}_p)$; see J.-P. Serre, *Galois Cohomology*, Chapter I,\n§4.3, or H. Koch, *Galois Theory of $p$-Extensions*. Since $G$ is finite, its continuous\ncohomology is its cohomology as an abstract group.\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n- J. Wisliceny, *Zur Darstellung von Pro-p-Gruppen und Lieschen Algebren durch Erzeugende und\n  Relationen*, Math. Nachr. **102** (1981), 57--78.\n-/\n\nopen Filter Topology\n\nnamespace Kourovka.«5.26»\n\n/--\n$r_1(G)$: the minimal number of defining relations of a finitely generated group $G$ on\n$d = d(G)$ generators, where $d(G)$ is the minimal number of generators of $G$ (`Group.rank G`).\nThat is, the least $n$ such that $G \\cong F_d / \\langle\\langle S \\rangle\\rangle$ for a set $S$ of\n$n$ elements of the free (discrete) group $F_d$ on $d$ generators.\n\nWhen $G$ is finite such a finite presentation always exists, so the infimum is attained.\n-/\nnoncomputable def discreteRelationRank (G : Type*) [Group G] [Group.FG G] : ℕ :=\n  sInf {n : ℕ | ∃ S : Finset (FreeGroup (Fin (Group.rank G))),\n    S.card = n ∧ Nonempty (PresentedGroup (S : Set (FreeGroup (Fin (Group.rank G)))) ≃* G)}\n\n/--\n$r_2(G)$: the minimal number of defining relations of a finite $p$-group $G$ on $d(G)$\ngenerators, in the sense of representing $G$ as a factor-group of the free pro-$p$ group on\n$d(G)$ generators. This equals $\\dim_{\\mathbb{F}_p} H^2(G, \\mathbb{F}_p)$ (cohomology with\ncoefficients in the trivial module $\\mathbb{F}_p$), which is how it is defined here.\n-/\nnoncomputable def proPRelationRank (p : ℕ) (G : Type) [Group G] : ℕ :=\n  Module.finrank (ZMod p) (groupCohomology.H2 (Rep.trivial (ZMod p) G (ZMod p)))\n\n/--\n$c(p)$: the exact upper bound (supremum) of the numbers $b$ such that $r_2(G) \\geq b \\, d(G)^2$\nfor all finite $p$-groups $G$.\n\nThe trivial group has $d = 0$ and $r_2 = 0$, so it imposes no constraint on $b$. The set of\nsuch $b$ contains $0$ (and, by the Golod–Shafarevich inequality $r_2 > d^2/4$, also $1/4$),\nand is bounded above by $1$ (take $G$ cyclic of order $p$), so the supremum is a genuine one.\n-/\nnoncomputable def c (p : ℕ) : ℝ :=\n  sSup {b : ℝ | ∀ (G : Type) [Group G] [Finite G], IsPGroup p G →\n    b * (Group.rank G : ℝ) ^ 2 ≤ proPRelationRank p G}\n\n/-- The set whose supremum defines $c(p)$ contains $0$, so $c(p) \\geq 0$. -/\n@[category API, AMS 20]\ntheorem c_nonneg (p : ℕ) : 0 ≤ c p := by\n  by_cases h : BddAbove {b : ℝ | ∀ (G : Type) [Group G] [Finite G], IsPGroup p G →\n      b * (Group.rank G : ℝ) ^ 2 ≤ proPRelationRank p G}\n  · exact le_csSup h fun G _ _ _ => by simp\n  · rw [c, Real.sSup_of_not_bddAbove h]\n\n/--\nLet $G$ be a finite $p$-group with the minimal number of generators $d$, and let $r_1$\n(respectively, $r_2$) be the minimal number of defining relations on $d$ generators in the\nsense of representing $G$ as a factor-group of a free discrete group (pro-$p$-group). It is\nobvious that $r_1 \\geq r_2$. Find a $p$-group with $r_1 > r_2$.\n\nFormalized as the existence of a prime $p$ and a finite $p$-group $G$ with $r_1(G) > r_2(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ) (G : Type) (_ : Group G) (_ : Finite G),\n      p.Prime ∧ IsPGroup p G ∧ proPRelationRank p G < discreteRelationRank G := by\n  sorry\n\n/--\nFor each prime number $p$ denote by $c(p)$ the exact upper bound for the numbers $b(p)$ with the\nproperty that $r_2 \\geq b(p) d^2$ for all finite $p$-groups. Conjecture:\n$\\lim_{p \\to \\infty} c(p) = 1/4$, the limit being taken over prime numbers $p$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Tendsto c (atTop ⊓ 𝓟 {p : ℕ | p.Prime}) (𝓝 (1 / 4)) := by\n  sorry\n\nend Kourovka.«5.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's reading (part a as an existence Prop, part b as a limit along primes of sSup-defined c(p), background remarks not formalized) matches the statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "r₂ is defined as dim_{F_p} H²(G, F_p) (Mathlib's abstract group cohomology of the finite group G with trivial coefficients ZMod p) rather than via the free pro-p group, which Mathlib lacks. This equality is a standard theorem for finitely generated pro-p groups (Serre, Galois Cohomology I §4.3; Koch; NSW 3.9.5), and for finite G continuous and abstract cohomology agree. The decomposition notes explicitly sanction this equivalent form.",
+    "r₁ takes the minimum over all presentations on exactly d = Group.rank G generators (all surjections F_d → G), counting relators as a Finset. discreteRelationRank assumes only Group.FG (needed for Group.rank); for a non-finitely-presented FG group the sInf would be of an empty set (= 0), but the statements only apply it to finite groups, where a finite presentation on d generators always exists.",
+    "Finite p-group is modeled as (G : Type) [Group G] [Finite G] with IsPGroup p G and p.Prime (p.Prime asserted in part a; in part b the limit filter is restricted to primes, so c p at non-primes is irrelevant). G is quantified over Type (universe 0) because Rep k G requires k and G in the same universe.",
+    "c p is sSup over ℝ; the defining set contains 0 and is bounded above by 1 (cyclic group of order p), so no Real.sSup default-value issue arises; the trivial group (d = 0) is harmless. The known bound r₂ > d²/4 is background and not formalized.",
+    "The limit p → ∞ over primes is expressed with the repo idiom Tendsto c (atTop ⊓ 𝓟 {p : ℕ | p.Prime}) (𝓝 (1/4)).",
+    "Part a ('Find a p-group with r₁ > r₂') is stated as a plain existence theorem (not answer(sorry) ↔ …), following the decomposition table; the remark 'It is obvious that r₁ ≥ r₂' is not formalized.",
+    "An extra proven API lemma c_nonneg (0 ≤ c p) is included as a basic sanity test of the bespoke definition c, per the repo's request to add basic API for bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "PresentedGroup, Group.rank, Subgroup.normalClosure (used as building blocks); no Mathlib or FormalConjecturesForMathlib notion of relation rank / deficiency exists.",
+     "name": "Kourovka.«5.26».discreteRelationRank",
+     "why_needed": "r₁(G): the minimal number of relators in a presentation of G on d(G) = Group.rank G generators as a quotient of the free discrete group. Mathlib has FreeGroup, PresentedGroup and Group.rank but no 'relation rank' / minimal number of relators."
+    },
+    {
+     "closest_existing_considered": "groupCohomology.H2 / Rep.trivial (used); searched Mathlib for pro-p, profinite completion, free pro-p group — none exist.",
+     "name": "Kourovka.«5.26».proPRelationRank",
+     "why_needed": "r₂(G): the minimal number of relations of G as a quotient of the free pro-p group on d(G) generators. Mathlib has no free pro-p groups or pro-p completions, so it is defined by the standard equivalent characterization Module.finrank (ZMod p) (groupCohomology.H2 (Rep.trivial (ZMod p) G (ZMod p))) (Serre, Galois Cohomology I.4.3; Koch, Galois Theory of p-Extensions)."
+    },
+    {
+     "closest_existing_considered": "sSup over ℝ (Real.sSup) directly; no existing definition of this constant.",
+     "name": "Kourovka.«5.26».c",
+     "why_needed": "The constant c(p) of the problem: sSup of the set of real b with r₂(G) ≥ b·d(G)² for all finite p-groups G. Problem-specific."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«5.26».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∃ prime p and finite p-group G (G : Type, Finite G, IsPGroup p G) with proPRelationRank p G < discreteRelationRank G, i.e. r₂(G) < r₁(G). r₁ is defined directly (min number of relators S ⊆ F_d, d = Group.rank G, with PresentedGroup S ≃* G); r₂ is defined as dim_{F_p} H²(G, F_p) since Mathlib has no free pro-p groups."
+    },
+    "kourovka.«5.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Tendsto c (atTop ⊓ 𝓟 {p | p.Prime}) (𝓝 (1/4)) with c p := sSup {b : ℝ | ∀ finite p-group G, b·d(G)² ≤ r₂(G)}. The set is nonempty (contains 0, proven in the file as c_nonneg's key step) and bounded above (b ≤ 1 via the cyclic group of order p), so sSup is a genuine supremum; the trivial group (d = 0, r₂ = 0) imposes no constraint."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«5.26».parts.a": "/--\nLet $G$ be a finite $p$-group with the minimal number of generators $d$, and let $r_1$\n(respectively, $r_2$) be the minimal number of defining relations on $d$ generators in the\nsense of representing $G$ as a factor-group of a free discrete group (pro-$p$-group). It is\nobvious that $r_1 \\geq r_2$. Find a $p$-group with $r_1 > r_2$.\n\nFormalized as the existence of a prime $p$ and a finite $p$-group $G$ with $r_1(G) > r_2(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ) (G : Type) (_ : Group G) (_ : Finite G),\n      p.Prime ∧ IsPGroup p G ∧ proPRelationRank p G < discreteRelationRank G := by\n  sorry",
+    "kourovka.«5.26».parts.b": "/--\nFor each prime number $p$ denote by $c(p)$ the exact upper bound for the numbers $b(p)$ with the\nproperty that $r_2 \\geq b(p) d^2$ for all finite $p$-groups. Conjecture:\n$\\lim_{p \\to \\infty} c(p) = 1/4$, the limit being taken over prime numbers $p$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Tendsto c (atTop ⊓ 𝓟 {p : ℕ | p.Prime}) (𝓝 (1 / 4)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 5.26\n\nby H. Koch\n\nLet $G$ be a finite $p$-group with the minimal number of generators $d$, and let $r_1$\n(respectively, $r_2$) be the minimal number of defining relations on $d$ generators in the\nsense of representing $G$ as a factor-group of a free discrete group (pro-$p$-group). It is well\nknown that always $r_2 > d^2/4$. For each prime number $p$ denote by $c(p)$ the exact upper\nbound for the numbers $b(p)$ with the property that $r_2 \\geq b(p) d^2$ for all finite\n$p$-groups.\n\na) It is obvious that $r_1 \\geq r_2$. Find a $p$-group with $r_1 > r_2$.\n\nb) Conjecture: $\\lim_{p \\to \\infty} c(p) = 1/4$. It is proved (J. Wisliceny, *Math. Nachr.*\n**102** (1981), 57–78) that $\\lim_{d \\to \\infty} r_2 / d^2 = 1/4$.\n\nHere $d = d(G)$ is `Group.rank G`. The number $r_1(G)$ is formalized literally: the least\nnumber of relators in a presentation of $G$ on $d(G)$ generators as a quotient of the free\n(discrete) group $F_{d(G)}$. For the pro-$p$ number $r_2(G)$ we use the standard identification\n$r_2(G) = \\dim_{\\mathbb{F}_p} H^2(G, \\mathbb{F}_p)$: for any minimal presentation of a pro-$p$\ngroup $G$ (in particular of a finite $p$-group), the minimal number of defining relations equals\n$\\dim_{\\mathbb{F}_p} H^2(G, \\mathbb{F}_p)$ (see Serre, *Galois Cohomology*, Ch. I, §4.3, or Koch,\n*Galois Theory of $p$-Extensions*); Mathlib has no free pro-$p$ groups, but it has group\ncohomology.\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n- J. Wisliceny, Math. Nachr. **102** (1981), 57–78.\n-/\n\nopen Filter Topology\n\nnamespace Kourovka.«5.26»\n\n/--\nThe minimal number $r_1(G)$ of defining relations of a finitely generated group $G$ on\n$d = d(G)$ generators, in the sense of representing $G$ as a factor-group of the free discrete\ngroup $F_d$: the least $n$ such that $G \\cong F_d / \\langle\\!\\langle R \\rangle\\!\\rangle$ for\nsome set $R$ of $n$ relators (that is, `PresentedGroup R ≃* G` with `R.card = n`).\n\nFor a finite group $G$ such a presentation with finitely many relators always exists (the kernel\nof a surjection $F_d \\to G$ has finite index, hence is finitely generated), so the infimum is\nattained.\n-/\nnoncomputable def r₁ (G : Type*) [Group G] [Group.FG G] : ℕ :=\n  sInf {n : ℕ | ∃ R : Finset (FreeGroup (Fin (Group.rank G))),\n    R.card = n ∧ Nonempty (PresentedGroup (R : Set (FreeGroup (Fin (Group.rank G)))) ≃* G)}\n\n/-- If $G$ has a presentation on $d(G)$ generators with $n$ relators, then $r_1(G) \\leq n$. -/\n@[category API, AMS 20]\ntheorem r₁_le {G : Type*} [Group G] [Group.FG G] (R : Finset (FreeGroup (Fin (Group.rank G))))\n    (e : PresentedGroup (R : Set (FreeGroup (Fin (Group.rank G)))) ≃* G) : r₁ G ≤ R.card :=\n  Nat.sInf_le ⟨R, rfl, ⟨e⟩⟩\n\n/--\nThe minimal number $r_2(G)$ of defining relations of a finite $p$-group $G$ on $d(G)$\ngenerators in the sense of representing $G$ as a factor-group of the free pro-$p$ group on $d(G)$\ngenerators. By a standard theorem (Serre, *Galois Cohomology*, Ch. I, §4.3) this equals\n$\\dim_{\\mathbb{F}_p} H^2(G, \\mathbb{F}_p)$, where $\\mathbb{F}_p$ carries the trivial\n$G$-action, and this is how it is defined here.\n-/\nnoncomputable def r₂ (p : ℕ) (G : Type) [Group G] : ℕ :=\n  Module.finrank (ZMod p) (groupCohomology (Rep.trivial (ZMod p) G (ZMod p)) 2)\n\n/--\nThe constant $c(p)$: the exact upper bound (supremum) of the numbers $b$ such that\n$r_2(G) \\geq b \\cdot d(G)^2$ for all finite $p$-groups $G$.\n\nThe trivial group has $d = 0$ and $r_2 = 0$, so it imposes no constraint on $b$. The set of\nsuch $b$ is nonempty (it contains $0$) and bounded above (the cyclic group of order $p$ has\n$d = 1$ and $r_2 = 1$), so the supremum is a genuine real number.\n-/\nnoncomputable def c (p : ℕ) : ℝ :=\n  sSup {b : ℝ | ∀ (G : Type) [Group G] [Finite G], IsPGroup p G →\n    b * (Group.rank G : ℝ) ^ 2 ≤ r₂ p G}\n\n/--\nFind a finite $p$-group $G$ with $r_1(G) > r_2(G)$, where $r_1(G)$ (resp. $r_2(G)$) is the\nminimal number of defining relations of $G$ on $d(G)$ generators as a factor-group of a free\ndiscrete (resp. free pro-$p$) group. (It is obvious that $r_1 \\geq r_2$ always holds.)\n\nFormalized as the existence of a prime $p$ and a finite $p$-group $G$ with $r_1(G) > r_2(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ) (G : Type) (_ : Group G) (_ : Finite G),\n      p.Prime ∧ IsPGroup p G ∧ r₂ p G < r₁ G := by\n  sorry\n\n/--\nConjecture: $\\lim_{p \\to \\infty} c(p) = 1/4$, where the limit is taken along the prime numbers\n$p$ and $c(p)$ is the supremum of the numbers $b$ with $r_2(G) \\geq b \\cdot d(G)^2$ for all\nfinite $p$-groups $G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Tendsto c (atTop ⊓ 𝓟 {p : ℕ | p.Prime}) (𝓝 (1 / 4)) := by\n  sorry\n\nend Kourovka.«5.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's decomposition (a: existence of a finite p-group with r₁ > r₂; b: lim c(p) = 1/4 along primes) matches the statement; the remarks 'r₁ ≥ r₂ is obvious', 'r₂ > d²/4' and Wisliceny's theorem are correctly treated as background.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "r₂ is defined as dim_{F_p} H²(G, F_p) (Mathlib groupCohomology with trivial action) instead of literally via free pro-p groups, which Mathlib lacks; this is the standard theorem r(G) = h²(G) for minimal pro-p presentations (Serre, Galois Cohomology I §4.3) and matches the decomposition notes and the cited Golod–Shafarevich bound r₂ > d²/4.",
+    "d(G) is Group.rank G (Mathlib's minimal number of generators), with the Group.FG instance for finite groups inferred from Group.fg_of_finite.",
+    "r₁ is defined via PresentedGroup R ≃* G with R a Finset of FreeGroup (Fin (Group.rank G)); equivalently min number of normal generators of the kernel of a surjection F_d → G. The sInf set is nonempty for finite G (finite-index subgroups of f.g. free groups are f.g.), so the ℕ-sInf default is never hit in the statements.",
+    "c(p) is a real sSup over G : Type (Type 0); every finite group is isomorphic to one in Type 0 and both r₂ and Group.rank are isomorphism-invariant, so no generality is lost. For prime p the set is nonempty and bounded above, so sSup is the true supremum.",
+    "The limit along primes uses the filter atTop ⊓ 𝓟 {p : ℕ | p.Prime} (same idiom as FormalConjectures/GreensOpenProblems/27.lean); the target 1/4 is a real number.",
+    "Part a) ('Find a p-group with r₁ > r₂') is formalized as the existence Prop, per the decomposition table, tagged research open (no star in the notebook). Part b) is a conjecture, not a question, so it is stated as a plain Prop without answer(sorry).",
+    "Added one API lemma r₁_le (with proof) as a basic test of the bespoke definition r₁, following CONTRIBUTING.md's request for basic API for bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Group.rank (only counts generators, not relations); PresentedGroup (used as a building block); Subgroup.normalClosure / MonoidHom.ker formulation (equivalent, but PresentedGroup is more literal).",
+     "name": "Kourovka.«5.26».r₁",
+     "why_needed": "The minimal number of relators in a presentation of G on d(G) generators as a quotient of the free discrete group F_{d(G)}; no such 'relation rank' notion exists in Mathlib or FormalConjecturesForMathlib. Defined as sInf over n of ∃ R : Finset (FreeGroup (Fin (Group.rank G))), R.card = n ∧ Nonempty (PresentedGroup R ≃* G). Accompanied by an API lemma r₁_le (with proof)."
+    },
+    {
+     "closest_existing_considered": "groupCohomology / groupCohomology.H2 (used); ProfiniteGrp (no free pro-p object or pro-p completion available).",
+     "name": "Kourovka.«5.26».r₂",
+     "why_needed": "The minimal number of relations of G on d(G) generators as a quotient of the free pro-p group. Mathlib has no free pro-p groups / pro-p completions, so r₂ is defined as Module.finrank (ZMod p) (groupCohomology (Rep.trivial (ZMod p) G (ZMod p)) 2) = dim_{F_p} H²(G, F_p), which by a standard theorem (Serre, Galois Cohomology I §4.3) equals the number of relations of any minimal pro-p presentation; for finite G discrete and continuous cohomology coincide. This identification is explicitly sanctioned in the decomposition table."
+    },
+    {
+     "closest_existing_considered": "sSup / iInf over nontrivial p-groups of r₂/d² (equivalent; the sSup form follows the notebook's wording 'exact upper bound for the numbers b(p)').",
+     "name": "Kourovka.«5.26».c",
+     "why_needed": "The constant c(p) of the problem: sSup {b : ℝ | ∀ (G : Type) [Group G] [Finite G], IsPGroup p G → b * (Group.rank G)^2 ≤ r₂ p G}. Problem-specific; no existing definition."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«5.26».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∃ prime p and finite p-group G (G : Type, [Group G], [Finite G], IsPGroup p G) with r₂ p G < r₁ G. r₁ is defined literally (least number of relators R ⊆ FreeGroup (Fin (Group.rank G)) with PresentedGroup R ≃* G); r₂ is defined as dim_{F_p} H²(G, F_p) via Mathlib's groupCohomology, the standard equivalent of the pro-p relation count since Mathlib has no free pro-p groups."
+    },
+    "kourovka.«5.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as Tendsto c (atTop ⊓ 𝓟 {p : ℕ | p.Prime}) (𝓝 (1/4)) with c p := sSup {b : ℝ | ∀ finite p-group G, b · (Group.rank G)² ≤ r₂ p G}. The set is nonempty (contains 0) and bounded above for prime p (cyclic group of order p gives d = 1, r₂ = 1), so sSup is the genuine supremum; the trivial group imposes no constraint."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«5.26».parts.a": "/--\nFind a finite $p$-group $G$ with $r_1(G) > r_2(G)$, where $r_1(G)$ (resp. $r_2(G)$) is the\nminimal number of defining relations of $G$ on $d(G)$ generators as a factor-group of a free\ndiscrete (resp. free pro-$p$) group. (It is obvious that $r_1 \\geq r_2$ always holds.)\n\nFormalized as the existence of a prime $p$ and a finite $p$-group $G$ with $r_1(G) > r_2(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.a :\n    ∃ (p : ℕ) (G : Type) (_ : Group G) (_ : Finite G),\n      p.Prime ∧ IsPGroup p G ∧ r₂ p G < r₁ G := by\n  sorry",
+    "kourovka.«5.26».parts.b": "/--\nConjecture: $\\lim_{p \\to \\infty} c(p) = 1/4$, where the limit is taken along the prime numbers\n$p$ and $c(p)$ is the supremum of the numbers $b$ with $r_2(G) \\geq b \\cdot d(G)^2$ for all\nfinite $p$-groups $G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«5.26».parts.b :\n    Tendsto c (atTop ⊓ 𝓟 {p : ℕ | p.Prime}) (𝓝 (1 / 4)) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«5.26».parts.a": "c07",
+  "kourovka.«5.26».parts.b": "c07"
+ },
+ "id": "kourovka-5.26",
+ "main_attempt": "c07"
+}

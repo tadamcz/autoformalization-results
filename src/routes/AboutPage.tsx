@@ -1,11 +1,17 @@
 import { useEffect } from "react";
 import { Link } from "react-router";
+import { orderedSources } from "../components/AreaSidebar";
 import { TopBar } from "../components/TopBar";
-import { HOW_PRODUCED, proverSentence } from "../components/ProvenanceDrawer";
+import { howProduced, proverBudget } from "../components/ProvenanceDrawer";
 import { formatDate, median } from "../data/filters";
 import { useIndex } from "../data/load";
+import type { IndexEntry, Meta, SourceMeta } from "../data/schema";
 
 const REPO_URL = "https://github.com/tadamcz/autoformalization-results";
+
+function joinWithAnd(parts: React.ReactNode[]): React.ReactNode[] {
+  return parts.flatMap((p, i) => (i === 0 ? [p] : [i === parts.length - 1 ? " and " : ", ", p]));
+}
 
 export function AboutPage() {
   const index = useIndex();
@@ -21,21 +27,24 @@ export function AboutPage() {
     );
   }
   const m = index.data.meta;
-  const o = m.outcomes;
-  const accepted = (o.shown ?? 0) + (o.below_threshold ?? 0);
-  const gens = m.models.generators.map((g) => g.name);
-  const settled = m.prover_settled_confidences;
-  const med = median(index.data.entries.map((e) => e.confidence));
+  const sources = orderedSources(m);
   return (
     <>
       <TopBar />
       <main className="page narrow about">
         <h1>About</h1>
         <p>
-          These are {m.n_entries} Lean 4 files, each stating an entry from Wikipedia's{" "}
-          <a href={m.list_url} target="_blank" rel="noopener noreferrer">
-            list of unsolved problems in mathematics
-          </a>{" "}
+          These are {m.n_entries} Lean 4 files, each stating an open problem from{" "}
+          {joinWithAnd(
+            sources.map(([key, s]) => (
+              <span key={key}>
+                <a href={s.url} target="_blank" rel="noopener noreferrer">
+                  {s.name}
+                </a>{" "}
+                ({s.n_entries} files)
+              </span>
+            )),
+          )}{" "}
           that was not in{" "}
           <a href={m.fc_repo_url} target="_blank" rel="noopener noreferrer">
             google-deepmind/formal-conjectures
@@ -46,34 +55,33 @@ export function AboutPage() {
         </p>
 
         <h2>Selection</h2>
-        <p>
-          The pipeline attempted {o.attempted} entries. It produced a file it was willing to stand behind for {accepted}; for {o.refused} it produced nothing (no attempt could
-          state the entry faithfully, or the entry had no statable claim), and {o.failed} were discarded because the final file failed a check or the prover settled a
-          statement. Of the {accepted} accepted files, the {m.n_entries} shown here are those whose automated reviewer reported a confidence of at least {m.min_confidence} that
-          every statement in the file is faithful; the {o.below_threshold} below that cut are not shown. Each file page shows that confidence and the list can be filtered by it.
-          Treat it as a weak signal
-          {settled.length > 0 ? (
-            <>
-              : the prover later proved or refuted a statement in {settled.length} {settled.length === 1 ? "file" : "files"} the reviewer had passed, with{" "}
-              {settled.length === 1 ? "confidence" : "confidences"} {settled.map((c) => c.toFixed(2)).join(", ")}
-              {med !== null ? `; the median across the files shown here is ${med.toFixed(2)}` : ""}.
-            </>
-          ) : (
-            "."
-          )}
-        </p>
+        {sources.map(([key, s]) => (
+          <Selection key={key} s={s} meta={m} entries={index.data.entries.filter((e) => e.source === key)} />
+        ))}
+        <p>Each file page shows the reviewer's confidence and the list can be filtered by it.</p>
 
         <h2>How each file was produced</h2>
-        <p>{HOW_PRODUCED}</p>
-        <p>
-          The {m.attempts_per_entry} attempts per entry were written by {gens.join(" and ")} ({m.attempts_per_entry / Math.max(1, gens.length)} each); the splitting into
-          claims and the final review were done by {m.models.adjudicator.name}; the prover was {m.models.prover.name}. {proverSentence(m.probe_budget_minutes)}
-        </p>
+        <p>{howProduced(null)}</p>
+        {sources.map(([key, s]) => {
+          const r = s.run;
+          const gens = r.models.generators.map((g) => g.name);
+          return (
+            <p key={key}>
+              For the {s.short_name}, the {r.attempts_per_entry} attempts per entry were written by {gens.join(" and ")} ({r.attempts_per_entry / Math.max(1, gens.length)} each);
+              the splitting into claims and the final review were done by {r.models.adjudicator.name}; the prover was {r.models.prover.name} and tried{" "}
+              {proverBudget(r.probe_budget)} per file.
+            </p>
+          );
+        })}
 
         <h2>Data</h2>
+        {sources.map(([key, s]) => (
+          <p key={key}>
+            <SourceData source={key} s={s} />
+          </p>
+        ))}
         <p>
-          The Wikipedia list and articles were read on {formatDate(m.wikipedia_snapshot)}. The files compile against Formal Conjectures commit <code>{m.fc.commit.slice(0, 7)}</code>{" "}
-          ({formatDate(m.fc.commit_date)}; {m.fc.lean_toolchain}
+          The files compile against Formal Conjectures commit <code>{m.fc.commit.slice(0, 7)}</code> ({formatDate(m.fc.commit_date)}; {m.fc.lean_toolchain}
           {m.fc.mathlib_rev ? `, Mathlib ${m.fc.mathlib_rev.slice(0, 7)}` : ""}). Whether Formal Conjectures has since gained a file for an entry is re-checked when the site is
           rebuilt; such entries are marked but kept.
         </p>
@@ -82,11 +90,18 @@ export function AboutPage() {
           <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
             {REPO_URL.replace("https://", "")}
           </a>
-          . Full transcripts of every model call (run {m.run_id}):{" "}
-          <a href={m.transcript_base} target="_blank" rel="noopener noreferrer">
-            Inspect log viewer
-          </a>
-          .
+          . Full transcripts of every model call:{" "}
+          {joinWithAnd(
+            sources.map(([key, s]) => (
+              <span key={key}>
+                <a href={s.run.transcript_base} target="_blank" rel="noopener noreferrer">
+                  {s.short_name}
+                </a>{" "}
+                (run {s.run.run_id})
+              </span>
+            )),
+          )}{" "}
+          in the Inspect log viewer.
         </p>
 
         <p className="made-by">
@@ -98,4 +113,49 @@ export function AboutPage() {
       </main>
     </>
   );
+}
+
+// One source's funnel: attempted -> accepted -> shown, and the calibration
+// caveat computed from the files the prover settled after the reviewer passed them.
+function Selection({ s, meta, entries }: { s: SourceMeta; meta: Meta; entries: IndexEntry[] }) {
+  const o = s.run.outcomes;
+  const accepted = (o.shown ?? 0) + (o.below_threshold ?? 0);
+  const settled = s.run.prover_settled_confidences;
+  const med = median(entries.map((e) => e.confidence));
+  return (
+    <p>
+      <strong>{s.short_name}.</strong> The pipeline attempted {o.attempted} entries. It produced a file it was willing to stand behind for {accepted}; for {o.refused} it produced
+      nothing (no attempt could state the entry faithfully, or the entry had no statable claim), and {o.failed} were discarded because the final file failed a check or the
+      prover settled a statement. Of the {accepted} accepted files, the {s.n_entries} shown here are those whose automated reviewer reported a confidence of at least{" "}
+      {meta.min_confidence} that every statement in the file is faithful; the {o.below_threshold} below that cut are not shown. Treat that confidence as a weak signal
+      {settled.length > 0 ? (
+        <>
+          : the prover later proved or refuted a statement in {settled.length} {settled.length === 1 ? "file" : "files"} the reviewer had passed, with{" "}
+          {settled.length === 1 ? "confidence" : "confidences"} {settled.map((c) => c.toFixed(2)).join(", ")}
+          {med !== null ? `; the median across the files shown here is ${med.toFixed(2)}` : ""}.
+        </>
+      ) : (
+        "."
+      )}
+    </p>
+  );
+}
+
+function SourceData({ source, s }: { source: string; s: SourceMeta }) {
+  if (source === "kourovka") {
+    return (
+      <>
+        The Kourovka Notebook is read from the editors' TeX at{" "}
+        <a href={s.url} target="_blank" rel="noopener noreferrer">
+          arXiv:{s.notebook_version ?? "1401.0300"}
+        </a>
+        {s.snapshot ? ` (fetched on ${formatDate(s.snapshot)})` : ""}. Problems the notebook marks as solved, and those Formal Conjectures already had a file for, were left out.
+        Statements are shown as written, with the TeX text rendered and the notebook's own macros applied to the mathematics; the TeX itself is one click away on each page.
+      </>
+    );
+  }
+  if (source === "wikipedia") {
+    return <>The Wikipedia list and articles were read on {formatDate(s.snapshot)}.</>;
+  }
+  return <>{s.name} was read on {formatDate(s.snapshot)}.</>;
 }

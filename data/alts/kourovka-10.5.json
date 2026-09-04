@@ -1,0 +1,433 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.5\n\nby V. S. Anashin\n\nConstruct an example of a finite group whose mixed identities do not have a finite\nbasis. Is the group constructed in (R. Bryant, *Bull. London Math. Soc.* **14**, no. 2\n(1982), 119–123) such an example?\n\nA *mixed identity* of a group $G$ is an element $w$ of the free product $G * F_\\infty$ of $G$\nwith a free group of countably infinite rank (the variables $x_1, x_2, \\dots$) such that $w$\nbecomes $1$ under every substitution of elements of $G$ for the variables, i.e.\n$\\varphi(w) = 1$ for every homomorphism $\\varphi \\colon G * F_\\infty \\to G$ that is the identity\non $G$. A set $B$ of mixed identities of $G$ is a *basis* of the mixed identities of $G$ if every\nmixed identity of $G$ is a consequence of $B$, i.e. lies in the smallest normal subgroup of\n$G * F_\\infty$ containing $B$ that is invariant under all endomorphisms of $G * F_\\infty$ fixing\n$G$ pointwise (substitutions of words for the variables).\n\nOnly the first sentence of the problem is formalised here. The second sentence asks about the\nspecific finite pointed group constructed in Bryant's paper.\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 10.5\n* R. M. Bryant, *The laws of finite pointed groups*,\n  [Bull. London Math. Soc. **14** (1982), 119–123](https://doi.org/10.1112/blms/14.2.119)\n-/\n\nopen Monoid\n\nnamespace Kourovka.«10.5»\n\nvariable (G : Type*) [Group G]\n\n/-- A *mixed identity* of `G` is an element `w` of the free product `Coprod G (FreeGroup ℕ)` of\n`G` with the free group on countably many variables such that `φ w = 1` for every homomorphism\n`φ : Coprod G (FreeGroup ℕ) →* G` which is the identity on `G`, i.e. `w` evaluates to `1` under\nevery substitution of elements of `G` for the variables. -/\ndef IsMixedIdentity (w : Coprod G (FreeGroup ℕ)) : Prop :=\n  ∀ φ : Coprod G (FreeGroup ℕ) →* G, φ.comp Coprod.inl = MonoidHom.id G → φ w = 1\n\n/-- The *consequences* of a set `B` of elements of `Coprod G (FreeGroup ℕ)`: the smallest normal\nsubgroup of `Coprod G (FreeGroup ℕ)` containing `B` that is invariant under every endomorphism\nof `Coprod G (FreeGroup ℕ)` fixing `G` pointwise (i.e. under every substitution of words for\nthe variables). -/\ndef mixedConsequences (B : Set (Coprod G (FreeGroup ℕ))) : Subgroup (Coprod G (FreeGroup ℕ)) :=\n  sInf {N | N.Normal ∧\n    (∀ ψ : Coprod G (FreeGroup ℕ) →* Coprod G (FreeGroup ℕ),\n      ψ.comp Coprod.inl = Coprod.inl → ∀ w ∈ N, ψ w ∈ N) ∧\n    B ⊆ N}\n\n/-- The mixed identities of `G` *have a finite basis* if there is a finite set `B` of elements\nof `Coprod G (FreeGroup ℕ)` whose consequences are exactly the mixed identities of `G`. -/\ndef HasFiniteMixedIdentityBasis : Prop :=\n  ∃ B : Finset (Coprod G (FreeGroup ℕ)),\n    ∀ w, IsMixedIdentity G w ↔ w ∈ mixedConsequences G B\n\n@[category test, AMS 20]\ntheorem isMixedIdentity_one : IsMixedIdentity G 1 := fun φ _ => map_one φ\n\n@[category API, AMS 20]\ntheorem subset_mixedConsequences (B : Set (Coprod G (FreeGroup ℕ))) :\n    B ⊆ mixedConsequences G B :=\n  fun _ hw => Subgroup.mem_sInf.2 fun _ hN => hN.2.2 hw\n\n/-- Every consequence of a set of mixed identities of `G` is again a mixed identity of `G`. -/\n@[category API, AMS 20]\ntheorem isMixedIdentity_of_mem_mixedConsequences {B : Set (Coprod G (FreeGroup ℕ))}\n    (hB : ∀ b ∈ B, IsMixedIdentity G b) {w : Coprod G (FreeGroup ℕ)}\n    (hw : w ∈ mixedConsequences G B) : IsMixedIdentity G w := by\n  intro φ hφ\n  let N : Subgroup (Coprod G (FreeGroup ℕ)) :=\n    ⨅ (φ : Coprod G (FreeGroup ℕ) →* G) (_ : φ.comp Coprod.inl = MonoidHom.id G), φ.ker\n  have hN : ∀ w, w ∈ N ↔ IsMixedIdentity G w := fun w => by\n    simp [N, Subgroup.mem_iInf, IsMixedIdentity]\n  refine (hN w).1 (Subgroup.mem_sInf.1 hw N ⟨?_, ?_, fun b hb => (hN b).2 (hB b hb)⟩) φ hφ\n  · exact Subgroup.normal_iInf_normal fun φ => Subgroup.normal_iInf_normal fun _ => inferInstance\n  · intro ψ hψ w hw\n    refine (hN _).2 fun φ hφ => (hN w).1 hw (φ.comp ψ) ?_\n    rw [MonoidHom.comp_assoc, hψ, hφ]\n\n/--\nConstruct an example of a finite group whose mixed identities do not have a finite basis.\n\nFormalised as the existence of a finite group `G` whose mixed identities (`IsMixedIdentity`)\nhave no finite basis (`HasFiniteMixedIdentityBasis`).\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G), Finite G ∧ ¬ HasFiniteMixedIdentityBasis G := by\n  sorry\n\nend Kourovka.«10.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None of substance. The second slot is correctly identified as depending on Bryant's explicit group, which is not available; I note that for a finite G, Anashin's mixed identities coincide with the laws of the pointed group (G; all elements of G) modulo the (finitely generated) relations among constants, so the relation between Bryant's result and Anashin's question is as described in the notes (not automatic).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Construct an example' is formalised as the existence Prop ∃ finite group G with no finite basis of mixed identities (as prescribed by the decomposition notes), stated with `theorem : P` (not answer(sorry)), since the sentence is a construction request, not a yes/no question.",
+    "Mixed identity defined via homomorphisms φ : Coprod G (FreeGroup ℕ) →* G with φ ∘ inl = id rather than via explicit substitutions f : ℕ → G; the two are equivalent (every such φ is Coprod.lift (MonoidHom.id G) (FreeGroup.lift f); checked in Lean in a scratch file).",
+    "Consequence closure = smallest subgroup that is normal AND invariant under G-fixing endomorphisms; normality is imposed separately because inner automorphisms of the free product are not G-fixing. This is the standard consequence relation for identities with constants; the API lemma isMixedIdentity_of_mem_mixedConsequences (proved) checks that consequences of mixed identities are mixed identities.",
+    "Countably infinitely many variables (FreeGroup ℕ), the standard setting for laws/mixed identities.",
+    "The group G in the ∃ is quantified over `Type` (as in other Kourovka files); finite groups exist in Type up to isomorphism.",
+    "A finite basis is a Finset of words in Coprod G (FreeGroup ℕ) whose consequences are exactly the mixed identities; this forces B ⊆ mixed identities, so it is equivalent to 'finite set of mixed identities generating all of them'.",
+    "The Bryant DOI link https://doi.org/10.1112/blms/14.2.119 follows the standard Bull. LMS DOI pattern but could not be verified online from the sandbox.",
+    "Used `Monoid.Coprod G (FreeGroup ℕ)` spelled out instead of the scoped `∗` notation, because FormalConjecturesForMathlib defines a global `∗` (sumConv) that shadows it."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has no notion of group laws/varieties/verbal or fully invariant subgroups; `Monoid.Coprod`, `Monoid.Coprod.lift`, `FreeGroup.lift` and `MonoidHom.ker` were the closest building blocks and are used directly.",
+     "name": "Kourovka.«10.5».IsMixedIdentity",
+     "why_needed": "Mixed identities (identities with constants from G) are not in Mathlib or FormalConjecturesForMathlib. Defined as: w ∈ Monoid.Coprod G (FreeGroup ℕ) with φ w = 1 for every φ : Coprod G (FreeGroup ℕ) →* G with φ.comp Coprod.inl = MonoidHom.id G."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.normalClosure` (gives normality but not invariance under G-endomorphisms); no fully-invariant/verbal subgroup notion exists in Mathlib.",
+     "name": "Kourovka.«10.5».mixedConsequences",
+     "why_needed": "The consequence closure of a set of mixed words: sInf of all normal subgroups of Coprod G (FreeGroup ℕ) containing B and invariant under every endomorphism ψ with ψ.comp Coprod.inl = Coprod.inl (substitution of words for variables). Needed to define 'basis'."
+    },
+    {
+     "closest_existing_considered": "Nothing analogous (finite basedness of laws) in Mathlib or the repo.",
+     "name": "Kourovka.«10.5».HasFiniteMixedIdentityBasis",
+     "why_needed": "'The mixed identities of G have a finite basis': ∃ B : Finset (Coprod G (FreeGroup ℕ)), ∀ w, IsMixedIdentity G w ↔ w ∈ mixedConsequences G B. (B ⊆ consequences B forces B to consist of mixed identities.)"
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as the existence of a finite group G (G : Type, Group G, Finite G) whose mixed identities have no finite basis. Mixed identities are elements w of the free product Monoid.Coprod G (FreeGroup ℕ) with φ w = 1 for every homomorphism φ : Coprod G (FreeGroup ℕ) →* G restricting to the identity on G (equivalently, every substitution of elements of G for the variables; checked in a scratch file). 'Finite basis' = a Finset B whose consequences (smallest normal subgroup containing B and invariant under all endomorphisms fixing Coprod.inl, i.e. substitutions of words for variables) are exactly the mixed identities. Needed bespoke definitions IsMixedIdentity, mixedConsequences, HasFiniteMixedIdentityBasis since neither Mathlib nor FormalConjecturesForMathlib has identities with constants / laws of pointed groups."
+    },
+    "kourovka.«10.5».variants.bryant": {
+     "outcome": "missing_primitives",
+     "why": "The question is about one specific finite (pointed) group constructed in R. M. Bryant, 'The laws of finite pointed groups', Bull. LMS 14 (1982) 119–123. The paper is not in the sandbox and the explicit group (and its distinguished element(s)) cannot be reliably transcribed from memory; no Mathlib/repo declaration provides it. Stating it with a guessed group would be unfaithful, so the slot is omitted. Once the group is available, the slot would be `answer(sorry) ↔ ¬ HasFiniteMixedIdentityBasis BryantGroup` using the definitions in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.5»": "/--\nConstruct an example of a finite group whose mixed identities do not have a finite basis.\n\nFormalised as the existence of a finite group `G` whose mixed identities (`IsMixedIdentity`)\nhave no finite basis (`HasFiniteMixedIdentityBasis`).\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G), Finite G ∧ ¬ HasFiniteMixedIdentityBasis G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.5\n\nby V. S. Anashin\n\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis. Is the group constructed in (R. Bryant, *Bull. London Math. Soc.*\n**14**, no. 2 (1982), 119–123) such an example?\n\nA *mixed identity* (identity with constants) of a group $G$ is an element $w$\nof the free product $G * F_\\infty$, where $F_\\infty$ is the free group on the\nvariables $x_0, x_1, \\dots$, such that $w(g_0, g_1, \\dots) = 1$ for every\nchoice of $g_0, g_1, \\dots \\in G$; equivalently, $\\varphi(w) = 1$ for every\nhomomorphism $\\varphi \\colon G * F_\\infty \\to G$ that is the identity on $G$.\nA set $S$ of mixed identities is a *basis* of the mixed identities of $G$ if\nevery mixed identity of $G$ is a consequence of $S$, i.e. lies in the smallest\nnormal subgroup of $G * F_\\infty$ that contains $S$ and is closed under all\nendomorphisms of $G * F_\\infty$ fixing $G$ pointwise (substitutions of\nvariables).\n\nOnly the first sentence of the problem is formalised here. The second sentence\nasks about the specific finite pointed group constructed in Bryant's paper,\nwhich is not transcribed here.\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), problem 10.5\n- R. M. Bryant, *The laws of finite pointed groups*, Bull. London Math. Soc.\n  14 (1982), no. 2, 119–123\n-/\n\nopen scoped Monoid.Coprod\n\nnamespace Kourovka.«10.5»\n\nvariable (G : Type*) [Group G]\n\n/-- Evaluation of mixed words at the substitution `f : ℕ → G` of the variables:\nthe unique homomorphism $G * F_\\infty \\to G$ that is the identity on $G$ and\nsends the variable $x_i$ to $f(i)$. -/\ndef evalAt (f : ℕ → G) : G ∗ FreeGroup ℕ →* G :=\n  Monoid.Coprod.lift (MonoidHom.id G) (FreeGroup.lift f)\n\n/-- The mixed identities of $G$: the words $w \\in G * F_\\infty$ with\n$w(g_0, g_1, \\dots) = 1$ for all $g_0, g_1, \\dots \\in G$. -/\ndef mixedIdentities : Subgroup (G ∗ FreeGroup ℕ) :=\n  ⨅ f : ℕ → G, (evalAt G f).ker\n\n/-- A substitution of variables: an endomorphism of $G * F_\\infty$ that fixes\n$G$ pointwise. -/\ndef IsSubstitution (σ : G ∗ FreeGroup ℕ →* G ∗ FreeGroup ℕ) : Prop :=\n  σ.comp Monoid.Coprod.inl = Monoid.Coprod.inl\n\n/-- The consequences of a set $S$ of mixed words: the smallest normal subgroup\nof $G * F_\\infty$ that contains $S$ and is closed under all substitutions of\nvariables. -/\ndef consequences (S : Set (G ∗ FreeGroup ℕ)) : Subgroup (G ∗ FreeGroup ℕ) :=\n  ⨅ (N : Subgroup (G ∗ FreeGroup ℕ)) (_ : N.Normal)\n    (_ : ∀ σ, IsSubstitution G σ → ∀ w ∈ N, σ w ∈ N) (_ : S ⊆ N), N\n\n/-- A set $S \\subseteq G * F_\\infty$ is a basis of the mixed identities of $G$\nif the mixed identities of $G$ are exactly the consequences of $S$. -/\ndef IsMixedBasis (S : Set (G ∗ FreeGroup ℕ)) : Prop :=\n  consequences G S = mixedIdentities G\n\n/-- A word $w \\in G * F_\\infty$ is a mixed identity of $G$ if and only if it evaluates to $1$\nunder every substitution of elements of $G$ for the variables. -/\n@[category API, AMS 20]\ntheorem mem_mixedIdentities_iff (w : G ∗ FreeGroup ℕ) :\n    w ∈ mixedIdentities G ↔ ∀ f : ℕ → G, evalAt G f w = 1 := by\n  simp [mixedIdentities, Subgroup.mem_iInf, MonoidHom.mem_ker]\n\n/-- A constant $g \\in G$ is a mixed identity of $G$ if and only if $g = 1$. -/\n@[category API, AMS 20]\ntheorem inl_mem_mixedIdentities_iff (g : G) :\n    Monoid.Coprod.inl g ∈ mixedIdentities G ↔ g = 1 := by\n  simp [mem_mixedIdentities_iff, evalAt]\n\ninstance mixedIdentities_normal : (mixedIdentities G).Normal :=\n  Subgroup.normal_iInf_normal fun _ => MonoidHom.normal_ker _\n\n/-- The mixed identities of $G$ are closed under substitutions of variables. -/\n@[category API, AMS 20]\ntheorem mixedIdentities_closed (σ : G ∗ FreeGroup ℕ →* G ∗ FreeGroup ℕ)\n    (hσ : IsSubstitution G σ) (w : G ∗ FreeGroup ℕ) (hw : w ∈ mixedIdentities G) :\n    σ w ∈ mixedIdentities G := by\n  rw [mem_mixedIdentities_iff] at hw ⊢\n  intro f\n  have : (evalAt G f).comp σ = evalAt G fun i => evalAt G f (σ (Monoid.Coprod.inr (.of i))) := by\n    apply Monoid.Coprod.hom_ext\n    · rw [MonoidHom.comp_assoc, hσ]\n      rfl\n    · apply FreeGroup.ext_hom\n      intro i\n      simp [evalAt]\n  have h2 : evalAt G f (σ w) = ((evalAt G f).comp σ) w := rfl\n  rw [h2, this]\n  exact hw _\n\n/-- The commutator $[x_0, x_1]$ is a mixed identity of $G$ if and only if $G$ is abelian. -/\n@[category test, AMS 20]\ntheorem commutator_mem_mixedIdentities_iff :\n    ⁅(Monoid.Coprod.inr (FreeGroup.of 0) : G ∗ FreeGroup ℕ),\n        Monoid.Coprod.inr (FreeGroup.of 1)⁆ ∈ mixedIdentities G ↔\n      ∀ a b : G, a * b = b * a := by\n  simp only [mem_mixedIdentities_iff, map_commutatorElement, evalAt,\n    Monoid.Coprod.lift_apply_inr, FreeGroup.lift_apply_of, commutatorElement_eq_one_iff_mul_comm]\n  constructor\n  · intro h a b\n    simpa using h fun i => if i = 0 then a else b\n  · intro h f\n    exact h _ _\n\n/--\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis.\n\nFormalised as the existence statement: there is a finite group $G$ such that\nno finite set $S \\subseteq G * F_\\infty$ is a basis of the mixed identities\nof $G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ ∃ S : Set (G ∗ FreeGroup ℕ), S.Finite ∧ IsMixedBasis G S := by\n  sorry\n\nend Kourovka.«10.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's reading (existence Prop for the imperative first sentence; witness-specific yes/no question for the second, requiring Bryant's explicit group) matches the source. I only note that the second slot is unformalizable without access to Bryant's paper, as the table's own notes anticipate.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Mixed words are elements of the free product `G ∗ FreeGroup ℕ` (`Monoid.Coprod`), i.e. constants from all of `G` and countably many variables `x_0, x_1, …`, following the decomposition notes; this matches Anashin's (and Hull–Osin's) definition of mixed identities.",
+    "Evaluation at a substitution `f : ℕ → G` is `Monoid.Coprod.lift (MonoidHom.id G) (FreeGroup.lift f)`; by the universal property these are exactly the homomorphisms `G ∗ F_∞ →* G` restricting to the identity on `G`, so quantifying over `f : ℕ → G` is equivalent to quantifying over such homomorphisms.",
+    "`mixedIdentities G` is defined as the subgroup `⨅ f, (evalAt G f).ker`; an API lemma `mem_mixedIdentities_iff` shows it is exactly the set of words vanishing under every substitution, and it is proved normal and closed under substitutions.",
+    "`consequences G S` is defined literally as the infimum of all normal subgroups containing `S` that are closed under every endomorphism `σ` of `G ∗ FreeGroup ℕ` with `σ ∘ inl = inl` (the `IsSubstitution` predicate). This is the syntactic notion of consequence of mixed identities; it coincides with the normal closure of all substitution instances of `S`, and, for `S` a set of mixed identities of `G`, with semantic consequence over groups containing `G`.",
+    "`IsMixedBasis G S := consequences G S = mixedIdentities G`. No separate hypothesis `S ⊆ mixedIdentities G` is needed since `S ⊆ consequences G S` forces it.",
+    "'Do not have a finite basis' is rendered as `¬ ∃ S : Set _, S.Finite ∧ IsMixedBasis G S` (equivalent to quantifying over `Finset`).",
+    "The imperative 'Construct an example …' is formalized as an existence proposition (no `answer(sorry)`), as the decomposition table prescribes; the group lives in `Type` (universe 0) with `Finite G`, following the other Kourovka files.",
+    "Sanity check: for the trivial group `{x_0}` is a finite basis, so the statement is not trivially true for every finite group; a constant `g` is a mixed identity iff `g = 1` (proved as an API lemma).",
+    "The module docstring briefly records that the second sentence (Bryant's group) is not formalized; the file cites both the Kourovka Notebook (arXiv:1401.0300v46) and Bryant's paper.",
+    "AMS tag 20 only (group theory); the finite basis problem could arguably also carry 08."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Monoid.Coprod.lift` and `FreeGroup.lift` (used to build it); no Mathlib notion of evaluating words with constants.",
+     "name": "Kourovka.«10.5».evalAt",
+     "why_needed": "The homomorphism `G ∗ FreeGroup ℕ →* G` that is the identity on `G` and sends the variable `x_i` to `f i`; needed to say a mixed word 'vanishes under every substitution of elements of `G`'."
+    },
+    {
+     "closest_existing_considered": "`MonoidHom.ker`, `Subgroup` infima (used); `FreeGroup`/`Monoid.Coprod` (no laws API).",
+     "name": "Kourovka.«10.5».mixedIdentities",
+     "why_needed": "The subgroup of `G ∗ FreeGroup ℕ` of mixed identities (identities with constants) of `G`; Mathlib has no notion of group laws/identities, let alone identities with constants."
+    },
+    {
+     "closest_existing_considered": "`MonoidHom.comp`/`Monoid.Coprod.inl` (used to express `σ ∘ inl = inl`); no Mathlib predicate for `G`-endomorphisms of a free product.",
+     "name": "Kourovka.«10.5».IsSubstitution",
+     "why_needed": "Endomorphisms of `G ∗ FreeGroup ℕ` fixing `G` pointwise (substitutions of variables), needed to define consequences of mixed identities."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.normalClosure` (only normal closure, not invariance under substitutions); `Subgroup.Characteristic`/`Subgroup.Normal` (wrong invariance class).",
+     "name": "Kourovka.«10.5».consequences",
+     "why_needed": "The smallest normal subgroup containing a set `S` and closed under all substitutions of variables, i.e. the set of consequences of `S`; Mathlib has no notion of verbal/fully-invariant closure relative to constants."
+    },
+    {
+     "closest_existing_considered": "No Mathlib or repo notion of a basis of identities.",
+     "name": "Kourovka.«10.5».IsMixedBasis",
+     "why_needed": "Expresses that a set `S` is a basis of the mixed identities of `G`, i.e. its consequences are exactly the mixed identities; needed to state 'do not have a finite basis'."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ ∃ S : Set (G ∗ FreeGroup ℕ), S.Finite ∧ IsMixedBasis G S`, where mixed identities are elements of the free product `G ∗ FreeGroup ℕ` killed by every homomorphism to `G` that is the identity on `G` (equivalently every substitution `ℕ → G` of the variables), and `IsMixedBasis G S` says the smallest normal subgroup of `G ∗ FreeGroup ℕ` containing `S` and closed under all `G`-fixing endomorphisms (substitutions of variables) equals the subgroup of mixed identities. Bespoke definitions were needed since Mathlib/the repo have no notion of identities with constants or of consequences/bases of identities."
+    },
+    "kourovka.«10.5».variants.bryant": {
+     "outcome": "missing_primitives",
+     "why": "The yes/no question concerns the one specific finite pointed group constructed in R. M. Bryant, 'The laws of finite pointed groups', Bull. LMS 14 (1982). That paper is not in the sandbox, nothing in Mathlib, FormalConjecturesForMathlib, the existing problem files, or the background documents transcribes the group, and I could not reliably reconstruct its definition from memory. Any concrete group written down would be a guess, so a faithful statement of this slot cannot be given; abstracting Bryant's group away (e.g. quantifying over all finite pointed groups with non-finitely-based pointed laws) would change the question, so the slot is omitted rather than misformalized."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.5»": "/--\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis.\n\nFormalised as the existence statement: there is a finite group $G$ such that\nno finite set $S \\subseteq G * F_\\infty$ is a basis of the mixed identities\nof $G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ ∃ S : Set (G ∗ FreeGroup ℕ), S.Finite ∧ IsMixedBasis G S := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.5\n\nby V. S. Anashin\n\nConstruct an example of a finite group whose mixed identities do not have a finite basis. Is the\nfinite group constructed by R. Bryant in *The laws of finite pointed groups* such an example?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n\n*Reference:* R. M. Bryant, *The laws of finite pointed groups*, Bulletin of the London Mathematical\nSociety **14** (1982), no. 2, 119–123.\n-/\n\nnamespace Kourovka.«10.5»\n\n/-- Words in countably many variables with constants from $G$ form the free product of $G$ and the\nfree group on $\\mathbb{N}$. -/\nabbrev MixedWord (G : Type*) [Group G] := Monoid.Coprod G (FreeGroup ℕ)\n\n/-- The mixed identities of $G$. These are the words which every homomorphism to $G$ that is the\nidentity on the distinguished copy of $G$ sends to $1$. -/\ndef mixedIdentities (G : Type*) [Group G] : Subgroup (MixedWord G) :=\n  ⨅ f : { f : MixedWord G →* G //\n      f.comp (Monoid.Coprod.inl : G →* MixedWord G) = MonoidHom.id G }, f.1.ker\n\n/-- The consequences of a set `s` of mixed words: the smallest normal subgroup containing `s` and\nclosed under every endomorphism which fixes the distinguished copy of $G$. -/\ndef mixedConsequenceClosure (G : Type*) [Group G] (s : Set (MixedWord G)) :\n    Subgroup (MixedWord G) :=\n  ⨅ N : { N : Subgroup (MixedWord G) //\n      N.Normal ∧ s ⊆ N ∧\n        ∀ e : MixedWord G →* MixedWord G,\n          e.comp (Monoid.Coprod.inl : G →* MixedWord G) = Monoid.Coprod.inl →\n            ∀ w ∈ N, e w ∈ N }, N.1\n\n/--\nConstruct an example of a finite group whose mixed identities do not have a finite basis.\n\nHere mixed words use countably many variables and every element of the group as a constant. A\nfinite basis is a finite set whose normal closure under all substitutions fixing those constants is\nthe full subgroup of mixed identities.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Fintype G),\n      ¬ ∃ s : Finset (MixedWord G),\n        mixedIdentities G = mixedConsequenceClosure G (s : Set (MixedWord G)) := by\n  sorry\n\nend Kourovka.«10.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Mixed words are elements of `Monoid.Coprod G (FreeGroup ℕ)`, giving all elements of `G` as constants and countably many variables.",
+    "The mixed identities are the intersection of kernels of all homomorphisms to `G` whose restriction to the constant factor is the identity.",
+    "Consequences of a set are the intersection of all normal subgroups containing it and invariant under every endomorphism fixing the constant factor.",
+    "A finite basis is represented by a `Finset` of mixed words whose consequence closure equals the subgroup of all mixed identities. This equality itself ensures that all basis words are identities.",
+    "Finiteness of the witness group is represented by a `Fintype` instance."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Monoid.Coprod` and `FreeGroup` provide the construction but no existing alias for mixed words.",
+     "name": "Kourovka.«10.5».MixedWord",
+     "why_needed": "Packages the ambient free product of group constants and countably many free variables used by mixed identities."
+    },
+    {
+     "closest_existing_considered": "Intersections of `MonoidHom.ker` subgroups; these primitives were used to define the missing concept.",
+     "name": "Kourovka.«10.5».mixedIdentities",
+     "why_needed": "Mathlib has no predicate or subgroup collecting identities with constants under every constant-fixing evaluation."
+    },
+    {
+     "closest_existing_considered": "Subgroup infima, `Subgroup.Normal`, and endomorphism invariance; these primitives were combined directly.",
+     "name": "Kourovka.«10.5».mixedConsequenceClosure",
+     "why_needed": "Mathlib has normal closure machinery and characteristic subgroups, but no closure simultaneously generated under normal operations and all endomorphisms fixing a distinguished free-product factor."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«10.5».variants.bryant": {
+     "outcome": "missing_primitives",
+     "why": "The variant requires the explicit finite pointed group constructed in Bryant's 1982 paper. That group is not specified in the supplied source and has no existing definition in Mathlib or FormalConjecturesForMathlib. Introducing an abstract or placeholder group would not faithfully state the witness-specific yes/no question."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.5»": "/--\nConstruct an example of a finite group whose mixed identities do not have a finite basis.\n\nHere mixed words use countably many variables and every element of the group as a constant. A\nfinite basis is a finite set whose normal closure under all substitutions fixing those constants is\nthe full subgroup of mixed identities.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Fintype G),\n      ¬ ∃ s : Finset (MixedWord G),\n        mixedIdentities G = mixedConsequenceClosure G (s : Set (MixedWord G)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.5\n\nby V. S. Anashin\n\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«10.5»\n\n/-- The mixed identities of a group $G$. These are the words in the free product\n$G * F_{\\mathbb{N}}$ that evaluate to $1$ under every homomorphism to $G$ whose\nrestriction to the distinguished copy of $G$ is the identity. -/\ndef mixedIdentities (G : Type*) [Group G] :\n    Set (Monoid.Coprod G (FreeGroup ℕ)) :=\n  {w | ∀ φ : Monoid.Coprod G (FreeGroup ℕ) →* G,\n    (∀ g : G, φ (Monoid.Coprod.inl g) = g) → φ w = 1}\n\n/-- The mixed identities generated by a set $S$ of words over $G$: the smallest\nnormal subgroup containing $S$ that is closed under every endomorphism fixing\nthe distinguished copy of $G$. -/\ndef mixedIdentityClosure (G : Type*) [Group G]\n    (S : Set (Monoid.Coprod G (FreeGroup ℕ))) :\n    Subgroup (Monoid.Coprod G (FreeGroup ℕ)) :=\n  sInf {N | S ⊆ N ∧ N.Normal ∧\n    ∀ σ : Monoid.Coprod G (FreeGroup ℕ) →* Monoid.Coprod G (FreeGroup ℕ),\n      (∀ g : G, σ (Monoid.Coprod.inl g) = Monoid.Coprod.inl g) → N.map σ ≤ N}\n\n/--\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis. In other words, find a finite group $G$ for which no finite set\n$S \\subseteq G * F_{\\mathbb{N}}$ generates all mixed identities under normal\nclosure and substitutions of variables by mixed words (endomorphisms fixing\n$G$ pointwise).\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ ∃ S : Set (Monoid.Coprod G (FreeGroup ℕ)),\n        S.Finite ∧ mixedIdentities G = mixedIdentityClosure G S := by\n  sorry\n\nend Kourovka.«10.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Mixed words over G are elements of `Monoid.Coprod G (FreeGroup ℕ)`, representing the free G-group on countably many variables.",
+    "A mixed identity is a word sent to 1 by every homomorphism to G whose restriction along `Monoid.Coprod.inl` is the identity on G.",
+    "The closure generated by S is the infimum of all normal subgroups containing S and stable under every endomorphism of the free G-group that fixes the embedded copy of G pointwise.",
+    "Nonexistence of a finite basis is stated as the failure of equality between the full set of mixed identities and this closure for every finite set S. Equality itself implies S consists of mixed identities."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FreeGroup`, `Monoid.Coprod`, and their universal-property homomorphisms provide the ingredients but not the predicate.",
+     "name": "Kourovka.«10.5».mixedIdentities",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no definition of mixed identities of a fixed group with all group elements used as constants."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.normalClosure` handles normal closure but not closure under endomorphisms; Mathlib's fully invariant submodule notion is module-specific.",
+     "name": "Kourovka.«10.5».mixedIdentityClosure",
+     "why_needed": "The statement requires the smallest normal subgroup closed under all G-fixing endomorphisms, and no group-specific fully invariant closure operator exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«10.5».variants.bryant": {
+     "outcome": "missing_primitives",
+     "why": "The explicit finite group constructed in Bryant's 1982 paper is not given in the supplied source, sandbox, Mathlib, or repository. Without Bryant's construction there is no faithful Lean term for this specific witness; introducing a placeholder group is forbidden and quantifying over an arbitrary group would change the question."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.5»": "/--\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis. In other words, find a finite group $G$ for which no finite set\n$S \\subseteq G * F_{\\mathbb{N}}$ generates all mixed identities under normal\nclosure and substitutions of variables by mixed words (endomorphisms fixing\n$G$ pointwise).\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ ∃ S : Set (Monoid.Coprod G (FreeGroup ℕ)),\n        S.Finite ∧ mixedIdentities G = mixedIdentityClosure G S := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.5\n\nby V. S. Anashin\n\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis. Is the group constructed in (R. Bryant, *Bull. London Math. Soc.*\n**14**, no. 2 (1982), 119–123) such an example?\n\nLet $F_\\infty$ be the free group on the countably many variables\n$x_0, x_1, x_2, \\dots$ and let $G * F_\\infty$ be the free product of $G$ with\n$F_\\infty$; its elements are words in the variables and in the elements of $G$\n(the constants). A *mixed identity* of $G$ is a word $w \\in G * F_\\infty$ with\n$\\varphi(w) = 1$ for every homomorphism $\\varphi : G * F_\\infty \\to G$ that is the\nidentity on $G$, i.e. $w$ becomes $1$ under every substitution of elements of\n$G$ for the variables.\n\nThe mixed identities of $G$ form a normal subgroup of $G * F_\\infty$ that is\ninvariant under every endomorphism of $G * F_\\infty$ fixing $G$ elementwise\n(that is, under every substitution of words for the variables). A set $S$ of\nmixed identities is a *basis* of the mixed identities of $G$ if the smallest\nsuch subgroup containing $S$ is the set of all mixed identities of $G$; the\nmixed identities *have a finite basis* if some finite $S$ is a basis.\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n* R. M. Bryant, *The laws of finite pointed groups*, Bull. London Math. Soc. 14\n  (1982), no. 2, 119–123.\n-/\n\nnamespace Kourovka.«10.5»\n\nopen Monoid.Coprod\n\nvariable (G : Type*) [Group G]\n\n/-- The subgroup of mixed identities of `G`: the words `w` in the free product\n`G ∗ FreeGroup ℕ` of `G` with the free group on countably many variables such\nthat `φ w = 1` for every homomorphism `φ : G ∗ FreeGroup ℕ →* G` restricting to\nthe identity on `G`. -/\ndef mixedIdentities : Subgroup (Monoid.Coprod G (FreeGroup ℕ)) :=\n  ⨅ (φ : Monoid.Coprod G (FreeGroup ℕ) →* G) (_ : φ.comp inl = MonoidHom.id G), φ.ker\n\nvariable {G}\n\n@[category API, AMS 20]\ntheorem mem_mixedIdentities {w : Monoid.Coprod G (FreeGroup ℕ)} :\n    w ∈ mixedIdentities G ↔\n      ∀ φ : Monoid.Coprod G (FreeGroup ℕ) →* G, φ.comp inl = MonoidHom.id G → φ w = 1 := by\n  simp [mixedIdentities, Subgroup.mem_iInf, MonoidHom.mem_ker]\n\n/-- A constant `g ∈ G` is a mixed identity of `G` if and only if `g = 1`. -/\n@[category API, AMS 20]\ntheorem inl_mem_mixedIdentities_iff {g : G} : inl g ∈ mixedIdentities G ↔ g = 1 := by\n  rw [mem_mixedIdentities]\n  refine ⟨fun h => ?_, fun h φ _ => by simp [h]⟩\n  simpa using h (lift (MonoidHom.id G) 1) (by ext; simp)\n\nvariable (G)\n\n/-- A subgroup `N` of `G ∗ FreeGroup ℕ` is *mixed verbal* (or `G`-verbal) if it\nis normal and is mapped into itself by every endomorphism of `G ∗ FreeGroup ℕ`\nthat restricts to the identity on `G`, i.e. by every substitution of words for\nthe variables. -/\ndef IsMixedVerbal (N : Subgroup (Monoid.Coprod G (FreeGroup ℕ))) : Prop :=\n  N.Normal ∧ ∀ φ : Monoid.Coprod G (FreeGroup ℕ) →* Monoid.Coprod G (FreeGroup ℕ),\n    φ.comp inl = inl → ∀ w ∈ N, φ w ∈ N\n\n/-- The mixed identities of `G` form a mixed verbal subgroup. -/\n@[category API, AMS 20]\ntheorem isMixedVerbal_mixedIdentities : IsMixedVerbal G (mixedIdentities G) := by\n  refine ⟨⟨fun w hw g => ?_⟩, fun φ hφ w hw => ?_⟩\n  · rw [mem_mixedIdentities] at hw ⊢\n    intro φ hφ\n    simp [hw φ hφ]\n  · rw [mem_mixedIdentities] at hw ⊢\n    intro ψ hψ\n    simpa using hw (ψ.comp φ) (by rw [MonoidHom.comp_assoc, hφ, hψ])\n\n/-- An intersection of mixed verbal subgroups is mixed verbal, so for every set `S` of words\nthere is a smallest mixed verbal subgroup containing `S`. -/\n@[category API, AMS 20]\ntheorem isMixedVerbal_sInf {𝒩 : Set (Subgroup (Monoid.Coprod G (FreeGroup ℕ)))}\n    (h : ∀ N ∈ 𝒩, IsMixedVerbal G N) : IsMixedVerbal G (sInf 𝒩) := by\n  refine ⟨⟨fun w hw g => ?_⟩, fun φ hφ w hw => ?_⟩\n  · rw [Subgroup.mem_sInf] at hw ⊢\n    exact fun N hN => (h N hN).1.conj_mem w (hw N hN) g\n  · rw [Subgroup.mem_sInf] at hw ⊢\n    exact fun N hN => (h N hN).2 φ hφ w (hw N hN)\n\n/-- The mixed identities of `G` *have a finite basis* if there is a finite set\n`S` of words such that the smallest mixed verbal subgroup of `G ∗ FreeGroup ℕ`\ncontaining `S` is exactly the subgroup of mixed identities of `G`. (Such an `S`\nthen automatically consists of mixed identities of `G`.) -/\ndef MixedIdentitiesFinitelyBased : Prop :=\n  ∃ S : Finset (Monoid.Coprod G (FreeGroup ℕ)),\n    sInf {N : Subgroup (Monoid.Coprod G (FreeGroup ℕ)) | IsMixedVerbal G N ∧ ∀ w ∈ S, w ∈ N} =\n      mixedIdentities G\n\n/--\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis.\n\nHere this is stated as the existence of a finite group `G` whose subgroup of\nmixed identities in `G ∗ FreeGroup ℕ` is not the smallest mixed verbal subgroup\ncontaining any finite set of words.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ MixedIdentitiesFinitelyBased G := by\n  sorry\n\nend Kourovka.«10.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None substantive. Note only that the second slot cannot be formalized without the text of Bryant's paper, which is unavailable in the sandbox; the table itself acknowledges this. The table's note that Bryant's result concerns pointed groups (finitely many constants) while Anashin's mixed identities use all of G as constants is correct and is why the two slots are logically distinct.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Variables: the free group on countably many variables is `FreeGroup ℕ`; the constants are all elements of G (Anashin's mixed identities), so words live in `Monoid.Coprod G (FreeGroup ℕ)`.",
+    "A mixed identity is defined via homomorphisms `φ : G ∗ F_∞ →* G` with `φ.comp Monoid.Coprod.inl = MonoidHom.id G` (equivalent, via the universal properties of Coprod and FreeGroup, to substituting arbitrary elements of G for the variables). `mixedIdentities G` is the `⨅` of the kernels of such φ, so it is a Subgroup; `mem_mixedIdentities` gives the expected characterization.",
+    "`IsMixedVerbal N` := `N.Normal ∧` invariance under every endomorphism of `G ∗ F_∞` that is the identity on `G` (equivalent to invariance under substitutions of words for variables). Normality is required separately because G-fixing endomorphisms do not include conjugations.",
+    "Finite basis: `∃ S : Finset _, sInf {N | IsMixedVerbal G N ∧ ∀ w ∈ S, w ∈ N} = mixedIdentities G`. The sInf is the smallest mixed verbal subgroup containing S (API lemma `isMixedVerbal_sInf`); equality forces S ⊆ mixedIdentities G automatically. This is the syntactic notion of consequence (G-verbal closure), which coincides with semantic consequence over groups receiving a homomorphism from G by the usual Birkhoff-type argument.",
+    "The imperative 'Construct an example of a finite group ...' is formalized, as the decomposition table prescribes, as the existence proposition `∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ MixedIdentitiesFinitelyBased G`, without `answer(sorry)`.",
+    "The group is taken in `Type` (universe 0), following the other Kourovka files; `Finite G` is used for finiteness. The trivial group is allowed but is harmless (its mixed identities are finitely based)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "MonoidHom.ker / Subgroup.iInf on Monoid.Coprod G (FreeGroup ℕ); FreeGroup.lift and Monoid.Coprod.lift (used for the equivalent substitution formulation). No verbal-subgroup or law/identity API exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«10.5».mixedIdentities",
+     "why_needed": "Mathlib has no notion of mixed identities (identities with constants) of a group; defined as the subgroup ⨅ over homs φ : G ∗ FreeGroup ℕ →* G with φ ∘ inl = id of ker φ."
+    },
+    {
+     "closest_existing_considered": "Subgroup.Normal, Subgroup.normalClosure, Subgroup.characteristic (only automorphism-invariance; wrong notion).",
+     "name": "Kourovka.«10.5».IsMixedVerbal",
+     "why_needed": "The closure operation defining 'consequence' of mixed identities needs subgroups of G ∗ F_∞ that are normal and invariant under all G-fixing endomorphisms (substitutions of variables); Mathlib has no verbal/fully-invariant subgroup notion, let alone a relative one."
+    },
+    {
+     "closest_existing_considered": "Subgroup.closure / Subgroup.normalClosure with Set.Finite (does not account for invariance under substitutions); sInf on Subgroup is used directly.",
+     "name": "Kourovka.«10.5».MixedIdentitiesFinitelyBased",
+     "why_needed": "Expresses 'the mixed identities of G have a finite basis': some Finset S whose smallest mixed verbal subgroup closure equals mixedIdentities G."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as the existence of a finite group G (G : Type, [Group G], [Finite G]) such that ¬ MixedIdentitiesFinitelyBased G. Mixed identities are elements w of the free product Monoid.Coprod G (FreeGroup ℕ) with φ w = 1 for every hom φ : G ∗ F_∞ →* G with φ.comp inl = id (i.e. every substitution of elements of G for the variables); a finite basis is a Finset S such that sInf {N | N normal ∧ N invariant under every endomorphism of G ∗ F_∞ fixing G ∧ S ⊆ N} = mixedIdentities G. Bespoke definitions were needed since Mathlib/the repo have no notion of mixed identities or G-verbal subgroups."
+    },
+    "kourovka.«10.5».variants.bryant": {
+     "outcome": "missing_primitives",
+     "why": "The slot asks a yes/no question about one concrete finite pointed group that is defined only in R. M. Bryant, 'The laws of finite pointed groups', Bull. LMS 14 (1982) 119–123. That paper is not in the sandbox and there is no network access, and I could not reconstruct the explicit group (and the distinguished element(s)) from memory with certainty. Neither Mathlib nor the repository contains this group. Guessing the group would risk stating a different theorem, and a placeholder definition is forbidden, so the slot is omitted. Once the group is transcribed, it can be stated as `answer(sorry) ↔ ¬ MixedIdentitiesFinitelyBased BryantGroup` using the definitions in this file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.5»": "/--\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis.\n\nHere this is stated as the existence of a finite group `G` whose subgroup of\nmixed identities in `G ∗ FreeGroup ℕ` is not the smallest mixed verbal subgroup\ncontaining any finite set of words.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ MixedIdentitiesFinitelyBased G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.5\n\nby V. S. Anashin\n\nConstruct an example of a finite group whose mixed identities do not have a finite basis.\nIs the group constructed in (R. Bryant, *Bull. London Math. Soc.*, **14**, no. 2 (1982),\n119–123) such an example?\n\nA *mixed identity* (identity with constants) of a group $G$ is an element $w$ of the free\nproduct $G * F_\\infty$, where $F_\\infty$ is the free group on the countably many variables\n$x_0, x_1, \\dots$, such that $w$ becomes $1$ under every substitution of elements of $G$ for the\nvariables; equivalently, $\\varphi(w) = 1$ for every homomorphism $\\varphi : G * F_\\infty \\to G$\nthat is the identity on $G$. A mixed identity $w$ is a *consequence* of a set $S$ of mixed\nidentities if $w$ lies in the smallest normal subgroup of $G * F_\\infty$ containing $S$ that is\ninvariant under all endomorphisms of $G * F_\\infty$ fixing $G$ elementwise (substitutions of\nwords for the variables). A *basis* of the mixed identities of $G$ is a set of mixed identities\nof which every mixed identity of $G$ is a consequence.\n\nOnly the first part of the problem is formalised here. The second part asks about the specific\nfinite pointed group of R. M. Bryant, *The laws of finite pointed groups*, Bull. London Math.\nSoc. **14** (1982), 119–123, whose laws with finitely many distinguished constants have no\nfinite basis.\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n- V. S. Anashin, *Mixed identities and mixed varieties of groups*, Mat. Sb. (N.S.) **129(171)**\n  (1986), no. 2, 163–174.\n-/\n\nopen Monoid.Coprod\n\nnamespace Kourovka.«10.5»\n\nvariable (G : Type*) [Group G]\n\n/--\nThe mixed identities of `G`: the words `w` in the free product `G ∗ FreeGroup ℕ` of `G` with\nthe free group on countably many variables such that `φ w = 1` for every homomorphism\n`φ : G ∗ FreeGroup ℕ →* G` that is the identity on `G`. These form a subgroup of\n`G ∗ FreeGroup ℕ`.\n-/\ndef mixedIdentities : Subgroup (G ∗ FreeGroup ℕ) :=\n  ⨅ φ : {φ : G ∗ FreeGroup ℕ →* G // φ.comp inl = MonoidHom.id G}, φ.1.ker\n\n/--\nThe consequences of a set `S` of words in `G ∗ FreeGroup ℕ`: the smallest normal subgroup of\n`G ∗ FreeGroup ℕ` containing `S` that is invariant under every endomorphism of\n`G ∗ FreeGroup ℕ` fixing `G` elementwise, i.e. under every substitution of words for the\nvariables.\n-/\ndef consequences (S : Set (G ∗ FreeGroup ℕ)) : Subgroup (G ∗ FreeGroup ℕ) :=\n  sInf {N | N.Normal ∧\n    (∀ σ : G ∗ FreeGroup ℕ →* G ∗ FreeGroup ℕ, σ.comp inl = inl → ∀ w ∈ N, σ w ∈ N) ∧ S ⊆ N}\n\n/--\nThe mixed identities of `G` have a finite basis: there is a finite set `S` of words in\n`G ∗ FreeGroup ℕ` whose consequences are exactly the mixed identities of `G`.\n-/\ndef HasFiniteBasis : Prop :=\n  ∃ S : Set (G ∗ FreeGroup ℕ), S.Finite ∧ consequences G S = mixedIdentities G\n\n/-- A word is a mixed identity of `G` iff it vanishes under every substitution `v : ℕ → G` of\nelements of `G` for the variables. -/\n@[category API, AMS 20]\ntheorem mem_mixedIdentities_iff (w : G ∗ FreeGroup ℕ) :\n    w ∈ mixedIdentities G ↔ ∀ v : ℕ → G, lift (MonoidHom.id G) (FreeGroup.lift v) w = 1 := by\n  simp only [mixedIdentities, Subgroup.mem_iInf, MonoidHom.mem_ker, Subtype.forall]\n  constructor\n  · intro h v\n    exact h _ rfl\n  · intro h φ hφ\n    have : φ = lift (MonoidHom.id G) (FreeGroup.lift (φ ∘ inr ∘ FreeGroup.of)) := by\n      refine lift_unique hφ ?_\n      ext n\n      simp\n    rw [this]\n    exact h _\n\n/-- A constant `g ∈ G` is a mixed identity of `G` iff `g = 1`. -/\n@[category API, AMS 20]\ntheorem inl_mem_mixedIdentities_iff (g : G) : inl g ∈ mixedIdentities G ↔ g = 1 := by\n  rw [mem_mixedIdentities_iff]\n  simp\n\n/-- The mixed identities of `G` are closed under consequences. -/\n@[category API, AMS 20]\ntheorem consequences_mixedIdentities : consequences G (mixedIdentities G) = mixedIdentities G := by\n  refine le_antisymm (sInf_le ⟨?_, ?_, le_rfl⟩) (le_sInf fun N hN => hN.2.2)\n  · exact Subgroup.normal_iInf_normal fun φ => MonoidHom.normal_ker φ.1\n  · intro σ hσ w hw\n    simp only [mixedIdentities, Subgroup.mem_iInf, MonoidHom.mem_ker, Subtype.forall] at hw ⊢\n    intro φ hφ\n    have : (φ.comp σ).comp inl = MonoidHom.id G := by\n      rw [MonoidHom.comp_assoc, hσ, hφ]\n    exact hw (φ.comp σ) this\n\n/--\nConstruct an example of a finite group whose mixed identities do not have a finite basis.\n\nFormalised as the existence of a finite group `G` such that the mixed identities of `G`, i.e.\nthe words in `G ∗ FreeGroup ℕ` that vanish under every substitution of elements of `G` for the\nvariables, are not the consequences of any finite set of words.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ HasFiniteBasis G := by\n  sorry\n\nend Kourovka.«10.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None of substance. The table's note for the bryant slot correctly anticipates that the explicit group must be transcribed from Bryant's paper, which is unavailable in the sandbox (and there is no network), so that slot could not be stated faithfully.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Variables: countably many, modelled by FreeGroup ℕ; the free product G * F_∞ is Monoid.Coprod G (FreeGroup ℕ) (notation G ∗ FreeGroup ℕ).",
+    "Mixed identity defined via arbitrary homomorphisms φ : G ∗ FreeGroup ℕ →* G with φ.comp inl = MonoidHom.id G, rather than via explicit substitutions v : ℕ → G; the API lemma `mem_mixedIdentities_iff` proves the two are equivalent.",
+    "Consequence closure requires both normality and invariance under all G-fixing endomorphisms (σ.comp inl = inl). Normality is not implied by endomorphism-invariance here (unlike in a free group), so it is stated explicitly. This agrees with the equational consequence relation for G-groups.",
+    "A basis is any set S with consequences S = mixed identities; S ⊆ consequences S holds automatically, so S consists of mixed identities. Finiteness is Set.Finite.",
+    "The primary slot is stated as a plain existence theorem (no answer(sorry)), following the decomposition notes, because the source is an imperative 'Construct an example' with a candidate witness asserted.",
+    "Category research open (the notebook marks the problem unsolved); G is taken in Type, with Finite G.",
+    "Three short proved @[category API] lemmas are included as sanity checks of the bespoke definitions (CONTRIBUTING asks for basic API tests of bespoke definitions).",
+    "The module docstring cites Anashin's 1986 Mat. Sb. paper (without a URL) as the source of the terminology; a reviewer may wish to double-check the bibliographic details."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Monoid.Coprod (used as the free product), FreeGroup, MonoidHom.ker; no Mathlib notion of verbal/fully invariant subgroup or group laws exists (grepped for verbal, FullyInvariant, laws, variety).",
+     "name": "Kourovka.«10.5».mixedIdentities",
+     "why_needed": "Mathlib has no notion of identities with constants (mixed identities) or of laws of a group. Defined as the subgroup ⨅ φ, φ.ker over all homomorphisms φ : G ∗ FreeGroup ℕ →* G with φ.comp inl = id, i.e. words vanishing under every substitution of elements of G for the variables."
+    },
+    {
+     "closest_existing_considered": "Subgroup.normalClosure (does not capture substitution invariance); no fully-invariant-subgroup API in Mathlib.",
+     "name": "Kourovka.«10.5».consequences",
+     "why_needed": "The consequence relation for mixed identities: the smallest normal subgroup of G ∗ FreeGroup ℕ containing S that is invariant under every endomorphism σ with σ.comp inl = inl (substitution of words for variables). Normality is required explicitly because inner automorphisms of the free product do not fix G pointwise."
+    },
+    {
+     "closest_existing_considered": "None; no notion of finitely based laws in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«10.5».HasFiniteBasis",
+     "why_needed": "Expresses 'the mixed identities of G have a finite basis': ∃ finite S with consequences G S = mixedIdentities G."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ HasFiniteBasis G, where mixed identities are the elements of the free product `G ∗ FreeGroup ℕ` (Monoid.Coprod) killed by every homomorphism to G that is the identity on G, and a finite basis is a finite set S whose consequences (smallest normal subgroup containing S and invariant under all G-fixing endomorphisms, i.e. substitutions) are exactly the mixed identities. Bespoke definitions `mixedIdentities`, `consequences`, `HasFiniteBasis` were needed; three short proved API lemmas sanity-check them (substitution characterisation, constants g are mixed identities iff g = 1, mixed identities are consequence-closed). No answer(sorry) since the source is an imperative existence request, per the decomposition notes."
+    },
+    "kourovka.«10.5».variants.bryant": {
+     "outcome": "missing_primitives",
+     "why": "The statement is a yes/no question about the specific finite pointed group constructed in R. M. Bryant, Bull. London Math. Soc. 14 (1982), 119–123. That group is defined neither in Mathlib nor in the repository, the paper is not in the sandbox, and there is no network access; I could not reliably reconstruct the exact group from memory. Stating the slot with a guessed witness would risk formalising the wrong group, so it is omitted. Once the group is transcribed, the slot would be `answer(sorry) ↔ ¬ HasFiniteBasis BryantGroup` using the definitions in the file (note Bryant's non-finite-basedness result is for laws with finitely many distinguished constants, whereas Anashin's mixed identities use all of G as constants, so the answer is genuinely open)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.5»": "/--\nConstruct an example of a finite group whose mixed identities do not have a finite basis.\n\nFormalised as the existence of a finite group `G` such that the mixed identities of `G`, i.e.\nthe words in `G ∗ FreeGroup ℕ` that vanish under every substitution of elements of `G` for the\nvariables, are not the consequences of any finite set of words.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ HasFiniteBasis G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.5\n\nby V. S. Anashin\n\nConstruct a finite group whose mixed identities do not have a finite basis.\nIs the group constructed by R. Bryant in *The laws of finite pointed groups*,\n*Bull. London Math. Soc.* **14** (1982), no. 2, 119–123, such an example?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 10.5.\n-/\n\nnamespace Kourovka.«10.5»\n\n/-- A mixed word over a group $G$ is an element of the free product of $G$\nwith the free group on countably many variables. -/\nabbrev MixedWord (G : Type*) [Group G] := Monoid.Coprod G (FreeGroup ℕ)\n\n/-- The subgroup of mixed identities of $G$. A mixed word is in this subgroup\nif every homomorphism from $G * F_\\infty$ to $G$ that is the identity on the\ncopy of $G$ sends it to $1$. -/\ndef mixedIdentities (G : Type*) [Group G] : Subgroup (MixedWord G) :=\n  ⨅ (φ : MixedWord G →* G)\n    (_ : φ.comp (Monoid.Coprod.inl : G →* MixedWord G) = .id G), φ.ker\n\n/-- The least normal subgroup containing $S$ and closed under every\nendomorphism of $G * F_\\infty$ that fixes the copy of $G$ pointwise. -/\ndef mixedIdentityClosure (G : Type*) [Group G] (S : Set (MixedWord G)) :\n    Subgroup (MixedWord G) :=\n  ⨅ (H : Subgroup (MixedWord G)) (_ : H.Normal) (_ : S ⊆ H)\n    (_ : ∀ σ : MixedWord G →* MixedWord G,\n      σ.comp (Monoid.Coprod.inl : G →* MixedWord G) = Monoid.Coprod.inl →\n        H.map σ ≤ H), H\n\n/-- The mixed identities of $G$ have a finite basis if they are generated by\na finite set as a normal subgroup closed under substitutions of variables,\nwhere substitutions fix every element of $G$. -/\ndef HasFiniteMixedIdentityBasis (G : Type*) [Group G] : Prop :=\n  ∃ S : Set (MixedWord G), S.Finite ∧ S ⊆ mixedIdentities G ∧\n    mixedIdentityClosure G S = mixedIdentities G\n\n/--\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ HasFiniteMixedIdentityBasis G := by\n  sorry\n\nend Kourovka.«10.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Mixed words over G are modeled by `Monoid.Coprod G (FreeGroup ℕ)`, giving one constant for every element of G and countably many variables.",
+    "The mixed-identity subgroup is the infimum of the kernels of all homomorphisms to G whose composite with the left coproduct inclusion is `MonoidHom.id G`.",
+    "Consequences of a basis are modeled as the infimum of all normal subgroups containing it and invariant under every endomorphism fixing the left copy of G pointwise.",
+    "A finite basis is explicitly required to be a finite set contained in the mixed-identity subgroup whose substitution-normal closure equals the full mixed-identity subgroup.",
+    "Finiteness of the witness group is represented by the proposition-valued `Finite G` instance."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Monoid.Coprod` and `FreeGroup` provide the construction, but no existing combined mixed-word abbreviation was found.",
+     "name": "MixedWord",
+     "why_needed": "Names the free product of the constant group with the free group on countably many variables used throughout the statement."
+    },
+    {
+     "closest_existing_considered": "`MonoidHom.ker` and complete-lattice infima of `Subgroup` supply the needed primitives.",
+     "name": "mixedIdentities",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no existing definition of the mixed identities of a group with all group elements as constants."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.normalClosure` imposes normality only; `Subgroup.Characteristic` concerns automorphisms rather than the required constant-fixing endomorphisms.",
+     "name": "mixedIdentityClosure",
+     "why_needed": "No existing closure operation simultaneously imposes normality and invariance under all endomorphisms fixing the constants."
+    },
+    {
+     "closest_existing_considered": "No verbal-law or finite mixed-identity basis predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "HasFiniteMixedIdentityBasis",
+     "why_needed": "Packages the exact finite-basis property for the theorem statement."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«10.5».variants.bryant": {
+     "outcome": "missing_primitives",
+     "why": "A faithful statement requires the explicit finite pointed group constructed in Bryant's 1982 paper. That construction is absent from the supplied source bundle, Mathlib, and the repository. Introducing an unspecified constant, opaque group, or axiomatized placeholder is forbidden and would not identify Bryant's group."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.5»": "/--\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ HasFiniteMixedIdentityBasis G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.5\n\nby V. S. Anashin\n\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis. The problem also asks whether the group constructed by R. Bryant\nin *The laws of finite pointed groups* is such an example.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«10.5»\n\n/-- The group of mixed words over $G$ in variables indexed by $\\mathbb{N}$ is\nthe free product $G * F_{\\infty}$. -/\nabbrev MixedWord (G : Type*) [Group G] := Monoid.Coprod G (FreeGroup ℕ)\n\n/-- The subgroup of mixed identities of $G$: the intersection of the kernels\nof all homomorphisms $G * F_{\\infty} \\to G$ which restrict to the identity on\nthe distinguished copy of $G$. -/\ndef mixedIdentities (G : Type*) [Group G] : Subgroup (MixedWord G) :=\n  sInf {N | ∃ φ : MixedWord G →* G,\n    (∀ g : G, φ (Monoid.Coprod.inl g) = g) ∧ N = φ.ker}\n\n/-- A subgroup of $G * F_{\\infty}$ is closed under mixed substitutions if it\nis preserved by every endomorphism which fixes the distinguished copy of\n$G$ pointwise. -/\ndef IsClosedUnderMixedSubstitutions {G : Type*} [Group G]\n    (N : Subgroup (MixedWord G)) : Prop :=\n  ∀ σ : MixedWord G →* MixedWord G,\n    (∀ g : G, σ (Monoid.Coprod.inl g) = Monoid.Coprod.inl g) →\n    ∀ w ∈ N, σ w ∈ N\n\n/-- A set $S$ is a basis for a subgroup $N$ of mixed words if $N$ is the\nsmallest normal subgroup containing $S$ and closed under all mixed\nsubstitutions. -/\ndef IsMixedIdentityBasis {G : Type*} [Group G] (S : Set (MixedWord G))\n    (N : Subgroup (MixedWord G)) : Prop :=\n  S ⊆ N ∧ N.Normal ∧ IsClosedUnderMixedSubstitutions N ∧\n    ∀ H : Subgroup (MixedWord G), S ⊆ H → H.Normal →\n      IsClosedUnderMixedSubstitutions H → N ≤ H\n\n/-- A subgroup of mixed words has a finite basis if it has a finite set of\nmixed identities as a basis. -/\ndef HasFiniteMixedIdentityBasis {G : Type*} [Group G]\n    (N : Subgroup (MixedWord G)) : Prop :=\n  ∃ S : Set (MixedWord G), S.Finite ∧ IsMixedIdentityBasis S N\n\n/--\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis. Here mixed identities are words in $G * F_{\\infty}$ which vanish\nunder every evaluation fixing $G$, and a basis generates them as a normal\nsubgroup closed under all substitutions fixing $G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ HasFiniteMixedIdentityBasis (mixedIdentities G) := by\n  sorry\n\nend Kourovka.«10.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Mixed words over G are represented by the group free product `Monoid.Coprod G (FreeGroup ℕ)`, giving countably many variables.",
+    "The mixed-identity subgroup is the infimum of kernels of all homomorphisms from the mixed-word group to G whose restriction to the canonical copy of G is the identity.",
+    "A basis S for N means that N is normal, contains S, is preserved by every endomorphism fixing the canonical copy of G pointwise, and is contained in every subgroup with those three properties. This spells out the required smallest closure rather than relying on an unavailable packaged notion.",
+    "Finiteness of the witness group is expressed by a `Finite G` instance; finiteness of a basis is `Set.Finite`.",
+    "The Bryant-specific yes/no variant is omitted because its required explicit witness cannot be recovered from the cited-but-unavailable paper."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Monoid.Coprod` and `FreeGroup` provide the construction, but no existing combined alias represents mixed words over a group.",
+     "name": "Kourovka.«10.5».MixedWord",
+     "why_needed": "Names the group of mixed words G * F_∞ used throughout the statement."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `MonoidHom.ker` and complete lattices of subgroups, but no notion of mixed identities or identities with constants.",
+     "name": "Kourovka.«10.5».mixedIdentities",
+     "why_needed": "Defines the subgroup of words vanishing under every evaluation that fixes all constants from G."
+    },
+    {
+     "closest_existing_considered": "The only search hit for fully invariant objects was specific to submodules; no group/subgroup analogue exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«10.5».IsClosedUnderMixedSubstitutions",
+     "why_needed": "Expresses invariance under all endomorphisms of the mixed-word group fixing G pointwise."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.closure` handles ordinary subgroup generation only and does not include normal or endomorphism closure.",
+     "name": "Kourovka.«10.5».IsMixedIdentityBasis",
+     "why_needed": "Expresses that a set generates exactly the smallest normal, mixed-substitution-closed subgroup."
+    },
+    {
+     "closest_existing_considered": "No finite-basis predicate for group identities or endomorphism-closed normal subgroups exists in the searched libraries.",
+     "name": "Kourovka.«10.5».HasFiniteMixedIdentityBasis",
+     "why_needed": "Packages existence of a finite basis for the mixed-identity subgroup."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«10.5».variants.bryant": {
+     "outcome": "ambiguous_statement",
+     "why": "The supplied source identifies the witness only as “the group constructed” in Bryant's 1982 paper, but the paper and its explicit group construction/presentation are not available in the sandbox. Thus the referent cannot be turned into a specific Lean group faithfully from the provided material; inventing or existentially abstracting the group would change this witness-specific yes/no question."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.5»": "/--\nConstruct an example of a finite group whose mixed identities do not have a\nfinite basis. Here mixed identities are words in $G * F_{\\infty}$ which vanish\nunder every evaluation fixing $G$, and a basis generates them as a normal\nsubgroup closed under all substitutions fixing $G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.5» :\n    ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ HasFiniteMixedIdentityBasis (mixedIdentities G) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«10.5»": "c06",
+  "kourovka.«10.5».variants.bryant": null
+ },
+ "id": "kourovka-10.5",
+ "main_attempt": "c06"
+}

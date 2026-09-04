@@ -1,0 +1,469 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.23\n\nby V. D. Mazurov\n\nLet $G$ be a finite group, $B$ a block of characters of $G$, $D(B)$ its defect group and\n$k(B)$ (respectively, $k_0(B)$) the number of all irreducible complex characters (of height $0$)\nlying in $B$. *Conjectures:*\n\na) (R. Brauer) $k(B) \\leq |D(B)|$; this has been proved for $p$-soluble groups\n(D. Gluck, K. Magaard, U. Riese, P. Schmid, *J. Algebra*, **279** (2004), 694–719);\n\nb) (J. B. Olsson) $k_0(B) \\leq |D(B) : D(B)'|$, where $D(B)'$ is the derived subgroup of $D(B)$;\n\nc) (R. Brauer) $D(B)$ is abelian if and only if $k_0(B) = k(B)$.\n\n## Formalisation\n\nBlocks are set up character-theoretically, as in Isaacs, *Character Theory of Finite Groups*,\nChapter 15, and Navarro, *Characters and Blocks of Finite Groups*, Chapters 3–4. Fix a prime\n$p$ and a maximal ideal $M$ of the ring $R$ of algebraic integers in $\\mathbb{C}$ with $p \\in M$.\nFor an irreducible complex character $\\chi$ of $G$ and $x \\in G$ the central character value\n$\\omega_\\chi(\\hat K_x) = |K_x| \\chi(x) / \\chi(1)$ (where $K_x$ is the conjugacy class of $x$)\nis an algebraic integer. Two irreducible characters $\\chi, \\psi$ lie in the same $p$-block if\nand only if $\\omega_\\chi(\\hat K) \\equiv \\omega_\\psi(\\hat K) \\pmod M$ for every conjugacy\nclass $K$; so every block is of the form `blockOf M χ` for some irreducible character `χ`.\n\nBy the min–max theorem, the defect groups of a block $B$ are exactly the Sylow $p$-subgroups\nof the centralisers $C_G(x)$ of those $x \\in G$ with $\\lambda_B(\\hat K_x) \\ne 0$\n(i.e. $\\omega_\\chi(\\hat K_x) \\notin M$ for $\\chi \\in B$) for which $|C_G(x)|_p$ is as small\nas possible. A character $\\chi \\in B$ has height $0$ if and only if\n$\\chi(1)_p \\cdot |D(B)| = |G|_p$.\n\nAll statements are quantified over every prime $p$, every finite group $G$, every choice of\nmaximal ideal $M \\ni p$ of the algebraic integers, every block $B$ and every defect group\n$D(B)$ of $B$.\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), problem 9.23.\n- D. Gluck, K. Magaard, U. Riese, P. Schmid, *The solution of the k(GV)-problem*,\n  J. Algebra **279** (2004), 694–719.\n- R. Kessar, G. Malle, *Quasi-isolated blocks and Brauer's height zero conjecture*,\n  Ann. of Math. **178** (2013), 321–384.\n- G. Malle, G. Navarro, A. A. Schaeffer Fry, P. H. Tiep, *Brauer's Height Zero Conjecture*,\n  Ann. of Math. **200** (2024), 557–608.\n-/\n\nopen CategoryTheory\n\nnamespace Kourovka.«9.23»\n\nvariable {G : Type} [Group G]\n\n/-- The set of irreducible complex characters of `G`, i.e. the characters of the simple\nfinite-dimensional complex representations of `G`. -/\ndef irreducibleCharacters (G : Type) [Group G] : Set (G → ℂ) :=\n  {χ | ∃ V : FDRep ℂ G, Simple V ∧ V.character = χ}\n\n/-- The value $\\omega_\\chi(\\hat K_x) = |K_x| \\chi(x) / \\chi(1)$ of the central character\nassociated to `χ` on the class sum of the conjugacy class $K_x$ of `x`. For an irreducible\ncharacter `χ` this is an algebraic integer. -/\nnoncomputable def centralCharacter (χ : G → ℂ) (x : G) : ℂ :=\n  (Set.ncard {y | IsConj x y} : ℂ) * χ x / χ 1\n\n/-- `z ∈ ℂ` lies in the ideal `M` of the ring of algebraic integers in `ℂ`. -/\ndef MemIdeal (M : Ideal (integralClosure ℤ ℂ)) (z : ℂ) : Prop :=\n  ∃ r ∈ M, (r : ℂ) = z\n\n/-- The `p`-block of `G` containing the irreducible character `χ`, with respect to the maximal\nideal `M` (containing `p`) of the algebraic integers: the set of irreducible characters `ψ`\nof `G` with $\\omega_\\psi(\\hat K) \\equiv \\omega_\\chi(\\hat K) \\pmod M$ for every conjugacy\nclass $K$ of `G`. -/\ndef blockOf (M : Ideal (integralClosure ℤ ℂ)) (χ : G → ℂ) : Set (G → ℂ) :=\n  {ψ ∈ irreducibleCharacters G | ∀ x : G, MemIdeal M (centralCharacter ψ x - centralCharacter χ x)}\n\n/-- `D` is a defect group of the conjugacy class of `x`, i.e. a Sylow `p`-subgroup of the\ncentraliser $C_G(x)$. -/\ndef IsClassDefectGroup (p : ℕ) (x : G) (D : Subgroup G) : Prop :=\n  ∃ S : Sylow p (Subgroup.centralizer {x}), D = Subgroup.map (Subgroup.centralizer {x}).subtype S\n\n/-- `D` is a defect group of the `p`-block `blockOf M χ` of `G` containing the irreducible\ncharacter `χ`: by the min–max theorem, this means that `D` is a Sylow `p`-subgroup of $C_G(x)$\nfor some `x` with $\\lambda_B(\\hat K_x) \\ne 0$ (i.e. $\\omega_\\chi(\\hat K_x) \\notin M$) such that\n$|C_G(x)|_p$ is minimal among all such `x`. -/\ndef IsDefectGroup (p : ℕ) (M : Ideal (integralClosure ℤ ℂ)) (χ : G → ℂ) (D : Subgroup G) :\n    Prop :=\n  ∃ x : G, ¬ MemIdeal M (centralCharacter χ x) ∧ IsClassDefectGroup p x D ∧\n    ∀ y : G, ¬ MemIdeal M (centralCharacter χ y) →\n      ∀ E : Subgroup G, IsClassDefectGroup p y E → Nat.card D ≤ Nat.card E\n\n/-- An irreducible character `χ` of a block with defect group `D` has height `0` if\n$\\chi(1)_p \\cdot |D| = |G|_p$, i.e. $\\nu_p(\\chi(1)) + \\nu_p(|D|) = \\nu_p(|G|)$. -/\ndef IsHeightZero (p : ℕ) (D : Subgroup G) (χ : G → ℂ) : Prop :=\n  ∃ n : ℕ, (n : ℂ) = χ 1 ∧ padicValNat p n + padicValNat p (Nat.card D) = padicValNat p (Nat.card G)\n\n/-- The class sum of the identity is `1`, so $\\omega_\\chi(\\hat K_1) = 1$. -/\n@[category API, AMS 20]\ntheorem centralCharacter_one {χ : G → ℂ} (hχ : χ 1 ≠ 0) : centralCharacter χ 1 = 1 := by\n  simp [centralCharacter, div_self hχ]\n\n/-- A block consists of irreducible characters. -/\n@[category API, AMS 20]\ntheorem blockOf_subset (M : Ideal (integralClosure ℤ ℂ)) (χ : G → ℂ) :\n    blockOf M χ ⊆ irreducibleCharacters G :=\n  fun _ h => h.1\n\n/-- An irreducible character lies in its own block. -/\n@[category API, AMS 20]\ntheorem mem_blockOf_self (M : Ideal (integralClosure ℤ ℂ)) {χ : G → ℂ}\n    (hχ : χ ∈ irreducibleCharacters G) : χ ∈ blockOf M χ :=\n  ⟨hχ, fun _ => ⟨0, M.zero_mem, by simp⟩⟩\n\n/-- The number $k(B)$ of irreducible complex characters lying in the block `blockOf M χ`. -/\nnoncomputable def numChars (M : Ideal (integralClosure ℤ ℂ)) (χ : G → ℂ) : ℕ :=\n  (blockOf M χ).ncard\n\n/-- The number $k_0(B)$ of irreducible complex characters of height `0` lying in the block\n`blockOf M χ`, whose defect group is `D`. -/\nnoncomputable def numHeightZeroChars (p : ℕ) (M : Ideal (integralClosure ℤ ℂ)) (χ : G → ℂ)\n    (D : Subgroup G) : ℕ :=\n  {ψ ∈ blockOf M χ | IsHeightZero p D ψ}.ncard\n\n/--\na) (R. Brauer) $k(B) \\leq |D(B)|$, for every prime $p$, every finite group $G$ and every\n$p$-block $B$ of $G$ with defect group $D(B)$.\n\nThis is Brauer's $k(B)$-conjecture. The notebook remarks that it has been proved for\n$p$-soluble groups (D. Gluck, K. Magaard, U. Riese, P. Schmid, *J. Algebra* **279** (2004),\n694–719).\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.a (p : ℕ) [Fact p.Prime] (G : Type) [Group G] [Finite G]\n    (M : Ideal (integralClosure ℤ ℂ)) (hM : M.IsMaximal) (hp : (p : integralClosure ℤ ℂ) ∈ M)\n    (χ : G → ℂ) (hχ : χ ∈ irreducibleCharacters G) (D : Subgroup G)\n    (hD : IsDefectGroup p M χ D) :\n    numChars M χ ≤ Nat.card D := by\n  sorry\n\n/--\nb) (J. B. Olsson) $k_0(B) \\leq |D(B) : D(B)'|$, where $D(B)'$ is the derived subgroup of\n$D(B)$, for every prime $p$, every finite group $G$ and every $p$-block $B$ of $G$ with defect\ngroup $D(B)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.b (p : ℕ) [Fact p.Prime] (G : Type) [Group G] [Finite G]\n    (M : Ideal (integralClosure ℤ ℂ)) (hM : M.IsMaximal) (hp : (p : integralClosure ℤ ℂ) ∈ M)\n    (χ : G → ℂ) (hχ : χ ∈ irreducibleCharacters G) (D : Subgroup G)\n    (hD : IsDefectGroup p M χ D) :\n    numHeightZeroChars p M χ D ≤ (commutator D).index := by\n  sorry\n\n/--\nc) (R. Brauer) $D(B)$ is abelian if and only if $k_0(B) = k(B)$, for every prime $p$, every\nfinite group $G$ and every $p$-block $B$ of $G$ with defect group $D(B)$.\n\nThis is Brauer's Height Zero Conjecture. The implication \"$D(B)$ abelian $\\Rightarrow$\n$k_0(B) = k(B)$\" was proved by Kessar and Malle (Ann. of Math. **178** (2013)), and the\nconverse by Malle, Navarro, Schaeffer Fry and Tiep (Ann. of Math. **200** (2024)).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«9.23».parts.c (p : ℕ) [Fact p.Prime] (G : Type) [Group G] [Finite G]\n    (M : Ideal (integralClosure ℤ ℂ)) (hM : M.IsMaximal) (hp : (p : integralClosure ℤ ℂ) ∈ M)\n    (χ : G → ℂ) (hχ : χ ∈ irreducibleCharacters G) (D : Subgroup G)\n    (hD : IsDefectGroup p M χ D) :\n    IsMulCommutative D ↔ numHeightZeroChars p M χ D = numChars M χ := by\n  sorry\n\nend Kourovka.«9.23»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's reading (implicit universal quantification over p, G, B; |D(B)| well defined up to conjugacy; non-strict bounds; (c) as a single biconditional tagged research solved) was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Mathlib has no block theory, so p-blocks are set up character-theoretically as in Isaacs (Character Theory of Finite Groups, Ch. 15) and Navarro (Characters and Blocks of Finite Groups, Ch. 3): fix a maximal ideal M of the ring R = integralClosure ℤ ℂ of algebraic integers with p ∈ M; irreducible characters χ, ψ lie in the same p-block iff ω_χ(K̂) ≡ ω_ψ(K̂) (mod M) for every conjugacy class K, where ω_χ(K̂) = |K|χ(x)/χ(1). The statements are universally quantified over all such M (which is what the conjectures assert for every choice of p-modular system; the block partition of Irr(G) is standardly regarded as independent of the choice).",
+    "Membership of the complex number ω_ψ(x) − ω_χ(x) in M is expressed as `∃ r ∈ M, (r : ℂ) = z` (MemIdeal); the central character values are algebraic integers, so this is the intended congruence.",
+    "Blocks are indexed by an irreducible character χ they contain (`blockOf M χ`); every block contains at least one irreducible character, so quantifying over χ ∈ Irr(G) ranges over all blocks.",
+    "Defect groups are characterised via the min–max theorem: D is a defect group of B iff D is a Sylow p-subgroup of C_G(x) for some x with λ_B(K̂_x) ≠ 0 (i.e. ω_χ(K̂_x) ∉ M) such that |C_G(x)|_p is minimal among all such x. (λ_B(K̂) ≠ 0 ⇒ D ≤_G δ(K), and a defect class attains equality.) A reviewer should check this against their preferred textbook definition. All defect groups of a block are conjugate, so quantifying over every such D is faithful.",
+    "Height zero is formalised as ν_p(χ(1)) + ν_p(|D|) = ν_p(|G|), i.e. χ(1)_p = |G|_p/|D(B)|, using |D(B)| = p^{d(B)}; χ(1) is recovered as the natural number n with (n : ℂ) = χ 1.",
+    "Irreducible complex characters are the characters of `Simple` objects of `FDRep ℂ G`; because `FDRep` requires the coefficient field and group to live in the same universe, G : Type.",
+    "Sizes: k(B) and k_0(B) use `Set.ncard` on subsets of Irr(G), which is finite, so no default-value issue arises; |D(B) : D(B)'| is `(commutator D).index`; 'abelian' is `IsMulCommutative D`.",
+    "Only the three slots are stated as research theorems; the GMRS p-soluble special case of (a) is recorded in the docstring rather than as a separate declaration (Mathlib has no notion of p-soluble group)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FDRep.character together with CategoryTheory.Simple (used to build it); Representation.IsIrreducible has no attached character API.",
+     "name": "Kourovka.«9.23».irreducibleCharacters",
+     "why_needed": "The set Irr(G) of irreducible complex characters as functions G → ℂ, so that blocks can be subsets of it and counted."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib; FDRep.character only gives χ itself.",
+     "name": "Kourovka.«9.23».centralCharacter",
+     "why_needed": "The value ω_χ(K̂_x) = |K_x|χ(x)/χ(1) of the central character on a class sum, needed for Brauer's block criterion and for λ_B ≠ 0 in the defect-group characterisation."
+    },
+    {
+     "closest_existing_considered": "Ideal.map along the subtype embedding is not available as a ring hom to ℂ in a convenient form; Set.image of the ideal would be equivalent but less readable.",
+     "name": "Kourovka.«9.23».MemIdeal",
+     "why_needed": "Membership of a complex number in an ideal of integralClosure ℤ ℂ (the ideal lives in the subalgebra, the character values in ℂ)."
+    },
+    {
+     "closest_existing_considered": "No block theory (central idempotents of group algebras, defect groups) exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«9.23».blockOf",
+     "why_needed": "The p-block containing χ with respect to the maximal ideal M (Brauer/Isaacs central-character criterion)."
+    },
+    {
+     "closest_existing_considered": "Sylow p (Subgroup.centralizer {x}) mapped along Subgroup.subtype (used to define it).",
+     "name": "Kourovka.«9.23».IsClassDefectGroup",
+     "why_needed": "Defect group of a conjugacy class: a Sylow p-subgroup of C_G(x), as a subgroup of G."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "Kourovka.«9.23».IsDefectGroup",
+     "why_needed": "Defect group of a block, via the min–max theorem characterisation."
+    },
+    {
+     "closest_existing_considered": "padicValNat (used inside).",
+     "name": "Kourovka.«9.23».IsHeightZero",
+     "why_needed": "Height-zero characters of a block with defect group D (χ(1)_p·|D| = |G|_p)."
+    },
+    {
+     "closest_existing_considered": "Set.ncard (used).",
+     "name": "Kourovka.«9.23».numChars",
+     "why_needed": "k(B), the number of irreducible characters in the block."
+    },
+    {
+     "closest_existing_considered": "Set.ncard (used).",
+     "name": "Kourovka.«9.23».numHeightZeroChars",
+     "why_needed": "k_0(B), the number of height-zero irreducible characters in the block."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.23».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every prime p, finite group G, maximal ideal M of the algebraic integers with p ∈ M, irreducible character χ (its block B = blockOf M χ ranges over all p-blocks) and every defect group D of B, k(B) = (blockOf M χ).ncard ≤ Nat.card D. Non-strict bound; the GMRS p-soluble remark is recorded in the docstring only."
+    },
+    "kourovka.«9.23».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same quantifiers; k_0(B) counts characters ψ of B with ν_p(ψ(1)) + ν_p(|D|) = ν_p(|G|) (height zero), bounded by (commutator D).index = |D(B) : D(B)'|. Non-strict bound."
+    },
+    "kourovka.«9.23».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same quantifiers; single biconditional IsMulCommutative D ↔ k_0(B) = k(B), tagged `research solved` (Kessar–Malle 2013; Malle–Navarro–Schaeffer Fry–Tiep 2024) as requested by the decomposition table."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.23».parts.a": "/--\na) (R. Brauer) $k(B) \\leq |D(B)|$, for every prime $p$, every finite group $G$ and every\n$p$-block $B$ of $G$ with defect group $D(B)$.\n\nThis is Brauer's $k(B)$-conjecture. The notebook remarks that it has been proved for\n$p$-soluble groups (D. Gluck, K. Magaard, U. Riese, P. Schmid, *J. Algebra* **279** (2004),\n694–719).\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.a (p : ℕ) [Fact p.Prime] (G : Type) [Group G] [Finite G]\n    (M : Ideal (integralClosure ℤ ℂ)) (hM : M.IsMaximal) (hp : (p : integralClosure ℤ ℂ) ∈ M)\n    (χ : G → ℂ) (hχ : χ ∈ irreducibleCharacters G) (D : Subgroup G)\n    (hD : IsDefectGroup p M χ D) :\n    numChars M χ ≤ Nat.card D := by\n  sorry",
+    "kourovka.«9.23».parts.b": "/--\nb) (J. B. Olsson) $k_0(B) \\leq |D(B) : D(B)'|$, where $D(B)'$ is the derived subgroup of\n$D(B)$, for every prime $p$, every finite group $G$ and every $p$-block $B$ of $G$ with defect\ngroup $D(B)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.b (p : ℕ) [Fact p.Prime] (G : Type) [Group G] [Finite G]\n    (M : Ideal (integralClosure ℤ ℂ)) (hM : M.IsMaximal) (hp : (p : integralClosure ℤ ℂ) ∈ M)\n    (χ : G → ℂ) (hχ : χ ∈ irreducibleCharacters G) (D : Subgroup G)\n    (hD : IsDefectGroup p M χ D) :\n    numHeightZeroChars p M χ D ≤ (commutator D).index := by\n  sorry",
+    "kourovka.«9.23».parts.c": "/--\nc) (R. Brauer) $D(B)$ is abelian if and only if $k_0(B) = k(B)$, for every prime $p$, every\nfinite group $G$ and every $p$-block $B$ of $G$ with defect group $D(B)$.\n\nThis is Brauer's Height Zero Conjecture. The implication \"$D(B)$ abelian $\\Rightarrow$\n$k_0(B) = k(B)$\" was proved by Kessar and Malle (Ann. of Math. **178** (2013)), and the\nconverse by Malle, Navarro, Schaeffer Fry and Tiep (Ann. of Math. **200** (2024)).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«9.23».parts.c (p : ℕ) [Fact p.Prime] (G : Type) [Group G] [Finite G]\n    (M : Ideal (integralClosure ℤ ℂ)) (hM : M.IsMaximal) (hp : (p : integralClosure ℤ ℂ) ∈ M)\n    (χ : G → ℂ) (hχ : χ ∈ irreducibleCharacters G) (D : Subgroup G)\n    (hD : IsDefectGroup p M χ D) :\n    IsMulCommutative D ↔ numHeightZeroChars p M χ D = numChars M χ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c02",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Rejected the unrelated Mathlib notion `MulAction.IsBlock`, which concerns imprimitivity blocks for group actions rather than character blocks.",
+    "Rejected an abstract structure with fields for a character set, defect subgroup, and height-zero subset because it would impose no modular representation-theoretic compatibility and would quantify over many objects that are not blocks.",
+    "Generic group-algebra, idempotent, finite-dimensional representation, commutator, and abelianization APIs were found, but they do not provide the modular decomposition/Brauer-pair machinery needed to define the missing notions faithfully."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "kourovka.«9.23».parts.a": {
+     "outcome": "missing_primitives",
+     "why": "Mathlib and FormalConjecturesForMathlib have finite-dimensional representations and trace characters, but no theory of p-blocks of ordinary irreducible characters and no defect group attached to such a block. A bespoke record containing an arbitrary character set and subgroup would not define a genuine block or defect group and would change the conjecture."
+    },
+    "kourovka.«9.23».parts.b": {
+     "outcome": "missing_primitives",
+     "why": "In addition to the missing p-block and defect-group theory, there is no definition of the p-height of an ordinary irreducible character in a block, hence no faithful k₀(B). Mathlib does have group commutators/abelianization, but that alone is insufficient to state Olsson's conjecture."
+    },
+    "kourovka.«9.23».parts.c": {
+     "outcome": "missing_primitives",
+     "why": "The biconditional requires genuine p-blocks, their defect groups, and character heights. These modular character-theory primitives are absent; modeling them as unconstrained fields would make the statement materially different despite Mathlib already supporting the final abelianness and cardinality notions."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.23\n\nby V. D. Mazurov\n\nLet $G$ be a finite group, $B$ a block of characters of $G$, $D(B)$ its defect group and\n$k(B)$ (respectively, $k_0(B)$) the number of all irreducible complex characters (of height\n$0$) lying in $B$. *Conjectures:*\n\na) (R. Brauer) $k(B) \\leq |D(B)|$; this has been proved for $p$-soluble groups\n   (D. Gluck, K. Magaard, U. Riese, P. Schmid, *J. Algebra*, **279** (2004), 694–719);\n\nb) (J. B. Olsson) $k_0(B) \\leq |D(B) : D(B)'|$, where $D(B)'$ is the derived subgroup of\n   $D(B)$;\n\nc) (R. Brauer) $D(B)$ is abelian if and only if $k_0(B) = k(B)$.\n\nPart c) is Brauer's height zero conjecture. It is not starred in the notebook, but it has since\nbeen proved: the direction \"$D(B)$ abelian $\\Rightarrow k_0(B) = k(B)$\" by Kessar and Malle\n(2013) and the converse by Malle, Navarro, Schaeffer Fry and Tiep (2024).\n\n## Formalisation\n\nBlock theory is not in Mathlib, so this file sets it up from scratch, following the classical\ncharacter-theoretic approach (Brauer; Isaacs, *Character Theory of Finite Groups*, Chapter 15;\nNavarro, *Characters and Blocks of Finite Groups*, Chapters 3 and 4).\n\nFix a prime $p$ and a maximal ideal $M$ of the ring $\\mathbf{R}$ of all algebraic integers\nwith $p \\in M$.\n\n* The irreducible complex characters $\\operatorname{Irr}(G)$ are the characters of the simple\n  objects of `FDRep ℂ G`.\n* The central character of $\\chi \\in \\operatorname{Irr}(G)$ is\n  $\\omega_\\chi(x) = |\\operatorname{cl}(x)| \\chi(x) / \\chi(1)$; its values are algebraic\n  integers. Two irreducible characters $\\chi, \\psi$ lie in the same $p$-block if\n  $\\omega_\\chi(x) \\equiv \\omega_\\psi(x) \\pmod M$ for all $x \\in G$. A $p$-block $B$ is an\n  equivalence class of this relation. The block $B$ has a central character\n  $\\lambda_B(x) = \\omega_\\chi(x) + M \\in \\mathbf{R}/M$ ($\\chi \\in B$).\n* (Brauer) A conjugacy class $\\operatorname{cl}(x)$ with $\\lambda_B(x) \\neq 0$ and with\n  $|C_G(x)|_p$ minimal among such classes is a *defect class* of $B$, and a *defect group* of\n  $B$ is a Sylow $p$-subgroup of $C_G(x)$ for a defect class $\\operatorname{cl}(x)$. By\n  Brauer's min–max theorem this agrees with the definition of defect groups through relative\n  traces or Brauer homomorphisms. The defect groups of $B$ form a single conjugacy class of\n  $p$-subgroups of $G$, so $|D(B)|$, $|D(B) : D(B)'|$ and \"$D(B)$ is abelian\" do not depend\n  on the choice.\n* $\\chi \\in B$ has height zero if $\\chi(1)_p = |G|_p / |D(B)|$.\n\nThe statements quantify over all primes $p$, all finite groups $G$, all maximal ideals $M$ of\n$\\mathbf{R}$ containing $p$, all $p$-blocks $B$ of $G$ with respect to $M$ and all defect groups\n$D$ of $B$. The solved special case of a) for $p$-soluble groups is not stated separately.\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n- [Wikipedia, Brauer's height zero conjecture](https://en.wikipedia.org/wiki/Brauer%27s_height_zero_conjecture)\n- D. Gluck, K. Magaard, U. Riese, P. Schmid, *The solution of the k(GV)-problem*,\n  J. Algebra 279 (2004), 694–719\n- R. Kessar, G. Malle, *Quasi-isolated blocks and Brauer's height zero conjecture*,\n  [arXiv:1112.2642](https://arxiv.org/abs/1112.2642), Ann. of Math. 178 (2013), 321–384\n- G. Malle, G. Navarro, A. A. Schaeffer Fry, P. H. Tiep, *Brauer's Height Zero Conjecture*,\n  [arXiv:2209.04736](https://arxiv.org/abs/2209.04736), Ann. of Math. 200 (2024), 557–608\n-/\n\nopen CategoryTheory\n\nnamespace Kourovka.«9.23»\n\n/-- The ring $\\mathbf{R}$ of all algebraic integers, i.e. the integral closure of $\\mathbb{Z}$\nin $\\mathbb{C}$. -/\nlocal notation \"𝐑\" => integralClosure ℤ ℂ\n\nvariable {G : Type} [Group G]\n\n/-- The set $\\operatorname{Irr}(G)$ of irreducible complex characters of $G$: the characters\nof the simple (irreducible) finite-dimensional complex representations of $G$. -/\ndef irreducibleCharacters (G : Type) [Group G] : Set (G → ℂ) :=\n  {χ | ∃ V : FDRep ℂ G, Simple V ∧ V.character = χ}\n\n/-- The central character $\\omega_\\chi(x) = |\\operatorname{cl}(x)| \\, \\chi(x) / \\chi(1)$\nattached to a character $\\chi$, evaluated at the conjugacy class of $x$. For\n$\\chi \\in \\operatorname{Irr}(G)$ this is an algebraic integer. -/\nnoncomputable def centralChar (χ : G → ℂ) (x : G) : ℂ :=\n  ({y : G | IsConj x y}.ncard : ℂ) * χ x / χ 1\n\n/-- The set of complex numbers lying in the ideal `M` of the ring of algebraic integers. -/\ndef idealImage (M : Ideal 𝐑) : Set ℂ :=\n  Subtype.val '' (M : Set 𝐑)\n\n/-- Two characters $\\chi, \\psi$ lie in the same block (with respect to the maximal ideal $M$\nof the algebraic integers) if $\\omega_\\chi(x) \\equiv \\omega_\\psi(x) \\pmod M$ for every\n$x \\in G$. -/\ndef SameBlock (M : Ideal 𝐑) (χ ψ : G → ℂ) : Prop :=\n  ∀ x : G, centralChar χ x - centralChar ψ x ∈ idealImage M\n\n/-- `B` is a block of characters of `G` with respect to the maximal ideal `M` of the algebraic\nintegers: an equivalence class of `SameBlock M` on $\\operatorname{Irr}(G)$. When\n$p \\in M$ these are exactly the $p$-blocks of $G$. -/\ndef IsBlock (M : Ideal 𝐑) (B : Set (G → ℂ)) : Prop :=\n  ∃ χ ∈ irreducibleCharacters G, B = {ψ ∈ irreducibleCharacters G | SameBlock M χ ψ}\n\n/-- `D` is a Sylow `p`-subgroup of the centraliser $C_G(x)$. -/\ndef IsSylowOfCentralizer (p : ℕ) [Fact p.Prime] (x : G) (D : Subgroup G) : Prop :=\n  ∃ P : Sylow p (Subgroup.centralizer {x}),\n    D = Subgroup.map (Subgroup.centralizer {x}).subtype (P : Subgroup _)\n\n/-- The Sylow `p`-subgroups of the centralisers $C_G(x)$ of the elements $x \\in G$ whose\nconjugacy class satisfies $\\lambda_B(x) \\neq 0$, i.e. $\\omega_\\chi(x) \\notin M$ for\n$\\chi \\in B$. -/\ndef defectCandidates (p : ℕ) [Fact p.Prime] (M : Ideal 𝐑) (B : Set (G → ℂ)) :\n    Set (Subgroup G) :=\n  {Q | ∃ x : G, (∀ χ ∈ B, centralChar χ x ∉ idealImage M) ∧ IsSylowOfCentralizer p x Q}\n\n/-- `D` is a defect group of the block `B` (Brauer's definition): `D` is a Sylow\n`p`-subgroup of $C_G(x)$ where $\\operatorname{cl}(x)$ is a defect class of `B`, i.e.\n$\\lambda_B(x) \\neq 0$ and $|C_G(x)|_p$ is minimal among the classes with\n$\\lambda_B(x) \\neq 0$. -/\ndef IsDefectGroup (p : ℕ) [Fact p.Prime] (M : Ideal 𝐑) (B : Set (G → ℂ)) (D : Subgroup G) :\n    Prop :=\n  D ∈ defectCandidates p M B ∧ ∀ Q ∈ defectCandidates p M B, Nat.card D ≤ Nat.card Q\n\n/-- A character `χ` of a block with defect group `D` has height zero if\n$\\chi(1)_p = |G|_p / |D|$, i.e. $\\nu_p(\\chi(1)) + \\nu_p(|D|) = \\nu_p(|G|)$. -/\ndef IsHeightZero (p : ℕ) (D : Subgroup G) (χ : G → ℂ) : Prop :=\n  ∃ n : ℕ, χ 1 = n ∧\n    padicValNat p n + padicValNat p (Nat.card D) = padicValNat p (Nat.card G)\n\n@[category test, AMS 20]\ntheorem centralChar_one (χ : G → ℂ) (hχ : χ 1 ≠ 0) : centralChar χ 1 = 1 := by\n  simp [centralChar, hχ]\n\n@[category API, AMS 20]\ntheorem IsBlock.subset_irreducibleCharacters {M : Ideal 𝐑} {B : Set (G → ℂ)}\n    (hB : IsBlock M B) : B ⊆ irreducibleCharacters G := by\n  obtain ⟨χ, -, rfl⟩ := hB\n  exact Set.sep_subset _ _\n\n@[category API, AMS 20]\ntheorem IsBlock.nonempty {M : Ideal 𝐑} {B : Set (G → ℂ)} (hB : IsBlock M B) :\n    B.Nonempty := by\n  obtain ⟨χ, hχ, rfl⟩ := hB\n  exact ⟨χ, hχ, fun x => ⟨0, M.zero_mem, by simp⟩⟩\n\n/--\n**Brauer's $k(B)$-conjecture.** Let $G$ be a finite group, $p$ a prime, $B$ a $p$-block of\n$G$ and $D(B)$ a defect group of $B$. Then $k(B) \\leq |D(B)|$, where $k(B)$ is the number of\nirreducible complex characters lying in $B$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.a (p : ℕ) [Fact p.Prime] [Finite G]\n    (M : Ideal 𝐑) (hM : M.IsMaximal) (hpM : (p : 𝐑) ∈ M)\n    (B : Set (G → ℂ)) (hB : IsBlock M B) (D : Subgroup G) (hD : IsDefectGroup p M B D) :\n    B.ncard ≤ Nat.card D := by\n  sorry\n\n/--\n**Olsson's conjecture.** Let $G$ be a finite group, $p$ a prime, $B$ a $p$-block of $G$ and\n$D(B)$ a defect group of $B$. Then $k_0(B) \\leq |D(B) : D(B)'|$, where $k_0(B)$ is the number\nof irreducible complex characters of height $0$ lying in $B$ and $D(B)'$ is the derived\nsubgroup of $D(B)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.b (p : ℕ) [Fact p.Prime] [Finite G]\n    (M : Ideal 𝐑) (hM : M.IsMaximal) (hpM : (p : 𝐑) ∈ M)\n    (B : Set (G → ℂ)) (hB : IsBlock M B) (D : Subgroup G) (hD : IsDefectGroup p M B D) :\n    {χ ∈ B | IsHeightZero p D χ}.ncard ≤ ⁅D, D⁆.relIndex D := by\n  sorry\n\n/--\n**Brauer's height zero conjecture.** Let $G$ be a finite group, $p$ a prime, $B$ a $p$-block\nof $G$ and $D(B)$ a defect group of $B$. Then $D(B)$ is abelian if and only if\n$k_0(B) = k(B)$, i.e. if and only if every irreducible complex character in $B$ has height $0$.\n\nThis was proved by Kessar and Malle (2013, direction\n\"$D(B)$ abelian $\\Rightarrow k_0(B) = k(B)$\") and by Malle, Navarro, Schaeffer Fry and Tiep\n(2024, direction \"$k_0(B) = k(B) \\Rightarrow D(B)$ abelian\").\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«9.23».parts.c (p : ℕ) [Fact p.Prime] [Finite G]\n    (M : Ideal 𝐑) (hM : M.IsMaximal) (hpM : (p : 𝐑) ∈ M)\n    (B : Set (G → ℂ)) (hB : IsBlock M B) (D : Subgroup G) (hD : IsDefectGroup p M B D) :\n    IsMulCommutative D ↔ {χ ∈ B | IsHeightZero p D χ}.ncard = B.ncard := by\n  sorry\n\nend Kourovka.«9.23»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The table's reading (implicit universal quantifiers over p, G, B; D(B) up to conjugacy; non-strict bounds; c) as a single biconditional tagged research solved) is the one formalized.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "p-blocks are defined à la Brauer/Isaacs/Navarro via central characters modulo a maximal ideal M of the ring of all algebraic integers (integralClosure ℤ ℂ) containing p; the theorems quantify over all such M (hypotheses hM : M.IsMaximal, hpM : (p : 𝐑) ∈ M). The partition into blocks is in fact independent of M (Galois action on characters = power maps on classes), so this is harmless and matches 'for any p-modular system'.",
+    "Membership 'ω_χ(x) − ω_ψ(x) ∈ M' is encoded as membership in the image Subtype.val '' M ⊆ ℂ, relying on the classical fact that central character values of irreducible characters are algebraic integers (so no information is lost).",
+    "Defect groups are defined by Brauer's defect-class characterisation (Sylow p-subgroup of C_G(x) with λ_B(x) ≠ 0 and |C_G(x)|_p minimal). This agrees with the relative-trace/Brauer-homomorphism definition by the min–max theorem; the reviewer should confirm they accept this as the definition of D(B). All defect groups are conjugate, so quantifying over every D with IsDefectGroup is faithful for |D|, |D:D'| and commutativity.",
+    "λ_B(x) ≠ 0 is written as ∀ χ ∈ B, centralChar χ x ∉ idealImage M; for a (nonempty) block this is equivalent to the ∃-version.",
+    "Height zero uses the defect-group form χ(1)_p = |G|_p/|D| (ν_p(χ(1)) + ν_p(|D|) = ν_p(|G|)) rather than the equivalent 'ν_p(χ(1)) minimal in B'.",
+    "|D(B):D(B)'| is ⁅D, D⁆.relIndex D (index of the derived subgroup in D); 'abelian' is IsMulCommutative D; k(B) and k_0(B) are Set.ncard of the relevant sets of characters (finite here).",
+    "Irreducible characters are FDRep.character of Simple objects of FDRep ℂ G; this forces G : Type (universe 0), as in the other Kourovka files.",
+    "The solved special case for p-soluble groups (Gluck–Magaard–Riese–Schmid) is not stated separately (p-solubility is not in Mathlib and the notes make this optional); it is mentioned in the module docstring.",
+    "All block-theoretic definitions live in the problem file rather than FormalConjecturesForMathlib because the task requires a single candidate file; a reviewer may wish to move them.",
+    "Some DOI/Wikipedia links were omitted because they could not be verified offline; only links believed correct (arXiv 1401.0300v46, 1112.2642, 2209.04736, Wikipedia height zero conjecture) are included."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FDRep.character and CategoryTheory.Simple (used as building blocks); Mathlib has no set of irreducible characters.",
+     "name": "Kourovka.«9.23».irreducibleCharacters",
+     "why_needed": "Irr(G) as a set of functions G → ℂ: characters of Simple objects of FDRep ℂ G. Needed to count characters in a block."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (only FDRep.character).",
+     "name": "Kourovka.«9.23».centralChar",
+     "why_needed": "The central character ω_χ(x) = |cl(x)| χ(x)/χ(1) used by the classical definition of p-blocks."
+    },
+    {
+     "closest_existing_considered": "Ideal.map (not applicable: ℂ is a field), Subtype.val '' M (this is the definition).",
+     "name": "Kourovka.«9.23».idealImage",
+     "why_needed": "The set of complex numbers lying in an ideal M of integralClosure ℤ ℂ; lets us write ω_χ(x) − ω_ψ(x) ∈ M without first proving that central character values are algebraic integers."
+    },
+    {
+     "closest_existing_considered": "Nothing (searched rg for block/defect/character in Mathlib and the repo).",
+     "name": "Kourovka.«9.23».SameBlock / IsBlock",
+     "why_needed": "χ ~ ψ iff ω_χ ≡ ω_ψ (mod M) on all classes (Brauer/Isaacs/Navarro); a block is an equivalence class inside Irr(G). No block theory exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Sylow (used), Subgroup.centralizer (used); Mathlib has no defect groups.",
+     "name": "Kourovka.«9.23».IsSylowOfCentralizer / defectCandidates / IsDefectGroup",
+     "why_needed": "Defect groups via Brauer's defect classes: D is a Sylow p-subgroup of C_G(x) with λ_B(x) ≠ 0 (ω_χ(x) ∉ M for χ ∈ B) and |C_G(x)|_p minimal among such classes. Equivalent to the relative-trace/Brauer-homomorphism definition by Brauer's min–max theorem."
+    },
+    {
+     "closest_existing_considered": "padicValNat (used); no notion of character height exists.",
+     "name": "Kourovka.«9.23».IsHeightZero",
+     "why_needed": "χ has height zero iff χ(1)_p = |G|_p / |D|, expressed as ∃ n : ℕ, χ 1 = n ∧ padicValNat p n + padicValNat p (Nat.card D) = padicValNat p (Nat.card G)."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.23».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every prime p, finite group G, maximal ideal M of the algebraic integers with p ∈ M, every M-block B ⊆ Irr(G) and every defect group D of B, B.ncard ≤ Nat.card D. Block theory is absent from Mathlib/the repo, so blocks, central characters, defect groups were defined in the file. The solved p-soluble special case is only mentioned in the module docstring, not stated."
+    },
+    "kourovka.«9.23».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same quantifiers; k_0(B) is the ncard of {χ ∈ B | IsHeightZero p D χ} with height zero meaning ν_p(χ(1)) + ν_p(|D|) = ν_p(|G|) (i.e. χ(1)_p = |G|_p/|D|), and |D(B):D(B)'| is ⁅D, D⁆.relIndex D. Non-strict bound."
+    },
+    "kourovka.«9.23».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Single biconditional IsMulCommutative D ↔ ncard {height-zero chars of B} = B.ncard, with the same quantifiers; tagged `category research solved` (Kessar–Malle 2013 and Malle–Navarro–Schaeffer Fry–Tiep 2024) as the decomposition notes require."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.23».parts.a": "/--\n**Brauer's $k(B)$-conjecture.** Let $G$ be a finite group, $p$ a prime, $B$ a $p$-block of\n$G$ and $D(B)$ a defect group of $B$. Then $k(B) \\leq |D(B)|$, where $k(B)$ is the number of\nirreducible complex characters lying in $B$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.a (p : ℕ) [Fact p.Prime] [Finite G]\n    (M : Ideal 𝐑) (hM : M.IsMaximal) (hpM : (p : 𝐑) ∈ M)\n    (B : Set (G → ℂ)) (hB : IsBlock M B) (D : Subgroup G) (hD : IsDefectGroup p M B D) :\n    B.ncard ≤ Nat.card D := by\n  sorry",
+    "kourovka.«9.23».parts.b": "/--\n**Olsson's conjecture.** Let $G$ be a finite group, $p$ a prime, $B$ a $p$-block of $G$ and\n$D(B)$ a defect group of $B$. Then $k_0(B) \\leq |D(B) : D(B)'|$, where $k_0(B)$ is the number\nof irreducible complex characters of height $0$ lying in $B$ and $D(B)'$ is the derived\nsubgroup of $D(B)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.b (p : ℕ) [Fact p.Prime] [Finite G]\n    (M : Ideal 𝐑) (hM : M.IsMaximal) (hpM : (p : 𝐑) ∈ M)\n    (B : Set (G → ℂ)) (hB : IsBlock M B) (D : Subgroup G) (hD : IsDefectGroup p M B D) :\n    {χ ∈ B | IsHeightZero p D χ}.ncard ≤ ⁅D, D⁆.relIndex D := by\n  sorry",
+    "kourovka.«9.23».parts.c": "/--\n**Brauer's height zero conjecture.** Let $G$ be a finite group, $p$ a prime, $B$ a $p$-block\nof $G$ and $D(B)$ a defect group of $B$. Then $D(B)$ is abelian if and only if\n$k_0(B) = k(B)$, i.e. if and only if every irreducible complex character in $B$ has height $0$.\n\nThis was proved by Kessar and Malle (2013, direction\n\"$D(B)$ abelian $\\Rightarrow k_0(B) = k(B)$\") and by Malle, Navarro, Schaeffer Fry and Tiep\n(2024, direction \"$k_0(B) = k(B) \\Rightarrow D(B)$ abelian\").\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«9.23».parts.c (p : ℕ) [Fact p.Prime] [Finite G]\n    (M : Ideal 𝐑) (hM : M.IsMaximal) (hpM : (p : 𝐑) ∈ M)\n    (B : Set (G → ℂ)) (hB : IsBlock M B) (D : Subgroup G) (hD : IsDefectGroup p M B D) :\n    IsMulCommutative D ↔ {χ ∈ B | IsHeightZero p D χ}.ncard = B.ncard := by\n  sorry"
+   }
+  },
+  {
+   "bailed": true,
+   "cid": "c04",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Did not model a character block as an arbitrary finite set of FDRep characters plus an arbitrary p-subgroup: that abstraction omits the defining modular block relation and defect-group condition and would state a different, generally false universal assertion.",
+    "Did not replace a defect group by a Sylow p-subgroup or by a subgroup chosen only from its cardinality/character defect: defect groups need not be Sylow subgroups of G, and part (c) depends on their group structure, not only their order.",
+    "Left /workspace/candidate/candidate.lean absent, as required for a full bail-out."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "kourovka.«9.23».parts.a": {
+     "outcome": "missing_primitives",
+     "why": "Mathlib and FormalConjecturesForMathlib have no faithful notion of an ordinary p-block of irreducible complex characters and no construction or predicate for its defect groups. Generic FDRep characters, group algebras, idempotents, and Sylow subgroups do not supply the modular block correspondence or defect-group theory needed to state k(B) ≤ |D(B)|. Packaging an arbitrary character set and subgroup as a block would quantify over non-block data and change the conjecture."
+    },
+    "kourovka.«9.23».parts.b": {
+     "outcome": "missing_primitives",
+     "why": "The required p-block, defect group, and height-zero character notions are absent. While Mathlib has p-adic valuations and derived subgroups/abelianization, it lacks the block defect needed to define character height by χ(1)_p = |G|_p / |D(B)| and to identify D(B) as a genuine defect group. Thus k₀(B) and the intended right-hand side cannot be connected faithfully to a block."
+    },
+    "kourovka.«9.23».parts.c": {
+     "outcome": "missing_primitives",
+     "why": "The biconditional requires a genuine defect group of a genuine p-block and the genuine set of height-zero irreducible ordinary characters. Mathlib has IsMulCommutative/commutator machinery for a subgroup once supplied, but block theory, defect groups, and character heights are missing, so the Height Zero Conjecture cannot be stated faithfully."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": true,
+   "cid": "c05",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Did not introduce an abstract structure carrying an arbitrary character set and subgroup: without axioms or definitions identifying these as a genuine p-block and its defect group, that would state a different theorem and amount to a placeholder definition.",
+    "Left /workspace/candidate/ without a candidate file, as required for a full bail-out in which every slot is omitted."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "kourovka.«9.23».parts.a": {
+     "outcome": "missing_primitives",
+     "why": "Mathlib and FormalConjecturesForMathlib have no definition of a p-block of ordinary irreducible characters or of the defect group attached to a block. Although Mathlib has finite-dimensional representations and their ordinary character functions, these do not suffice to define k(B) and D(B) without developing substantial modular representation theory."
+    },
+    "kourovka.«9.23».parts.b": {
+     "outcome": "missing_primitives",
+     "why": "In addition to the missing p-block and defect-group theory, Mathlib and the repository have no definition of the p-height of an irreducible ordinary character in a block or of the height-zero characters of a block. Thus k₀(B) cannot be stated faithfully. The existing commutator/abelianization API would handle D(B)' only after a genuine defect group were available."
+    },
+    "kourovka.«9.23».parts.c": {
+     "outcome": "missing_primitives",
+     "why": "The biconditional requires genuine p-blocks, their defect groups, and the height-zero character count. Those modular character-theory primitives are absent from Mathlib and FormalConjecturesForMathlib, so neither side can be connected faithfully to a block B."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": true,
+   "cid": "c06",
+   "code": null,
+   "compile_errors": [],
+   "compile_ok": false,
+   "confidence": null,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Did not model a block as an unconstrained structure bundling a set of characters and a subgroup, because quantifying over such arbitrary data would state a substantially stronger and generally false proposition rather than the three conjectures about genuine p-blocks.",
+    "Existing ordinary representation characters, group commutator subgroups, and abelianization are insufficient: a faithful development would first require substantial modular representation theory (block membership and defect groups, with character-height compatibility), not merely local notation or a small bespoke definition."
+   ],
+   "new_definitions": [],
+   "per_slot": {
+    "kourovka.«9.23».parts.a": {
+     "outcome": "missing_primitives",
+     "why": "Mathlib and FormalConjecturesForMathlib have no faithful notion of a p-block of ordinary irreducible characters or of its defect group. Existing FDRep character theory only defines the trace character of a given representation. Defining an arbitrary record containing a set of characters and a subgroup would not characterize genuine blocks and would change Brauer's conjecture."
+    },
+    "kourovka.«9.23».parts.b": {
+     "outcome": "missing_primitives",
+     "why": "The notions of p-block membership, defect group, and character height are absent. Mathlib does have commutator subgroups/abelianization, but that only handles |D(B):D(B)'| after a genuine defect group and block have been supplied; those essential modular-character-theory primitives are unavailable."
+    },
+    "kourovka.«9.23».parts.c": {
+     "outcome": "missing_primitives",
+     "why": "The biconditional cannot be stated faithfully without genuine p-blocks, their defect groups, and the counts of all irreducible ordinary characters and height-zero characters in a block. None of this modular block infrastructure exists in Mathlib or the repository helpers."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {}
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.23\n\nby V. D. Mazurov\n\nLet $G$ be a finite group, $B$ a block of characters of $G$, $D(B)$ its defect group and\n$k(B)$ (respectively, $k_0(B)$) the number of all irreducible complex characters (of height $0$)\nlying in $B$. *Conjectures:*\n\na) (R. Brauer) $k(B) \\leq |D(B)|$; this has been proved for $p$-soluble groups\n(D. Gluck, K. Magaard, U. Riese, P. Schmid, *J. Algebra*, **279** (2004), 694–719);\n\nb) (J. B. Olsson) $k_0(B) \\leq |D(B) : D(B)'|$, where $D(B)'$ is the derived subgroup of\n$D(B)$;\n\nc) (R. Brauer) $D(B)$ is abelian if and only if $k_0(B) = k(B)$.\n\n## Formalisation notes\n\nHere \"block\" means $p$-block for a prime $p$; the statement is implicitly quantified over\n$p$, $G$ and $B$. Mathlib has no block theory, so the file follows the classical\ncharacter-theoretic setup (G. Navarro, *Characters and Blocks of Finite Groups*, LMS Lecture\nNote Series 250, 1998, Chapters 3 and 4):\n\n* Fix a maximal ideal $M$ of the ring of algebraic integers containing $p$. For an irreducible\n  complex character $\\chi$ of $G$ and $g \\in G$ with conjugacy class $K$, the central character\n  value $\\omega_\\chi(\\hat K) = |K|\\,\\chi(g)/\\chi(1)$ is an algebraic integer. Two irreducible\n  characters lie in the same $p$-block if and only if $\\omega_\\chi(\\hat K) \\equiv\n  \\omega_\\psi(\\hat K) \\pmod M$ for every conjugacy class $K$. The resulting partition of\n  $\\mathrm{Irr}(G)$ does not depend on the choice of $M$; the statements below are quantified\n  over all such $M$.\n* A conjugacy class $K$ is nonvanishing for a block $B$ if $\\lambda_B(\\hat K) \\neq 0$, i.e.\n  $\\omega_\\chi(\\hat K) \\notin M$ for $\\chi \\in B$. The defect group $\\delta(K)$ of $K \\ni x$ is a\n  Sylow $p$-subgroup of $C_G(x)$. A defect group of $B$ is $\\delta(K)$ for a nonvanishing class\n  $K$ such that $\\delta(K) \\leq_G \\delta(L)$ for every nonvanishing class $L$ (the minimal\n  defect groups of nonvanishing classes). Such classes exist and all defect groups of $B$ are\n  $G$-conjugate, so $|D(B)|$, $|D(B) : D(B)'|$ and commutativity of $D(B)$ are well defined.\n* If $|G|_p = p^a$ and $|D(B)| = p^d$, then every $\\chi \\in B$ has $\\chi(1)_p = p^{a - d + h}$ for\n  an integer $h \\geq 0$, the height of $\\chi$; $\\chi$ has height $0$ when $\\chi(1)_p |D(B)| =\n  |G|_p$.\n\nPart c) is Brauer's Height Zero Conjecture. The direction \"$D(B)$ abelian implies\n$k_0(B) = k(B)$\" was proved by R. Kessar and G. Malle (*Ann. of Math.* **178** (2013)), the\nconverse by G. Malle, G. Navarro, A. A. Schaeffer Fry and P. H. Tiep (*Ann. of Math.* **200**\n(2024)); parts a) and b) remain open.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen CategoryTheory\n\nnamespace Kourovka.«9.23»\n\nvariable {G : Type} [Group G]\n\n/-- A function $\\chi : G \\to \\mathbb{C}$ is an irreducible complex character of $G$ if it is the\ncharacter of a simple finite-dimensional complex representation of $G$. -/\ndef IsIrreducibleCharacter (χ : G → ℂ) : Prop :=\n  ∃ V : FDRep ℂ G, Simple V ∧ V.character = χ\n\n/-- The central character value $\\omega_\\chi(\\hat K) = |K| \\chi(g) / \\chi(1)$ of $\\chi$ on the\nconjugacy class $K$ of $g$, where $|K| = |G : C_G(g)|$. -/\nnoncomputable def centralCharacter (χ : G → ℂ) (g : G) : ℂ :=\n  ((Subgroup.centralizer {g}).index : ℂ) * χ g / χ 1\n\n/-- The complex number $z$ lies in the ideal $M$ of the ring of algebraic integers\n`integralClosure ℤ ℂ`. -/\ndef MemIdeal (M : Ideal (integralClosure ℤ ℂ)) (z : ℂ) : Prop :=\n  ∃ a ∈ M, (a : ℂ) = z\n\n/-- Two characters $\\chi, \\psi$ lie in the same block with respect to the maximal ideal $M$ if\n$\\omega_\\chi(\\hat K) \\equiv \\omega_\\psi(\\hat K) \\pmod M$ for every conjugacy class $K$ of $G$. -/\ndef SameBlock (M : Ideal (integralClosure ℤ ℂ)) (χ ψ : G → ℂ) : Prop :=\n  ∀ g : G, MemIdeal M (centralCharacter χ g - centralCharacter ψ g)\n\n/-- A set $B$ of functions $G \\to \\mathbb{C}$ is a block of $G$ with respect to the maximal ideal\n$M$ if it is the set of all irreducible complex characters of $G$ lying in the same block as some\nirreducible character $\\chi$. -/\ndef IsBlock (M : Ideal (integralClosure ℤ ℂ)) (B : Set (G → ℂ)) : Prop :=\n  ∃ χ : G → ℂ, IsIrreducibleCharacter χ ∧\n    B = {ψ | IsIrreducibleCharacter ψ ∧ SameBlock M χ ψ}\n\n/-- The conjugacy class of $x$ is nonvanishing for the block $B$, i.e. $\\lambda_B(\\hat K) \\neq 0$\nwhere $\\lambda_B$ is the central character of $B$ modulo $M$: for some (equivalently, every)\n$\\chi \\in B$ the algebraic integer $\\omega_\\chi(\\hat K)$ does not lie in $M$. -/\ndef IsNonvanishingClass (M : Ideal (integralClosure ℤ ℂ)) (B : Set (G → ℂ)) (x : G) :\n    Prop :=\n  ∃ χ ∈ B, ¬ MemIdeal M (centralCharacter χ x)\n\n/-- `D` is a defect group of the block `B` with respect to `M`: `D` is a Sylow $p$-subgroup of the\ncentralizer $C_G(x)$ of an element $x$ whose class is nonvanishing for $B$, and for every element\n$y$ whose class is nonvanishing for $B$, some $G$-conjugate of `D` lies in $C_G(y)$ (that is,\n`D` is contained in a Sylow $p$-subgroup of $C_G(y)$ up to conjugacy). -/\ndef IsDefectGroup (p : ℕ) (M : Ideal (integralClosure ℤ ℂ)) (B : Set (G → ℂ))\n    (D : Subgroup G) : Prop :=\n  (∃ x : G, IsNonvanishingClass M B x ∧ ∃ P : Sylow p (Subgroup.centralizer {x}),\n    D = (P : Subgroup (Subgroup.centralizer {x})).map (Subgroup.centralizer {x}).subtype) ∧\n  ∀ y : G, IsNonvanishingClass M B y → ∃ g : G, D ≤ Subgroup.centralizer {g * y * g⁻¹}\n\n/-- The character $\\chi$ has height $0$ with respect to the defect group `D`: its degree\n$\\chi(1)$ is a natural number $n$ with $\\nu_p(n) + \\nu_p(|D|) = \\nu_p(|G|)$, i.e.\n$\\chi(1)_p |D| = |G|_p$. -/\ndef HasHeightZero (p : ℕ) (D : Subgroup G) (χ : G → ℂ) : Prop :=\n  ∃ n : ℕ, χ 1 = n ∧\n    padicValNat p n + padicValNat p (Nat.card D) = padicValNat p (Nat.card G)\n\n/-- An irreducible character has nonzero degree. -/\n@[category API, AMS 20]\ntheorem IsIrreducibleCharacter.one_ne_zero {χ : G → ℂ} (h : IsIrreducibleCharacter χ) :\n    χ 1 ≠ 0 := by\n  obtain ⟨V, hV, rfl⟩ := h\n  rw [FDRep.char_one]\n  have := Simple.not_isZero V\n  norm_cast\n  intro h0\n  apply this\n  have hsub : Subsingleton V := Module.finrank_zero_iff.mp h0\n  rw [Limits.IsZero.iff_id_eq_zero]\n  ext x\n  exact hsub.elim _ _\n\n/-- The central character value on the class of the identity is $1$. -/\n@[category API, AMS 20]\ntheorem centralCharacter_one (χ : G → ℂ) (hχ : χ 1 ≠ 0) : centralCharacter χ 1 = 1 := by\n  have : Subgroup.centralizer ({1} : Set G) = ⊤ := by\n    rw [Subgroup.centralizer_eq_top_iff_subset]\n    simp\n  simp [centralCharacter, this, hχ]\n\n/-- Every character lies in the same block as itself. -/\n@[category API, AMS 20]\ntheorem sameBlock_refl (M : Ideal (integralClosure ℤ ℂ)) (χ : G → ℂ) : SameBlock M χ χ :=\n  fun _ => ⟨0, M.zero_mem, by simp⟩\n\n/-- The class of the identity is nonvanishing for every block (when $M$ is a proper ideal), so\nevery block has a nonvanishing class and hence a defect group. -/\n@[category API, AMS 20]\ntheorem IsBlock.isNonvanishingClass_one {M : Ideal (integralClosure ℤ ℂ)} (hM : M ≠ ⊤)\n    {B : Set (G → ℂ)} (hB : IsBlock M B) : IsNonvanishingClass M B 1 := by\n  obtain ⟨χ, hχ, rfl⟩ := hB\n  refine ⟨χ, ⟨hχ, sameBlock_refl M χ⟩, ?_⟩\n  rintro ⟨a, haM, ha⟩\n  rw [centralCharacter_one χ hχ.one_ne_zero] at ha\n  apply hM\n  rw [Ideal.eq_top_iff_one]\n  have : a = 1 := Subtype.ext (by simpa using ha)\n  exact this ▸ haM\n\n/--\na) (R. Brauer) For every prime $p$, every finite group $G$ and every $p$-block $B$ of $G$ with\ndefect group $D(B)$, one has $k(B) \\leq |D(B)|$, where $k(B)$ is the number of irreducible\ncomplex characters in $B$.\n\nThe Kourovka Notebook records that this has been proved for $p$-soluble groups by D. Gluck,\nK. Magaard, U. Riese and P. Schmid (*J. Algebra* **279** (2004), 694–719).\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.a :\n    ∀ (p : ℕ), p.Prime → ∀ (G : Type) [Group G] [Finite G]\n      (M : Ideal (integralClosure ℤ ℂ)), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n      ∀ B : Set (G → ℂ), IsBlock M B → ∀ D : Subgroup G, IsDefectGroup p M B D →\n        B.ncard ≤ Nat.card D := by\n  sorry\n\n/--\nb) (J. B. Olsson) For every prime $p$, every finite group $G$ and every $p$-block $B$ of $G$ with\ndefect group $D(B)$, one has $k_0(B) \\leq |D(B) : D(B)'|$, where $k_0(B)$ is the number of\nirreducible complex characters of height $0$ in $B$ and $D(B)'$ is the derived subgroup of\n$D(B)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.b :\n    ∀ (p : ℕ), p.Prime → ∀ (G : Type) [Group G] [Finite G]\n      (M : Ideal (integralClosure ℤ ℂ)), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n      ∀ B : Set (G → ℂ), IsBlock M B → ∀ D : Subgroup G, IsDefectGroup p M B D →\n        {χ ∈ B | HasHeightZero p D χ}.ncard ≤ (commutator D).index := by\n  sorry\n\n/--\nc) (R. Brauer) For every prime $p$, every finite group $G$ and every $p$-block $B$ of $G$ with\ndefect group $D(B)$: $D(B)$ is abelian if and only if $k_0(B) = k(B)$, i.e. if and only if every\nirreducible complex character in $B$ has height $0$.\n\nThis is Brauer's Height Zero Conjecture. The implication \"$D(B)$ abelian\n$\\Rightarrow k_0(B) = k(B)$\" was proved by R. Kessar and G. Malle (2013) and the converse\n\"$k_0(B) = k(B) \\Rightarrow D(B)$ abelian\" by G. Malle, G. Navarro, A. A. Schaeffer Fry and\nP. H. Tiep (2024).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«9.23».parts.c :\n    ∀ (p : ℕ), p.Prime → ∀ (G : Type) [Group G] [Finite G]\n      (M : Ideal (integralClosure ℤ ℂ)), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n      ∀ B : Set (G → ℂ), IsBlock M B → ∀ D : Subgroup G, IsDefectGroup p M B D →\n        (IsMulCommutative D ↔ {χ ∈ B | HasHeightZero p D χ}.ncard = B.ncard) := by\n  sorry\n\nend Kourovka.«9.23»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's reading (three separate conjectures, implicit universal quantifiers over p, G and B; a) and b) open, c) solved) matches the source and was followed. The only remark: the table suggests a formalizer 'may' record the p-soluble special case of a); this was not done as a declaration because neither Mathlib nor the repo has a notion of p-soluble group (it is mentioned in the docstring instead).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Irreducible complex characters are modelled as functions χ : G → ℂ that are the character of some `Simple` object of `FDRep ℂ G` (Mathlib's notion of irreducible representation, used in `FDRep.char_orthonormal`). Because characters determine isomorphism classes, k(B) = Set.ncard B counts irreducible characters correctly. This forces `G : Type` (universe 0), consistent with the other Kourovka files.",
+    "p-blocks are defined à la Navarro (Characters and Blocks of Finite Groups, Ch. 3): χ, ψ lie in the same block iff ω_χ(K̂) ≡ ω_ψ(K̂) mod M for all conjugacy classes K, where ω_χ(K̂) = |G : C_G(g)| χ(g)/χ(1) and M is a maximal ideal of `integralClosure ℤ ℂ` containing p. The theorems are quantified over ALL such M (the literature fixes an arbitrary M, and the partition is in fact M-independent — Galois-conjugate maximal ideals give the same blocks since ω_{χ^σ}(K̂_g) = ω_χ(K̂_{g^k}) — so ∀M is exactly the literature's claim). Membership `MemIdeal M z` is encoded as ∃ a ∈ M, (a : ℂ) = z; the relevant values are algebraic integers by a standard theorem, so this is the intended congruence. Reviewer should confirm they are happy with M as an explicit parameter.",
+    "Defect groups are defined via defect classes (Navarro Ch. 4): D is a defect group of B iff D is (the image in G of) a Sylow p-subgroup of C_G(x) for some x whose class is nonvanishing for B (λ_B(K̂) ≠ 0, i.e. ω_χ(K̂) ∉ M for χ ∈ B), and for every nonvanishing class of y some G-conjugate of D lies in C_G(y) (i.e. D ≤_G δ(L) for all nonvanishing L). By the standard class-multiplication argument the minimal defect groups of nonvanishing classes form one conjugacy class equal to the defect groups of B, so this is equivalent to the textbook definition; the theorems quantify over all such D (all conjugate), so |D|, |D:D'| and commutativity are unambiguous. The identity class is always nonvanishing (proved as an API lemma), so the hypothesis is never vacuous.",
+    "`IsNonvanishingClass` uses ∃ χ ∈ B rather than ∀ χ ∈ B; the two agree for genuine blocks since all χ ∈ B have the same central character modulo M.",
+    "Height zero is defined relative to the defect group as in the source: χ(1)_p |D(B)| = |G|_p, encoded as ∃ n : ℕ, χ 1 = n ∧ padicValNat p n + padicValNat p (Nat.card D) = padicValNat p (Nat.card G) (the ∃ n extracts the natural-number degree from the complex value χ(1)).",
+    "|D(B) : D(B)'| is encoded as `(commutator ↥D).index`, the index of the derived subgroup of D in D; 'D(B) abelian' as `IsMulCommutative ↥D` (as in Kourovka/20_76.lean).",
+    "The remark in a) that the conjecture is proved for p-soluble groups is a status remark; it is recorded in docstrings only and not as a separate declaration, since Mathlib/the repo have no notion of p-soluble (p-separable) group.",
+    "Four small `@[category API]` lemmas with proofs were added as basic tests of the bespoke definitions (nonzero degree of irreducible characters, ω_χ(1̂) = 1, reflexivity of SameBlock, identity class nonvanishing for every block), per CONTRIBUTING's request for API tests of bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FDRep.character, CategoryTheory.Simple, Representation.IsIrreducible (none give a set of irreducible characters as functions).",
+     "name": "Kourovka.«9.23».IsIrreducibleCharacter",
+     "why_needed": "Mathlib has FDRep characters and `Simple` objects but no predicate 'χ : G → ℂ is an irreducible character' and no type/set Irr(G); needed to count characters in a block."
+    },
+    {
+     "closest_existing_considered": "FDRep.character (only the character itself); Subgroup.index of the centralizer for |K|.",
+     "name": "Kourovka.«9.23».centralCharacter",
+     "why_needed": "The central character value ω_χ(K̂) = |K| χ(g)/χ(1) is the basic ingredient of the definition of p-blocks; absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "Ideal membership for elements of the subalgebra (requires a proof of integrality); Ideal.map (not applicable into the field ℂ).",
+     "name": "Kourovka.«9.23».MemIdeal",
+     "why_needed": "Membership of a complex number in an ideal of the ring of algebraic integers `integralClosure ℤ ℂ` (needed to state congruences modulo a maximal ideal over p)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or FormalConjecturesForMathlib (searched for block/defect/Brauer/height).",
+     "name": "Kourovka.«9.23».SameBlock",
+     "why_needed": "The p-block equivalence relation on irreducible characters (agreement of central characters modulo M); Mathlib has no block theory."
+    },
+    {
+     "closest_existing_considered": "None (MulAction blocks in Mathlib are unrelated).",
+     "name": "Kourovka.«9.23».IsBlock",
+     "why_needed": "Predicate 'B is a p-block of G' (an equivalence class of irreducible characters under SameBlock)."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«9.23».IsNonvanishingClass",
+     "why_needed": "λ_B(K̂) ≠ 0, the condition on conjugacy classes used to define defect groups."
+    },
+    {
+     "closest_existing_considered": "Sylow p G (used as a building block for δ(K)); no notion of defect group exists.",
+     "name": "Kourovka.«9.23».IsDefectGroup",
+     "why_needed": "Defect groups of a p-block, needed for |D(B)|, |D(B):D(B)'| and 'D(B) abelian'; absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "padicValNat (used as building block); no notion of height exists.",
+     "name": "Kourovka.«9.23».HasHeightZero",
+     "why_needed": "Height zero characters of a block (χ(1)_p |D(B)| = |G|_p), needed for k_0(B)."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.23».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every prime p, finite group G, maximal ideal M of the algebraic integers containing p, every p-block B (w.r.t. M) and every defect group D of B, B.ncard ≤ Nat.card D. Non-strict bound; universal quantifiers over p, G, B (and M, D, which are auxiliary and well defined up to the standard theorems). Category research open. The p-soluble special case (GMRS 2004) is recorded in the docstring only, since Mathlib has no notion of p-soluble group."
+    },
+    "kourovka.«9.23».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: under the same quantifiers, the number of χ ∈ B of height zero (χ(1)_p·|D| = |G|_p, encoded as ν_p(χ(1)) + ν_p(|D|) = ν_p(|G|)) is ≤ (commutator ↥D).index = |D : D'|. Non-strict bound; research open."
+    },
+    "kourovka.«9.23».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as a single biconditional: IsMulCommutative ↥D ↔ k_0(B) = k(B), for every p, G, M, B and defect group D of B. Tagged research solved (Kessar–Malle 2013 and Malle–Navarro–Schaeffer Fry–Tiep 2024), as the decomposition table requires."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.23».parts.a": "/--\na) (R. Brauer) For every prime $p$, every finite group $G$ and every $p$-block $B$ of $G$ with\ndefect group $D(B)$, one has $k(B) \\leq |D(B)|$, where $k(B)$ is the number of irreducible\ncomplex characters in $B$.\n\nThe Kourovka Notebook records that this has been proved for $p$-soluble groups by D. Gluck,\nK. Magaard, U. Riese and P. Schmid (*J. Algebra* **279** (2004), 694–719).\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.a :\n    ∀ (p : ℕ), p.Prime → ∀ (G : Type) [Group G] [Finite G]\n      (M : Ideal (integralClosure ℤ ℂ)), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n      ∀ B : Set (G → ℂ), IsBlock M B → ∀ D : Subgroup G, IsDefectGroup p M B D →\n        B.ncard ≤ Nat.card D := by\n  sorry",
+    "kourovka.«9.23».parts.b": "/--\nb) (J. B. Olsson) For every prime $p$, every finite group $G$ and every $p$-block $B$ of $G$ with\ndefect group $D(B)$, one has $k_0(B) \\leq |D(B) : D(B)'|$, where $k_0(B)$ is the number of\nirreducible complex characters of height $0$ in $B$ and $D(B)'$ is the derived subgroup of\n$D(B)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.b :\n    ∀ (p : ℕ), p.Prime → ∀ (G : Type) [Group G] [Finite G]\n      (M : Ideal (integralClosure ℤ ℂ)), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n      ∀ B : Set (G → ℂ), IsBlock M B → ∀ D : Subgroup G, IsDefectGroup p M B D →\n        {χ ∈ B | HasHeightZero p D χ}.ncard ≤ (commutator D).index := by\n  sorry",
+    "kourovka.«9.23».parts.c": "/--\nc) (R. Brauer) For every prime $p$, every finite group $G$ and every $p$-block $B$ of $G$ with\ndefect group $D(B)$: $D(B)$ is abelian if and only if $k_0(B) = k(B)$, i.e. if and only if every\nirreducible complex character in $B$ has height $0$.\n\nThis is Brauer's Height Zero Conjecture. The implication \"$D(B)$ abelian\n$\\Rightarrow k_0(B) = k(B)$\" was proved by R. Kessar and G. Malle (2013) and the converse\n\"$k_0(B) = k(B) \\Rightarrow D(B)$ abelian\" by G. Malle, G. Navarro, A. A. Schaeffer Fry and\nP. H. Tiep (2024).\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«9.23».parts.c :\n    ∀ (p : ℕ), p.Prime → ∀ (G : Type) [Group G] [Finite G]\n      (M : Ideal (integralClosure ℤ ℂ)), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n      ∀ B : Set (G → ℂ), IsBlock M B → ∀ D : Subgroup G, IsDefectGroup p M B D →\n        (IsMulCommutative D ↔ {χ ∈ B | HasHeightZero p D χ}.ncard = B.ncard) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.23\n\nby V. D. Mazurov\n\nLet $G$ be a finite group, $B$ a block of characters of $G$, $D(B)$ its defect group and\n$k(B)$ (respectively, $k_0(B)$) the number of all irreducible complex characters (of height $0$)\nlying in $B$. *Conjectures:*\n\na) (R. Brauer) $k(B) \\leq |D(B)|$; this has been proved for $p$-soluble groups (D. Gluck,\nK. Magaard, U. Riese, P. Schmid, *J. Algebra* **279** (2004), 694–719);\n\nb) (J. B. Olsson) $k_0(B) \\leq |D(B) : D(B)'|$, where $D(B)'$ is the derived subgroup of $D(B)$;\n\nc) (R. Brauer) $D(B)$ is abelian if and only if $k_0(B) = k(B)$.\n\nPart c) is Brauer's Height Zero Conjecture. It is now a theorem: the direction\n\"$D(B)$ abelian $\\Rightarrow$ $k_0(B) = k(B)$\" was proved by Kessar and Malle (2013), and the\nconverse by Malle, Navarro, Schaeffer Fry and Tiep (2024). Parts a) and b) are open.\n\n## Formalisation\n\nMathlib has no block theory, so this file sets up Brauer's character-theoretic definitions.\nThroughout, $p$ is a prime, $\\mathbb{A}$ is the ring of all algebraic integers in $\\mathbb{C}$\n(`integralClosure ℤ ℂ`) and $M$ is a maximal ideal of $\\mathbb{A}$ containing $p$, so that\n$\\mathbb{A}/M$ is an algebraically closed field of characteristic $p$.\n\n* For an irreducible character $\\chi$ and $x \\in G$ with conjugacy class $K$, the central\n  character value is $\\omega_\\chi(\\hat K) = |K| \\chi(x)/\\chi(1) = |G : C_G(x)| \\chi(x)/\\chi(1)$,\n  an algebraic integer.\n* Two irreducible characters $\\chi, \\psi$ lie in the same $p$-block iff\n  $\\omega_\\chi(\\hat K) \\equiv \\omega_\\psi(\\hat K) \\pmod M$ for every conjugacy class $K$.\n  The $p$-blocks are the equivalence classes of $\\mathrm{Irr}(G)$ for this relation\n  (Isaacs, *Character theory of finite groups*, Ch. 15; Navarro, *Characters and blocks of finite\n  groups*, Ch. 3). The resulting partition does not depend on the choice of $M$; the statements\n  below quantify over all admissible $M$ anyway.\n* Each block $B$ has a central character $\\lambda_B : Z(\\mathbb{A}G/MG) \\to \\mathbb{A}/M$ with\n  $\\lambda_B(\\hat K) = \\omega_\\chi(\\hat K) \\bmod M$ for any $\\chi \\in B$. The defect groups of a\n  conjugacy class $K = x^G$ are the Sylow $p$-subgroups $\\delta(K)$ of $C_G(x)$. By Brauer's\n  min–max theorem, the defect groups of $B$ are exactly the groups $\\delta(K)$ of smallest order\n  among the classes $K$ with $\\lambda_B(\\hat K) \\neq 0$ (equivalently, the minimal ones under\n  inclusion); they form a single conjugacy class of $p$-subgroups of $G$. We take this\n  characterisation as the definition of a defect group $D(B)$.\n* If $|G|_p = p^a$ and $|D(B)| = p^d$, every $\\chi \\in B$ has $\\chi(1)_p = p^{a - d + h}$ for an\n  integer $h \\geq 0$, the *height* of $\\chi$. Height zero thus means $\\chi(1)_p |D(B)| = |G|_p$.\n\nSince all defect groups of $B$ are conjugate, $|D(B)|$, $|D(B) : D(B)'|$ and whether $D(B)$ is\nabelian are well defined, and the statements below quantify over every defect group of $B$.\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 9.23.\n* D. Gluck, K. Magaard, U. Riese, P. Schmid, *The solution of the k(GV)-problem*,\n  [J. Algebra 279 (2004), 694–719](https://doi.org/10.1016/j.jalgebra.2004.02.027).\n* R. Kessar, G. Malle, *Quasi-isolated blocks and Brauer's height zero conjecture*,\n  [Ann. of Math. 178 (2013), 321–384](https://doi.org/10.4007/annals.2013.178.1.6).\n* G. Malle, G. Navarro, A. A. Schaeffer Fry, P. H. Tiep, *Brauer's Height Zero Conjecture*,\n  [Ann. of Math. 200 (2024), 557–608](https://doi.org/10.4007/annals.2024.200.2.4).\n-/\n\nopen CategoryTheory\n\nnamespace Kourovka.«9.23»\n\nvariable {G : Type} [Group G]\n\n/-- A function `χ : G → ℂ` is an irreducible (complex) character of `G` if it is the character\nof a simple, i.e. irreducible, finite-dimensional complex representation of `G`. -/\ndef IsIrreducibleCharacter (χ : G → ℂ) : Prop :=\n  ∃ V : FDRep ℂ G, Simple V ∧ V.character = χ\n\n/-- The central character value $\\omega_\\chi(\\hat K) = |K| \\chi(x) / \\chi(1)$ of `χ` at the\nconjugacy class $K$ of `x`, where $|K| = |G : C_G(x)|$. For an irreducible character `χ` this is\nan algebraic integer. -/\nnoncomputable def centralCharacter (χ : G → ℂ) (x : G) : ℂ :=\n  ((Subgroup.centralizer {x}).index : ℂ) * χ x / χ 1\n\nvariable (M : Ideal (integralClosure ℤ ℂ))\n\n/-- `χ` and `ψ` lie in the same block (with respect to the maximal ideal `M` of the algebraic\nintegers): $\\omega_\\chi(\\hat K) \\equiv \\omega_\\psi(\\hat K) \\pmod M$ for every conjugacy class\n$K$ of `G`. -/\ndef SameBlock (χ ψ : G → ℂ) : Prop :=\n  ∀ x : G, ∃ r ∈ M, (r : ℂ) = centralCharacter χ x - centralCharacter ψ x\n\n/-- `B` is a block of characters of `G` (a $p$-block, where $p$ is the prime in `M`): an\nequivalence class of irreducible characters of `G` under `SameBlock M`. -/\ndef IsBlock (B : Set (G → ℂ)) : Prop :=\n  ∃ χ, IsIrreducibleCharacter χ ∧ B = {ψ | IsIrreducibleCharacter ψ ∧ SameBlock M χ ψ}\n\n/-- The central character $\\lambda_B$ of the block `B` does not vanish on the class sum of the\nconjugacy class of `x`: for every `χ ∈ B`, the algebraic integer $\\omega_\\chi(\\hat K)$ is not\nin `M`. -/\ndef CentralCharacterNeZero (B : Set (G → ℂ)) (x : G) : Prop :=\n  ∀ χ ∈ B, ∃ r : integralClosure ℤ ℂ, r ∉ M ∧ (r : ℂ) = centralCharacter χ x\n\n/-- `D` is a defect group of the conjugacy class of `x`: a Sylow `p`-subgroup of the\ncentraliser $C_G(x)$, regarded as a subgroup of `G`. -/\ndef IsDefectGroupOfClass (p : ℕ) (x : G) (D : Subgroup G) : Prop :=\n  ∃ P : Sylow p (Subgroup.centralizer {x}),\n    D = (P : Subgroup (Subgroup.centralizer {x})).map (Subgroup.centralizer {x}).subtype\n\n/-- `D` is a defect group of the block `B`: a defect group of a conjugacy class $K$ with\n$\\lambda_B(\\hat K) \\neq 0$, of smallest order among all such defect groups (Brauer's min–max\ntheorem). The trivial class always satisfies $\\lambda_B(\\hat 1) = 1 \\neq 0$, so defect groups\nexist, and they form a single conjugacy class of $p$-subgroups of `G`. -/\ndef IsDefectGroup (p : ℕ) (B : Set (G → ℂ)) (D : Subgroup G) : Prop :=\n  (∃ x : G, CentralCharacterNeZero M B x ∧ IsDefectGroupOfClass p x D) ∧\n    ∀ (y : G) (Q : Subgroup G), CentralCharacterNeZero M B y → IsDefectGroupOfClass p y Q →\n      Nat.card D ≤ Nat.card Q\n\n/-- The character `χ` has height zero with respect to the prime `p` and the defect group `D` of\nits block: $\\chi(1)_p \\cdot |D| = |G|_p$, i.e. $\\nu_p(\\chi(1)) + \\nu_p(|D|) = \\nu_p(|G|)$. -/\ndef HasHeightZero (p : ℕ) (D : Subgroup G) (χ : G → ℂ) : Prop :=\n  ∃ n : ℕ, χ 1 = n ∧\n    padicValNat p n + padicValNat p (Nat.card D) = padicValNat p (Nat.card G)\n\n/-- `SameBlock M` is reflexive. -/\n@[category API, AMS 20]\ntheorem sameBlock_refl (χ : G → ℂ) : SameBlock M χ χ :=\n  fun _ => ⟨0, M.zero_mem, by simp⟩\n\nvariable {M} in\n/-- `SameBlock M` is symmetric. -/\n@[category API, AMS 20]\ntheorem SameBlock.symm {χ ψ : G → ℂ} (h : SameBlock M χ ψ) : SameBlock M ψ χ := by\n  intro x\n  obtain ⟨r, hr, hrx⟩ := h x\n  exact ⟨-r, M.neg_mem hr, by rw [Subalgebra.coe_neg, hrx]; ring⟩\n\n/-- The central character value at the identity is $\\omega_\\chi(\\hat 1) = 1$. -/\n@[category API, AMS 20]\ntheorem centralCharacter_one {χ : G → ℂ} (hχ : χ 1 ≠ 0) : centralCharacter χ 1 = 1 := by\n  have h : Subgroup.centralizer ({1} : Set G) = ⊤ :=\n    eq_top_iff.mpr fun g _ => by simp [Subgroup.mem_centralizer_iff]\n  simp [centralCharacter, h, Subgroup.index_top, hχ]\n\n/--\nLet $G$ be a finite group, $B$ a block of characters of $G$ (a $p$-block for a prime $p$),\n$D(B)$ its defect group and $k(B)$ the number of irreducible complex characters lying in $B$.\nBrauer's $k(B)$-conjecture: $k(B) \\leq |D(B)|$. (The notebook records that this has been proved\nfor $p$-soluble groups by Gluck, Magaard, Riese and Schmid, 2004.)\n\nHere $p$ ranges over all primes, $M$ over all maximal ideals of the algebraic integers containing\n$p$ (this fixes the reduction modulo $p$ used to define blocks), $G$ over all finite groups, $B$\nover all $p$-blocks of $G$ and $D$ over all defect groups of $B$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.a :\n    ∀ (p : ℕ), p.Prime →\n    ∀ M : Ideal (integralClosure ℤ ℂ), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n    ∀ (G : Type) [Group G] [Finite G] (B : Set (G → ℂ)) (D : Subgroup G),\n      IsBlock M B → IsDefectGroup M p B D → Nat.card B ≤ Nat.card D := by\n  sorry\n\n/--\nLet $G$ be a finite group, $B$ a block of characters of $G$ (a $p$-block for a prime $p$),\n$D(B)$ its defect group and $k_0(B)$ the number of irreducible complex characters of height $0$\nlying in $B$. Olsson's conjecture: $k_0(B) \\leq |D(B) : D(B)'|$, where $D(B)'$ is the derived\nsubgroup of $D(B)$.\n\nHere $p$ ranges over all primes, $M$ over all maximal ideals of the algebraic integers containing\n$p$, $G$ over all finite groups, $B$ over all $p$-blocks of $G$ and $D$ over all defect groups\nof $B$; a character $\\chi \\in B$ has height $0$ when $\\chi(1)_p |D| = |G|_p$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.b :\n    ∀ (p : ℕ), p.Prime →\n    ∀ M : Ideal (integralClosure ℤ ℂ), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n    ∀ (G : Type) [Group G] [Finite G] (B : Set (G → ℂ)) (D : Subgroup G),\n      IsBlock M B → IsDefectGroup M p B D →\n        Nat.card {χ ∈ B | HasHeightZero p D χ} ≤ (commutator D).index := by\n  sorry\n\n/--\nLet $G$ be a finite group, $B$ a block of characters of $G$ (a $p$-block for a prime $p$),\n$D(B)$ its defect group and $k(B)$ (respectively, $k_0(B)$) the number of irreducible complex\ncharacters (of height $0$) lying in $B$. Brauer's Height Zero Conjecture: $D(B)$ is abelian if\nand only if $k_0(B) = k(B)$.\n\nHere $p$ ranges over all primes, $M$ over all maximal ideals of the algebraic integers containing\n$p$, $G$ over all finite groups, $B$ over all $p$-blocks of $G$ and $D$ over all defect groups\nof $B$. This is now a theorem of Kessar–Malle (2013, \"if\") and\nMalle–Navarro–Schaeffer Fry–Tiep (2024, \"only if\").\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«9.23».parts.c :\n    ∀ (p : ℕ), p.Prime →\n    ∀ M : Ideal (integralClosure ℤ ℂ), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n    ∀ (G : Type) [Group G] [Finite G] (B : Set (G → ℂ)) (D : Subgroup G),\n      IsBlock M B → IsDefectGroup M p B D →\n        (IsMulCommutative D ↔ Nat.card {χ ∈ B | HasHeightZero p D χ} = Nat.card B) := by\n  sorry\n\nend Kourovka.«9.23»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's three slots match the three conjectures; the Gluck–Magaard–Riese–Schmid clause is correctly treated as a status remark. I did not add a separate research-solved p-soluble variant because Mathlib has no notion of p-solvability and the notes make it optional; it is mentioned in the docstrings.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Blocks are defined character-theoretically à la Brauer/Isaacs (Ch. 15)/Navarro (Ch. 3): fix a maximal ideal M of the ring of all algebraic integers `integralClosure ℤ ℂ` with p ∈ M; χ, ψ ∈ Irr(G) are in the same block iff ω_χ(K̂) − ω_ψ(K̂) ∈ M for every class K, with ω_χ(K̂) = |G:C_G(x)|·χ(x)/χ(1). The statements quantify over all such M. (The partition is in fact independent of M: the block idempotent coefficients (1/|G|)Σ_{χ∈B}χ(1)χ(x⁻¹) = (1/|G|)Σ_T Φ_T(1)φ_T(x⁻¹) are p-integral at every prime over p since |G|_p | Φ_T(1); either way, quantifying over M is faithful.)",
+    "Congruences use the idiom `∃ r ∈ M, (r : ℂ) = a − b` and `∃ r ∉ M, (r : ℂ) = ω_χ(x)`, which relies on the standard theorem that central character values ω_χ(K̂) are algebraic integers; a reviewer should confirm they are happy with this encoding.",
+    "Defect group of B is defined via Brauer's min–max theorem: D is a Sylow p-subgroup of C_G(x) (image of a Mathlib `Sylow p (centralizer {x})` under the subtype map) for some x with λ_B(x̂) ≠ 0 (i.e. ω_χ(x̂) ∉ M for χ ∈ B), of minimal order among all such. This is equivalent to the textbook definitions (defect classes / minimal D with e_B ∈ (kG)^G_D) but is not literally one of them; it never degenerates because the class of 1 always has λ_B(1̂) = 1.",
+    "Height zero is defined literally as χ(1)_p·|D| = |G|_p via `padicValNat p n + padicValNat p (Nat.card D) = padicValNat p (Nat.card G)` with `χ 1 = (n : ℂ)` (following the table notes), rather than via minimality of ν_p(χ(1)) within B.",
+    "Irreducible characters are functions `G → ℂ` of the form `V.character` for a `Simple V : FDRep ℂ G`; k(B) and k_0(B) are `Nat.card` of the corresponding sets of functions (distinct simple representations have distinct characters, so this counts irreducible characters). Because `FDRep` needs the group and the field in the same universe, G is quantified over `Type`.",
+    "|D(B):D(B)'| is formalised as `(commutator ↥D).index`, and 'D(B) abelian' as `IsMulCommutative ↥D`.",
+    "Category tags: a) and b) `research open`; c) `research solved` as instructed. Three short proved `category API` lemmas (reflexivity/symmetry of SameBlock, ω_χ(1̂) = 1) are included as basic sanity tests of the definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FDRep.character together with CategoryTheory.Simple (used to define it)",
+     "name": "Kourovka.«9.23».IsIrreducibleCharacter",
+     "why_needed": "Mathlib has `FDRep.character` and `CategoryTheory.Simple` but no predicate 'χ is an irreducible character of G' on functions G → ℂ, which is needed to form blocks as sets of characters."
+    },
+    {
+     "closest_existing_considered": "Subgroup.centralizer / Subgroup.index (used for |K| = |G : C_G(x)|); nothing for ω_χ itself",
+     "name": "Kourovka.«9.23».centralCharacter",
+     "why_needed": "The central character values ω_χ(K̂) = |K|χ(x)/χ(1) are the basis of Brauer's definition of p-blocks; Mathlib has no central characters."
+    },
+    {
+     "closest_existing_considered": "Ideal.Quotient / Ideal membership on integralClosure ℤ ℂ (used inside the definition)",
+     "name": "Kourovka.«9.23».SameBlock",
+     "why_needed": "Brauer's relation ω_χ ≡ ω_ψ (mod M) defining p-blocks; absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "None (searched for block/defect/Brauer in Mathlib and the repo)",
+     "name": "Kourovka.«9.23».IsBlock",
+     "why_needed": "The notion of a p-block of characters of a finite group is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "None",
+     "name": "Kourovka.«9.23».CentralCharacterNeZero",
+     "why_needed": "Expresses λ_B(K̂) ≠ 0, the condition selecting the classes whose defect groups contain a defect group of B (needed for the min–max characterisation of D(B))."
+    },
+    {
+     "closest_existing_considered": "Sylow p ↥(Subgroup.centralizer {x}) with Subgroup.map (used to define it)",
+     "name": "Kourovka.«9.23».IsDefectGroupOfClass",
+     "why_needed": "Defect group δ(K) of a conjugacy class: a Sylow p-subgroup of C_G(x), as a subgroup of G. Mathlib's `Sylow p H` is for a group H, not for 'Sylow subgroup of a subgroup of G, viewed in G'."
+    },
+    {
+     "closest_existing_considered": "None",
+     "name": "Kourovka.«9.23».IsDefectGroup",
+     "why_needed": "Defect groups of a block are absent from Mathlib; defined via Brauer's min–max theorem."
+    },
+    {
+     "closest_existing_considered": "padicValNat (used to define it)",
+     "name": "Kourovka.«9.23».HasHeightZero",
+     "why_needed": "Heights of irreducible characters in a block are absent from Mathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.23».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every prime p, every maximal ideal M of the algebraic integers containing p, every finite group G, every p-block B (equivalence class of Irr(G) under Brauer's congruence ω_χ ≡ ω_ψ mod M) and every defect group D of B, Nat.card B ≤ Nat.card D. Non-strict bound; all defect groups are conjugate so |D(B)| is well defined. The p-soluble status remark is recorded in the docstrings only (Mathlib has no p-solvability)."
+    },
+    "kourovka.«9.23».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same quantifiers; k_0(B) is Nat.card of the characters χ ∈ B with ν_p(χ(1)) + ν_p(|D|) = ν_p(|G|) (χ(1)_p = |G|_p/|D(B)|, as in the table notes), and |D(B):D(B)'| is (commutator ↥D).index. Non-strict bound."
+    },
+    "kourovka.«9.23».parts.c": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same quantifiers; single biconditional IsMulCommutative ↥D ↔ k_0(B) = k(B), tagged `category research solved` per the table notes (Kessar–Malle 2013; Malle–Navarro–Schaeffer Fry–Tiep 2024)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.23».parts.a": "/--\nLet $G$ be a finite group, $B$ a block of characters of $G$ (a $p$-block for a prime $p$),\n$D(B)$ its defect group and $k(B)$ the number of irreducible complex characters lying in $B$.\nBrauer's $k(B)$-conjecture: $k(B) \\leq |D(B)|$. (The notebook records that this has been proved\nfor $p$-soluble groups by Gluck, Magaard, Riese and Schmid, 2004.)\n\nHere $p$ ranges over all primes, $M$ over all maximal ideals of the algebraic integers containing\n$p$ (this fixes the reduction modulo $p$ used to define blocks), $G$ over all finite groups, $B$\nover all $p$-blocks of $G$ and $D$ over all defect groups of $B$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.a :\n    ∀ (p : ℕ), p.Prime →\n    ∀ M : Ideal (integralClosure ℤ ℂ), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n    ∀ (G : Type) [Group G] [Finite G] (B : Set (G → ℂ)) (D : Subgroup G),\n      IsBlock M B → IsDefectGroup M p B D → Nat.card B ≤ Nat.card D := by\n  sorry",
+    "kourovka.«9.23».parts.b": "/--\nLet $G$ be a finite group, $B$ a block of characters of $G$ (a $p$-block for a prime $p$),\n$D(B)$ its defect group and $k_0(B)$ the number of irreducible complex characters of height $0$\nlying in $B$. Olsson's conjecture: $k_0(B) \\leq |D(B) : D(B)'|$, where $D(B)'$ is the derived\nsubgroup of $D(B)$.\n\nHere $p$ ranges over all primes, $M$ over all maximal ideals of the algebraic integers containing\n$p$, $G$ over all finite groups, $B$ over all $p$-blocks of $G$ and $D$ over all defect groups\nof $B$; a character $\\chi \\in B$ has height $0$ when $\\chi(1)_p |D| = |G|_p$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.23».parts.b :\n    ∀ (p : ℕ), p.Prime →\n    ∀ M : Ideal (integralClosure ℤ ℂ), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n    ∀ (G : Type) [Group G] [Finite G] (B : Set (G → ℂ)) (D : Subgroup G),\n      IsBlock M B → IsDefectGroup M p B D →\n        Nat.card {χ ∈ B | HasHeightZero p D χ} ≤ (commutator D).index := by\n  sorry",
+    "kourovka.«9.23».parts.c": "/--\nLet $G$ be a finite group, $B$ a block of characters of $G$ (a $p$-block for a prime $p$),\n$D(B)$ its defect group and $k(B)$ (respectively, $k_0(B)$) the number of irreducible complex\ncharacters (of height $0$) lying in $B$. Brauer's Height Zero Conjecture: $D(B)$ is abelian if\nand only if $k_0(B) = k(B)$.\n\nHere $p$ ranges over all primes, $M$ over all maximal ideals of the algebraic integers containing\n$p$, $G$ over all finite groups, $B$ over all $p$-blocks of $G$ and $D$ over all defect groups\nof $B$. This is now a theorem of Kessar–Malle (2013, \"if\") and\nMalle–Navarro–Schaeffer Fry–Tiep (2024, \"only if\").\n-/\n@[category research solved, AMS 20]\ntheorem kourovka.«9.23».parts.c :\n    ∀ (p : ℕ), p.Prime →\n    ∀ M : Ideal (integralClosure ℤ ℂ), M.IsMaximal → (p : integralClosure ℤ ℂ) ∈ M →\n    ∀ (G : Type) [Group G] [Finite G] (B : Set (G → ℂ)) (D : Subgroup G),\n      IsBlock M B → IsDefectGroup M p B D →\n        (IsMulCommutative D ↔ Nat.card {χ ∈ B | HasHeightZero p D χ} = Nat.card B) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«9.23».parts.a": "c08",
+  "kourovka.«9.23».parts.b": "c08",
+  "kourovka.«9.23».parts.c": "c08"
+ },
+ "id": "kourovka-9.23",
+ "main_attempt": "c08"
+}

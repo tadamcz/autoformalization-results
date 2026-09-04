@@ -10,7 +10,7 @@ export function TopBar({ children }: { children?: React.ReactNode }) {
           {SITE_NAME}
         </Link>
         <span className="topbar-desc">
-          Lean 4 statements of Wikipedia's unsolved problems, written by an automated pipeline. Drafts for review.
+          Lean 4 statements of open problems from Wikipedia's list and the Kourovka Notebook, written by an automated pipeline. Drafts for review.
         </span>
         <nav className="topbar-nav">
           {children}

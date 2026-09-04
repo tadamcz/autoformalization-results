@@ -1,0 +1,472 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.45\n\nby B. I. Plotkin\n\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent\ntorsion-free group $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\nHere a *radical* is understood in the sense of Kurosh (and Plotkin): a class\n$\\mathfrak{X}$ of groups is a radical class if it is closed under homomorphic images,\nevery group $G$ has a largest normal $\\mathfrak{X}$-subgroup $\\mathfrak{X}(G)$ (the\n$\\mathfrak{X}$-radical of $G$), and $\\mathfrak{X}(G / \\mathfrak{X}(G)) = 1$.\nThe radical is *hereditary* if $\\mathfrak{X}$ is closed under taking subgroups\n(equivalently, $H \\cap \\mathfrak{X}(G) \\leq \\mathfrak{X}(H)$ for every subgroup\n$H \\leq G$). A subgroup $H$ of $G$ is *isolated* if $g^n \\in H$ for some $n \\geq 1$\nimplies $g \\in H$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nuniverse u\n\nnamespace Kourovka.«3.45»\n\n/-- A class of groups, i.e. a predicate on groups (in a fixed universe). -/\nabbrev GroupClass : Type (u + 1) := ∀ (G : Type u) [Group G], Prop\n\nvariable (𝔛 : GroupClass.{u})\n\n/-- The $\\mathfrak{X}$-radical $\\mathfrak{X}(G)$ of a group $G$: the join of all normal\nsubgroups of $G$ that belong to the class $\\mathfrak{X}$. -/\ndef GroupClass.radical (G : Type u) [Group G] : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ 𝔛 N}\n\n/-- The $\\mathfrak{X}$-radical is a normal subgroup, being a join of normal subgroups. -/\n@[category API, AMS 20]\ninstance GroupClass.radical_normal (G : Type u) [Group G] : (𝔛.radical G).Normal := by\n  have h : 𝔛.radical G = (𝔛.radical G).normalCore :=\n    le_antisymm\n      (sSup_le fun N hN => (Subgroup.normal_le_normalCore (hN := hN.1)).mpr (le_sSup hN))\n      (Subgroup.normalCore_le _)\n  rw [h]\n  exact Subgroup.normalCore_normal _\n\n/-- A class $\\mathfrak{X}$ of groups is a *radical class* (a radical in the sense of\nKurosh and Plotkin) if\n* $\\mathfrak{X}$ is closed under homomorphic images,\n* for every group $G$, the join $\\mathfrak{X}(G)$ of all normal $\\mathfrak{X}$-subgroups\n  of $G$ again belongs to $\\mathfrak{X}$ (so $\\mathfrak{X}(G)$ is the largest normal\n  $\\mathfrak{X}$-subgroup of $G$), and\n* $\\mathfrak{X}(G / \\mathfrak{X}(G)) = 1$ for every group $G$. -/\nstructure GroupClass.IsRadical : Prop where\n  /-- `𝔛` is closed under homomorphic images. -/\n  of_surjective : ∀ {G H : Type u} [Group G] [Group H] (f : G →* H),\n    Function.Surjective f → 𝔛 G → 𝔛 H\n  /-- The `𝔛`-radical of any group belongs to `𝔛`. -/\n  radical_mem : ∀ (G : Type u) [Group G], 𝔛 (𝔛.radical G)\n  /-- The quotient of a group by its `𝔛`-radical has trivial `𝔛`-radical. -/\n  radical_quotient : ∀ (G : Type u) [Group G], 𝔛.radical (G ⧸ 𝔛.radical G) = ⊥\n\n/-- A class $\\mathfrak{X}$ of groups is *hereditary* if it is closed under taking\nsubgroups. -/\ndef GroupClass.IsHereditary : Prop :=\n  ∀ (G : Type u) [Group G] (H : Subgroup G), 𝔛 G → 𝔛 H\n\n/-- A group is *locally nilpotent* if all its finitely generated subgroups are nilpotent. -/\ndef IsLocallyNilpotent (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/-- A subgroup $H$ of a group $G$ is *isolated* if $g^n \\in H$ for some $n \\geq 1$\nimplies $g \\in H$. -/\ndef IsIsolated {G : Type*} [Group G] (H : Subgroup G) : Prop :=\n  ∀ (g : G) (n : ℕ), 0 < n → g ^ n ∈ H → g ∈ H\n\n/-- The whole group is an isolated subgroup of itself. -/\n@[category test, AMS 20]\ntheorem isIsolated_top (G : Type*) [Group G] : IsIsolated (⊤ : Subgroup G) :=\n  fun _ _ _ _ => Subgroup.mem_top _\n\n/-- In a torsion-free group the trivial subgroup is isolated. -/\n@[category test, AMS 20]\ntheorem isIsolated_bot (G : Type*) [Group G] [IsMulTorsionFree G] :\n    IsIsolated (⊥ : Subgroup G) := fun g n hn hg => by\n  rw [Subgroup.mem_bot] at hg ⊢\n  exact (pow_eq_one_iff_left hn.ne').mp hg\n\n/--\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent\ntorsion-free group $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\nHere $\\mathfrak{X}$ ranges over all hereditary radical classes of groups (in the sense\nof Kurosh and Plotkin), $\\mathfrak{X}(G)$ is the $\\mathfrak{X}$-radical of $G$, i.e. the\nlargest normal $\\mathfrak{X}$-subgroup of $G$, and \"isolated\" means that\n$g^n \\in \\mathfrak{X}(G)$ with $n \\geq 1$ implies $g \\in \\mathfrak{X}(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : GroupClass.{u}), 𝔛.IsRadical → 𝔛.IsHereditary →\n      ∀ (G : Type u) [Group G], IsLocallyNilpotent G → IsMulTorsionFree G →\n        IsIsolated (𝔛.radical G) := by\n  sorry\n\nend Kourovka.«3.45»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot decomposition is correct; the notes' choice of 'radical' (Kurosh–Amitsur radical class) and 'hereditary' (closed under subgroups) is one of two plausible readings of Plotkin's terminology (the other being Plotkin's broader function-based 'radical' with only the functoriality axiom), and I followed the table.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Radical' is modeled as a Kurosh–Amitsur radical class (as the decomposition table specifies): closed under surjective homomorphic images; the join 𝔛(G) of all normal 𝔛-subgroups belongs to 𝔛; and 𝔛(G/𝔛(G)) = ⊥. Plotkin's papers also use a broader function-based notion ('radical' = subfunctor of the identity with 𝔛(G)φ ⊆ 𝔛(Gφ), possibly with 𝔛(G/𝔛(G)) = 1 but without the maximality of 𝔛(G) among normal 𝔛-subgroups); that reading would quantify over a strictly larger family of 𝔛 and is not what is formalized here.",
+    "'Hereditary' is modeled as the class being closed under all subgroups (per the decomposition table); given the radical axioms this is equivalent to H ∩ 𝔛(G) ≤ 𝔛(H) for every subgroup H ≤ G. The ring-theoretic analogue 'closed under normal subgroups' is a different (weaker) condition and is not used.",
+    "The 𝔛-radical is defined as `sSup {N : Subgroup G | N.Normal ∧ 𝔛 N}`; axiom `radical_mem` (this join lies in 𝔛) is equivalent to Kurosh's 'G has a largest normal 𝔛-subgroup' because 𝔛 is isomorphism-closed (it is closed under homomorphic images).",
+    "Groups and the class 𝔛 live in a single arbitrary universe `Type u`; the theorem is universe polymorphic (precedent: ErdosProblems/74.lean). Other Kourovka files use `Type`.",
+    "Torsion-free is Mathlib's `IsMulTorsionFree G` (n-th power map injective for n ≠ 0), which for groups is equivalent to having no nontrivial elements of finite order.",
+    "Locally nilpotent is 'every finitely generated subgroup (`Subgroup.FG`) is nilpotent (`Group.IsNilpotent`)'.",
+    "Isolated uses natural exponents with `0 < n`; equivalent to the integer-exponent version with n ≠ 0.",
+    "Sanity: the class of all groups and the class of trivial groups are both hereditary radical classes, with 𝔛(G) = ⊤ resp. ⊥, both isolated in torsion-free groups, so the hypotheses are satisfiable and the statement is not vacuous. Two `category test` lemmas (`isIsolated_top`, `isIsolated_bot`) check the `IsIsolated` definition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Set Grp.{u}` (category-theoretic bundled groups) — heavier and less convenient than a predicate `∀ (G : Type u) [Group G], Prop`.",
+     "name": "Kourovka.«3.45».GroupClass",
+     "why_needed": "A 'class of groups' (predicate on all groups in a fixed universe) is needed to talk about radical classes; no such notion exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "Ring-theoretic radicals (`Ideal.radical`, `Ring.jacobson`, Köthe radical in FormalConjectures/Wikipedia/Koethe.lean) — all ring-specific; Mathlib has no group-radical notion (only specific subgroups like `center`, `upperCentralSeries`, `commutator`).",
+     "name": "Kourovka.«3.45».GroupClass.radical",
+     "why_needed": "The 𝔛-radical 𝔛(G) := join (sSup) of all normal subgroups of G lying in 𝔛; this is the subgroup the problem asks about."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.sup_normal` (only binary joins), `Subgroup.normalCore_eq_iSup`.",
+     "name": "Kourovka.«3.45».GroupClass.radical_normal (instance)",
+     "why_needed": "Normality of the 𝔛-radical is needed to form the quotient G ⧸ 𝔛(G) in the third radical axiom; proved via `Subgroup.normalCore` (a join of normal subgroups is normal). Mathlib has no `Normal` instance for `sSup` of normal subgroups."
+    },
+    {
+     "closest_existing_considered": "No Mathlib/repo notion of radical class or radical property for groups or rings.",
+     "name": "Kourovka.«3.45».GroupClass.IsRadical",
+     "why_needed": "Kurosh–Amitsur radical class for groups: closed under homomorphic images; the join 𝔛(G) of all normal 𝔛-subgroups is in 𝔛 (i.e. is the largest normal 𝔛-subgroup); 𝔛(G/𝔛(G)) = 1."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "Kourovka.«3.45».GroupClass.IsHereditary",
+     "why_needed": "Hereditary = class closed under taking subgroups (equivalently, given the radical axioms, H ∩ 𝔛(G) ≤ 𝔛(H) for all H ≤ G)."
+    },
+    {
+     "closest_existing_considered": "`Group.IsNilpotent`, `Subgroup.FG` (used as building blocks).",
+     "name": "Kourovka.«3.45».IsLocallyNilpotent",
+     "why_needed": "Locally nilpotent group: every finitely generated subgroup is nilpotent. Not in Mathlib (only `Group.IsNilpotent`)."
+    },
+    {
+     "closest_existing_considered": "Nothing relevant; `Subgroup.cyclic_of_isolated_one` in Mathlib is unrelated (ordered groups).",
+     "name": "Kourovka.«3.45».IsIsolated",
+     "why_needed": "Isolated subgroup: g^n ∈ H with n ≥ 1 implies g ∈ H (Kurosh/Mal'cev terminology). Not in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.45»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ 𝔛 : GroupClass, 𝔛.IsRadical → 𝔛.IsHereditary → ∀ G [Group G], IsLocallyNilpotent G → IsMulTorsionFree G → IsIsolated (𝔛.radical G)`. Radical class (Kurosh–Amitsur/Plotkin sense), hereditary, locally nilpotent, isolated, and the 𝔛-radical 𝔛(G) are not in Mathlib or FormalConjecturesForMathlib and are defined in the file; torsion-free uses Mathlib's `IsMulTorsionFree`, nilpotent uses `Group.IsNilpotent`, finitely generated uses `Subgroup.FG`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.45»": "/--\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent\ntorsion-free group $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\nHere $\\mathfrak{X}$ ranges over all hereditary radical classes of groups (in the sense\nof Kurosh and Plotkin), $\\mathfrak{X}(G)$ is the $\\mathfrak{X}$-radical of $G$, i.e. the\nlargest normal $\\mathfrak{X}$-subgroup of $G$, and \"isolated\" means that\n$g^n \\in \\mathfrak{X}(G)$ with $n \\geq 1$ implies $g \\in \\mathfrak{X}(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : GroupClass.{u}), 𝔛.IsRadical → 𝔛.IsHereditary →\n      ∀ (G : Type u) [Group G], IsLocallyNilpotent G → IsMulTorsionFree G →\n        IsIsolated (𝔛.radical G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.45\n\nby B. I. Plotkin\n\nLet $\\mathfrak X$ be a hereditary radical. Is $\\mathfrak X(G)$ isolated in every\nlocally nilpotent torsion-free group $G$?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«3.45»\n\n/-- A Kurosh--Amitsur radical class of groups, together with its radical\nsubgroup $\\mathfrak X(G)$. -/\nstructure GroupRadicalClass where\n  /-- Membership in the radical class. -/\n  Mem : ∀ (G : Type) [Group G], Prop\n  /-- The radical subgroup of a group. -/\n  subgroup : ∀ (G : Type) [Group G], Subgroup G\n  /-- The class is closed under homomorphic images. -/\n  mem_of_surjective : ∀ {G H : Type} [Group G] [Group H] (f : G →* H),\n    Function.Surjective f → Mem G → Mem H\n  /-- The radical subgroup is normal. -/\n  normal : ∀ (G : Type) [Group G], (subgroup G).Normal\n  /-- The radical subgroup belongs to the radical class. -/\n  subgroup_mem : ∀ (G : Type) [Group G], Mem (subgroup G)\n  /-- Every normal subgroup in the radical class lies in the radical subgroup. -/\n  le_subgroup : ∀ {G : Type} [Group G] (N : Subgroup G),\n    N.Normal → Mem N → N ≤ subgroup G\n  /-- The quotient by the radical has no nontrivial normal subgroup in the\n  radical class. -/\n  quotient_semisimple : ∀ (G : Type) [Group G],\n    letI := normal G\n    ∀ N : Subgroup (G ⧸ subgroup G), N.Normal → Mem N → N = ⊥\n\n/-- A radical class is hereditary if it is closed under taking subgroups. -/\ndef GroupRadicalClass.IsHereditary (𝔛 : GroupRadicalClass) : Prop :=\n  ∀ {G : Type} [Group G], 𝔛.Mem G → ∀ H : Subgroup G, 𝔛.Mem H\n\n/-- A group is locally nilpotent if each of its finitely generated subgroups is\nnilpotent. -/\ndef IsLocallyNilpotent (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, Group.FG H → Group.IsNilpotent H\n\n/-- A subgroup is isolated if it is closed under taking positive roots. -/\ndef IsIsolatedSubgroup {G : Type*} [Group G] (H : Subgroup G) : Prop :=\n  ∀ g : G, ∀ n : ℕ, n ≠ 0 → g ^ n ∈ H → g ∈ H\n\n/--\nLet $\\mathfrak X$ be a hereditary radical. Is it true that, in every locally\nnilpotent torsion-free group $G$, the subgroup $\\mathfrak X(G)$ is isolated?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : GroupRadicalClass), 𝔛.IsHereditary →\n      ∀ (G : Type) [Group G], IsLocallyNilpotent G → IsMulTorsionFree G →\n        IsIsolatedSubgroup (𝔛.subgroup G) := by\n  sorry\n\nend Kourovka.«3.45»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A Kurosh–Amitsur group radical is represented as a class predicate together with its canonical radical subgroup in each group. The axioms state closure under surjective homomorphic images, that the radical subgroup is the largest normal subgroup in the class, and that the quotient by it has no nontrivial normal subgroup in the class.",
+    "“Hereditary” means exactly that the associated radical class is closed under taking arbitrary subgroups; it is not strengthened to an equality between the radical of a subgroup and an intersection with the ambient radical.",
+    "“Locally nilpotent” is expressed by requiring every finitely generated subgroup to satisfy Mathlib's `Group.IsNilpotent`.",
+    "“Torsion-free” uses Mathlib's `IsMulTorsionFree`. “Isolated” is root-closure for natural powers with nonzero (equivalently positive) exponent."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's occurrences of radicals concern ideals, rings, Lie algebras, and unrelated constructions; none model radical classes of groups.",
+     "name": "GroupRadicalClass",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no Kurosh–Amitsur radical-class primitive for groups."
+    },
+    {
+     "closest_existing_considered": "No existing `IsHereditary` or group radical-class closure predicate was found.",
+     "name": "GroupRadicalClass.IsHereditary",
+     "why_needed": "The problem quantifies over radical classes closed under subgroups, and no such group-theoretic predicate exists."
+    },
+    {
+     "closest_existing_considered": "Defined from `Group.FG` and `Group.IsNilpotent`.",
+     "name": "IsLocallyNilpotent",
+     "why_needed": "Mathlib provides group nilpotence and finite generation, but no primitive for locally nilpotent groups."
+    },
+    {
+     "closest_existing_considered": "Directly expressed using membership of positive natural powers in a `Subgroup`.",
+     "name": "IsIsolatedSubgroup",
+     "why_needed": "Mathlib has no isolated-subgroup/root-closed subgroup predicate with the meaning required here."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.45»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.45»": "/--\nLet $\\mathfrak X$ be a hereditary radical. Is it true that, in every locally\nnilpotent torsion-free group $G$, the subgroup $\\mathfrak X(G)$ is isolated?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : GroupRadicalClass), 𝔛.IsHereditary →\n      ∀ (G : Type) [Group G], IsLocallyNilpotent G → IsMulTorsionFree G →\n        IsIsolatedSubgroup (𝔛.subgroup G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.45\n\nby B. I. Plotkin\n\nLet $\\mathfrak X$ be a hereditary radical. Is $\\mathfrak X(G)$ isolated in every\nlocally nilpotent torsion-free group $G$?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«3.45»\n\nuniverse u\n\n/-- A property of groups in a fixed universe. -/\nabbrev GroupProperty := ∀ (G : Type u), [Group G] → Prop\n\n/-- The $\\mathfrak X$-radical of $G$: the join of all normal subgroups of $G$\nthat belong to the class $\\mathfrak X$. -/\ndef radical (𝔛 : GroupProperty.{u}) (G : Type u) [Group G] : Subgroup G :=\n  sSup {H : Subgroup G | H.Normal ∧ 𝔛 H}\n\n/-- A radical class of groups is closed under surjective homomorphic images.\nFor every group $G$, the join of its normal $\\mathfrak X$-subgroups is a\nnormal $\\mathfrak X$-subgroup, and the quotient by this radical has trivial\n$\\mathfrak X$-radical. -/\ndef IsRadicalClass (𝔛 : GroupProperty.{u}) : Prop :=\n  (∀ (G H : Type u) [Group G] [Group H] (f : G →* H),\n      Function.Surjective f → 𝔛 G → 𝔛 H) ∧\n  ∀ (G : Type u) [Group G],\n    𝔛 (radical 𝔛 G) ∧ (radical 𝔛 G).Normal ∧\n      ∀ [(radical 𝔛 G).Normal], radical 𝔛 (G ⧸ radical 𝔛 G) = ⊥\n\n/-- A hereditary radical is a radical class closed under taking subgroups. -/\ndef IsHereditaryRadical (𝔛 : GroupProperty.{u}) : Prop :=\n  IsRadicalClass 𝔛 ∧\n    ∀ (G : Type u) [Group G], 𝔛 G → ∀ H : Subgroup G, 𝔛 H\n\n/-- A group is locally nilpotent if each of its finitely generated subgroups is\nnilpotent. -/\ndef IsLocallyNilpotent (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/--\nLet $\\mathfrak X$ be a hereditary radical. Is it true that, in a locally\nnilpotent torsion-free group $G$, the subgroup $\\mathfrak X(G)$ is isolated?\nHere isolated means that if $g^n \\in \\mathfrak X(G)$ for some $n \\geq 1$, then\n$g \\in \\mathfrak X(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : GroupProperty.{u}), IsHereditaryRadical 𝔛 →\n      ∀ (G : Type u) [Group G], IsLocallyNilpotent G → IsMulTorsionFree G →\n        (radical 𝔛 G).Saturated := by\n  sorry\n\nend Kourovka.«3.45»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.92,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A group class is represented by a universe-level predicate on types equipped with group structures.",
+    "The Kurosh–Amitsur radical of G is the supremum of all normal subgroups of G whose underlying groups belong to the class.",
+    "A radical class is required to be closed under surjective homomorphic images; its radical subgroup must be normal and belong to the class; and the quotient by the radical must have trivial radical.",
+    "Hereditary means closure of the radical class under all subgroups.",
+    "Locally nilpotent means that every finitely generated subgroup is nilpotent, using Mathlib's Subgroup.FG and Group.IsNilpotent.",
+    "The source's isolated subgroup is represented by Mathlib's Subgroup.Saturated, whose zero-exponent alternative makes it equivalent to closure under positive natural-number roots.",
+    "The theorem quantifies an ordinary proof of IsMulTorsionFree G rather than installing it as a typeclass; this has the same propositional meaning and keeps all hypotheses after answer(sorry)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "No group-class predicate abstraction suitable for Kurosh–Amitsur radicals was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«3.45».GroupProperty",
+     "why_needed": "Provides the universe-level type of classes of groups over which the question quantifies."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Order.radical is an unrelated lattice notion used for the Frattini subgroup; no group-class radical construction was found.",
+     "name": "Kourovka.«3.45».radical",
+     "why_needed": "Defines the subgroup denoted by 𝔛(G) as the join of all normal 𝔛-subgroups."
+    },
+    {
+     "closest_existing_considered": "No radical-class or comparable group-class primitive was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«3.45».IsRadicalClass",
+     "why_needed": "Formalizes the Kurosh–Amitsur radical-class axioms for groups."
+    },
+    {
+     "closest_existing_considered": "No hereditary radical primitive was found.",
+     "name": "Kourovka.«3.45».IsHereditaryRadical",
+     "why_needed": "Adds the source's hereditary condition, namely closure of a radical class under subgroups."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides Subgroup.FG and Group.IsNilpotent but no IsLocallyNilpotent predicate.",
+     "name": "Kourovka.«3.45».IsLocallyNilpotent",
+     "why_needed": "Packages the standard condition that every finitely generated subgroup is nilpotent."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.45»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Mathlib provides torsion-free groups, nilpotent groups, finitely generated subgroups, and saturated (isolated) subgroups, but neither Kurosh–Amitsur radical classes nor local nilpotence as a packaged predicate. These were defined explicitly."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.45»": "/--\nLet $\\mathfrak X$ be a hereditary radical. Is it true that, in a locally\nnilpotent torsion-free group $G$, the subgroup $\\mathfrak X(G)$ is isolated?\nHere isolated means that if $g^n \\in \\mathfrak X(G)$ for some $n \\geq 1$, then\n$g \\in \\mathfrak X(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : GroupProperty.{u}), IsHereditaryRadical 𝔛 →\n      ∀ (G : Type u) [Group G], IsLocallyNilpotent G → IsMulTorsionFree G →\n        (radical 𝔛 G).Saturated := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.45\n\nby B. I. Plotkin\n\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent\ntorsion-free group $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\nHere a *radical* (in the sense of Kurosh) is given by a radical class $\\mathfrak{X}$ of groups:\na class closed under homomorphic images such that every group $G$ has a largest normal\n$\\mathfrak{X}$-subgroup $\\mathfrak{X}(G)$, the $\\mathfrak{X}$-radical of $G$, and\n$\\mathfrak{X}(G/\\mathfrak{X}(G)) = 1$. The radical is *hereditary* if $\\mathfrak{X}$ is closed\nunder subgroups, equivalently $\\mathfrak{X}(H) \\supseteq H \\cap \\mathfrak{X}(G)$ for every\nsubgroup $H$ of every group $G$. A subgroup $H$ of $G$ is *isolated* if $g^n \\in H$ with\n$n \\geq 1$ implies $g \\in H$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«3.45»\n\nuniverse u\n\n/-- The $\\mathfrak{X}$-radical $\\mathfrak{X}(G)$ of a group $G$ with respect to a class of groups\n$\\mathfrak{X}$: the join of all normal subgroups of $G$ that belong to $\\mathfrak{X}$. -/\ndef radical (𝔛 : (G : Type u) → [Group G] → Prop) (G : Type u) [Group G] : Subgroup G :=\n  ⨆ N : {N : Subgroup G // N.Normal ∧ 𝔛 N}, (N : Subgroup G)\n\nvariable {𝔛 : (G : Type u) → [Group G] → Prop} {G : Type u} [Group G]\n\n/-- Every normal $\\mathfrak{X}$-subgroup of $G$ is contained in $\\mathfrak{X}(G)$. -/\n@[category API, AMS 20]\ntheorem le_radical (N : Subgroup G) (hN : N.Normal) (hX : 𝔛 N) : N ≤ radical 𝔛 G :=\n  le_iSup (fun N : {N : Subgroup G // N.Normal ∧ 𝔛 N} => (N : Subgroup G)) ⟨N, hN, hX⟩\n\n/-- The $\\mathfrak{X}$-radical is a normal subgroup. -/\ninstance radical_normal : (radical 𝔛 G).Normal where\n  conj_mem n hn g := by\n    refine Subgroup.iSup_induction (C := fun n => g * n * g⁻¹ ∈ radical 𝔛 G) _ hn ?_ ?_ ?_\n    · intro N x hx\n      exact le_radical N.1 N.2.1 N.2.2 (N.2.1.conj_mem x hx g)\n    · simp\n    · intro x y hx hy\n      simpa [mul_assoc] using mul_mem hx hy\n\n/-- A class of groups $\\mathfrak{X}$ is a *radical class* (in the sense of Kurosh) if it is closed\nunder homomorphic images, for every group $G$ the join $\\mathfrak{X}(G)$ of all normal\n$\\mathfrak{X}$-subgroups of $G$ is again an $\\mathfrak{X}$-group (so that it is the largest normal\n$\\mathfrak{X}$-subgroup of $G$), and $\\mathfrak{X}(G / \\mathfrak{X}(G)) = 1$. -/\nstructure IsRadicalClass (𝔛 : (G : Type u) → [Group G] → Prop) : Prop where\n  /-- `𝔛` is closed under homomorphic images (in particular under isomorphisms). -/\n  of_surjective {G H : Type u} [Group G] [Group H] (f : G →* H) :\n    Function.Surjective f → 𝔛 G → 𝔛 H\n  /-- The join of all normal `𝔛`-subgroups of `G` is an `𝔛`-group. -/\n  radical_mem (G : Type u) [Group G] : 𝔛 (radical 𝔛 G)\n  /-- The quotient `G ⧸ 𝔛(G)` is `𝔛`-semisimple, i.e. has trivial `𝔛`-radical. -/\n  radical_quotient (G : Type u) [Group G] : radical 𝔛 (G ⧸ radical 𝔛 G) = ⊥\n\n/-- A radical class $\\mathfrak{X}$ is *hereditary* if it is closed under subgroups. -/\nstructure IsHereditaryRadicalClass (𝔛 : (G : Type u) → [Group G] → Prop) : Prop\n    extends IsRadicalClass 𝔛 where\n  /-- `𝔛` is closed under subgroups. -/\n  of_subgroup (G : Type u) [Group G] (H : Subgroup G) : 𝔛 G → 𝔛 H\n\n/-- The class of all groups is a hereditary radical class. -/\n@[category test, AMS 20]\ntheorem isHereditaryRadicalClass_top :\n    IsHereditaryRadicalClass (fun (G : Type u) [Group G] => True) where\n  of_surjective _ _ _ := trivial\n  radical_mem _ := trivial\n  radical_quotient G _ := by\n    have h : radical (fun (G : Type u) [Group G] => True) G = ⊤ :=\n      top_le_iff.mp (le_radical ⊤ inferInstance trivial)\n    have : Subsingleton (G ⧸ radical (fun (G : Type u) [Group G] => True) G) :=\n      ⟨fun x y => by\n        induction x using QuotientGroup.induction_on\n        induction y using QuotientGroup.induction_on\n        exact QuotientGroup.eq.mpr (h ▸ Subgroup.mem_top _)⟩\n    exact Subsingleton.elim _ _\n  of_subgroup _ _ _ _ := trivial\n\n/-- A group is *locally nilpotent* if all its finitely generated subgroups are nilpotent. -/\ndef IsLocallyNilpotent (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/-- Nilpotent groups are locally nilpotent. -/\n@[category test, AMS 20]\ntheorem IsLocallyNilpotent.of_isNilpotent [Group.IsNilpotent G] : IsLocallyNilpotent G :=\n  fun _ _ => inferInstance\n\n/--\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent torsion-free\ngroup $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\n\"Isolated\" is `Subgroup.Saturated`: if $g^n \\in \\mathfrak{X}(G)$ with $n \\geq 1$ then\n$g \\in \\mathfrak{X}(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : (G : Type) → [Group G] → Prop), IsHereditaryRadicalClass 𝔛 →\n      ∀ (G : Type) [Group G], IsLocallyNilpotent G → IsMulTorsionFree G →\n        (radical 𝔛 G).Saturated := by\n  sorry\n\nend Kourovka.«3.45»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single-slot decomposition is correct; the notes' reading of 'hereditary radical' as a radical class closed under subgroups was followed (see modeling_decisions for the alternative 'normal subgroups' reading).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Radical' is taken in the Kurosh–Amitsur sense used by the Russian school: a radical class 𝔛 of groups, closed under homomorphic images (stated for all surjective homomorphisms, which also yields closure under isomorphism, i.e. 𝔛 is an abstract class), such that for every group G the join 𝔛(G) := radical 𝔛 G of all normal 𝔛-subgroups is itself an 𝔛-group (hence the largest normal 𝔛-subgroup), and 𝔛(G/𝔛(G)) = 1. If 'radical' is read in Plotkin's more general functional sense (ρ(G)φ ⊆ ρ(Gφ), ρ(G/ρ(G)) = 1), the hereditary hypothesis forces ρ(ρ(G)) = ρ(G), so ρ is a Kurosh radical with radical class {G | ρ(G) = G}; hence no generality is lost.",
+    "'Hereditary' is taken, following the decomposition notes, as closure of 𝔛 under ALL subgroups (equivalently 𝔛(H) ⊇ H ∩ 𝔛(G) for all H ≤ G). A reviewer should be aware of the alternative ring-theory-style reading 'closed under normal subgroups' (ideals ↔ normal subgroups), which would quantify over a larger set of radicals and give a formally different statement; I believe the all-subgroups reading matches Plotkin's usage.",
+    "The class 𝔛 is a predicate `(G : Type) → [Group G] → Prop` on groups in universe `Type`, and G ranges over `Type`, in line with the other Kourovka files. All closure conditions (subgroups, quotients, radicals) stay inside the same universe, so the axioms are self-contained.",
+    "'Isolated subgroup' is formalised by Mathlib's `Subgroup.Saturated` (∀ n g, g ^ n ∈ H → n = 0 ∨ g ∈ H, with n : ℕ); by `Subgroup.saturated_iff_zpow` this is equivalent to the integer-exponent version.",
+    "'Locally nilpotent' is defined as: every finitely generated subgroup (`Subgroup.FG`) is nilpotent (`Group.IsNilpotent`). 'Torsion-free' is Mathlib's `IsMulTorsionFree`, which for groups means no nontrivial element has finite order.",
+    "Two `@[category test]` lemmas and one `@[category API]` lemma are included as basic API for the bespoke definitions (class of all groups is a hereditary radical class; nilpotent groups are locally nilpotent; normal 𝔛-subgroups lie in the radical), together with an instance that the radical is normal (needed to form G ⧸ 𝔛(G))."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has only ring-theoretic radicals (`Ideal.radical`, `Ideal.jacobson`, nilradical) and specific group-theoretic subgroups (`Subgroup.center`, `commutator`, `Subgroup.normalClosure`); none give a radical relative to an arbitrary class of groups.",
+     "name": "Kourovka.«3.45».radical",
+     "why_needed": "The 𝔛-radical 𝔛(G) of a group G for a class of groups 𝔛 (join of all normal 𝔛-subgroups) is not in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "No class-of-groups machinery exists in Mathlib; nothing analogous (Fitting classes, formations, radical classes) was found by grepping for 'radical', 'Fitting', 'hereditary'.",
+     "name": "Kourovka.«3.45».IsRadicalClass",
+     "why_needed": "Kurosh radical classes of groups (Q-closed; 𝔛(G) ∈ 𝔛; 𝔛(G/𝔛(G)) = 1) do not exist in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "None; see IsRadicalClass.",
+     "name": "Kourovka.«3.45».IsHereditaryRadicalClass",
+     "why_needed": "'Hereditary radical' = radical class closed under subgroups; needed as the hypothesis on 𝔛."
+    },
+    {
+     "closest_existing_considered": "`Group.IsNilpotent` (global nilpotency), `Subgroup.FG`; combined as ∀ H : Subgroup G, H.FG → Group.IsNilpotent H.",
+     "name": "Kourovka.«3.45».IsLocallyNilpotent",
+     "why_needed": "Locally nilpotent groups (every finitely generated subgroup nilpotent) are not defined in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.45»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ 𝔛, IsHereditaryRadicalClass 𝔛 → ∀ G [Group G], IsLocallyNilpotent G → IsMulTorsionFree G → (radical 𝔛 G).Saturated`. Mathlib has torsion-free (`IsMulTorsionFree`), nilpotent (`Group.IsNilpotent`), finitely generated (`Subgroup.FG`) and isolated (`Subgroup.Saturated`, i.e. g^n ∈ H with n ≠ 0 ⇒ g ∈ H), but no notion of radical class / 𝔛-radical / hereditary radical / locally nilpotent group, so these were defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.45»": "/--\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent torsion-free\ngroup $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\n\"Isolated\" is `Subgroup.Saturated`: if $g^n \\in \\mathfrak{X}(G)$ with $n \\geq 1$ then\n$g \\in \\mathfrak{X}(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : (G : Type) → [Group G] → Prop), IsHereditaryRadicalClass 𝔛 →\n      ∀ (G : Type) [Group G], IsLocallyNilpotent G → IsMulTorsionFree G →\n        (radical 𝔛 G).Saturated := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.45\n\nby B. I. Plotkin\n\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent\ntorsion-free group $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\nA radical in the sense of Kurosh and Plotkin is determined by its *radical class*\n$\\mathfrak{X}$ of groups. A class of groups $\\mathfrak{X}$ is a radical class if it is closed\nunder homomorphic images, every group $G$ has a largest normal $\\mathfrak{X}$-subgroup\n$\\mathfrak{X}(G)$ (the $\\mathfrak{X}$-radical of $G$), and $\\mathfrak{X}(G/\\mathfrak{X}(G)) = 1$.\nThe radical is *hereditary* if $\\mathfrak{X}$ is closed under taking subgroups; equivalently,\n$H \\cap \\mathfrak{X}(G) \\le \\mathfrak{X}(H)$ for every subgroup $H$ of every group $G$.\n\nA group is *locally nilpotent* if all its finitely generated subgroups are nilpotent. A subgroup\n$H$ of $G$ is *isolated* if $g^n \\in H$ for some $n \\ge 1$ implies $g \\in H$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nuniverse u\n\nnamespace Kourovka.«3.45»\n\n/-- A class of groups, given as a predicate on groups in `Type u`. -/\nabbrev GroupClass : Type (u + 1) := ∀ (G : Type u) [Group G], Prop\n\nvariable (𝔛 : GroupClass.{u})\n\n/-- The `𝔛`-radical `𝔛(G)` of a group `G`: the join of all normal subgroups of `G` that belong\nto the class `𝔛`. For a radical class `𝔛` this is the largest normal `𝔛`-subgroup of `G`. -/\ndef radical (G : Type u) [Group G] : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ 𝔛 N}\n\n/-- The `𝔛`-radical of `G` is a normal subgroup of `G`. -/\ninstance radical_normal (G : Type u) [Group G] : (radical 𝔛 G).Normal := by\n  have h : (radical 𝔛 G).normalCore = radical 𝔛 G :=\n    le_antisymm (Subgroup.normalCore_le _) <| sSup_le fun N hN =>\n      haveI := hN.1\n      Subgroup.normal_le_normalCore.mpr (le_sSup hN)\n  exact h ▸ Subgroup.normalCore_normal _\n\n/-- A class of groups `𝔛` is a *radical class* (Kurosh) if\n* `𝔛` is closed under homomorphic images (in particular under isomorphisms),\n* for every group `G` the join `𝔛(G)` of all normal `𝔛`-subgroups of `G` is again an `𝔛`-group,\n  so that `𝔛(G)` is the largest normal `𝔛`-subgroup of `G`, and\n* the `𝔛`-radical of `G ⧸ 𝔛(G)` is trivial. -/\nstructure IsRadicalClass : Prop where\n  /-- `𝔛` is closed under homomorphic images. -/\n  of_surjective {G H : Type u} [Group G] [Group H] (f : G →* H) (hf : Function.Surjective f) :\n    𝔛 G → 𝔛 H\n  /-- The join of all normal `𝔛`-subgroups of `G` is an `𝔛`-group. -/\n  radical_mem (G : Type u) [Group G] : 𝔛 (radical 𝔛 G)\n  /-- `𝔛(G ⧸ 𝔛(G)) = 1`. -/\n  radical_quotient (G : Type u) [Group G] : radical 𝔛 (G ⧸ radical 𝔛 G) = ⊥\n\n/-- A radical class `𝔛` is *hereditary* if it is closed under taking subgroups. -/\nstructure IsHereditaryRadicalClass : Prop extends IsRadicalClass 𝔛 where\n  /-- `𝔛` is closed under subgroups. -/\n  of_subgroup (G : Type u) [Group G] (H : Subgroup G) : 𝔛 G → 𝔛 H\n\n/-- A group is *locally nilpotent* if every finitely generated subgroup is nilpotent. -/\ndef IsLocallyNilpotent (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/-- A subgroup `H` of `G` is *isolated* if `g ^ n ∈ H` for some `n ≥ 1` implies `g ∈ H`. -/\ndef IsIsolated {G : Type*} [Group G] (H : Subgroup G) : Prop :=\n  ∀ (g : G) (n : ℕ), 0 < n → g ^ n ∈ H → g ∈ H\n\n/--\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent\ntorsion-free group $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\nHere \"torsion-free\" means that no element other than $1$ has finite order.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : GroupClass.{u}), IsHereditaryRadicalClass 𝔛 →\n      ∀ (G : Type u) [Group G], IsLocallyNilpotent G → (∀ g : G, IsOfFinOrder g → g = 1) →\n        IsIsolated (radical 𝔛 G) := by\n  sorry\n\n/-- The radical of the class of all groups is the whole group. -/\n@[category API, AMS 20]\ntheorem radical_top (G : Type u) [Group G] : radical (fun _ _ => True) G = ⊤ :=\n  top_le_iff.mp (le_sSup ⟨inferInstance, trivial⟩)\n\n/-- The class of all groups is a hereditary radical class. -/\n@[category test, AMS 20]\ntheorem isHereditaryRadicalClass_top : IsHereditaryRadicalClass (fun _ _ => True) where\n  of_surjective _ _ _ := trivial\n  radical_mem _ := trivial\n  radical_quotient G := by\n    refine (Subgroup.eq_bot_iff_forall _).mpr fun x _ => ?_\n    induction x using QuotientGroup.induction_on with\n    | H g => exact (QuotientGroup.eq_one_iff g).mpr (by rw [radical_top]; exact Subgroup.mem_top g)\n  of_subgroup _ _ _ _ := trivial\n\n/-- The trivial subgroup of a torsion-free group is isolated. -/\n@[category test, AMS 20]\ntheorem isIsolated_bot (G : Type*) [Group G] (hG : ∀ g : G, IsOfFinOrder g → g = 1) :\n    IsIsolated (⊥ : Subgroup G) := fun g n hn hg =>\n  Subgroup.mem_bot.mpr <| hG g <| isOfFinOrder_iff_pow_eq_one.mpr ⟨n, hn, Subgroup.mem_bot.mp hg⟩\n\nend Kourovka.«3.45»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition is correct; the only interpretive point (hereditary = subgroup-closed) is fixed by the table and matches Plotkin's usage for groups.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Hereditary radical' is formalized, per the decomposition table, as a Kurosh radical class closed under all subgroups (Plotkin's sense for groups). The ring-theoretic analogue 'closed under normal subgroups/ideals' was not used; reviewers should confirm this reading matches Plotkin's usage.",
+    "Radical class uses Kurosh's three axioms with 𝔛(G) := sSup of normal 𝔛-subgroups: (i) closed under surjective homomorphisms (implies isomorphism-closure), (ii) 𝔛 (radical 𝔛 G) (equivalent to 'G has a largest normal 𝔛-subgroup'), (iii) radical 𝔛 (G ⧸ radical 𝔛 G) = ⊥. This is equivalent to the Q-, E-, N-closure characterization. The empty class is excluded by (ii), as in Kurosh.",
+    "Classes of groups are predicates on groups in a fixed universe `Type u`; the theorem is universe-polymorphic. This is the standard way to model a proper class of groups.",
+    "Torsion-free is stated literally as `∀ g : G, IsOfFinOrder g → g = 1` rather than Mathlib's `IsMulTorsionFree` (injectivity of x ↦ x^n), which for non-abelian groups is a priori stronger (e.g. the Klein bottle group). Under local nilpotency the two are equivalent by Mal'cev's unique-roots theorem, but the literal form avoids relying on that theorem. Note the repo's Kaplansky.lean uses `IsMulTorsionFree`.",
+    "Isolated: `∀ g n, 0 < n → g ^ n ∈ H → g ∈ H` (n = 0 is excluded since g^0 = 1 ∈ H always).",
+    "Locally nilpotent: every finitely generated subgroup is nilpotent (`Subgroup.FG` + `Group.IsNilpotent ↥H`).",
+    "Additional API/test declarations (radical_top, isHereditaryRadicalClass_top, isIsolated_bot) are fully proven and sanity-check the definitions: the class of all groups is a hereditary radical class with radical ⊤, and ⊥ is isolated in torsion-free groups."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Set Grp.{u} (bundled groups in Mathlib's category); rejected as heavier and requiring Grp.of coercions everywhere.",
+     "name": "Kourovka.«3.45».GroupClass",
+     "why_needed": "A 'class of groups' is needed to talk about radical classes; modeled as a predicate `∀ (G : Type u) [Group G], Prop`."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib: only ring-theoretic radicals (Ideal.radical, nilradical, Jacobson) and Koethe radical in the repo; no group-class radical.",
+     "name": "Kourovka.«3.45».radical",
+     "why_needed": "The 𝔛-radical 𝔛(G) = sSup of all normal 𝔛-subgroups of G; the object the problem asks about. Comes with a (fully proven) `Normal` instance so that `G ⧸ radical 𝔛 G` makes sense."
+    },
+    {
+     "closest_existing_considered": "No Mathlib/repo notion of Kurosh–Amitsur radical classes of groups exists. The equivalent Q/E/N-closure characterization (Robinson) was considered; Kurosh's original three axioms were chosen as closer to the source's framework.",
+     "name": "Kourovka.«3.45».IsRadicalClass",
+     "why_needed": "Kurosh's definition of a radical class: closed under homomorphic images (surjective homs, which also gives isomorphism-invariance), the join of all normal 𝔛-subgroups of any G is an 𝔛-group (so it is the largest normal 𝔛-subgroup), and radical 𝔛 (G ⧸ radical 𝔛 G) = ⊥."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or the repo.",
+     "name": "Kourovka.«3.45».IsHereditaryRadicalClass",
+     "why_needed": "Hereditary radical = radical class closed under taking subgroups (as fixed by the decomposition table; equivalent to H ∩ 𝔛(G) ≤ 𝔛(H) for all H ≤ G)."
+    },
+    {
+     "closest_existing_considered": "Group.IsNilpotent (only nilpotent, not locally nilpotent); no LocallyNilpotent in Mathlib or repo.",
+     "name": "Kourovka.«3.45».IsLocallyNilpotent",
+     "why_needed": "Locally nilpotent group: every finitely generated subgroup (Subgroup.FG) is nilpotent (Group.IsNilpotent). Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib GroupTheory/Algebra.Group for IsIsolated / root-closed / pure subgroup; nothing found.",
+     "name": "Kourovka.«3.45».IsIsolated",
+     "why_needed": "Isolated subgroup: g ^ n ∈ H with 0 < n implies g ∈ H. Not in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.45»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ 𝔛 hereditary radical class (Kurosh radical class closed under subgroups), ∀ locally nilpotent torsion-free group G (in Type u), the 𝔛-radical 𝔛(G) (join of all normal 𝔛-subgroups) is isolated (g^n ∈ 𝔛(G), n ≥ 1 ⟹ g ∈ 𝔛(G)). Mathlib lacks radical classes, locally nilpotent groups and isolated subgroups, so these are defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.45»": "/--\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent\ntorsion-free group $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\nHere \"torsion-free\" means that no element other than $1$ has finite order.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : GroupClass.{u}), IsHereditaryRadicalClass 𝔛 →\n      ∀ (G : Type u) [Group G], IsLocallyNilpotent G → (∀ g : G, IsOfFinOrder g → g = 1) →\n        IsIsolated (radical 𝔛 G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.45\n\nby B. I. Plotkin\n\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent\ntorsion-free group $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\nHere a *radical* (in the sense of Kurosh, Amitsur and Plotkin) is given by a *radical class*\n$\\mathfrak{X}$ of groups: a class closed under homomorphic images, under joins of arbitrary\nfamilies of normal $\\mathfrak{X}$-subgroups, and under extensions. Every group $G$ then has a\nlargest normal $\\mathfrak{X}$-subgroup, the $\\mathfrak{X}$-radical $\\mathfrak{X}(G)$, namely\nthe join of all normal $\\mathfrak{X}$-subgroups of $G$. The radical is *hereditary* if the\nclass $\\mathfrak{X}$ is closed under taking subgroups.\n\nA group is *locally nilpotent* if all its finitely generated subgroups are nilpotent, and\n*torsion-free* if its only element of finite order is the identity. A subgroup $H$ of $G$ is\n*isolated* if $g^n \\in H$ with $n \\geq 1$ implies $g \\in H$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«3.45»\n\nuniverse u\n\n/-- A class of groups `𝔛` is a *radical class* (in the sense of Kurosh, Amitsur and Plotkin)\nif it is closed under homomorphic images, under joins of arbitrary families of normal\n`𝔛`-subgroups, and under extensions. -/\nstructure IsRadicalClass (𝔛 : (G : Type u) → [Group G] → Prop) : Prop where\n  /-- `𝔛` is closed under homomorphic images. -/\n  of_surjective {G H : Type u} [Group G] [Group H] (f : G →* H) (hf : Function.Surjective f)\n    (hG : 𝔛 G) : 𝔛 H\n  /-- The join of any family of normal `𝔛`-subgroups of a group is an `𝔛`-group. -/\n  sSup_mem {G : Type u} [Group G] (S : Set (Subgroup G)) (hS : ∀ N ∈ S, N.Normal ∧ 𝔛 N) :\n    𝔛 ↥(sSup S)\n  /-- `𝔛` is closed under extensions. -/\n  of_extension {G : Type u} [Group G] (N : Subgroup G) [N.Normal] (hN : 𝔛 N) (hQ : 𝔛 (G ⧸ N)) :\n    𝔛 G\n\n/-- A radical class `𝔛` is *hereditary* if it is moreover closed under taking subgroups, i.e.\nevery subgroup of an `𝔛`-group is an `𝔛`-group. -/\nstructure IsHereditaryRadicalClass (𝔛 : (G : Type u) → [Group G] → Prop) : Prop\n    extends IsRadicalClass 𝔛 where\n  /-- `𝔛` is closed under subgroups. -/\n  of_subgroup {G : Type u} [Group G] (H : Subgroup G) (hG : 𝔛 G) : 𝔛 H\n\n/-- The `𝔛`-radical $\\mathfrak{X}(G)$ of a group `G`: the join of all normal `𝔛`-subgroups\nof `G`. When `𝔛` is a radical class this is the largest normal `𝔛`-subgroup of `G`. -/\ndef radical (𝔛 : (G : Type u) → [Group G] → Prop) (G : Type u) [Group G] : Subgroup G :=\n  sSup {N : Subgroup G | N.Normal ∧ 𝔛 N}\n\nvariable {G : Type*} [Group G]\n\n/-- A group is *locally nilpotent* if all its finitely generated subgroups are nilpotent. -/\ndef IsLocallyNilpotent (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/-- A subgroup `H` of `G` is *isolated* if $g^n \\in H$ for some $n \\geq 1$ implies $g \\in H$. -/\ndef IsIsolated (H : Subgroup G) : Prop :=\n  ∀ (g : G) (n : ℕ), n ≠ 0 → g ^ n ∈ H → g ∈ H\n\n/-- For a radical class `𝔛`, the radical `𝔛(G)` is itself an `𝔛`-group. -/\n@[category API, AMS 20]\ntheorem IsRadicalClass.radical_mem {𝔛 : (G : Type u) → [Group G] → Prop} (h : IsRadicalClass 𝔛)\n    (G : Type u) [Group G] : 𝔛 ↥(radical 𝔛 G) :=\n  h.sSup_mem _ fun _ hN => hN\n\n/-- The radical `𝔛(G)` is a normal subgroup of `G`. -/\n@[category API, AMS 20]\ntheorem radical_normal (𝔛 : (G : Type u) → [Group G] → Prop) (G : Type u) [Group G] :\n    (radical 𝔛 G).Normal := by\n  constructor\n  intro n hn g\n  have : (radical 𝔛 G).map (MulAut.conj g).toMonoidHom ≤ radical 𝔛 G := by\n    rw [radical, sSup_eq_iSup', Subgroup.map_iSup]\n    exact iSup_le fun N => le_iSup_of_le N\n      (Subgroup.map_le_iff_le_comap.2 fun x hx => N.2.1.conj_mem x hx g)\n  exact this ⟨n, hn, rfl⟩\n\n/-- Every normal `𝔛`-subgroup of `G` is contained in the radical `𝔛(G)`. -/\n@[category API, AMS 20]\ntheorem le_radical (𝔛 : (G : Type u) → [Group G] → Prop) {G : Type u} [Group G]\n    (N : Subgroup G) [N.Normal] (hN : 𝔛 N) : N ≤ radical 𝔛 G :=\n  le_sSup ⟨‹N.Normal›, hN⟩\n\n/-- The class of all groups is a hereditary radical class. -/\n@[category test, AMS 20]\ntheorem isHereditaryRadicalClass_true :\n    IsHereditaryRadicalClass fun (_ : Type u) [Group _] => True :=\n  { of_surjective := by intros; trivial\n    sSup_mem := by intros; trivial\n    of_extension := by intros; trivial\n    of_subgroup := by intros; trivial }\n\n/-- A nilpotent group is locally nilpotent. -/\n@[category test, AMS 20]\ntheorem IsLocallyNilpotent.of_isNilpotent [Group.IsNilpotent G] : IsLocallyNilpotent G :=\n  fun _ _ => inferInstance\n\n/-- The whole group is an isolated subgroup. -/\n@[category test, AMS 20]\ntheorem isIsolated_top : IsIsolated (⊤ : Subgroup G) :=\n  fun _ _ _ _ => Subgroup.mem_top _\n\n/--\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent\ntorsion-free group $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\nHere $\\mathfrak{X}$ ranges over all hereditary radical classes of groups, $\\mathfrak{X}(G)$\nis the join of all normal $\\mathfrak{X}$-subgroups of $G$ (its largest normal\n$\\mathfrak{X}$-subgroup), $G$ is torsion-free in the sense that $1$ is its only element of\nfinite order, and $\\mathfrak{X}(G)$ is isolated if $g^n \\in \\mathfrak{X}(G)$ with $n \\geq 1$\nimplies $g \\in \\mathfrak{X}(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : (G : Type) → [Group G] → Prop), IsHereditaryRadicalClass 𝔛 →\n      ∀ (G : Type) [Group G], IsLocallyNilpotent G → (∀ g : G, IsOfFinOrder g → g = 1) →\n        IsIsolated (radical 𝔛 G) := by\n  sorry\n\nend Kourovka.«3.45»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.82,
+   "decomposition_objections": "None. The single-slot table and its notes (hereditary = subgroup-closed radical class; isolated = root-closed) match the notebook's statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Hereditary' is taken, as in the decomposition table and in Russian group-theoretic usage (наследственный класс), to mean the radical class is closed under ALL subgroups (equivalently 𝔛(H) ⊇ H ∩ 𝔛(G) for every H ≤ G). The weaker reading 'closed under normal subgroups only' (the ring-theoretic analogue) would quantify over more radicals and give a stronger universal statement; a reviewer should confirm the chosen reading.",
+    "A radical is modelled by its radical class 𝔛 : (G : Type u) → [Group G] → Prop, required to be Q-closed (surjective homomorphic images), N-closed (join of any family of normal 𝔛-subgroups is an 𝔛-group) and E-closed (extensions). This is equivalent to Kurosh's formulation (Q-closed; every group has a largest normal 𝔛-subgroup; the quotient by it is 𝔛-semisimple) and to Plotkin's functorial radical with idempotence. Isomorphism-invariance follows from Q-closure. 𝔛(G) is defined as the join of all normal 𝔛-subgroups.",
+    "The class 𝔛 and the group G are quantified over Type (universe 0), following the repository convention for Kourovka files (∀ (G : Type) [Group G]); the definitions themselves are universe-polymorphic.",
+    "Torsion-free is stated literally as ∀ g, IsOfFinOrder g → g = 1 rather than Mathlib's IsMulTorsionFree (injectivity of g ↦ g^n), which for non-abelian groups is the stronger unique-roots property; the two coincide for locally nilpotent groups only by Mal'cev's theorem, so the literal version was preferred.",
+    "Isolated is stated with natural exponents n ≠ 0; integer exponents give the same notion since g^(-n) ∈ H ↔ g^n ∈ H.",
+    "Boundary check: 𝔛 = all groups gives 𝔛(G) = G (isolated); 𝔛 = trivial groups gives 𝔛(G) = 1 (isolated iff G torsion-free, which holds under the hypotheses), so the statement is neither vacuous nor trivially true for every answer."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Ring-theoretic radicals (Ideal.radical, Ideal.jacobson) — unrelated to group radical classes; no group-theoretic radical class notion exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«3.45».IsRadicalClass",
+     "why_needed": "Kurosh–Amitsur/Plotkin radical class of groups (closed under homomorphic images, joins of arbitrary families of normal 𝔛-subgroups, and extensions); nothing in Mathlib or the repo models radical classes of groups."
+    },
+    {
+     "closest_existing_considered": "None; searched Mathlib and the repo for 'hereditary', 'radical class', 'Kurosh'.",
+     "name": "Kourovka.«3.45».IsHereditaryRadicalClass",
+     "why_needed": "A radical class closed under taking subgroups, i.e. a hereditary radical in Plotkin's sense, as fixed by the decomposition table."
+    },
+    {
+     "closest_existing_considered": "Subgroup.center / Subgroup.normalCore / upperCentralSeries — specific radicals, not parametrised by a class.",
+     "name": "Kourovka.«3.45».radical",
+     "why_needed": "The 𝔛-radical 𝔛(G) := sSup of all normal 𝔛-subgroups of G (the largest normal 𝔛-subgroup when 𝔛 is a radical class). API lemmas proved: 𝔛(G) is an 𝔛-group, is normal, and contains every normal 𝔛-subgroup."
+    },
+    {
+     "closest_existing_considered": "Group.IsNilpotent (only global nilpotency), Subgroup.FG.",
+     "name": "Kourovka.«3.45».IsLocallyNilpotent",
+     "why_needed": "Locally nilpotent groups (every finitely generated subgroup nilpotent) are not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "Torsion-freeness of the quotient G ⧸ H (equivalent for normal H, but requires a Normal instance and is less literal); Subgroup.saturated (a different notion: ∀ n, g^n ∈ H → n = 0 ∨ g ∈ H, i.e. roots closure only outside n = 0 — actually equivalent, but its intended use differs and the direct definition is more transparent).",
+     "name": "Kourovka.«3.45».IsIsolated",
+     "why_needed": "Isolated subgroup (g^n ∈ H with n ≥ 1 implies g ∈ H) is not in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.45»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ hereditary radical class 𝔛 (of groups in Type), ∀ locally nilpotent torsion-free group G, the radical 𝔛(G) (join of all normal 𝔛-subgroups) is isolated (closed under n-th roots, n ≥ 1). Radical class, hereditary radical class, 𝔛-radical, local nilpotence and isolated subgroup are not in Mathlib or FormalConjecturesForMathlib and were defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.45»": "/--\nLet $\\mathfrak{X}$ be a hereditary radical. Is it true that, in a locally nilpotent\ntorsion-free group $G$, the subgroup $\\mathfrak{X}(G)$ is isolated?\n\nHere $\\mathfrak{X}$ ranges over all hereditary radical classes of groups, $\\mathfrak{X}(G)$\nis the join of all normal $\\mathfrak{X}$-subgroups of $G$ (its largest normal\n$\\mathfrak{X}$-subgroup), $G$ is torsion-free in the sense that $1$ is its only element of\nfinite order, and $\\mathfrak{X}(G)$ is isolated if $g^n \\in \\mathfrak{X}(G)$ with $n \\geq 1$\nimplies $g \\in \\mathfrak{X}(G)$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : (G : Type) → [Group G] → Prop), IsHereditaryRadicalClass 𝔛 →\n      ∀ (G : Type) [Group G], IsLocallyNilpotent G → (∀ g : G, IsOfFinOrder g → g = 1) →\n        IsIsolated (radical 𝔛 G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.45\n\nby B. I. Plotkin\n\nLet $\\mathfrak X$ be a hereditary radical. Is the radical subgroup\n$\\mathfrak X(G)$ isolated in every locally nilpotent torsion-free group $G$?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«3.45»\n\n/-- A property of groups. -/\ndef GroupProperty := (G : Type) → [Group G] → Prop\n\n/-- The subgroup generated by all normal subgroups of $G$ having the group\nproperty $\\mathfrak X$. -/\ndef radicalSubgroup (X : GroupProperty) (G : Type) [Group G] : Subgroup G :=\n  sSup {H : Subgroup G | H.Normal ∧ X H}\n\n/-- A group property $\\mathfrak X$ is a radical class if it is closed under\nsurjective homomorphic images, its radical subgroup belongs to $\\mathfrak X$,\nand the quotient by that subgroup has no nontrivial normal\n$\\mathfrak X$-subgroup. -/\ndef IsRadicalClass (X : GroupProperty) : Prop :=\n  (∀ (G H : Type) [Group G] [Group H] (f : G →* H),\n      Function.Surjective f → X G → X H) ∧\n    ∀ (G : Type) [Group G],\n      let R := radicalSubgroup X G\n      R.Normal ∧ X R ∧ ∀ hR : R.Normal,\n        let _ : R.Normal := hR\n        ∀ N : Subgroup (G ⧸ R), N.Normal → X N → N = ⊥\n\n/-- A hereditary radical is a radical class closed under taking subgroups. -/\ndef IsHereditaryRadical (X : GroupProperty) : Prop :=\n  IsRadicalClass X ∧\n    ∀ (G : Type) [Group G], X G → ∀ H : Subgroup G, X H\n\n/-- A group is locally nilpotent if each of its finitely generated subgroups is\nnilpotent. -/\ndef IsLocallyNilpotent (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, Group.FG H → Group.IsNilpotent H\n\n/-- A group is torsion-free if no nonidentity element has a positive power\nequal to the identity. -/\ndef IsGroupTorsionFree (G : Type*) [Group G] : Prop :=\n  ∀ g : G, ∀ n : ℕ, 0 < n → g ^ n = 1 → g = 1\n\n/-- A subgroup $H$ is isolated if it is closed under taking roots: whenever\n$g^n \\in H$ for some positive integer $n$, one has $g \\in H$. -/\ndef IsIsolated {G : Type*} [Group G] (H : Subgroup G) : Prop :=\n  ∀ g : G, ∀ n : ℕ, 0 < n → g ^ n ∈ H → g ∈ H\n\n/--\nLet $\\mathfrak X$ be a hereditary radical. Is it true that, in every locally\nnilpotent torsion-free group $G$, the subgroup $\\mathfrak X(G)$ is isolated?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (X : GroupProperty), IsHereditaryRadical X →\n      ∀ (G : Type) [Group G], IsLocallyNilpotent G → IsGroupTorsionFree G →\n        IsIsolated (radicalSubgroup X G) := by\n  sorry\n\nend Kourovka.«3.45»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A group property is represented universe-locally as a predicate on small groups, matching the theorem's quantification over `G : Type`.",
+    "The radical subgroup `𝔛(G)` is the supremum of all normal subgroups of `G` whose underlying groups belong to `𝔛`.",
+    "A radical class is required to be closed under surjective homomorphic images, to contain its radical subgroup, and to leave a quotient with no nontrivial normal `𝔛`-subgroup; hereditary means closure under all subgroups.",
+    "Local nilpotence is stated as nilpotence of every finitely generated subgroup.",
+    "Ordinary group torsion-freeness is defined by `g ^ n = 1` for positive `n` implying `g = 1`; Mathlib's `IsMulTorsionFree` was deliberately not used because for noncommutative groups it imposes injectivity of every power map, a stronger unique-root condition.",
+    "Isolation is closure under positive natural roots: `g ^ n ∈ H` with `0 < n` implies `g ∈ H`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's bundled `GrpCat` and typeclass predicates; neither directly represents a quantified class of groups for this statement.",
+     "name": "GroupProperty",
+     "why_needed": "Provides a universe-local type for a class/property of groups that can be quantified over."
+    },
+    {
+     "closest_existing_considered": "Mathlib subgroup suprema (`sSup`) provide the construction, but no group-radical operator exists.",
+     "name": "radicalSubgroup",
+     "why_needed": "Defines the subgroup denoted `𝔛(G)` as the subgroup generated by all normal `𝔛`-subgroups."
+    },
+    {
+     "closest_existing_considered": "Searched for radical classes and group radicals; similarly named ring/Jacobson/Frattini radicals do not express this notion.",
+     "name": "IsRadicalClass",
+     "why_needed": "The Kurosh–Amitsur/Plotkin notion of a radical class of groups is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "No hereditary group-radical primitive was found.",
+     "name": "IsHereditaryRadical",
+     "why_needed": "Adds closure under subgroups to the radical-class notion, as required by the source."
+    },
+    {
+     "closest_existing_considered": "Built from `Group.FG` and `Group.IsNilpotent`.",
+     "name": "IsLocallyNilpotent",
+     "why_needed": "Mathlib defines nilpotent and finitely generated groups/subgroups but not locally nilpotent groups."
+    },
+    {
+     "closest_existing_considered": "`IsMulTorsionFree`, `IsOfFinOrder`, and torsion APIs were inspected; an explicit positive-power condition is the faithful notion here.",
+     "name": "IsGroupTorsionFree",
+     "why_needed": "Ordinary nonabelian group torsion-freeness is needed; Mathlib's `IsMulTorsionFree` is strictly stronger because it requires all nonzero power maps to be injective."
+    },
+    {
+     "closest_existing_considered": "Searches found only specialized lemmas mentioning isolated elements/subgroups, not the required predicate.",
+     "name": "IsIsolated",
+     "why_needed": "No general Mathlib predicate for an isolated subgroup in the root-closed sense was found."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.45»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.45»": "/--\nLet $\\mathfrak X$ be a hereditary radical. Is it true that, in every locally\nnilpotent torsion-free group $G$, the subgroup $\\mathfrak X(G)$ is isolated?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (X : GroupProperty), IsHereditaryRadical X →\n      ∀ (G : Type) [Group G], IsLocallyNilpotent G → IsGroupTorsionFree G →\n        IsIsolated (radicalSubgroup X G) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.45\n\nby B. I. Plotkin\n\nLet $\\mathfrak X$ be a hereditary radical. Is it true that, in a locally\nnilpotent torsion-free group $G$, the subgroup $\\mathfrak X(G)$ is isolated?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«3.45»\n\n/-- A class of groups (in the fixed universe used in the conjecture). -/\nabbrev GroupClass := (G : Type) → [Group G] → Prop\n\n/-- The radical of a group class $\\mathfrak X$ in $G$: the join of all normal\nsubgroups of $G$ which belong to $\\mathfrak X$. -/\ndef radical (𝔛 : GroupClass) (G : Type) [Group G] : Subgroup G :=\n  sSup {H : Subgroup G | H.Normal ∧ 𝔛 H}\n\n/-- A group class is a hereditary radical if it is closed under surjective\nhomomorphic images, its radical belongs to the class in every group, and it is\nclosed under taking subgroups. -/\ndef IsHereditaryRadical (𝔛 : GroupClass) : Prop :=\n  (∀ {G K : Type} [Group G] [Group K] (f : G →* K),\n      Function.Surjective f → 𝔛 G → 𝔛 K) ∧\n  (∀ (G : Type) [Group G], 𝔛 (radical 𝔛 G)) ∧\n  (∀ (G : Type) [Group G] (H : Subgroup G), 𝔛 G → 𝔛 H)\n\n/-- A group is locally nilpotent if each of its finitely generated subgroups is\nnilpotent. -/\ndef IsLocallyNilpotent (G : Type) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Group.IsNilpotent H\n\n/-- A subgroup $H$ is isolated if it is closed under taking roots: whenever\n$g^n \\in H$ for some positive integer $n$, one has $g \\in H$. -/\ndef IsIsolated {G : Type} [Group G] (H : Subgroup G) : Prop :=\n  ∀ (g : G) (n : ℕ), 0 < n → g ^ n ∈ H → g ∈ H\n\n/--\nLet $\\mathfrak X$ be a hereditary radical. Is it true that, in every locally\nnilpotent torsion-free group $G$, the subgroup $\\mathfrak X(G)$ is isolated?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : GroupClass), IsHereditaryRadical 𝔛 →\n    ∀ (G : Type) [Group G], IsLocallyNilpotent G → IsMulTorsionFree G →\n      IsIsolated (radical 𝔛 G) := by\n  sorry\n\nend Kourovka.«3.45»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A group radical is represented by its Kurosh–Amitsur radical class: a class closed under surjective homomorphic images and containing, in every group, the join of all normal subgroups in the class. The associated subgroup 𝔛(G) is defined to be that join.",
+    "Heredity is expressed as closure of the radical class under all subgroups.",
+    "Local nilpotence means that every finitely generated subgroup is nilpotent, using Mathlib's `Subgroup.FG` and `Group.IsNilpotent`.",
+    "Torsion-freeness uses Mathlib's `IsMulTorsionFree`. Isolation is root-closure for positive natural powers."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "No group-class abstraction suitable for Kurosh–Amitsur radicals was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«3.45».GroupClass",
+     "why_needed": "Provides the type of classes of groups over which the hereditary radical is quantified."
+    },
+    {
+     "closest_existing_considered": "Mathlib has radicals for ideals and Lie algebras, but no radical of a class of groups.",
+     "name": "Kourovka.«3.45».radical",
+     "why_needed": "Defines the subgroup 𝔛(G) associated to a radical class as the join of its normal subgroups in G."
+    },
+    {
+     "closest_existing_considered": "No group-theoretic hereditary radical or radical-class predicate was found in Mathlib, FormalConjecturesForMathlib, or nearby conjecture files.",
+     "name": "Kourovka.«3.45».IsHereditaryRadical",
+     "why_needed": "The source's Kurosh–Amitsur/Plotkin notion of a hereditary radical has no existing primitive."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Group.IsNilpotent` and `Subgroup.FG` supply the components but not the local notion.",
+     "name": "Kourovka.«3.45».IsLocallyNilpotent",
+     "why_needed": "Mathlib has nilpotent groups but no predicate for groups whose finitely generated subgroups are all nilpotent."
+    },
+    {
+     "closest_existing_considered": "Searches found only unrelated topological/order uses of 'isolated'; no root-closed subgroup predicate exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«3.45».IsIsolated",
+     "why_needed": "The group-theoretic notion of an isolated (root-closed) subgroup is absent."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.45»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.45»": "/--\nLet $\\mathfrak X$ be a hereditary radical. Is it true that, in every locally\nnilpotent torsion-free group $G$, the subgroup $\\mathfrak X(G)$ is isolated?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.45» : answer(sorry) ↔\n    ∀ (𝔛 : GroupClass), IsHereditaryRadical 𝔛 →\n    ∀ (G : Type) [Group G], IsLocallyNilpotent G → IsMulTorsionFree G →\n      IsIsolated (radical 𝔛 G) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«3.45»": "c05"
+ },
+ "id": "kourovka-3.45",
+ "main_attempt": "c05"
+}

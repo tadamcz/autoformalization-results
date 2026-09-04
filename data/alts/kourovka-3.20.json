@@ -1,0 +1,529 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.20\n\nby A. I. Kokorin\n\nDoes the class of orderable groups coincide with the smallest axiomatizable class\ncontaining pro-orderable groups? (See 1.35.)\n\nAll orders on a group are two-sided invariant here: a *partial order* of a group\n$G$ is a partial order $\\leq$ on $G$ such that $a \\leq b$ implies $ca \\leq cb$ and\n$ac \\leq bc$ for all $a, b, c \\in G$. A group is *orderable* if it admits a linear\norder of this kind. Following Problem 1.35, a group is *pro-orderable* (an\n$O^*$-group) if each of its partial orders can be extended to a linear order.\nA class of groups is *axiomatizable* if it is the class of all models of some set\nof first-order sentences in the language of groups. The smallest axiomatizable\nclass containing the pro-orderable groups is the class of models of their\nfirst-order theory.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen FirstOrder FirstOrder.Language\n\nnamespace Kourovka.«3.20»\n\n/-- The function symbols of the first-order language of groups: a binary\nmultiplication, a unary inversion and a constant for the identity. -/\ninductive GroupFunc : ℕ → Type\n  | mul : GroupFunc 2\n  | inv : GroupFunc 1\n  | one : GroupFunc 0\n\n/-- The first-order language of groups, with function symbols `*`, `⁻¹` and `1`\nand no relation symbols. -/\ndef groupLanguage : Language where\n  Functions := GroupFunc\n  Relations _ := Empty\n\n/-- Every group is a structure for the language of groups, with the symbols\ninterpreted by the group operations. -/\ninstance (G : Type*) [Group G] : groupLanguage.Structure G where\n  funMap {n} f :=\n    match n, f with\n    | _, .mul => fun x => x 0 * x 1\n    | _, .inv => fun x => (x 0)⁻¹\n    | _, .one => fun _ => 1\n  RelMap r := (r : Empty).elim\n\n/-- A binary relation on a group is bi-invariant if it is preserved by\nmultiplication on the left and on the right. -/\ndef IsBiInvariant {G : Type*} [Group G] (r : G → G → Prop) : Prop :=\n  Covariant G G (· * ·) r ∧ Covariant G G (Function.swap (· * ·)) r\n\n/-- A group is orderable if it admits a bi-invariant linear order. -/\ndef IsOrderable (G : Type*) [Group G] : Prop :=\n  ∃ r : G → G → Prop, IsLinearOrder G r ∧ IsBiInvariant r\n\n/-- A group is pro-orderable (an $O^*$-group) if every bi-invariant partial order\non it can be extended to a bi-invariant linear order. -/\ndef IsProOrderable (G : Type*) [Group G] : Prop :=\n  ∀ r : G → G → Prop, IsPartialOrder G r → IsBiInvariant r →\n    ∃ s : G → G → Prop, IsLinearOrder G s ∧ IsBiInvariant s ∧ ∀ a b, r a b → s a b\n\n/-- A class `C` of groups is axiomatizable if there is a set `T` of first-order\nsentences in the language of groups such that a group belongs to `C` exactly when\nit is a model of `T`. -/\ndef IsAxiomatizable (C : Set GrpCat) : Prop :=\n  ∃ T : groupLanguage.Theory, ∀ G : GrpCat, G ∈ C ↔ G ⊨ T\n\n/--\nDoes the class of orderable groups coincide with the smallest axiomatizable class\ncontaining pro-orderable groups?\n\nThe statement says that the class of orderable groups is the least element, under\ninclusion, of the family of axiomatizable classes of groups that contain every\npro-orderable group. Every pro-orderable group is orderable and the class of\norderable groups is axiomatizable, so this asks whether every orderable group\nsatisfies every first-order sentence that holds in all pro-orderable groups.\n-/\n@[category research open, AMS 3 6 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    IsLeast {C : Set GrpCat.{0} | IsAxiomatizable C ∧ {G : GrpCat | IsProOrderable G} ⊆ C}\n      {G : GrpCat | IsOrderable G} := by\n  sorry\n\n/-- Every pro-orderable group is orderable: the trivial partial order extends to\na bi-invariant linear order. -/\n@[category API, AMS 6 20]\ntheorem IsProOrderable.isOrderable {G : Type*} [Group G] (h : IsProOrderable G) :\n    IsOrderable G := by\n  obtain ⟨s, hs, hs', -⟩ := h (· = ·)\n    { refl := fun _ => rfl, trans := fun _ _ _ => Eq.trans, antisymm := fun _ _ h _ => h }\n    ⟨fun _ _ _ h => congrArg _ h, fun _ _ _ h => congrArg (· * _) h⟩\n  exact ⟨s, hs, hs'⟩\n\n@[category test, AMS 6 20]\ntheorem isOrderable_multiplicative_int : IsOrderable (Multiplicative ℤ) :=\n  ⟨(· ≤ ·), inferInstance, fun _ _ _ h => mul_le_mul_right h _,\n    fun _ _ _ h => mul_le_mul_left h _⟩\n\n/-- The sentence $\\forall x\\, \\forall y,\\ x y = y x$ of the language of groups. -/\ndef commSentence : groupLanguage.Sentence :=\n  ∀' ∀' (Functions.apply₂ (GroupFunc.mul : groupLanguage.Functions 2) (&0) (&1) ='\n    Functions.apply₂ (GroupFunc.mul : groupLanguage.Functions 2) (&1) (&0))\n\n@[category test, AMS 3 20]\ntheorem multiplicative_int_models_commSentence : Multiplicative ℤ ⊨ commSentence := by\n  simp only [commSentence, Sentence.Realize, Formula.Realize, BoundedFormula.realize_all,\n    BoundedFormula.realize_bdEqual, Term.realize_functions_apply₂]\n  intro x y\n  exact mul_comm x y\n\n@[category test, AMS 3 20]\ntheorem not_perm_models_commSentence : ¬ Equiv.Perm (Fin 3) ⊨ commSentence := by\n  simp only [commSentence, Sentence.Realize, Formula.Realize, BoundedFormula.realize_all,\n    BoundedFormula.realize_bdEqual, Term.realize_functions_apply₂]\n  intro h\n  have := congrArg (· 0) (h (Equiv.swap 0 1) (Equiv.swap 1 2))\n  exact absurd this (by decide)\n\nend Kourovka.«3.20»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot table is correct; the '(See 1.35.)' cross-reference only supplies the definition of pro-orderable groups.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Coincide with the smallest axiomatizable class containing pro-orderable groups' is rendered literally as `IsLeast` of the family of axiomatizable classes containing all pro-orderable groups, evaluated at the class of orderable groups. This packages three claims (orderable groups form an axiomatizable class; pro-orderable ⇒ orderable; every axiomatizable class containing the pro-orderable groups contains all orderable groups); the first two are known theorems (Łoś; trivial), so the statement is equivalent to the reading 'every orderable group is a model of Th(pro-orderable groups)' given in the decomposition notes. It does not rely on the fact that the intersection of axiomatizable classes is axiomatizable.",
+    "Classes of groups are modelled as `Set GrpCat.{0}` (sets of bundled groups in `Type`), consistent with the other Kourovka files quantifying over `(G : Type)`. The definitions are universe-polymorphic; only the theorem pins universe 0.",
+    "All orders are two-sided (bi-)invariant, as in Kokorin–Kopytov's theory of (partially) ordered groups; 'orderable' is bi-orderable (O-group), not left/right-orderable.",
+    "'Pro-orderable' follows Problem 1.35 / the O*-group definition: every bi-invariant partial order on the group extends (as a relation, i.e. r ⊆ s) to a bi-invariant linear order. Orders are represented as relations `G → G → Prop` with Mathlib's `IsPartialOrder`/`IsLinearOrder` rather than as `PartialOrder`/`LinearOrder` instances, to avoid instance-juggling between two orders on the same type.",
+    "'Axiomatizable' is first-order axiomatizable by an arbitrary (possibly infinite) set of sentences, in the signature {·, ⁻¹, 1}; finite axiomatizability is not intended (a smallest finitely axiomatizable class need not exist), and the choice of signature does not change which classes of groups are axiomatizable.",
+    "The `groupLanguage.Structure` instance is a global (non-scoped) instance on any `Group`; it cannot clash with anything since `groupLanguage` is bespoke and namespaced."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FirstOrder.Language.ring (Mathlib/ModelTheory/Algebra/Ring/Basic.lean), FirstOrder.Language.graph, Language.mk₂ — none is the language of groups.",
+     "name": "Kourovka.«3.20».GroupFunc / groupLanguage",
+     "why_needed": "Mathlib's ModelTheory has `Language.ring` but no first-order language of groups; needed to talk about first-order axiomatizable classes of groups. Signature {·, ⁻¹, 1}; since 1 and ⁻¹ are first-order definable from · in groups, the axiomatizable classes are the same as for the signature {·}."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Ring.compatibleRingOfRing (for rings only).",
+     "name": "instance : groupLanguage.Structure G for [Group G]",
+     "why_needed": "Interprets the symbols by the group operations so that `G ⊨ T` makes sense for a group `G`. Tested by `multiplicative_int_models_commSentence` and `not_perm_models_commSentence`."
+    },
+    {
+     "closest_existing_considered": "MulLeftMono/MulRightMono, IsOrderedMonoid (CommMonoid only), GroupCone (CommGroup only).",
+     "name": "Kourovka.«3.20».IsBiInvariant",
+     "why_needed": "Two-sided invariance of a relation on a group, `Covariant G G (· * ·) r ∧ Covariant G G (swap (· * ·)) r`; needed because Mathlib's ordered-group classes (`IsOrderedMonoid`, `GroupCone`, `LinearOrderedCommGroup`) require commutativity, and `MulLeftMono`/`MulRightMono` are tied to an `LE` instance rather than an arbitrary relation."
+    },
+    {
+     "closest_existing_considered": "LinearOrderedCommGroup / IsOrderedMonoid (commutative only; also bundled data rather than a predicate on the group).",
+     "name": "Kourovka.«3.20».IsOrderable",
+     "why_needed": "'Orderable group' = admits a bi-invariant linear order (`∃ r, IsLinearOrder G r ∧ IsBiInvariant r`). Not in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "None; IsPartialOrder / IsLinearOrder (unbundled relation classes) were reused for the order axioms.",
+     "name": "Kourovka.«3.20».IsProOrderable",
+     "why_needed": "Kokorin's 'pro-orderable' (O*-group) from Problem 1.35: every bi-invariant partial order extends to a bi-invariant linear order. Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.ModelType, Theory.Model, completeTheory.",
+     "name": "Kourovka.«3.20».IsAxiomatizable",
+     "why_needed": "A class `C : Set GrpCat` of groups is axiomatizable iff `∃ T : groupLanguage.Theory, ∀ G, G ∈ C ↔ G ⊨ T`. Mathlib has `Theory.Model`, `Theory.ModelType` and `completeTheory` but no notion of an axiomatizable/elementary class."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«3.20».commSentence",
+     "why_needed": "Only used by the two `category test` theorems to check that the `groupLanguage.Structure` instance interprets multiplication correctly (holds in `Multiplicative ℤ`, fails in `Perm (Fin 3)`)."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.20»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ IsLeast {C : Set GrpCat.{0} | IsAxiomatizable C ∧ {G | IsProOrderable G} ⊆ C} {G | IsOrderable G}`: the class of orderable groups is the least (under inclusion) axiomatizable class of groups containing all pro-orderable groups. Mathlib has no first-order language of groups and no notion of (bi-)orderable / O*-group, so these were defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.20»": "/--\nDoes the class of orderable groups coincide with the smallest axiomatizable class\ncontaining pro-orderable groups?\n\nThe statement says that the class of orderable groups is the least element, under\ninclusion, of the family of axiomatizable classes of groups that contain every\npro-orderable group. Every pro-orderable group is orderable and the class of\norderable groups is axiomatizable, so this asks whether every orderable group\nsatisfies every first-order sentence that holds in all pro-orderable groups.\n-/\n@[category research open, AMS 3 6 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    IsLeast {C : Set GrpCat.{0} | IsAxiomatizable C ∧ {G : GrpCat | IsProOrderable G} ⊆ C}\n      {G : GrpCat | IsOrderable G} := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.20\n\nby A. I. Kokorin\n\nDoes the class of orderable groups coincide with the smallest axiomatizable class containing\npro-orderable groups? Here an orderable group has a bi-invariant linear order, and a pro-orderable\n(or O*-group) is a group in which every bi-invariant partial order extends to a bi-invariant linear\norder.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«3.20»\n\nopen FirstOrder\n\n/-- The function symbols for the first-order language of groups. -/\ninductive groupFunc : ℕ → Type\n  | mul : groupFunc 2\n  | inv : groupFunc 1\n  | one : groupFunc 0\n  deriving DecidableEq\n\n/-- The first-order language of groups, with multiplication, inverse, and identity symbols. -/\ndef groupLanguage : Language where\n  Functions := groupFunc\n  Relations := fun _ => Empty\n\n/-- The canonical interpretation of the first-order group language on a group. -/\ndef groupStructure (G : Type) [Group G] : groupLanguage.Structure G where\n  funMap := fun {n} f =>\n    match n, f with\n    | _, .mul => fun x => x 0 * x 1\n    | _, .inv => fun x => (x 0)⁻¹\n    | _, .one => fun _ => 1\n  RelMap := fun {_} r => r.elim\n\n/-- A group satisfies a sentence when the sentence holds in its canonical first-order group\nstructure. -/\ndef SatisfiesGroupSentence (G : Type) [Group G] (φ : groupLanguage.Sentence) : Prop :=\n  @Language.Sentence.Realize groupLanguage G (groupStructure G) φ\n\n/-- A relation on a group is bi-invariant if left and right multiplication preserve and reflect\nit. -/\ndef IsBiInvariant {G : Type*} [Group G] (r : G → G → Prop) : Prop :=\n  ∀ a b c, (r a b ↔ r (c * a) (c * b)) ∧ (r a b ↔ r (a * c) (b * c))\n\n/-- A group partial order is a bi-invariant partial order on the underlying type. -/\ndef IsGroupPartialOrder (G : Type*) [Group G] (r : G → G → Prop) : Prop :=\n  IsPartialOrder G r ∧ IsBiInvariant r\n\n/-- A group linear order is a bi-invariant linear order on the underlying type. -/\ndef IsGroupLinearOrder (G : Type*) [Group G] (r : G → G → Prop) : Prop :=\n  IsLinearOrder G r ∧ IsBiInvariant r\n\n/-- A group is orderable if it admits a bi-invariant linear order. -/\ndef IsOrderable (G : Type*) [Group G] : Prop :=\n  ∃ r : G → G → Prop, IsGroupLinearOrder G r\n\n/-- A group is pro-orderable (an O*-group) if each of its bi-invariant partial orders extends to a\nbi-invariant linear order. -/\ndef IsProOrderable (G : Type*) [Group G] : Prop :=\n  ∀ r : G → G → Prop, IsGroupPartialOrder G r →\n    ∃ s : G → G → Prop, IsGroupLinearOrder G s ∧ ∀ ⦃a b⦄, r a b → s a b\n\n/-- The first-order theory consisting of the group-language sentences true in every pro-orderable\ngroup. -/\ndef proOrderableTheory : groupLanguage.Theory :=\n  {φ | ∀ (G : Type) [Group G], IsProOrderable G → SatisfiesGroupSentence G φ}\n\n/-- A group is a model of the common first-order theory of the pro-orderable groups. -/\ndef ModelsProOrderableTheory (G : Type) [Group G] : Prop :=\n  ∀ φ ∈ proOrderableTheory, SatisfiesGroupSentence G φ\n\n/--\nDoes the class of orderable groups coincide with the smallest first-order axiomatizable class\ncontaining the pro-orderable groups? Equivalently, does every group admitting a bi-invariant linear\norder satisfy every first-order group sentence that holds in every group whose bi-invariant partial\norders all extend to bi-invariant linear orders?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsOrderable G → ModelsProOrderableTheory G := by\n  sorry\n\nend Kourovka.«3.20»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used the decomposition's equivalent formulation: the unknown positive answer says that every orderable group models the first-order theory common to all pro-orderable groups.",
+    "Represented partial and linear group orders as binary relations satisfying Mathlib's IsPartialOrder or IsLinearOrder laws and invariance under both left and right multiplication.",
+    "Represented extension of a partial order by a linear order as inclusion of their binary relations.",
+    "Used a problem-local first-order group language with multiplication, inverse, and identity, because Mathlib provides first-order semantics but no first-order language of groups.",
+    "Quantified over groups whose carriers lie in Type, consistently in both the common theory and the conjecture."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's FirstOrder.ringFunc is analogous but includes ring operations and is not a faithful group signature.",
+     "name": "groupFunc",
+     "why_needed": "Supplies the indexed multiplication, inverse, and identity symbols for a first-order group signature."
+    },
+    {
+     "closest_existing_considered": "Mathlib's FirstOrder.Language.ring and general FirstOrder.Language; no group-language specialization was found.",
+     "name": "groupLanguage",
+     "why_needed": "A first-order group language is required to express axiomatizability and the common theory of pro-orderable groups."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Ring.compatibleRingOfRing provides the analogous construction only for the ring language.",
+     "name": "groupStructure",
+     "why_needed": "Interprets the custom group language canonically on each Lean Group."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Sentence.Realize, which this definition specializes to canonical group structures.",
+     "name": "SatisfiesGroupSentence",
+     "why_needed": "Evaluates group-language sentences using the canonical group structure without installing a potentially conflicting global typeclass instance."
+    },
+    {
+     "closest_existing_considered": "Mathlib's MulLeftMono and MulRightMono typeclasses require an installed LE instance and are less suitable for quantifying over many relations on one group.",
+     "name": "IsBiInvariant",
+     "why_needed": "Expresses preservation and reflection of an order relation under left and right group multiplication."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsPartialOrder handles the order laws but not compatibility with group multiplication.",
+     "name": "IsGroupPartialOrder",
+     "why_needed": "Packages the precise notion of a bi-invariant partial order quantified over in the definition of pro-orderability."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsLinearOrder handles the order laws but not compatibility with group multiplication.",
+     "name": "IsGroupLinearOrder",
+     "why_needed": "Packages the precise notion of a bi-invariant linear order used for orderability and order extensions."
+    },
+    {
+     "closest_existing_considered": "A hard search found no existing predicate for existence of a bi-order on a group; installed LinearOrder and multiplication-monotonicity classes describe a chosen order rather than existential orderability.",
+     "name": "IsOrderable",
+     "why_needed": "States existence of a bi-invariant linear order without changing the Group's typeclass instances."
+    },
+    {
+     "closest_existing_considered": "No pro-orderable or O*-group definition was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsProOrderable",
+     "why_needed": "Formalizes Kokorin's O*-group terminology: every bi-invariant partial order extends to a bi-invariant linear order."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.completeTheory handles one structure, not the intersection of theories of a predicate-defined class of structures.",
+     "name": "proOrderableTheory",
+     "why_needed": "Constructs the common first-order theory of all pro-orderable groups, whose models form the smallest elementary class containing them."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.Model was considered, but this wrapper fixes the canonical custom group structure explicitly and avoids local instance plumbing.",
+     "name": "ModelsProOrderableTheory",
+     "why_needed": "States that a group satisfies every sentence in the common theory of pro-orderable groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.20»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.20»": "/--\nDoes the class of orderable groups coincide with the smallest first-order axiomatizable class\ncontaining the pro-orderable groups? Equivalently, does every group admitting a bi-invariant linear\norder satisfy every first-order group sentence that holds in every group whose bi-invariant partial\norders all extend to bi-invariant linear orders?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsOrderable G → ModelsProOrderableTheory G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.20\n\nby A. I. Kokorin\n\nDoes the class of orderable groups coincide with the smallest axiomatizable class\ncontaining pro-orderable groups? (See 1.35.)\n\nHere a group is *orderable* if it admits a linear order that is invariant under\nmultiplication on the left and on the right. In the terminology of Problem 1.35, a group is\n*pro-orderable* (an $O^*$-group) if each of its two-sided invariant partial orders\ncan be extended to a two-sided invariant linear order. A class of groups is\n*axiomatizable* if it consists of all groups satisfying some set of first-order\nsentences in the language of groups. The smallest axiomatizable class containing\nthe pro-orderable groups is the intersection of all axiomatizable classes that\ncontain them, i.e. the class of models of the first-order theory of the\npro-orderable groups.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«3.20»\n\nopen FirstOrder Language Structure\n\n/-- A relation `≤` on a group `G` is *two-sided invariant* if `a ≤ b` implies\n`c * a ≤ c * b` and `a * c ≤ b * c` for all `a b c : G`. -/\ndef IsBiInvariant (G : Type*) [Group G] [LE G] : Prop :=\n  MulLeftMono G ∧ MulRightMono G\n\n/-- A group is *orderable* if it admits a two-sided invariant linear order. -/\ndef IsOrderable (G : Type*) [Group G] : Prop :=\n  ∃ _ : LinearOrder G, IsBiInvariant G\n\n/-- A group `G` is *pro-orderable* (an $O^*$-group) if every two-sided invariant partial\norder `p` on `G` can be extended to a two-sided invariant linear order `l` on `G`, i.e.\n`x ≤ y` for `p` implies `x ≤ y` for `l`. -/\ndef IsProOrderable (G : Type*) [Group G] : Prop :=\n  ∀ p : PartialOrder G, @IsBiInvariant G _ p.toLE →\n    ∃ l : LinearOrder G, @IsBiInvariant G _ l.toLE ∧ ∀ x y : G, p.le x y → l.le x y\n\n/-- The function symbols of the first-order language of groups: multiplication, inversion\nand the identity. -/\ninductive GroupFunc : ℕ → Type\n  | mul : GroupFunc 2\n  | inv : GroupFunc 1\n  | one : GroupFunc 0\n\n/-- The first-order language of groups, with function symbols `*`, `⁻¹` and `1` and no\nrelation symbols. -/\ndef Language.group : Language :=\n  { Functions := GroupFunc\n    Relations := fun _ => Empty }\n  deriving Language.IsAlgebraic\n\n/-- `GroupFunc.mul`, with the defeq type `Language.group.Functions 2`. -/\nabbrev mulFunc : Language.group.Functions 2 := GroupFunc.mul\n\n/-- `GroupFunc.inv`, with the defeq type `Language.group.Functions 1`. -/\nabbrev invFunc : Language.group.Functions 1 := GroupFunc.inv\n\n/-- `GroupFunc.one`, with the defeq type `Language.group.Functions 0`. -/\nabbrev oneFunc : Language.group.Functions 0 := GroupFunc.one\n\n/-- Every group is a structure for the language of groups, interpreting the symbols by the\ngroup operations. -/\ninstance (G : Type*) [Group G] : Language.group.Structure G where\n  funMap {n} f := match n, f with\n    | _, .mul => fun x => x 0 * x 1\n    | _, .inv => fun x => (x 0)⁻¹\n    | _, .one => fun _ => 1\n\n/-- A class `C` of groups is *axiomatizable* if there is a set `T` of first-order sentences\nin the language of groups such that `C` consists exactly of the groups that are models\nof `T`. -/\ndef IsAxiomatizable (C : ∀ (G : Type) [Group G], Prop) : Prop :=\n  ∃ T : Language.group.Theory, ∀ (G : Type) [Group G], C G ↔ G ⊨ T\n\n/-- Every pro-orderable group is orderable: extend the trivial partial order. -/\n@[category API, AMS 6 20]\ntheorem IsProOrderable.isOrderable {G : Type*} [Group G] (h : IsProOrderable G) :\n    IsOrderable G := by\n  obtain ⟨l, hl, -⟩ := h\n    { le := (· = ·)\n      le_refl := fun _ => rfl\n      le_trans := fun _ _ _ => Eq.trans\n      le_antisymm := fun _ _ h _ => h }\n    ⟨⟨fun _ _ _ h => congrArg _ h⟩, ⟨fun _ _ _ h => congrArg (· * _) h⟩⟩\n  exact ⟨l, hl⟩\n\n/-- A group belongs to every axiomatizable class containing the pro-orderable groups (that is,\nto the smallest such class) if and only if it is a model of the first-order theory of the\npro-orderable groups. -/\n@[category API, AMS 3 20]\ntheorem forall_isAxiomatizable_iff_model (G : Type) [Group G] :\n    (∀ C : ∀ (H : Type) [Group H], Prop, IsAxiomatizable C →\n      (∀ (H : Type) [Group H], IsProOrderable H → C H) → C G) ↔\n    G ⊨ ({φ | ∀ (H : Type) [Group H], IsProOrderable H → H ⊨ φ} : Language.group.Theory) := by\n  constructor\n  · intro h\n    exact h (fun H _ => H ⊨ ({φ | ∀ (H : Type) [Group H], IsProOrderable H → H ⊨ φ} :\n      Language.group.Theory)) ⟨_, fun _ _ => Iff.rfl⟩ fun H _ hH => ⟨fun φ hφ => hφ H hH⟩\n  · intro h C ⟨T, hT⟩ hC\n    refine (hT G).2 ⟨fun φ hφ => h.realize_of_mem φ ?_⟩\n    exact fun H _ hH => ((hT H).1 (hC H hH)).realize_of_mem φ hφ\n\n@[category test, AMS 6 20]\ntheorem isOrderable_multiplicative_int : IsOrderable (Multiplicative ℤ) :=\n  ⟨inferInstance, inferInstance, inferInstance⟩\n\n@[category test, AMS 3 20]\ntheorem funMap_mul {G : Type*} [Group G] (a b : G) :\n    funMap mulFunc ![a, b] = a * b :=\n  rfl\n\n@[category test, AMS 3 20]\ntheorem funMap_inv {G : Type*} [Group G] (a : G) :\n    funMap invFunc ![a] = a⁻¹ :=\n  rfl\n\n@[category test, AMS 3 20]\ntheorem funMap_one {G : Type*} [Group G] :\n    funMap oneFunc ![] = (1 : G) :=\n  rfl\n\n/--\nDoes the class of orderable groups coincide with the smallest axiomatizable class\ncontaining pro-orderable groups?\n\nThat is, is a group $G$ orderable if and only if $G$ belongs to every axiomatizable\nclass of groups that contains all pro-orderable groups?\n-/\n@[category research open, AMS 3 6 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsOrderable G ↔\n        ∀ C : ∀ (H : Type) [Group H], Prop, IsAxiomatizable C →\n          (∀ (H : Type) [Group H], IsProOrderable H → C H) → C G := by\n  sorry\n\nend Kourovka.«3.20»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.88,
+   "decomposition_objections": "None. The single-slot decomposition is correct; the '(See 1.35.)' cross-reference only supplies the terminology 'pro-orderable' and adds no further question. I stated the question as a class equality (biconditional) rather than the note's equivalent one-inclusion simplification, since the two agree in truth value and the biconditional is closer to the text.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Orderable' is taken as bi-orderable (linear order invariant under left and right multiplication), following Kokorin's usage and the decomposition note; left-orderability was not intended.",
+    "'Partial order of a group' in the definition of pro-orderable is taken as a two-sided invariant partial order (standard in Fuchs / Kokorin–Kopytov); the trivial order counts, so pro-orderable ⇒ orderable (proved as API lemma IsProOrderable.isOrderable).",
+    "'Smallest axiomatizable class containing K' is formalized literally as membership in every axiomatizable class containing K (i.e. the intersection); the API lemma forall_isAxiomatizable_iff_model proves this is equivalent to being a model of Th(K) = {φ | every pro-orderable group ⊨ φ}, which is the decomposition note's reading.",
+    "'Coincide' is formalized as a biconditional for every group (class equality), not only the inclusion O ⊆ Mod(Th(O*)); the other inclusion is a known theorem (orderable groups form an axiomatizable class, Łoś), so the two formulations have the same truth value but the biconditional is the more literal one.",
+    "The first-order language of groups is taken with signature {*, ⁻¹, 1}. Since inverse and identity are first-order definable from multiplication, the axiomatizable classes of groups are the same for any of the usual group signatures.",
+    "All groups (both the group G being classified and the groups quantified over in the definitions of axiomatizable class and of the theory of pro-orderable groups) live in universe `Type`, following the repository convention (e.g. Kourovka 1.40, 1.74, 19.25).",
+    "Classes of groups are represented as predicates `∀ (G : Type) [Group G], Prop`; axiomatizable classes are automatically closed under isomorphism, so no isomorphism-invariance hypothesis is needed.",
+    "Orders are quantified as Mathlib `PartialOrder G` / `LinearOrder G` structures with explicit `@IsBiInvariant G _ p.toLE` to avoid instance ambiguity; extension is expressed as `∀ x y, p.le x y → l.le x y`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "IsOrderedMonoid / IsOrderedCancelMonoid (need CommMonoid); MulLeftMono, MulRightMono (used as the two conjuncts).",
+     "name": "Kourovka.«3.20».IsBiInvariant",
+     "why_needed": "Two-sided invariance of an order relation on a (non-commutative) group: MulLeftMono G ∧ MulRightMono G. Mathlib's bundled `IsOrderedMonoid` requires `CommMonoid`, so it cannot express bi-invariance for arbitrary groups."
+    },
+    {
+     "closest_existing_considered": "LinearOrderedCommGroup-style bundled classes (commutative only, and a class rather than an existence predicate).",
+     "name": "Kourovka.«3.20».IsOrderable",
+     "why_needed": "'Orderable group' (O-group): ∃ LinearOrder G that is two-sided invariant. No such predicate exists in Mathlib or FormalConjecturesForMathlib (grepped for orderable/BiOrder/LeftOrder)."
+    },
+    {
+     "closest_existing_considered": "None; Mathlib has no notion of extending compatible partial orders on groups.",
+     "name": "Kourovka.«3.20».IsProOrderable",
+     "why_needed": "Kokorin's 'pro-orderable' (O*-group): every two-sided invariant PartialOrder on G extends to a two-sided invariant LinearOrder on G. Nothing comparable exists in Mathlib."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.ring / FirstOrder.Ring.CompatibleRing (rings only); FirstOrder.Language.empty / Language.mk₂.",
+     "name": "Kourovka.«3.20».GroupFunc, Kourovka.«3.20».Language.group (with abbrevs mulFunc, invFunc, oneFunc and the Structure instance on any Group)",
+     "why_needed": "The first-order language of groups (symbols *, ⁻¹, 1; no relations) and the interpretation of every group as a structure for it, needed to talk about first-order theories/axiomatizable classes of groups. Mathlib only provides `Language.ring` (Mathlib/ModelTheory/Algebra/Ring) and no group language; the definition mirrors `Language.ring`/`compatibleRingOfRing`."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Theory.Model, Theory.ModelType (models of a fixed theory, not the notion of a class being axiomatizable).",
+     "name": "Kourovka.«3.20».IsAxiomatizable",
+     "why_needed": "An axiomatizable (elementary) class of groups: a predicate C on groups in `Type` such that for some theory T in the language of groups, C G ↔ G ⊨ T for all groups G. Mathlib has `Theory.Model` but no notion of an axiomatizable class of structures/groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.20»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: answer(sorry) ↔ ∀ (G : Type) [Group G], IsOrderable G ↔ (G belongs to every axiomatizable class of groups containing all pro-orderable groups). 'Coincide' is formalized literally as a biconditional on every group (equality of classes), not just the inclusion the note reduces it to; the reverse inclusion is a theorem (Łoś) so both readings agree. Needed bespoke definitions because Mathlib has no bi-orderable-group predicate and no first-order language of groups."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.20»": "/--\nDoes the class of orderable groups coincide with the smallest axiomatizable class\ncontaining pro-orderable groups?\n\nThat is, is a group $G$ orderable if and only if $G$ belongs to every axiomatizable\nclass of groups that contains all pro-orderable groups?\n-/\n@[category research open, AMS 3 6 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsOrderable G ↔\n        ∀ C : ∀ (H : Type) [Group H], Prop, IsAxiomatizable C →\n          (∀ (H : Type) [Group H], IsProOrderable H → C H) → C G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.20\n\nby A. I. Kokorin\n\nDoes the class of orderable groups coincide with the smallest first-order axiomatizable class\ncontaining pro-orderable groups?\n\nA pro-orderable group, also called an $O^*$-group, is a group for which every compatible partial\norder extends to a compatible linear order.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«3.20»\n\nopen FirstOrder\n\n/-- The function symbols of the first-order language of groups: the identity, inverse, and\nmultiplication. -/\ninductive GroupFunction : ℕ → Type\n  | one : GroupFunction 0\n  | inv : GroupFunction 1\n  | mul : GroupFunction 2\n\n/-- The first-order language of groups. -/\ndef groupLanguage : FirstOrder.Language where\n  Functions := GroupFunction\n  Relations := fun _ => Empty\n\n/-- The canonical interpretation of the first-order group language in a group. -/\ndef groupStructure (G : Type*) [Group G] : groupLanguage.Structure G where\n  funMap := fun f x => match f with\n    | .one => 1\n    | .inv => (x 0)⁻¹\n    | .mul => x 0 * x 1\n  RelMap := fun r => nomatch r\n\n/-- A partial order on a group compatible with multiplication on both sides. -/\ndef IsPartiallyOrderedGroup (G : Type*) [Group G] (r : G → G → Prop) : Prop :=\n  IsPartialOrder G r ∧\n    ∀ a b c, r a b → r (c * a) (c * b) ∧ r (a * c) (b * c)\n\n/-- A linear order on a group compatible with multiplication on both sides. -/\ndef IsLinearlyOrderedGroup (G : Type*) [Group G] (r : G → G → Prop) : Prop :=\n  IsLinearOrder G r ∧\n    ∀ a b c, r a b → r (c * a) (c * b) ∧ r (a * c) (b * c)\n\n/-- A group is orderable if it admits a compatible linear order. -/\ndef IsOrderable (G : Type*) [Group G] : Prop :=\n  ∃ r : G → G → Prop, IsLinearlyOrderedGroup G r\n\n/-- A group is pro-orderable if each compatible partial order on it extends to a compatible\nlinear order. -/\ndef IsProOrderable (G : Type*) [Group G] : Prop :=\n  ∀ r : G → G → Prop, IsPartiallyOrderedGroup G r →\n    ∃ s : G → G → Prop, IsLinearlyOrderedGroup G s ∧ ∀ a b, r a b → s a b\n\nuniverse u\n\n/--\nDoes the class of orderable groups coincide with the smallest first-order axiomatizable class\ncontaining the pro-orderable groups?\n\nEquivalently, does every orderable group satisfy every first-order sentence in the language of\ngroups that is true in every pro-orderable group?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type u) (_ : Group G), IsOrderable G →\n      ∀ φ : groupLanguage.Sentence,\n        (∀ (H : Type u) (_ : Group H), IsProOrderable H →\n          @FirstOrder.Language.Sentence.Realize groupLanguage H (groupStructure H) φ) →\n        @FirstOrder.Language.Sentence.Realize groupLanguage G (groupStructure G) φ := by\n  sorry\n\nend Kourovka.«3.20»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used the decomposition table's equivalent semantic formulation: an orderable group must realize every first-order group-language sentence realized by every pro-orderable group. These sentences form the theory of the class of pro-orderable groups, whose models are the smallest first-order axiomatizable class containing that class.",
+    "Represented group orders by non-strict binary relations. Compatibility requires invariance under multiplication on both the left and right; extension is inclusion of the original relation in a compatible linear order.",
+    "Quantified groups in an arbitrary universe `u`; the theorem is universe-polymorphic. All sentence evaluations use the canonical interpretation of the ordinary group language."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `FirstOrder.Language` framework and its ring/field languages; no first-order group language was found.",
+     "name": "GroupFunction",
+     "why_needed": "Supplies the identity, inverse, and multiplication symbols for the first-order language of groups."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language`; no pre-existing specialized group language was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "groupLanguage",
+     "why_needed": "Defines the ordinary first-order language in which the common theory of pro-orderable groups is expressed."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Structure` and canonical structures for other algebraic languages; no canonical group-language structure was found.",
+     "name": "groupStructure",
+     "why_needed": "Gives each Lean `Group` its canonical model structure for `groupLanguage`."
+    },
+    {
+     "closest_existing_considered": "Mathlib's unbundled `IsPartialOrder`; no predicate combining it with two-sided group compatibility was found.",
+     "name": "IsPartiallyOrderedGroup",
+     "why_needed": "Expresses a partial order invariant under group multiplication on both sides."
+    },
+    {
+     "closest_existing_considered": "Mathlib's unbundled `IsLinearOrder`; no predicate for a possibly noncommutative bi-linearly ordered group relation was found.",
+     "name": "IsLinearlyOrderedGroup",
+     "why_needed": "Expresses a linear order invariant under group multiplication on both sides."
+    },
+    {
+     "closest_existing_considered": "Mathlib order and ordered-algebra structures; no existential predicate for bi-orderability of an arbitrary group was found.",
+     "name": "IsOrderable",
+     "why_needed": "Expresses existence of a compatible linear order on a group without choosing an order as typeclass data."
+    },
+    {
+     "closest_existing_considered": "Mathlib's general `extend_partialOrder` theorem only extends abstract partial orders and does not preserve group compatibility; no pro-orderability predicate was found.",
+     "name": "IsProOrderable",
+     "why_needed": "Formalizes Kokorin's pro-orderable (`O^*`) groups as those for which every compatible partial order extends to a compatible linear order."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.20»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.20»": "/--\nDoes the class of orderable groups coincide with the smallest first-order axiomatizable class\ncontaining the pro-orderable groups?\n\nEquivalently, does every orderable group satisfy every first-order sentence in the language of\ngroups that is true in every pro-orderable group?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type u) (_ : Group G), IsOrderable G →\n      ∀ φ : groupLanguage.Sentence,\n        (∀ (H : Type u) (_ : Group H), IsProOrderable H →\n          @FirstOrder.Language.Sentence.Realize groupLanguage H (groupStructure H) φ) →\n        @FirstOrder.Language.Sentence.Realize groupLanguage G (groupStructure G) φ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.20\n\nby A. I. Kokorin\n\nDoes the class of orderable groups coincide with the smallest axiomatizable class\ncontaining pro-orderable groups? (See 1.35.)\n\nHere a group is *orderable* if it admits a linear order that is invariant under\nmultiplication on both sides. Following Problem 1.35 of the notebook, a group is\n*pro-orderable* (an $O^*$-group) if every partial order of the group, i.e. every partial\norder invariant under multiplication on both sides, can be extended to a linear order of\nthe group. A class of groups is *axiomatizable* if it is the class of models of a set of\nfirst-order sentences in the language of groups. The smallest axiomatizable class\ncontaining a class $\\mathfrak{K}$ is the class of models of the first-order theory of\n$\\mathfrak{K}$, i.e. of the set of all sentences that hold in every group of\n$\\mathfrak{K}$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen FirstOrder FirstOrder.Language\n\nnamespace Kourovka.«3.20»\n\n/-- The function symbols of the first-order language of groups: multiplication, inversion\nand the identity. -/\ninductive groupFunc : ℕ → Type\n  | mul : groupFunc 2\n  | inv : groupFunc 1\n  | one : groupFunc 0\n\n/-- The first-order language of groups, with function symbols for multiplication, inversion\nand the identity, and no relation symbols. -/\ndef groupLanguage : Language :=\n  { Functions := groupFunc\n    Relations := fun _ => Empty }\n  deriving Language.IsAlgebraic\n\n/-- Every group is a structure for the language of groups, interpreting the function symbols\nby the group operations. -/\ninstance (G : Type*) [Group G] : groupLanguage.Structure G where\n  funMap {n} f := match n, f with\n    | _, .mul => fun x => x 0 * x 1\n    | _, .inv => fun x => (x 0)⁻¹\n    | _, .one => fun _ => 1\n\n/-- A group $G$ is *orderable* if it admits a linear order $\\le$ that is invariant under\nmultiplication on both sides, i.e. $a \\le b$ implies $xa \\le xb$ and $ax \\le bx$ for all\n$x \\in G$. -/\ndef IsOrderable (G : Type*) [Group G] : Prop :=\n  ∃ _ : LinearOrder G, MulLeftMono G ∧ MulRightMono G\n\n/-- A group $G$ is *pro-orderable* (an $O^*$-group, see Problem 1.35) if every partial order\nof $G$ extends to a linear order of $G$. Here a partial order of $G$ is a partial order that\nis invariant under multiplication on both sides, and a linear order of $G$ is a linear order\nwith the same invariance property; the linear order $\\le'$ extends the partial order $\\le$\nif $a \\le b$ implies $a \\le' b$. -/\ndef IsProOrderable (G : Type*) [Group G] : Prop :=\n  ∀ p : PartialOrder G, MulLeftMono G → MulRightMono G →\n    ∃ l : LinearOrder G, @MulLeftMono G _ l.toLE ∧ @MulRightMono G _ l.toLE ∧\n      ∀ a b : G, p.le a b → l.le a b\n\n/-- The first-order theory of the class of pro-orderable groups: the set of all sentences in\nthe language of groups that hold in every pro-orderable group. Its class of models is the\nsmallest axiomatizable class of groups containing all pro-orderable groups. -/\ndef proOrderableTheory : groupLanguage.Theory :=\n  {φ | ∀ (H : Type) [Group H], IsProOrderable H → H ⊨ φ}\n\n/-- Every pro-orderable group is a model of the theory of pro-orderable groups. -/\n@[category API, AMS 3 6 20]\ntheorem model_proOrderableTheory (G : Type) [Group G] (hG : IsProOrderable G) :\n    G ⊨ proOrderableTheory :=\n  ⟨fun _ hφ => hφ G hG⟩\n\n/-- Every pro-orderable group is orderable: the linear order extending the trivial partial\norder (equality) is a linear order of the group. -/\n@[category API, AMS 6 20]\ntheorem IsProOrderable.isOrderable {G : Type*} [Group G] (h : IsProOrderable G) :\n    IsOrderable G := by\n  let p : PartialOrder G :=\n    { le := (· = ·)\n      le_refl := fun _ => rfl\n      le_trans := fun _ _ _ => Eq.trans\n      le_antisymm := fun _ _ h _ => h }\n  obtain ⟨l, hl, hr, -⟩ :=\n    h p ⟨fun _ _ _ h => congrArg _ h⟩ ⟨fun _ _ _ h => congrArg (· * _) h⟩\n  exact ⟨l, hl, hr⟩\n\n/-- The group of integers, written multiplicatively, is orderable. -/\n@[category test, AMS 6 20]\ntheorem isOrderable_multiplicative_int : IsOrderable (Multiplicative ℤ) :=\n  ⟨inferInstance, inferInstance, inferInstance⟩\n\n/--\nDoes the class of orderable groups coincide with the smallest axiomatizable class\ncontaining pro-orderable groups?\n\nThat is, is a group orderable if and only if it satisfies every first-order sentence in the\nlanguage of groups that holds in all pro-orderable groups?\n-/\n@[category research open, AMS 3 6 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], (IsOrderable G ↔ G ⊨ proOrderableTheory) := by\n  sorry\n\nend Kourovka.«3.20»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition and its reading of 'orderable', 'axiomatizable' and 'pro-orderable' agree with the source and were followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Smallest axiomatizable class containing K' is formalized as Mod(Th(K)) (models of the set of all group-language sentences true in every pro-orderable group), rather than literally as the intersection of all axiomatizable classes containing K; these coincide by a standard argument, as the decomposition notes state.",
+    "Language of groups chosen with symbols mul, inv, one (standard); any other standard signature for groups yields the same axiomatizable classes since inv and one are definable from mul.",
+    "'Partial order of a group' and 'linear order of a group' are taken to be two-sided invariant (a ≤ b ⇒ xa ≤ xb and ax ≤ bx), following Kokorin–Kopytov; expressed via Mathlib's `MulLeftMono` and `MulRightMono`. Extension means ≤ ⊆ ≤'.",
+    "Both the groups G under test and the pro-orderable groups H defining the theory are quantified over `Type` (universe 0), following repository convention.",
+    "The statement asserts full coincidence of the two classes (an `↔` for every group G), including the direction Mod(Th(K)) ⊆ Orderable which is known to hold; this is faithful to 'coincide'.",
+    "Added two short API lemmas (pro-orderable ⇒ model of the theory; pro-orderable ⇒ orderable) and one test (ℤ is orderable) to sanity-check the bespoke definitions, per CONTRIBUTING guidance."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FirstOrder.Language.ring, FirstOrder.Language.mk₂",
+     "name": "Kourovka.«3.20».groupFunc / groupLanguage",
+     "why_needed": "Mathlib only has the first-order language of rings (`FirstOrder.Language.ring`); no language of groups exists. Defined with function symbols mul (arity 2), inv (arity 1), one (arity 0) and no relation symbols, modelled on `Language.ring`."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Ring.compatibleRingOfRing",
+     "name": "Kourovka.«3.20».instStructureGroupLanguage (anonymous instance `groupLanguage.Structure G` for `[Group G]`)",
+     "why_needed": "Needed so that `G ⊨ φ` makes sense for a group G; interprets the symbols by the group operations."
+    },
+    {
+     "closest_existing_considered": "IsOrderedMonoid (commutative only), LinearOrderedCommGroup-type structures",
+     "name": "Kourovka.«3.20».IsOrderable",
+     "why_needed": "'Orderable group' = admits a linear order invariant under left and right multiplication. Mathlib's `IsOrderedMonoid` requires commutativity, so the bi-invariance is expressed with `MulLeftMono ∧ MulRightMono` over an existentially quantified `LinearOrder`."
+    },
+    {
+     "closest_existing_considered": "none (searched Mathlib and FormalConjecturesForMathlib for orderable/bi-order notions)",
+     "name": "Kourovka.«3.20».IsProOrderable",
+     "why_needed": "Kokorin's 'pro-orderable' (O*-group, Problem 1.35): every bi-invariant partial order of the group extends to a bi-invariant linear order. No Mathlib/repo counterpart."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.completeTheory (theory of a single structure, not of a class)",
+     "name": "Kourovka.«3.20».proOrderableTheory",
+     "why_needed": "The first-order theory Th(K) of the class K of pro-orderable groups; its model class is the smallest axiomatizable class containing K."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.20»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type) [Group G], (IsOrderable G ↔ G ⊨ proOrderableTheory)`, i.e. the class of (bi-)orderable groups coincides with the class of models of the first-order theory (in the language of groups: mul, inv, one) of the pro-orderable groups, which is the smallest axiomatizable class containing them. Mathlib has no first-order language of groups and no notion of (pro-)orderable group, so these were defined in the file using Mathlib's `FirstOrder.Language`, `LinearOrder`/`PartialOrder`, `MulLeftMono`/`MulRightMono`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.20»": "/--\nDoes the class of orderable groups coincide with the smallest axiomatizable class\ncontaining pro-orderable groups?\n\nThat is, is a group orderable if and only if it satisfies every first-order sentence in the\nlanguage of groups that holds in all pro-orderable groups?\n-/\n@[category research open, AMS 3 6 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], (IsOrderable G ↔ G ⊨ proOrderableTheory) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.20\n\nby A. I. Kokorin\n\nDoes the class of orderable groups coincide with the smallest first-order\naxiomatizable class containing the pro-orderable groups? Here an order is\nrequired to be invariant under multiplication on both sides, and a group is\npro-orderable if each of its invariant partial orders extends to an invariant\nlinear order.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«3.20»\n\nopen FirstOrder\n\n/-- The function symbols for the first-order language of groups. -/\ninductive GroupFunc : ℕ → Type\n  | one : GroupFunc 0\n  | inv : GroupFunc 1\n  | mul : GroupFunc 2\n\n/-- The first-order language of groups, with symbols for $1$, inversion, and multiplication. -/\nabbrev groupLanguage : FirstOrder.Language := ⟨GroupFunc, fun _ => Empty⟩\n\n/-- The canonical first-order group-language structure associated to a group. -/\ndef groupStructure (G : Type*) [Group G] : groupLanguage.Structure G where\n  funMap\n    | .one, _ => 1\n    | .inv, x => (x 0)⁻¹\n    | .mul, x => x 0 * x 1\n  RelMap r := nomatch r\n\n/-- A relation linearly orders a group on both sides if it is a linear order and is invariant\nunder both left and right multiplication. -/\ndef IsBiOrderedBy {G : Type*} [Group G] (r : G → G → Prop) : Prop :=\n  IsLinearOrder G r ∧\n    (∀ a b c : G, r a b → r (c * a) (c * b)) ∧\n    (∀ a b c : G, r a b → r (a * c) (b * c))\n\n/-- A group is orderable if it admits a linear order invariant under multiplication on both\nsides. -/\ndef IsOrderable (G : Type*) [Group G] : Prop :=\n  ∃ r : G → G → Prop, IsBiOrderedBy r\n\n/-- A group is pro-orderable (an $O^*$-group) if every partial order invariant under\nmultiplication on both sides extends to such a linear order. -/\ndef IsProOrderable (G : Type*) [Group G] : Prop :=\n  ∀ r : G → G → Prop,\n    IsPartialOrder G r →\n    (∀ a b c : G, r a b → r (c * a) (c * b)) →\n    (∀ a b c : G, r a b → r (a * c) (b * c)) →\n    ∃ s : G → G → Prop, IsBiOrderedBy s ∧ ∀ a b : G, r a b → s a b\n\n/-- The first-order theory consisting of the group-language sentences true in every\npro-orderable group. -/\ndef proOrderableTheory : groupLanguage.Theory :=\n  {φ | ∀ (G : Type) [Group G], IsProOrderable G →\n    φ ∈ @groupLanguage.completeTheory G (groupStructure G)}\n\n/--\nDoes the class of orderable groups coincide with the smallest first-order axiomatizable class\ncontaining the pro-orderable groups? Equivalently, does every orderable group model the\nfirst-order theory of all pro-orderable groups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsOrderable G →\n      @FirstOrder.Language.Theory.Model groupLanguage G (groupStructure G) proOrderableTheory := by\n  sorry\n\nend Kourovka.«3.20»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Used the decomposition's equivalent formulation: every orderable group is a model of the first-order theory of all pro-orderable groups.",
+    "Interpreted orderable as bi-linearly orderable: the non-strict order is invariant under both left and right multiplication.",
+    "Interpreted a pro-orderable group (an O*-group) as one in which every bi-invariant partial order extends, by relation inclusion, to a bi-invariant linear order.",
+    "Used the standard first-order group language with identity, inversion, and multiplication; `proOrderableTheory` is the intersection of the complete theories of all pro-orderable groups.",
+    "Quantified over `Type` consistently with nearby repository statements and evaluated every group-language theory using the canonical structure arising from the given `Group` instance."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's first-order graph, order, and ring languages; no first-order group language was found.",
+     "name": "GroupFunc",
+     "why_needed": "Supplies the dependent function-symbol signature for the first-order language of groups."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language` and Mathlib's `Language.ring`; the latter includes additive ring operations and does not faithfully represent arbitrary groups.",
+     "name": "groupLanguage",
+     "why_needed": "Provides a literal first-order language in which to form the theory of pro-orderable groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib structure constructors for graph, order, and ring languages; no canonical group-language structure was found.",
+     "name": "groupStructure",
+     "why_needed": "Interprets the group-language symbols canonically on each group so its complete first-order theory can be formed."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsLinearOrder`, `MulLeftMono`, `MulRightMono`, and ordered-monoid classes; the latter are typeclass-based and do not conveniently quantify over and compare candidate relations.",
+     "name": "IsBiOrderedBy",
+     "why_needed": "Expresses that a relation is a linear order invariant under multiplication on both sides."
+    },
+    {
+     "closest_existing_considered": "Mathlib ordered algebra typeclasses; no proposition asserting existence of such an order on a fixed group was found.",
+     "name": "IsOrderable",
+     "why_needed": "Expresses existence of a bi-invariant linear order on an arbitrary group."
+    },
+    {
+     "closest_existing_considered": "Mathlib order-extension and ordered-group APIs; no predicate for extension while preserving both multiplication invariance and the original relation was found.",
+     "name": "IsProOrderable",
+     "why_needed": "Expresses Kokorin's O*-group property, including extension of every invariant partial order."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.completeTheory`; this handles one structure, so an intersection over all pro-orderable groups was still needed.",
+     "name": "proOrderableTheory",
+     "why_needed": "Represents the sentences true in every pro-orderable group, whose models form the smallest first-order axiomatizable class containing those groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.20»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.20»": "/--\nDoes the class of orderable groups coincide with the smallest first-order axiomatizable class\ncontaining the pro-orderable groups? Equivalently, does every orderable group model the\nfirst-order theory of all pro-orderable groups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsOrderable G →\n      @FirstOrder.Language.Theory.Model groupLanguage G (groupStructure G) proOrderableTheory := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.20\n\nby A. I. Kokorin\n\nDoes the class of orderable groups coincide with the smallest axiomatizable\nclass containing pro-orderable groups?\n\nHere an orderable group is a group admitting a bi-invariant linear order. A\npro-orderable group (an $O^*$-group in Problem 1.35) is a group for which every\nbi-invariant partial order extends to a bi-invariant linear order.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«3.20»\n\nuniverse u\n\n/-- A relation on a group is a partial group order if it is a partial order\npreserved by multiplication on both sides. -/\ndef IsPartialGroupOrder {G : Type u} [Group G] (r : G → G → Prop) : Prop :=\n  IsPartialOrder G r ∧\n    (∀ a b c, r a b → r (c * a) (c * b)) ∧\n    (∀ a b c, r a b → r (a * c) (b * c))\n\n/-- A group is orderable if it admits a bi-invariant linear order. -/\ndef IsOrderable (G : Type u) [Group G] : Prop :=\n  ∃ r : G → G → Prop, IsLinearOrder G r ∧ IsPartialGroupOrder r\n\n/-- A group is pro-orderable if each of its partial group orders extends to a\nlinear group order. -/\ndef IsProOrderable (G : Type u) [Group G] : Prop :=\n  ∀ r : G → G → Prop, IsPartialGroupOrder r →\n    ∃ s : G → G → Prop, IsLinearOrder G s ∧ IsPartialGroupOrder s ∧\n      ∀ ⦃a b⦄, r a b → s a b\n\n/-- Function symbols for the first-order language of groups. -/\ninductive groupFunc : ℕ → Type\n  | mul : groupFunc 2\n  | inv : groupFunc 1\n  | one : groupFunc 0\n\n/-- The first-order language with multiplication, inverse, and identity. -/\ndef groupLanguage : FirstOrder.Language :=\n  { Functions := groupFunc\n    Relations := fun _ ↦ Empty }\n\n/-- The canonical interpretation of the first-order group language on a group. -/\ndef groupStructure (G : Type u) [Group G] : groupLanguage.Structure G where\n  funMap := fun {n} f ↦\n    match n, f with\n    | _, .mul => fun x ↦ x 0 * x 1\n    | _, .inv => fun x ↦ (x 0)⁻¹\n    | _, .one => fun _ ↦ 1\n  RelMap := fun {_n} r ↦ nomatch r\n\n/-- A group satisfies a sentence when the sentence holds in its canonical\nfirst-order group structure. -/\ndef ModelsGroupSentence (G : Type u) [Group G] (φ : groupLanguage.Sentence) : Prop :=\n  @FirstOrder.Language.Sentence.Realize groupLanguage G (groupStructure G) φ\n\n/--\nDoes the class of orderable groups coincide with the smallest first-order\naxiomatizable class containing the pro-orderable groups? Equivalently, does\nevery orderable group satisfy every first-order group sentence that holds in\nall pro-orderable groups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type u) [Group G], IsOrderable G →\n      ∀ φ : groupLanguage.Sentence,\n        (∀ (H : Type u) [Group H], IsProOrderable H → ModelsGroupSentence H φ) →\n          ModelsGroupSentence G φ := by\n  sorry\n\nend Kourovka.«3.20»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented a partial group order as a non-strict partial order invariant under both left and right multiplication; a linear group order is such a relation that is also a linear order.",
+    "Represented pro-orderability by requiring every partial group order to be included in some linear group order.",
+    "Encoded the ordinary pure first-order group language with multiplication, inverse, and identity, and interpreted it canonically on each group.",
+    "Used the decomposition's equivalent formulation: every orderable group satisfies every pure group-language sentence true in all pro-orderable groups. This expresses membership in Mod(Th(K)); the converse inclusion follows from the noted established facts that pro-orderable groups are orderable and orderable groups form an axiomatizable class.",
+    "Quantified groups in a polymorphic universe `u`, with the common theory formed using groups in that same universe."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `IsPartialOrder`, `MulLeftMono`, and `MulRightMono`.",
+     "name": "IsPartialGroupOrder",
+     "why_needed": "Mathlib has unbundled partial-order predicates and ordered algebra typeclasses, but no predicate packaging a variable relation as a bi-invariant partial group order."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsLinearOrder` together with ordered-group compatibility classes.",
+     "name": "IsOrderable",
+     "why_needed": "The conjecture quantifies over groups admitting some bi-invariant linear order; no existing existential predicate for noncommutative bi-orderable groups was found."
+    },
+    {
+     "closest_existing_considered": "No existing order-extension predicate for partial group orders was found.",
+     "name": "IsProOrderable",
+     "why_needed": "Kokorin's O*-group/pro-orderable extension property is not present in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FirstOrder.ringFunc`.",
+     "name": "groupFunc",
+     "why_needed": "Mathlib provides first-order languages for rings and orders but no pure group-language signature."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FirstOrder.Language.ring` and `FirstOrder.Language.order`.",
+     "name": "groupLanguage",
+     "why_needed": "A pure first-order group language is required to state the common theory of the pro-orderable groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FirstOrder.Ring.compatibleRingOfRing` and `FirstOrder.Language.orderStructure`.",
+     "name": "groupStructure",
+     "why_needed": "Group-language sentences must be interpreted using each group's multiplication, inverse, and identity."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FirstOrder.Language.Sentence.Realize` and notation `⊨`.",
+     "name": "ModelsGroupSentence",
+     "why_needed": "This wrapper fixes the canonical group-language structure when asserting satisfaction, avoiding ambiguous local structure instances in the theorem statement."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.20»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.20»": "/--\nDoes the class of orderable groups coincide with the smallest first-order\naxiomatizable class containing the pro-orderable groups? Equivalently, does\nevery orderable group satisfy every first-order group sentence that holds in\nall pro-orderable groups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type u) [Group G], IsOrderable G →\n      ∀ φ : groupLanguage.Sentence,\n        (∀ (H : Type u) [Group H], IsProOrderable H → ModelsGroupSentence H φ) →\n          ModelsGroupSentence G φ := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 3.20\n\nby A. I. Kokorin\n\nDoes the class of orderable groups coincide with the smallest axiomatizable class containing\npro-orderable groups? (See 1.35.)\n\nHere a group is *orderable* if it admits a linear order that is invariant under multiplication\non both sides. A group is *pro-orderable* (Kokorin's term from Problem 1.35; such groups are also\ncalled $O^*$-groups) if every partial order on it that is invariant under multiplication on both\nsides can be extended to a linear order that is again invariant under multiplication on both\nsides. An *axiomatizable class* of groups is the class of all groups satisfying some set of\nfirst-order sentences in the language of groups, so the smallest axiomatizable class containing\nthe pro-orderable groups is the class of all groups satisfying every first-order sentence that\nholds in all pro-orderable groups.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen FirstOrder Language\n\nnamespace Kourovka.«3.20»\n\n/-- A binary relation `le` on a group `G` is *two-sided invariant* if `le a b` implies\n`le (x * a * y) (x * b * y)` for all `x y : G`, i.e. $a \\le b$ implies $x a y \\le x b y$. -/\ndef IsBiInvariant {G : Type*} [Group G] (le : G → G → Prop) : Prop :=\n  ∀ a b x y : G, le a b → le (x * a * y) (x * b * y)\n\n/-- A group is *orderable* if it admits a linear order that is invariant under multiplication on\nboth sides. -/\ndef IsOrderable (G : Type*) [Group G] : Prop :=\n  ∃ l : LinearOrder G, IsBiInvariant l.le\n\n/-- A group is *pro-orderable* (an $O^*$-group) if every partial order on it that is invariant\nunder multiplication on both sides can be extended to a linear order that is invariant under\nmultiplication on both sides. -/\ndef IsProOrderable (G : Type*) [Group G] : Prop :=\n  ∀ p : PartialOrder G, IsBiInvariant p.le →\n    ∃ l : LinearOrder G, IsBiInvariant l.le ∧ ∀ a b : G, p.le a b → l.le a b\n\n/-- Every pro-orderable group is orderable: extend the trivial partial order. -/\n@[category API, AMS 6 20]\ntheorem IsProOrderable.isOrderable {G : Type*} [Group G] (h : IsProOrderable G) :\n    IsOrderable G := by\n  obtain ⟨l, hl, -⟩ := h\n    { le := (· = ·)\n      le_refl := fun _ => rfl\n      le_trans := fun _ _ _ => Eq.trans\n      le_antisymm := fun _ _ h _ => h }\n    (fun _ _ _ _ h => by rw [h]; exact rfl)\n  exact ⟨l, hl⟩\n\n/-- The function symbols of the first-order language of groups: a binary multiplication, a unary\ninversion and a constant for the identity. -/\ninductive GroupFunc : ℕ → Type\n  | mul : GroupFunc 2\n  | inv : GroupFunc 1\n  | one : GroupFunc 0\n\n/-- The first-order language of groups, with function symbols `*`, `⁻¹`, `1` and no relation\nsymbols. -/\ndef groupLanguage : Language where\n  Functions := GroupFunc\n  Relations _ := Empty\n\n/-- A group `G` as a structure for the language of groups, interpreting the function symbols by\nthe group operations. -/\ndef groupStructure (G : Type*) [Group G] : groupLanguage.Structure G where\n  funMap {n} f :=\n    match n, f with\n    | _, .mul => fun x => x 0 * x 1\n    | _, .inv => fun x => (x 0)⁻¹\n    | _, .one => fun _ => 1\n  RelMap r := Empty.elim r\n\n/-- The first-order theory of the pro-orderable groups: the set of all sentences in the language\nof groups that hold in every pro-orderable group. The class of groups satisfying this theory is\nthe smallest axiomatizable class containing the pro-orderable groups. -/\ndef proOrderableTheory : groupLanguage.Theory :=\n  {φ | ∀ (G : Type) [Group G], IsProOrderable G → letI := groupStructure G; G ⊨ φ}\n\n/-- Every pro-orderable group satisfies the theory of the pro-orderable groups. -/\n@[category API, AMS 3 20]\ntheorem model_proOrderableTheory (G : Type) [Group G] (h : IsProOrderable G) :\n    letI := groupStructure G; G ⊨ proOrderableTheory := by\n  letI := groupStructure G\n  exact ⟨fun _ hφ => hφ G h⟩\n\n/--\nDoes the class of orderable groups coincide with the smallest axiomatizable class containing\npro-orderable groups?\n\nThat is, is a group orderable if and only if it satisfies every first-order sentence in the\nlanguage of groups that holds in all pro-orderable groups?\n-/\n@[category research open, AMS 3 6 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsOrderable G ↔ (letI := groupStructure G; G ⊨ proOrderableTheory) := by\n  sorry\n\nend Kourovka.«3.20»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot table and its reading of 'orderable', 'axiomatizable' and 'pro-orderable' agree with Kokorin's terminology; I chose the literal class-coincidence form rather than the equivalent one-directional form mentioned in the notes.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Orderable' is taken as bi-orderable: a linear order invariant under multiplication on both sides (Kokorin–Kopytov usage).",
+    "'Partial order on a group' in the pro-orderable definition means a partial order invariant under multiplication on both sides (Kokorin–Kopytov's partially ordered groups); the trivial order is included, so pro-orderable ⇒ orderable (proved as an API lemma in the file).",
+    "'Axiomatizable class' = class of models of a set of first-order sentences in the language of groups; the smallest such class containing K is Mod(Th(K)). The language uses symbols *, ⁻¹, 1; using only * would give the same axiomatizable classes since inverse and identity are first-order definable.",
+    "The question is stated literally as coincidence of classes (an iff per group), not only as the forward inclusion 'orderable ⇒ model of Th(pro-orderable)'; the reverse inclusion is a known theorem (pro-orderable ⊆ orderable and orderable groups form an axiomatizable class by Łoś), so the two forms are equivalent.",
+    "All groups (both in the theory Th(pro-orderable) and in the question) are quantified over `Type`, following the repository convention; classes are automatically isomorphism-closed since satisfaction is.",
+    "Two `category API` lemmas (pro-orderable ⇒ orderable; pro-orderable groups model proOrderableTheory) were added as basic sanity tests of the bespoke definitions, per CONTRIBUTING.md.",
+    "Since the task allowed writing only one file, the language-of-groups definitions live in the problem file rather than FormalConjecturesForMathlib; a maintainer may wish to move them."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "MulLeftMono G ∧ MulRightMono G (Mathlib CovariantClass), which would require `@`-instance passing for each order term; no non-commutative `IsOrderedGroup` exists in Mathlib (IsOrderedMonoid requires CommMonoid).",
+     "name": "Kourovka.«3.20».IsBiInvariant",
+     "why_needed": "A relation on a group invariant under multiplication on both sides (a ≤ b → x*a*y ≤ x*b*y); needed to speak about two-sided invariant partial/linear orders given as explicit `PartialOrder`/`LinearOrder` structures without instance juggling."
+    },
+    {
+     "closest_existing_considered": "IsOrderedMonoid / IsOrderedCancelMonoid — commutative only; no orderability predicate exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«3.20».IsOrderable",
+     "why_needed": "A group admitting a two-sided invariant linear order (Kokorin's 'orderable group')."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or the repo.",
+     "name": "Kourovka.«3.20».IsProOrderable",
+     "why_needed": "O*-group / pro-orderable group: every two-sided invariant partial order extends to a two-sided invariant linear order (Kokorin's notion from Problem 1.35)."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.ring (Mathlib has ring and field languages but no group language); `Language.mk₂` no longer exists in Mathlib.",
+     "name": "Kourovka.«3.20».GroupFunc, Kourovka.«3.20».groupLanguage",
+     "why_needed": "The first-order language of groups (function symbols *, ⁻¹, 1; no relations), needed to talk about first-order axiomatizable classes of groups."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Ring.compatibleRingOfRing (for rings only).",
+     "name": "Kourovka.«3.20».groupStructure",
+     "why_needed": "Interprets the language of groups in a `Group G` via the group operations, mirroring `FirstOrder.Ring.compatibleRingOfRing`."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.completeTheory M (theory of a single structure, not of a class).",
+     "name": "Kourovka.«3.20».proOrderableTheory",
+     "why_needed": "Th(pro-orderable groups): the set of sentences true in all pro-orderable groups (in Type); its class of models is the smallest axiomatizable class containing the pro-orderable groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«3.20»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated literally as a class equality: for every group G (in Type), G is orderable (admits a two-sided invariant linear order) iff G satisfies every first-order sentence of the language of groups that holds in all pro-orderable groups (= the smallest axiomatizable class Mod(Th(pro-orderable))). Mathlib has no first-order language of groups, nor notions of (pro-)orderable group, so these were defined locally in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«3.20»": "/--\nDoes the class of orderable groups coincide with the smallest axiomatizable class containing\npro-orderable groups?\n\nThat is, is a group orderable if and only if it satisfies every first-order sentence in the\nlanguage of groups that holds in all pro-orderable groups?\n-/\n@[category research open, AMS 3 6 20]\ntheorem kourovka.«3.20» : answer(sorry) ↔\n    ∀ (G : Type) [Group G],\n      IsOrderable G ↔ (letI := groupStructure G; G ⊨ proOrderableTheory) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«3.20»": "c05"
+ },
+ "id": "kourovka-3.20",
+ "main_attempt": "c05"
+}

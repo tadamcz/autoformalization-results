@@ -3,6 +3,14 @@
 import katex from "katex";
 import { Fragment, useMemo } from "react";
 
+// macros the sources' statements rely on (the Kourovka Notebook's \goth, \Z,
+// \geq -> \geqslant …); set from index.json's meta before anything renders
+let katexMacros: Record<string, string> = {};
+
+export function setKatexMacros(macros: Record<string, string>): void {
+  katexMacros = macros;
+}
+
 function render(expr: string, display: boolean): string {
   return katex.renderToString(expr, {
     displayMode: display,
@@ -10,6 +18,8 @@ function render(expr: string, display: boolean): string {
     strict: "ignore",
     trust: false,
     output: "html",
+    // KaTeX adds to this object when the input defines macros: pass a copy
+    macros: { ...katexMacros },
   });
 }
 

@@ -1,0 +1,604 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.4\n\nby M. R. Vaughan-Lee\n\nConstruct a finite centrally nilpotent loop whose laws have no finite basis.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.4»\n\n/-- A loop, presented in its equational signature: an identity, multiplication,\nand left and right division. -/\nstructure Loop (L : Type*) where\n  one : L\n  mul : L → L → L\n  ldiv : L → L → L\n  rdiv : L → L → L\n  one_mul : ∀ x, mul one x = x\n  mul_one : ∀ x, mul x one = x\n  ldiv_mul : ∀ x y, ldiv x (mul x y) = y\n  mul_ldiv : ∀ x y, mul x (ldiv x y) = y\n  mul_rdiv : ∀ x y, mul (rdiv x y) y = x\n  rdiv_mul : ∀ x y, rdiv (mul x y) y = x\n\n/-- A congruence of a loop is an equivalence relation compatible with every\noperation in the loop signature. -/\nstructure LoopCongruence {L : Type*} (A : Loop L) where\n  rel : L → L → Prop\n  refl : ∀ x, rel x x\n  symm : ∀ {x y}, rel x y → rel y x\n  trans : ∀ {x y z}, rel x y → rel y z → rel x z\n  mul : ∀ {x₁ x₂ y₁ y₂}, rel x₁ x₂ → rel y₁ y₂ → rel (A.mul x₁ y₁) (A.mul x₂ y₂)\n  ldiv : ∀ {x₁ x₂ y₁ y₂}, rel x₁ x₂ → rel y₁ y₂ → rel (A.ldiv x₁ y₁) (A.ldiv x₂ y₂)\n  rdiv : ∀ {x₁ x₂ y₁ y₂}, rel x₁ x₂ → rel y₁ y₂ → rel (A.rdiv x₁ y₁) (A.rdiv x₂ y₂)\n\n/-- An element is central modulo a congruence if its image in the quotient\ncommutes and associates, in each of the three positions, with all elements. -/\ndef IsCentralModulo {L : Type*} (A : Loop L) (c : LoopCongruence A) (x : L) : Prop :=\n  (∀ y, c.rel (A.mul x y) (A.mul y x)) ∧\n  (∀ y z, c.rel (A.mul (A.mul x y) z) (A.mul x (A.mul y z))) ∧\n  (∀ y z, c.rel (A.mul (A.mul y x) z) (A.mul y (A.mul x z))) ∧\n  (∀ y z, c.rel (A.mul (A.mul y z) x) (A.mul y (A.mul z x)))\n\n/-- Bruck central nilpotency: there is a finite central congruence series from\nequality to the universal congruence. -/\ndef IsCentrallyNilpotent {L : Type*} (A : Loop L) : Prop :=\n  ∃ (n : ℕ) (c : Fin (n + 1) → LoopCongruence A),\n    (∀ x y, (c 0).rel x y ↔ x = y) ∧\n    (∀ x y, (c (Fin.last n)).rel x y) ∧\n    ∀ i : Fin n,\n      (∀ x y, (c i.castSucc).rel x y → (c i.succ).rel x y) ∧\n      ∀ x, (c i.succ).rel x A.one → IsCentralModulo A (c i.castSucc) x\n\n/-- Terms in the loop signature, with variables indexed by natural numbers. -/\ninductive LoopTerm where\n  | var : ℕ → LoopTerm\n  | one : LoopTerm\n  | mul : LoopTerm → LoopTerm → LoopTerm\n  | ldiv : LoopTerm → LoopTerm → LoopTerm\n  | rdiv : LoopTerm → LoopTerm → LoopTerm\n  deriving DecidableEq\n\n/-- Simultaneous substitution of loop terms for variables. -/\ndef LoopTerm.subst (σ : ℕ → LoopTerm) : LoopTerm → LoopTerm\n  | .var i => σ i\n  | .one => .one\n  | .mul t u => .mul (t.subst σ) (u.subst σ)\n  | .ldiv t u => .ldiv (t.subst σ) (u.subst σ)\n  | .rdiv t u => .rdiv (t.subst σ) (u.subst σ)\n\n/-- A law in the loop signature is an equation between two terms. -/\nabbrev LoopLaw := LoopTerm × LoopTerm\n\n/-- Evaluation of a loop term under an assignment of its variables. -/\ndef LoopTerm.eval {L : Type*} (A : Loop L) (v : ℕ → L) : LoopTerm → L\n  | .var i => v i\n  | .one => A.one\n  | .mul t u => A.mul (t.eval A v) (u.eval A v)\n  | .ldiv t u => A.ldiv (t.eval A v) (u.eval A v)\n  | .rdiv t u => A.rdiv (t.eval A v) (u.eval A v)\n\n/-- The assertion that a law holds for every assignment in a loop. -/\ndef Satisfies {L : Type*} (A : Loop L) (e : LoopLaw) : Prop :=\n  ∀ v : ℕ → L, e.1.eval A v = e.2.eval A v\n\n/-- Derivability from a set of laws by the standard rules of equational logic. -/\ninductive Derives (S : Set LoopLaw) : LoopLaw → Prop where\n  | assumption {e} : e ∈ S → Derives S e\n  | refl (t) : Derives S (t, t)\n  | symm {t u} : Derives S (t, u) → Derives S (u, t)\n  | trans {t u w} : Derives S (t, u) → Derives S (u, w) → Derives S (t, w)\n  | mul {t₁ t₂ u₁ u₂} : Derives S (t₁, t₂) → Derives S (u₁, u₂) →\n      Derives S (.mul t₁ u₁, .mul t₂ u₂)\n  | ldiv {t₁ t₂ u₁ u₂} : Derives S (t₁, t₂) → Derives S (u₁, u₂) →\n      Derives S (.ldiv t₁ u₁, .ldiv t₂ u₂)\n  | rdiv {t₁ t₂ u₁ u₂} : Derives S (t₁, t₂) → Derives S (u₁, u₂) →\n      Derives S (.rdiv t₁ u₁, .rdiv t₂ u₂)\n  | subst {t u} : Derives S (t, u) → (σ : ℕ → LoopTerm) →\n      Derives S (t.subst σ, u.subst σ)\n\n/-- A loop has no finite basis for its laws if no finite set of laws valid in\nthe loop derives every law valid in the loop. -/\ndef HasNoFiniteBasis {L : Type*} (A : Loop L) : Prop :=\n  ¬ ∃ S : Set LoopLaw, S.Finite ∧\n      (∀ e ∈ S, Satisfies A e) ∧\n      ∀ e, Satisfies A e → Derives S e\n\n/--\nConstruct a finite nilpotent loop with no finite basis for its laws. Here\nnilpotent means centrally nilpotent in Bruck's sense: a finite upper central\nseries reaches the whole loop. Laws and their consequences are taken in the\nsignature consisting of the identity, multiplication, and left and right\ndivision.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (A : Loop L), Finite L ∧ IsCentrallyNilpotent A ∧ HasNoFiniteBasis A := by\n  sorry\n\nend Kourovka.«8.4»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the imperative “Construct” as a direct existential statement, rather than as a yes/no question using `answer(sorry)`.",
+    "Represented a loop in the full equational signature with identity, multiplication, left division, and right division.",
+    "Expressed Bruck central nilpotency by the equivalent existence of a finite ascending central congruence series from equality to the universal congruence. Centrality modulo the preceding congruence is commutation together with associativity in all three positions.",
+    "Used natural-number-indexed variables for loop terms; every equational law is finitary, so this captures all loop identities.",
+    "Defined equational consequence syntactically using the standard rules of equational logic: assumptions, reflexivity, symmetry, transitivity, congruence for each operation, and simultaneous substitution.",
+    "Defined a finite basis as a finite set of laws valid in the loop that derives every law valid in the loop. Soundness of standard equational logic makes this equivalent to its deductive closure being exactly the equational theory of the loop.",
+    "Used `Finite L` for finiteness and quantified the witness type in `Type`, following nearby repository conventions for existential algebraic structures."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib group and quasigroup-related searches; `Group` is associative and therefore too restrictive, and no suitable quasigroup/loop class was found.",
+     "name": "Loop",
+     "why_needed": "Mathlib has no algebraic-loop structure carrying multiplication, identity, and both division operations with the loop equations."
+    },
+    {
+     "closest_existing_considered": "Mathlib group congruences and general first-order semantics; neither supplies congruences for the bespoke loop signature.",
+     "name": "LoopCongruence",
+     "why_needed": "Central nilpotency of a nonassociative loop requires quotients or equivalent compatible congruences, for which no loop-specific API exists."
+    },
+    {
+     "closest_existing_considered": "Mathlib semigroup/group centers, which assume associativity and do not model the center of a nonassociative loop.",
+     "name": "IsCentralModulo",
+     "why_needed": "Needed to state that an element's image lies in the center of a loop quotient, including the commutant and all three nuclei."
+    },
+    {
+     "closest_existing_considered": "Mathlib `IsNilpotent` and `upperCentralSeries` for groups; these require associativity and would change the conjecture.",
+     "name": "IsCentrallyNilpotent",
+     "why_needed": "Needed Bruck central nilpotency rather than Mathlib's group-theoretic nilpotency."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Term`; usable in principle, but no existing loop language or equational deduction API was available, so a focused local syntax avoids substantial encoding overhead.",
+     "name": "LoopTerm",
+     "why_needed": "Needed terms in exactly the loop signature for laws and finite basability."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Term.subst`, which applies to Mathlib's generic first-order term representation rather than the local loop syntax.",
+     "name": "LoopTerm.subst",
+     "why_needed": "Needed simultaneous substitution, a primitive rule of equational consequence."
+    },
+    {
+     "closest_existing_considered": "First-order equality formulas, which do not provide the required equational deduction relation out of the box.",
+     "name": "LoopLaw",
+     "why_needed": "Needed equations between loop terms."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Term.realize`, tied to first-order language structures rather than the local loop structure.",
+     "name": "LoopTerm.eval",
+     "why_needed": "Needed to interpret loop terms in a particular loop."
+    },
+    {
+     "closest_existing_considered": "Mathlib first-order semantics, which would require a separate language and structure encoding.",
+     "name": "Satisfies",
+     "why_needed": "Needed the equational theory (laws) of the witness loop."
+    },
+    {
+     "closest_existing_considered": "Mathlib first-order semantic consequence and syntax APIs; no matching syntactic equational derivability relation was found.",
+     "name": "Derives",
+     "why_needed": "Needed explicit equational consequences of a candidate basis; no equational-logic proof system was found in Mathlib or the repository helpers."
+    },
+    {
+     "closest_existing_considered": "No finite-basis predicate for identities/equational theories was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "HasNoFiniteBasis",
+     "why_needed": "Needed to state that the loop's equational theory is not generated by any finite valid set of laws."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.4»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.4»": "/--\nConstruct a finite nilpotent loop with no finite basis for its laws. Here\nnilpotent means centrally nilpotent in Bruck's sense: a finite upper central\nseries reaches the whole loop. Laws and their consequences are taken in the\nsignature consisting of the identity, multiplication, and left and right\ndivision.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (A : Loop L), Finite L ∧ IsCentrallyNilpotent A ∧ HasNoFiniteBasis A := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.4\n\nby M. R. Vaughan-Lee\n\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nA loop is a set with a multiplication and an identity element in which the equations\n$a x = b$ and $y a = b$ have unique solutions $x$ and $y$. Loops form a variety of algebras in\nthe signature $(\\cdot, \\backslash, /, 1)$ of multiplication, left division, right division and\nidentity, and the *laws* of a loop $L$ are the identities $s \\approx t$ between terms of this\nsignature that hold in $L$. The laws of $L$ have a *finite basis* if some finite set of laws\nof $L$ has every law of $L$ as a consequence. By the Oates–Powell theorem the laws of every\nfinite group have a finite basis; the problem asks for a finite nilpotent loop for which this\nfails.\n\n*Nilpotent* is Bruck's central nilpotency for loops: the centre $Z(L)$ of $L$ consists of the\nelements that commute and associate with all elements of $L$, it is a normal subloop, and $L$ is\nnilpotent if its upper central series $1 = Z_0 \\le Z_1 \\le \\dots$, with\n$Z_{i+1}/Z_i = Z(L/Z_i)$, reaches $L$ after finitely many steps. Equivalently, $L$ has a\nfinite central series, i.e. a chain of normal subloops $1 = N_0 \\le N_1 \\le \\dots \\le N_n = L$\nwith $N_{i+1}/N_i \\le Z(L/N_i)$ for all $i < n$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.4»\n\n/-- A loop: a type with a multiplication `*`, an identity element `1`, a left division `ldiv`\nand a right division `/` such that `x * ldiv x y = y`, `ldiv x (x * y) = y`, `(y / x) * x = y`\nand `(y * x) / x = y` for all `x y`. Equivalently, a type with a multiplication and an identity\nelement in which the equations `a * x = b` and `y * a = b` have unique solutions `x` and `y`,\nnamely `x = ldiv a b` and `y = b / a`. -/\nclass Loop (L : Type*) extends MulOneClass L, Div L where\n  /-- Left division: `ldiv x y` is the unique solution `z` of `x * z = y`. -/\n  ldiv : L → L → L\n  mul_ldiv_cancel (x y : L) : x * ldiv x y = y\n  ldiv_mul_cancel (x y : L) : ldiv x (x * y) = y\n  div_mul_cancel (x y : L) : (y / x) * x = y\n  mul_div_cancel (x y : L) : (y * x) / x = y\n\n/-- Terms in the signature `(*, ldiv, /, 1)` of loops, over the countably infinite set of\nvariables `x₀, x₁, x₂, …` indexed by `ℕ`. -/\ninductive LoopTerm : Type\n  /-- The variable `xᵢ`. -/\n  | var (i : ℕ)\n  /-- The constant `1`. -/\n  | one\n  /-- The product `s * t`. -/\n  | mul (s t : LoopTerm)\n  /-- The left quotient `ldiv s t`. -/\n  | ldiv (s t : LoopTerm)\n  /-- The right quotient `s / t`. -/\n  | div (s t : LoopTerm)\n\n/-- The value of a term in a loop `L` under an assignment `v : ℕ → L` of the variables. -/\ndef LoopTerm.eval {L : Type*} [Loop L] (v : ℕ → L) : LoopTerm → L\n  | var i => v i\n  | one => 1\n  | mul s t => s.eval v * t.eval v\n  | ldiv s t => Loop.ldiv (s.eval v) (t.eval v)\n  | div s t => s.eval v / t.eval v\n\n/-- A law (identity) in the signature of loops: a pair of terms `(s, t)`, read as the\nequation `s ≈ t`. -/\nabbrev LoopLaw : Type := LoopTerm × LoopTerm\n\nnamespace Loop\n\nvariable (L : Type*) [Loop L]\n\n/-- The law `e = (s, t)` holds in the loop `L` if `s` and `t` take the same value in `L` under\nevery assignment of the variables. -/\ndef Satisfies (e : LoopLaw) : Prop :=\n  ∀ v : ℕ → L, e.1.eval v = e.2.eval v\n\n/-- The set of all laws of the loop `L`. -/\ndef laws : Set LoopLaw :=\n  {e | Satisfies L e}\n\n/-- A set `S` of laws implies the law `e` if every loop satisfying all the laws in `S` also\nsatisfies `e`. By Birkhoff's completeness theorem this is the same as `e` being derivable from\n`S` (together with the defining identities of loops) in equational logic. -/\ndef Implies (S : Set LoopLaw) (e : LoopLaw) : Prop :=\n  ∀ (M : Type) [Loop M], (∀ e' ∈ S, Satisfies M e') → Satisfies M e\n\n/-- The laws of the loop `L` have a finite basis if there is a finite set of laws of `L` which\nimplies every law of `L`. -/\ndef HasFiniteBasis : Prop :=\n  ∃ S : Finset LoopLaw, ↑S ⊆ laws L ∧ ∀ e ∈ laws L, Implies S e\n\nvariable {L}\n\n/-- A congruence on the loop `L`: an equivalence relation on `L` compatible with `*`, `ldiv`\nand `/`. Congruences on `L` correspond bijectively to normal subloops of `L`, a congruence `r`\ncorresponding to the normal subloop `{m | r 1 m}`. -/\nstructure IsCongruence (r : L → L → Prop) : Prop where\n  equivalence : Equivalence r\n  mul {a b c d : L} : r a b → r c d → r (a * c) (b * d)\n  ldiv {a b c d : L} : r a b → r c d → r (ldiv a c) (ldiv b d)\n  div {a b c d : L} : r a b → r c d → r (a / c) (b / d)\n\n/-- The element `m` is central modulo the relation `r`: `m` commutes and associates with all\nelements of `L` up to `r`. When `r` is equality this says that `m` lies in the centre $Z(L)$,\nand when `r` is the congruence of a normal subloop `N` it says that the coset `m N` lies in the\ncentre of `L / N`. -/\ndef IsCentralMod (r : L → L → Prop) (m : L) : Prop :=\n  ∀ x y : L, r (m * x) (x * m) ∧ r (m * (x * y)) ((m * x) * y) ∧\n    r (x * (m * y)) ((x * m) * y) ∧ r (x * (y * m)) ((x * y) * m)\n\nvariable (L)\n\n/-- The loop `L` is (centrally) nilpotent, in the sense of Bruck, if it has a finite central\nseries. Normal subloops are described by their congruences: a central series of length `n` is\na chain of congruences `θ 0 ≤ θ 1 ≤ … ≤ θ n` on `L`, with `θ 0` the equality relation and\n`θ n` the total relation, such that for every `i < n` every element `m` that is\n`θ (i + 1)`-congruent to `1` is central modulo `θ i`. In terms of the normal subloops\n`N i = {m | θ i 1 m}` this is a chain `1 = N 0 ≤ N 1 ≤ … ≤ N n = L` with\n`N (i + 1) / N i ≤ Z(L / N i)` for all `i < n`. Equivalently, the upper central series of `L`\nreaches `L` after finitely many steps. -/\ndef IsNilpotent : Prop :=\n  ∃ (n : ℕ) (θ : ℕ → L → L → Prop),\n    (∀ i, IsCongruence (θ i)) ∧\n    (∀ a b, θ 0 a b ↔ a = b) ∧\n    (∀ a b, θ n a b) ∧\n    (∀ i < n, ∀ a b, θ i a b → θ (i + 1) a b) ∧\n    (∀ i < n, ∀ m, θ (i + 1) 1 m → IsCentralMod (θ i) m)\n\nend Loop\n\n/--\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nThat is: there is a finite, centrally nilpotent loop `L` whose laws (the identities in the\nsignature `(*, ldiv, /, 1)` of loops that hold in `L`) have no finite basis, i.e. no finite\nset of laws of `L` has every law of `L` as a consequence. This is the loop-theoretic\ncounterpart of the Oates–Powell theorem, which says that the laws of every finite group have a\nfinite basis.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (_ : Loop L), Finite L ∧ Loop.IsNilpotent L ∧ ¬ Loop.HasFiniteBasis L := by\n  sorry\n\n/-- Every group is a loop, with left division `ldiv a b = a⁻¹ * b` and the usual right\ndivision `a / b = a * b⁻¹`. -/\n@[category API, AMS 20]\ndef Loop.ofGroup (G : Type*) [Group G] : Loop G where\n  ldiv a b := a⁻¹ * b\n  mul_ldiv_cancel := mul_inv_cancel_left\n  ldiv_mul_cancel := inv_mul_cancel_left\n  div_mul_cancel x y := _root_.div_mul_cancel y x\n  mul_div_cancel x y := _root_.mul_div_cancel_right y x\n\n/-- The law `x₀ * 1 ≈ x₀` holds in every loop. -/\n@[category test, AMS 20]\ntheorem Loop.satisfies_mul_one (L : Type*) [Loop L] :\n    Loop.Satisfies L (.mul (.var 0) .one, .var 0) :=\n  fun _ => mul_one _\n\n/-- An abelian group is a nilpotent loop (with a central series of length one). -/\n@[category test, AMS 20]\ntheorem Loop.ofGroup_isNilpotent (G : Type*) [CommGroup G] :\n    letI := Loop.ofGroup G\n    Loop.IsNilpotent G := by\n  letI := Loop.ofGroup G\n  refine ⟨1, fun i a b => i = 0 → a = b, fun i => ?_, fun a b => ⟨fun h => h rfl, fun h _ => h⟩,\n    fun a b h => absurd h one_ne_zero, fun i _ a b _ h => absurd h i.succ_ne_zero,\n    fun i hi m _ x y => ?_⟩\n  · exact\n      { equivalence :=\n          ⟨fun _ _ => rfl, fun h hi => (h hi).symm, fun h h' hi => (h hi).trans (h' hi)⟩\n        mul := fun h h' hi => by rw [h hi, h' hi]\n        ldiv := fun h h' hi => by rw [h hi, h' hi]\n        div := fun h h' hi => by rw [h hi, h' hi] }\n  · obtain rfl : i = 0 := by omega\n    exact ⟨fun _ => mul_comm m x, fun _ => (mul_assoc m x y).symm, fun _ => (mul_assoc x m y).symm,\n      fun _ => (mul_assoc x y m).symm⟩\n\n/-- The laws of the trivial loop have a finite basis, namely the single law `x₀ ≈ x₁`. -/\n@[category test, AMS 8 20]\ntheorem Loop.hasFiniteBasis_unit :\n    letI := Loop.ofGroup Unit\n    Loop.HasFiniteBasis Unit := by\n  letI := Loop.ofGroup Unit\n  refine ⟨{(.var 0, .var 1)}, fun _ _ _ => Subsingleton.elim _ _, fun e _ M _ hM => ?_⟩\n  haveI : Subsingleton M :=\n    ⟨fun a b => hM _ (Finset.mem_singleton_self _) (fun i => if i = 0 then a else b)⟩\n  exact fun _ => Subsingleton.elim _ _\n\nend Kourovka.«8.4»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single slot matches the one-sentence statement, and the notes' reading (existence; Bruck central nilpotency; laws in the loop signature; finite basis = finite set of laws with all laws as equational consequences) is the standard one and was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Imperative 'Construct …' is formalized as a plain existence statement (no answer(sorry)), following the repository convention for imperative problems (cf. Wikipedia/SteinerSystem.lean) and the decomposition note.",
+    "Loops are taken in the equational signature (*, ldiv, /, 1) with the four division identities x*ldiv x y = y, ldiv x (x*y) = y, (y/x)*x = y, (y*x)/x = y (equivalent to unique solvability of a*x = b and y*a = b). Laws are pairs of terms in this signature over variables indexed by ℕ. For a finite loop the divisions are term-definable from multiplication, so finite basability does not depend on this signature choice.",
+    "Equational consequence `Loop.Implies S e` is semantic: every loop M : Type satisfying S satisfies e. By Birkhoff's completeness theorem this equals derivability from S plus the loop axioms; restricting M to universe Type is harmless since the relevant models are quotients of the countable term algebra. A basis is required to be a subset of laws L (standard; the implication direction alone would be the same notion since L itself satisfies S).",
+    "Nilpotency is Bruck's central nilpotency, encoded as existence of a finite central series. Normal subloops are represented by their congruences θ i (equivalence relations compatible with *, ldiv, /); a central series is a chain θ 0 = Eq ≤ θ 1 ≤ … ≤ θ n = ⊤ such that every m with θ (i+1) 1 m is central modulo θ i (commutes and lies in the left/middle/right nucleus modulo θ i), i.e. N_{i+1}/N_i ≤ Z(L/N_i). This is equivalent to the upper central series reaching L, the reading given in the decomposition notes. Requiring `∀ i, IsCongruence (θ i)` for all i (not just i ≤ n) is harmless since a series can be padded with ⊤.",
+    "Congruences are required to be compatible with ldiv and / as well as *, as is standard for the variety of loops; for finite loops multiplicative compatibility would already imply this, so no generality is lost or gained for the statement.",
+    "Boundary checks: the trivial loop is nilpotent and finitely based (proved as a test), so it is not a spurious witness; nilpotent loops that are groups are excluded by Oates–Powell; a central series of length 1 forces an abelian group, so IsNilpotent is not vacuous (abelian groups are nilpotent, proved as a test)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `MulOneClass`, `Group`, `IsCancelMul`, `DivInvMonoid` (all either lack division or force associativity/inverses).",
+     "name": "Kourovka.«8.4».Loop",
+     "why_needed": "Mathlib has no loop/quasigroup structure; class extending MulOneClass and Div with a left division `ldiv` and the four division identities."
+    },
+    {
+     "closest_existing_considered": "Mathlib `FirstOrder.Language.Term` with `Term.realize`; a custom `Language` would need arity-matching `Functions`/`Structure` definitions (`Language.mk₂` no longer exists), which is less transparent than a five-constructor inductive type.",
+     "name": "Kourovka.«8.4».LoopTerm / LoopTerm.eval / LoopLaw",
+     "why_needed": "Terms in the loop signature over ℕ-indexed variables and their evaluation; a law is a pair of terms."
+    },
+    {
+     "closest_existing_considered": "FormalConjectures/Other/EquationalTheories_677_255.lean (ad hoc single equations on magmas); Mathlib `FirstOrder.Language.Theory`/`Theory.Model` (first-order, would require encoding identities as universally closed sentences).",
+     "name": "Kourovka.«8.4».Loop.Satisfies / Loop.laws / Loop.Implies / Loop.HasFiniteBasis",
+     "why_needed": "Identity satisfaction, the equational theory of a loop, equational consequence within loops, and the finite basis property; none exist in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "Mathlib `Con` (only multiplicative compatibility), `Group.IsNilpotent`/`upperCentralSeries` (groups only).",
+     "name": "Kourovka.«8.4».Loop.IsCongruence / Loop.IsCentralMod / Loop.IsNilpotent",
+     "why_needed": "Loop congruences (compatible with *, ldiv, /), centrality modulo a congruence, and Bruck's central nilpotency via a finite central series."
+    },
+    {
+     "closest_existing_considered": "No existing bridge since `Loop` is new.",
+     "name": "Kourovka.«8.4».Loop.ofGroup",
+     "why_needed": "API definition making a group a loop, used by the sanity tests `Loop.ofGroup_isNilpotent` and `Loop.hasFiniteBasis_unit`."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.4»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∃ (L : Type) (_ : Loop L), Finite L ∧ Loop.IsNilpotent L ∧ ¬ Loop.HasFiniteBasis L. Mathlib and FormalConjecturesForMathlib have no loops/quasigroups, no loop congruences or central series, and no notion of equational theory / finite basis, so bespoke definitions were needed (all with proofs, no placeholders). Nilpotency is Bruck's central nilpotency (finite central series, equivalently upper central series reaching L); laws are identities in the loop signature (·, \\, /, 1) over countably many variables; finite basis = finite subset of the laws of L having every law of L as an equational consequence within loops."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.4»": "/--\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nThat is: there is a finite, centrally nilpotent loop `L` whose laws (the identities in the\nsignature `(*, ldiv, /, 1)` of loops that hold in `L`) have no finite basis, i.e. no finite\nset of laws of `L` has every law of `L` as a consequence. This is the loop-theoretic\ncounterpart of the Oates–Powell theorem, which says that the laws of every finite group have a\nfinite basis.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (_ : Loop L), Finite L ∧ Loop.IsNilpotent L ∧ ¬ Loop.HasFiniteBasis L := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.4\n\nby M. R. Vaughan-Lee\n\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nA loop is a set with a binary operation `*`, a two-sided identity `1`, and unique left and\nright division; the *loop signature* is `(*, ⧵, /, 1)`, in which loops form a variety.\nThe *laws* of a loop $L$ are the identities `s ≈ t` between terms of this signature that hold\nunder every assignment of the variables in $L$. The laws of $L$ have a *finite basis* if some\nfinite set of identities has exactly the laws of $L$ as its equational consequences (in the\nclass of all algebras of the loop signature; since loops are defined by finitely many\nidentities, restricting to loops gives the same notion).\n\"Nilpotent\" is Bruck's central nilpotency: the upper central series\n$1 = Z_0 \\le Z_1 \\le Z_2 \\le \\dots$, with $Z_{n+1}/Z_n = Z(L/Z_n)$, reaches $L$ after\nfinitely many steps. By the Oates–Powell theorem every finite group has a finite basis for\nits laws; the problem asks for a finite nilpotent loop showing that the loop analogue fails.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.4»\n\n/-- An algebra in the signature of loops: a multiplication `*`, a constant `1`, a left\ndivision `⧵` and a right division `/`. No axioms are imposed. -/\nclass LoopSignature (α : Type*) extends Mul α, One α, Div α where\n  /-- Left division: in a loop, `a ⧵ b` is the solution `x` of `a * x = b`. -/\n  ldiv : α → α → α\n\n@[inherit_doc] local infixl:70 \" ⧵ \" => LoopSignature.ldiv\n\n/-- A loop: an algebra `(L, *, ⧵, /, 1)` in the loop signature in which `1` is a two-sided\nidentity, `a ⧵ b` is the unique solution `x` of `a * x = b`, and `a / b` is the unique\nsolution `y` of `y * b = a`. -/\nclass Loop (α : Type*) extends LoopSignature α where\n  one_mul : ∀ a : α, 1 * a = a\n  mul_one : ∀ a : α, a * 1 = a\n  mul_ldiv : ∀ a b : α, a * (a ⧵ b) = b\n  ldiv_mul : ∀ a b : α, a ⧵ (a * b) = b\n  rdiv_mul : ∀ a b : α, (a / b) * b = a\n  mul_rdiv : ∀ a b : α, (a * b) / b = a\n\n/-- Terms in the signature of loops, with variables indexed by `ℕ`. -/\ninductive LoopTerm\n  | var : ℕ → LoopTerm\n  | one : LoopTerm\n  | mul : LoopTerm → LoopTerm → LoopTerm\n  | ldiv : LoopTerm → LoopTerm → LoopTerm\n  | rdiv : LoopTerm → LoopTerm → LoopTerm\n\n/-- The value of a term in an algebra `α` of the loop signature under an assignment `v` of the\nvariables. -/\ndef LoopTerm.eval {α : Type*} [LoopSignature α] (v : ℕ → α) : LoopTerm → α\n  | var n => v n\n  | one => 1\n  | mul s t => s.eval v * t.eval v\n  | ldiv s t => s.eval v ⧵ t.eval v\n  | rdiv s t => s.eval v / t.eval v\n\n/-- A law (identity) in the loop signature is a pair of terms `(s, t)`, read as `s ≈ t`. -/\nabbrev LoopLaw := LoopTerm × LoopTerm\n\n/-- The algebra `α` satisfies the law `s ≈ t` if `s` and `t` take the same value under every\nassignment of the variables in `α`. -/\ndef LoopSignature.Satisfies (α : Type*) [LoopSignature α] (e : LoopLaw) : Prop :=\n  ∀ v : ℕ → α, e.1.eval v = e.2.eval v\n\n/-- The laws of `α`: the set of all identities in the loop signature holding in `α`. -/\ndef LoopSignature.laws (α : Type*) [LoopSignature α] : Set LoopLaw :=\n  {e | LoopSignature.Satisfies α e}\n\n/-- The law `e` is an equational consequence of the set of laws `S`: every algebra of the loop\nsignature satisfying all laws in `S` satisfies `e`. By Birkhoff's completeness theorem this\nagrees with derivability of `e` from `S` in equational logic. -/\ndef LoopLaw.IsConsequence (S : Set LoopLaw) (e : LoopLaw) : Prop :=\n  ∀ (β : Type) [LoopSignature β], (∀ e' ∈ S, LoopSignature.Satisfies β e') →\n    LoopSignature.Satisfies β e\n\n/-- The laws of `α` have a finite basis: there is a finite set `S` of laws whose equational\nconsequences are exactly the laws of `α`. -/\ndef LoopSignature.HasFiniteBasis (α : Type*) [LoopSignature α] : Prop :=\n  ∃ S : Set LoopLaw, S.Finite ∧ ∀ e, LoopLaw.IsConsequence S e ↔ e ∈ LoopSignature.laws α\n\nnamespace Loop\n\nvariable {L : Type*} [Loop L]\n\n/-- `a` is congruent to `b` modulo the subset `N`, i.e. `a ∈ b * N`. When `N` is a normal\nsubloop this says that `a` and `b` have the same image in the quotient loop `L / N`. -/\ndef CongrMod (N : Set L) (a b : L) : Prop :=\n  ∃ n ∈ N, a = b * n\n\n/-- The centre of `L` modulo `N`: the elements that commute and associate (in every position)\nwith all elements of `L` modulo `N`. When `N` is a normal subloop this is the preimage of the\ncentre `Z(L / N)` of the quotient loop under the quotient map `L → L / N`. -/\ndef centerMod (N : Set L) : Set L :=\n  {a | ∀ x y : L, CongrMod N (a * x) (x * a) ∧\n    CongrMod N (a * x * y) (a * (x * y)) ∧\n    CongrMod N (x * a * y) (x * (a * y)) ∧\n    CongrMod N (x * y * a) (x * (y * a))}\n\n/-- The centre of the loop `L`: the elements that commute with every element and associate\nwith every pair of elements in every position, i.e. the intersection of the nucleus with the\ncommutant. -/\ndef center (L : Type*) [Loop L] : Set L :=\n  {a | ∀ x y : L, a * x = x * a ∧ a * x * y = a * (x * y) ∧\n    x * a * y = x * (a * y) ∧ x * y * a = x * (y * a)}\n\n/-- The upper central series of the loop `L`: `Z₀ = {1}` and `Z_{n+1} / Z_n = Z(L / Z_n)`. -/\ndef upperCentralSeries (L : Type*) [Loop L] : ℕ → Set L\n  | 0 => {1}\n  | n + 1 => centerMod (upperCentralSeries L n)\n\n/-- A loop is centrally nilpotent (in the sense of Bruck) if its upper central series reaches\nthe whole loop after finitely many steps. -/\ndef IsCentrallyNilpotent (L : Type*) [Loop L] : Prop :=\n  ∃ n : ℕ, upperCentralSeries L n = Set.univ\n\n/-- In a loop, `a ⧵ b` is the unique solution of `a * x = b`. -/\n@[category API, AMS 20]\ntheorem eq_ldiv_of_mul_eq {a b x : L} (h : a * x = b) : x = a ⧵ b := by\n  rw [← h, Loop.ldiv_mul]\n\n/-- In a loop, `a / b` is the unique solution of `y * b = a`. -/\n@[category API, AMS 20]\ntheorem eq_rdiv_of_mul_eq {a b y : L} (h : y * b = a) : y = a / b := by\n  rw [← h, Loop.mul_rdiv]\n\n/-- Congruence modulo the trivial subloop is equality. -/\n@[category API, AMS 20]\ntheorem congrMod_singleton_one (a b : L) : CongrMod {1} a b ↔ a = b := by\n  constructor\n  · rintro ⟨n, rfl, rfl⟩\n    exact Loop.mul_one b\n  · rintro rfl\n    exact ⟨1, rfl, (Loop.mul_one a).symm⟩\n\n/-- The first term of the upper central series is the centre. -/\n@[category API, AMS 20]\ntheorem upperCentralSeries_one : upperCentralSeries L 1 = center L := by\n  ext a\n  simp [upperCentralSeries, centerMod, center, congrMod_singleton_one]\n\nend Loop\n\n/--\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nThat is, there is a finite loop $L$ which is centrally nilpotent (its upper central series\nreaches $L$) and whose laws, i.e. the identities in the loop signature `(*, ⧵, /, 1)` holding\nin $L$, are not the equational consequences of any finite set of identities.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (_ : Loop L), Finite L ∧ Loop.IsCentrallyNilpotent L ∧\n      ¬ LoopSignature.HasFiniteBasis L := by\n  sorry\n\nend Kourovka.«8.4»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition (existence of a finite, centrally nilpotent loop whose laws in the loop signature are not finitely based) matches the statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The imperative 'Construct ...' is rendered as a plain existence statement `∃ (L : Type) (_ : Loop L), ...` (as in the repo's SteinerSystem 'Construct an S(t,k,n)' precedent) rather than `answer(sorry) ↔ ∃ ...`; the mathematical content is identical, and a negative resolution would be recorded by negating the statement.",
+    "Laws are taken in the full loop signature (*, ⧵, /, 1), the signature in which loops form a variety (standard in loop theory / universal algebra). Finite basedness is invariant under the term-equivalent (*, ⧵, /) signature.",
+    "Equational consequence is semantic, over all algebras of the loop signature (not just loops) living in `Type`. This is equivalent to syntactic derivability (Birkhoff) and to the relative notion 'finitely based within the variety of loops' since the loop axioms are finitely many identities; documented in the module docstring.",
+    "HasFiniteBasis is `∃ finite S, ∀ e, IsConsequence S e ↔ e ∈ laws L` (consequences of S are exactly the laws of L), which is the standard definition and implies S ⊆ laws L.",
+    "Upper central series is defined on `Set L` without constructing quotient loops: Z_{n+1} = {a | ∀ x y, (ax) ≡ (xa), ((ax)y) ≡ (a(xy)), ((xa)y) ≡ (x(ay)), ((xy)a) ≡ (x(ya)) mod Z_n} with u ≡ v mod N iff u ∈ vN. This coincides with the preimage of Z(L/Z_n) because each Z_n is (provably) a normal subloop and the quotient map is a surjective homomorphism; the check Z_1 = center is proved as an API lemma.",
+    "Central nilpotency is `∃ n, Z_n = univ` (class unrestricted); the trivial loop and finite groups (viewed as loops) are finitely based, so they are not degenerate witnesses.",
+    "Right division reuses Mathlib's `Div` class (`a / b` with `(a / b) * b = a`); left division is a new field with local notation `⧵`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib Mul/One/Div classes (used as parents); the EquationalTheories file's bespoke `Magma` (single binary operation only, no divisions/identity).",
+     "name": "Kourovka.«8.4».LoopSignature",
+     "why_needed": "Algebras of the loop signature (*, ⧵, /, 1) without axioms; needed as the class of models over which equational consequence is evaluated."
+    },
+    {
+     "closest_existing_considered": "Mathlib `Group`/`MulOneClass`/`IsCancelMul` — none captures non-associative loops with division operations.",
+     "name": "Kourovka.«8.4».Loop",
+     "why_needed": "Loops (identity + unique left/right division, given by the standard quasigroup identities). Mathlib has no quasigroup or loop structure (only Matroid.IsLoop, unrelated)."
+    },
+    {
+     "closest_existing_considered": "Mathlib `FreeMagma` (only one binary operation, no constant or division symbols); `FirstOrder.Language.Term` (heavier model-theoretic machinery; no ready loop language).",
+     "name": "Kourovka.«8.4».LoopTerm, LoopTerm.eval, LoopLaw",
+     "why_needed": "Terms in the loop signature with ℕ-indexed variables, their evaluation, and identities s ≈ t as pairs of terms."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or the repo about varieties/equational theories/finitely based laws.",
+     "name": "Kourovka.«8.4».LoopSignature.Satisfies, LoopSignature.laws, LoopLaw.IsConsequence, LoopSignature.HasFiniteBasis",
+     "why_needed": "Satisfaction of an identity, the set of laws of an algebra, semantic equational consequence over all algebras of the signature (in Type; sufficient by Birkhoff's completeness theorem), and the finite-basis property (a finite set whose consequences are exactly the laws)."
+    },
+    {
+     "closest_existing_considered": "Mathlib `upperCentralSeries`/`Group.IsNilpotent`/`Subgroup.center` — group-only, cannot be applied to loops.",
+     "name": "Kourovka.«8.4».Loop.CongrMod, Loop.centerMod, Loop.center, Loop.upperCentralSeries, Loop.IsCentrallyNilpotent",
+     "why_needed": "Bruck's central nilpotency for loops: centre (nucleus ∩ commutant), upper central series with Z_{n+1}/Z_n = Z(L/Z_n) expressed without quotient loops via coset congruence a ∈ bN, and nilpotency as the series reaching L."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.4»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as ∃ (L : Type) (_ : Loop L), Finite L ∧ Loop.IsCentrallyNilpotent L ∧ ¬ LoopSignature.HasFiniteBasis L. Mathlib and FormalConjecturesForMathlib have no loops/quasigroups, no equational theories for the loop signature, and no loop-theoretic central series, so all of these were defined in the file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.4»": "/--\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nThat is, there is a finite loop $L$ which is centrally nilpotent (its upper central series\nreaches $L$) and whose laws, i.e. the identities in the loop signature `(*, ⧵, /, 1)` holding\nin $L$, are not the equational consequences of any finite set of identities.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (_ : Loop L), Finite L ∧ Loop.IsCentrallyNilpotent L ∧\n      ¬ LoopSignature.HasFiniteBasis L := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.4\n\nby M. R. Vaughan-Lee\n\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.4»\n\n/-- A loop, presented in its equational signature with multiplication, left and right\ndivision, and an identity element. -/\nclass Loop (L : Type*) where\n  one : L\n  mul : L → L → L\n  ldiv : L → L → L\n  rdiv : L → L → L\n  one_mul : ∀ x, mul one x = x\n  mul_one : ∀ x, mul x one = x\n  ldiv_mul : ∀ x y, ldiv x (mul x y) = y\n  mul_ldiv : ∀ x y, mul x (ldiv x y) = y\n  rdiv_mul : ∀ x y, rdiv (mul x y) y = x\n  mul_rdiv : ∀ x y, mul (rdiv x y) y = x\n\n/-- Terms in the loop signature, with variables indexed by natural numbers. -/\ninductive LoopTerm where\n  | var : ℕ → LoopTerm\n  | one : LoopTerm\n  | mul : LoopTerm → LoopTerm → LoopTerm\n  | ldiv : LoopTerm → LoopTerm → LoopTerm\n  | rdiv : LoopTerm → LoopTerm → LoopTerm\n  deriving DecidableEq\n\nnamespace LoopTerm\n\n/-- Evaluation of a term in a loop. -/\ndef eval {L : Type*} [Loop L] (v : ℕ → L) : LoopTerm → L\n  | var n => v n\n  | one => Loop.one\n  | mul s t => Loop.mul (eval v s) (eval v t)\n  | ldiv s t => Loop.ldiv (eval v s) (eval v t)\n  | rdiv s t => Loop.rdiv (eval v s) (eval v t)\n\n/-- Simultaneous substitution of loop terms for variables. -/\ndef subst (σ : ℕ → LoopTerm) : LoopTerm → LoopTerm\n  | var n => σ n\n  | one => one\n  | mul s t => mul (subst σ s) (subst σ t)\n  | ldiv s t => ldiv (subst σ s) (subst σ t)\n  | rdiv s t => rdiv (subst σ s) (subst σ t)\n\nend LoopTerm\n\n/-- An identity (law) in the loop signature. -/\nabbrev LoopLaw := LoopTerm × LoopTerm\n\n/-- A loop satisfies an identity if its two terms have the same value under every\nassignment of the variables. -/\ndef Satisfies {L : Type*} [Loop L] (law : LoopLaw) : Prop :=\n  ∀ v : ℕ → L, law.1.eval v = law.2.eval v\n\n/-- Derivability from a set of identities in ordinary equational logic. -/\ninductive EqConsequence (basis : Set LoopLaw) : LoopTerm → LoopTerm → Prop\n  | axiom {s t} : (s, t) ∈ basis → EqConsequence basis s t\n  | refl (s) : EqConsequence basis s s\n  | symm {s t} : EqConsequence basis s t → EqConsequence basis t s\n  | trans {s t u} : EqConsequence basis s t → EqConsequence basis t u →\n      EqConsequence basis s u\n  | mul {s₁ s₂ t₁ t₂} : EqConsequence basis s₁ t₁ → EqConsequence basis s₂ t₂ →\n      EqConsequence basis (.mul s₁ s₂) (.mul t₁ t₂)\n  | ldiv {s₁ s₂ t₁ t₂} : EqConsequence basis s₁ t₁ → EqConsequence basis s₂ t₂ →\n      EqConsequence basis (.ldiv s₁ s₂) (.ldiv t₁ t₂)\n  | rdiv {s₁ s₂ t₁ t₂} : EqConsequence basis s₁ t₁ → EqConsequence basis s₂ t₂ →\n      EqConsequence basis (.rdiv s₁ s₂) (.rdiv t₁ t₂)\n  | subst {s t} (σ : ℕ → LoopTerm) : EqConsequence basis s t →\n      EqConsequence basis (s.subst σ) (t.subst σ)\n\n/-- The laws of a loop have a finite basis if some finite set of laws of the loop\nproves every law of the loop in equational logic. -/\ndef HasFiniteBasisOfLaws (L : Type*) [Loop L] : Prop :=\n  ∃ basis : Set LoopLaw, basis.Finite ∧\n    (∀ law ∈ basis, Satisfies (L := L) law) ∧\n    ∀ law, Satisfies (L := L) law → EqConsequence basis law.1 law.2\n\n/-- A congruence of a loop in the signature consisting of multiplication, left and\nright division, and the identity constant. -/\nstructure LoopCongruence (L : Type*) [Loop L] extends Setoid L where\n  mul' : ∀ {a b c d}, r a b → r c d → r (Loop.mul a c) (Loop.mul b d)\n  ldiv' : ∀ {a b c d}, r a b → r c d → r (Loop.ldiv a c) (Loop.ldiv b d)\n  rdiv' : ∀ {a b c d}, r a b → r c d → r (Loop.rdiv a c) (Loop.rdiv b d)\n\n/-- An element is central modulo a congruence if its image in the quotient commutes\nwith every element and lies in each of the three nuclei. -/\ndef IsCentralModulo {L : Type*} [Loop L] (R : LoopCongruence L) (x : L) : Prop :=\n  (∀ y, R.r (Loop.mul x y) (Loop.mul y x)) ∧\n  (∀ y z, R.r (Loop.mul (Loop.mul x y) z) (Loop.mul x (Loop.mul y z))) ∧\n  (∀ y z, R.r (Loop.mul (Loop.mul y x) z) (Loop.mul y (Loop.mul x z))) ∧\n  (∀ y z, R.r (Loop.mul (Loop.mul y z) x) (Loop.mul y (Loop.mul z x)))\n\n/-- Bruck central nilpotency: the loop has a finite central congruence series from\nequality to the universal congruence. -/\ndef IsCentrallyNilpotent (L : Type*) [Loop L] : Prop :=\n  ∃ n : ℕ, ∃ R : Fin (n + 1) → LoopCongruence L,\n    (∀ x y, (R 0).r x y ↔ x = y) ∧\n    (∀ x y, (R (Fin.last n)).r x y) ∧\n    ∀ i : Fin n,\n      (∀ x y, (R i.castSucc).r x y → (R i.succ).r x y) ∧\n      ∀ x, (R i.succ).r x Loop.one → IsCentralModulo (R i.castSucc) x\n\n/--\nConstruct a finite centrally nilpotent loop whose laws in the loop signature\n$(1,\\,\\cdot,\\,\\backslash,\\,/)$ have no finite basis.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (_ : Loop L), Finite L ∧ IsCentrallyNilpotent L ∧\n      ¬ HasFiniteBasisOfLaws L := by\n  sorry\n\nend Kourovka.«8.4»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the imperative “Construct” as a direct existential statement, rather than as a yes/no question using `answer(sorry)`.",
+    "Used the standard equational loop signature with identity, multiplication, left division, and right division, as specified by the decomposition.",
+    "Represented laws by terms over countably many variables; this suffices because each equational term is finite.",
+    "Represented equational consequence syntactically by the standard rules of equational logic, avoiding an artificial Lean universe bound on semantic models.",
+    "Represented Bruck central nilpotency by the equivalent existence of a finite central congruence series from equality to the universal congruence. A layer is central when its kernel in the relevant quotient commutes and belongs to all three nuclei."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `MulOneClass`, quasigroup-related cancellation classes, and group hierarchy; these impose too little or associativity/inverse laws that are too strong.",
+     "name": "Loop",
+     "why_needed": "Mathlib has no algebraic loop structure with multiplication, identity, and both division operations."
+    },
+    {
+     "closest_existing_considered": "No general universal-algebra term syntax was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "LoopTerm",
+     "why_needed": "Terms in the full loop signature are needed to define identities and finite equational bases."
+    },
+    {
+     "closest_existing_considered": "No existing evaluator for a general loop signature was found.",
+     "name": "LoopTerm.eval",
+     "why_needed": "Needed to interpret loop terms under variable assignments."
+    },
+    {
+     "closest_existing_considered": "No existing substitution operation for loop terms was found.",
+     "name": "LoopTerm.subst",
+     "why_needed": "Needed to state the substitution rule of equational consequence."
+    },
+    {
+     "closest_existing_considered": "No general equational-law type applicable to this signature was found.",
+     "name": "LoopLaw",
+     "why_needed": "Names a pair of loop terms as an equation."
+    },
+    {
+     "closest_existing_considered": "No general universal-algebra satisfaction predicate was found.",
+     "name": "Satisfies",
+     "why_needed": "Defines when a loop obeys a law under every variable assignment."
+    },
+    {
+     "closest_existing_considered": "No equational-logic consequence relation was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "EqConsequence",
+     "why_needed": "Finite basis requires the ordinary equational consequences of a set of laws."
+    },
+    {
+     "closest_existing_considered": "No finite identity-basis predicate was found.",
+     "name": "HasFiniteBasisOfLaws",
+     "why_needed": "Packages the precise finite-basis property whose negation occurs in the problem."
+    },
+    {
+     "closest_existing_considered": "`Setoid` supplies equivalence relations but not compatibility with the loop operations.",
+     "name": "LoopCongruence",
+     "why_needed": "Central nilpotency of loops is naturally and faithfully stated through a central congruence series."
+    },
+    {
+     "closest_existing_considered": "Mathlib has group centers but no center or nuclei for nonassociative loops.",
+     "name": "IsCentralModulo",
+     "why_needed": "Expresses membership in the center of a quotient loop via commutation and the three nucleus identities."
+    },
+    {
+     "closest_existing_considered": "Mathlib's nilpotency notions concern groups, rings, or elements and do not express central nilpotency of loops.",
+     "name": "IsCentrallyNilpotent",
+     "why_needed": "The problem specifically requires Bruck central nilpotency, for which no existing predicate was found."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.4»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.4»": "/--\nConstruct a finite centrally nilpotent loop whose laws in the loop signature\n$(1,\\,\\cdot,\\,\\backslash,\\,/)$ have no finite basis.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (_ : Loop L), Finite L ∧ IsCentrallyNilpotent L ∧\n      ¬ HasFiniteBasisOfLaws L := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.4\n\nby M. R. Vaughan-Lee\n\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nA loop is a set with a binary multiplication, a two-sided identity element $1$ and unique\nleft and right division, written $x \\backslash y$ and $y / x$. Nilpotency is Bruck's central\nnilpotency: the upper central series $1 = Z_0 \\le Z_1 \\le \\dotsb$, where $Z_{n+1}/Z_n$ is the\ncenter of $L/Z_n$, reaches $L$ after finitely many steps. The laws of a loop $L$ are the\nidentities $s = t$, in the signature $(\\cdot, \\backslash, /, 1)$, that hold in $L$. They have\na finite basis if some finite set of laws of $L$ implies all laws of $L$, i.e. every loop\nsatisfying the finitely many chosen laws satisfies every law of $L$. Since the loop axioms are\nthemselves laws of $L$, it makes no difference whether consequences are taken among all loops or\namong all algebras of this signature. For finite groups a finite basis always exists (the\nOates–Powell theorem).\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.4»\n\n/-- A loop: a type with a multiplication `*`, a two-sided identity `1`, a left division `ldiv`\n(written `x ⧵ y`, the unique solution `z` of `x * z = y`) and a right division `/`\n(`y / x` is the unique solution `z` of `z * x = y`). -/\nclass Loop (L : Type*) extends Mul L, One L, Div L where\n  /-- Left division: `ldiv x y` is the unique `z` with `x * z = y`. -/\n  ldiv : L → L → L\n  one_mul : ∀ x : L, 1 * x = x\n  mul_one : ∀ x : L, x * 1 = x\n  mul_ldiv : ∀ x y : L, x * ldiv x y = y\n  ldiv_mul : ∀ x y : L, ldiv x (x * y) = y\n  div_mul : ∀ x y : L, y / x * x = y\n  mul_div : ∀ x y : L, y * x / x = y\n\nlocal infixl:70 \" ⧵ \" => Loop.ldiv\n\n/-- Terms in the signature `(*, ⧵, /, 1)` of loops, over the variables `ℕ`. -/\ninductive LoopTerm\n  | var : ℕ → LoopTerm\n  | one : LoopTerm\n  | mul : LoopTerm → LoopTerm → LoopTerm\n  | ldiv : LoopTerm → LoopTerm → LoopTerm\n  | div : LoopTerm → LoopTerm → LoopTerm\n\nvariable {L : Type*} [Loop L]\n\n/-- The value of a term in a loop `L` under an assignment `v` of the variables. -/\ndef LoopTerm.eval (v : ℕ → L) : LoopTerm → L\n  | var n => v n\n  | one => 1\n  | mul s t => s.eval v * t.eval v\n  | ldiv s t => s.eval v ⧵ t.eval v\n  | div s t => s.eval v / t.eval v\n\n/-- A loop `L` satisfies the law `s = t` (given as the pair `(s, t)`) if `s` and `t` take the\nsame value in `L` under every assignment of the variables. -/\ndef Satisfies (L : Type*) [Loop L] (e : LoopTerm × LoopTerm) : Prop :=\n  ∀ v : ℕ → L, e.1.eval v = e.2.eval v\n\n/-- The laws of a loop `L`: all identities `s = t` in the signature of loops that hold in `L`. -/\ndef laws (L : Type*) [Loop L] : Set (LoopTerm × LoopTerm) :=\n  {e | Satisfies L e}\n\n/-- The laws of a loop `L` have a finite basis if there is a finite set `S` of laws of `L` such\nthat every law of `L` is a consequence of `S`, i.e. every loop satisfying all laws in `S`\nsatisfies all laws of `L`. -/\ndef HasFiniteBasis (L : Type*) [Loop L] : Prop :=\n  ∃ S : Set (LoopTerm × LoopTerm), S.Finite ∧ S ⊆ laws L ∧\n    ∀ (M : Type) [Loop M], (∀ e ∈ S, Satisfies M e) → ∀ e ∈ laws L, Satisfies M e\n\n/-- An element `a` is central modulo a subset `N` of `L` if it commutes and associates with all\nelements of `L` up to `N`: `a * x ∈ (x * a) * N`, `(a * x) * y ∈ (a * (x * y)) * N`,\n`(x * a) * y ∈ (x * (a * y)) * N` and `(x * y) * a ∈ (x * (y * a)) * N` for all `x y`.\nFor a normal subloop `N` this says exactly that the image of `a` lies in the center of `L / N`;\nfor `N = {1}` it says that `a` lies in the center of `L`. -/\ndef IsCentralMod (N : Set L) (a : L) : Prop :=\n  ∀ x y : L, (x * a) ⧵ (a * x) ∈ N ∧ (a * (x * y)) ⧵ (a * x * y) ∈ N ∧\n    (x * (a * y)) ⧵ (x * a * y) ∈ N ∧ (x * (y * a)) ⧵ (x * y * a) ∈ N\n\n/-- The upper central series `Z_0 = {1} ≤ Z_1 ≤ Z_2 ≤ ⋯` of a loop, in Bruck's sense:\n`Z_{n+1} / Z_n` is the center of `L / Z_n`, i.e. `Z_{n+1}` consists of the elements that are\ncentral modulo `Z_n`. -/\ndef upperCentralSeries (L : Type*) [Loop L] : ℕ → Set L\n  | 0 => {1}\n  | n + 1 => {a | IsCentralMod (upperCentralSeries L n) a}\n\n/-- A loop is (centrally) nilpotent if its upper central series reaches the whole loop after\nfinitely many steps. -/\ndef IsCentrallyNilpotent (L : Type*) [Loop L] : Prop :=\n  ∃ n, upperCentralSeries L n = Set.univ\n\n/-- In a loop, `x ⧵ y = 1` if and only if `y = x`. -/\n@[category API, AMS 8 20]\ntheorem ldiv_eq_one_iff (x y : L) : x ⧵ y = 1 ↔ y = x := by\n  constructor\n  · intro h\n    have := Loop.mul_ldiv x y\n    rw [h, Loop.mul_one] at this\n    exact this.symm\n  · intro h\n    rw [h]\n    have := Loop.ldiv_mul x 1\n    rwa [Loop.mul_one] at this\n\n/-- The first term `Z_1` of the upper central series is the center of `L`: the elements that\ncommute and associate with all elements of `L`. -/\n@[category API, AMS 8 20]\ntheorem mem_upperCentralSeries_one_iff (a : L) :\n    a ∈ upperCentralSeries L 1 ↔ ∀ x y : L, a * x = x * a ∧ a * x * y = a * (x * y) ∧\n      x * a * y = x * (a * y) ∧ x * y * a = x * (y * a) := by\n  simp [upperCentralSeries, IsCentralMod, ldiv_eq_one_iff]\n\ninstance : Loop Unit where\n  mul _ _ := ()\n  one := ()\n  div _ _ := ()\n  ldiv _ _ := ()\n  one_mul _ := rfl\n  mul_one _ := rfl\n  mul_ldiv _ _ := rfl\n  ldiv_mul _ _ := rfl\n  div_mul _ _ := rfl\n  mul_div _ _ := rfl\n\n/-- The trivial loop is centrally nilpotent. -/\n@[category test, AMS 8 20]\ntheorem isCentrallyNilpotent_unit : IsCentrallyNilpotent Unit :=\n  ⟨0, Set.eq_univ_of_forall fun _ => rfl⟩\n\n/-- The laws of the trivial loop have the finite basis `{x = y}`. -/\n@[category test, AMS 8 20]\ntheorem hasFiniteBasis_unit : HasFiniteBasis Unit := by\n  refine ⟨{(.var 0, .var 1)}, Set.finite_singleton _, fun _ _ _ => rfl, fun M _ hM e _ v => ?_⟩\n  have : ∀ a b : M, a = b := fun a b =>\n    hM _ rfl fun n => if n = 0 then a else b\n  exact this _ _\n\n/--\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nDoes there exist a finite, centrally nilpotent loop `L` whose laws have no finite basis?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.4» : answer(sorry) ↔\n    ∃ (L : Type) (_ : Loop L), Finite L ∧ IsCentrallyNilpotent L ∧ ¬ HasFiniteBasis L := by\n  sorry\n\nend Kourovka.«8.4»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot table and its reading (existence of a finite, Bruck-centrally-nilpotent loop whose equational theory in the loop signature is not finitely based) match the statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Construct …' is read as the existence question 'does such a loop exist?' and stated with the repository's `answer(sorry) ↔ ∃ …` idiom (answer(True) = such a loop exists), following the decomposition notes; the alternative would be a bare `∃ …` conjecture.",
+    "Laws are taken in the standard equational signature of loops (·, \\, /, 1) with variables indexed by ℕ. For a finite loop the divisions and 1 are term-definable from · alone, so the finite-basis property does not depend on this choice, but a reviewer may wish to confirm the signature convention.",
+    "`HasFiniteBasis` requires the finite basis S to consist of laws of L and takes equational consequence relative to all loops `M : Type`. Since the loop axioms are themselves laws of L this agrees with consequence over all algebras of the signature (Birkhoff), and restricting M to universe `Type` is harmless (countable free algebras suffice).",
+    "Bruck's upper central series is defined without quotient loops: `a ∈ Z_{n+1}` iff for all x y, `(x*a)⧵(a*x) ∈ Z_n`, `(a*(x*y))⧵((a*x)*y) ∈ Z_n`, `(x*(a*y))⧵((x*a)*y) ∈ Z_n`, `(x*(y*a))⧵((x*y)*a) ∈ Z_n`. This is exactly `a Z_n ∈ Z(L/Z_n)` because Bruck's Z_n is a normal subloop and `u ∈ v N ↔ v⧵u ∈ N`. The API lemma `mem_upperCentralSeries_one_iff` verifies Z₁ is Bruck's center (commutant ∩ nucleus).",
+    "Nilpotency is Bruck's central nilpotency (equivalently, commutator-theoretic nilpotency, which coincides for loops), not any group-theoretic notion.",
+    "Finiteness is `Finite L`; a loop is nonempty (contains 1). The trivial loop is finite, nilpotent and finitely based (proved as tests), so it is not a degenerate witness.",
+    "AMS tags 8 (general algebraic systems / varieties) and 20 (loops, 20N05)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Group`/`Monoid`/`IsCancelMul` (all require associativity or lack identity/division); `Magma` class in FormalConjectures/Other/EquationalTheories_677_255.lean (single binary operation, local to that file).",
+     "name": "Kourovka.«8.4».Loop",
+     "why_needed": "Mathlib has no loops or quasigroups. Class with `*`, `1`, left division `ldiv` (local notation `⧵`) and right division `/` (Mathlib's `Div`), with axioms 1x = x, x1 = x, x(x⧵y) = y, x⧵(xy) = y, (y/x)x = y, (yx)/x = y."
+    },
+    {
+     "closest_existing_considered": "Mathlib `FreeMagma` (only one binary operation, no divisions or constant) and Mathlib's `FirstOrder.Language.Term` (heavier and would still need a bespoke language).",
+     "name": "Kourovka.«8.4».LoopTerm (with LoopTerm.eval)",
+     "why_needed": "Terms in the loop signature (·, ⧵, /, 1) over variables ℕ, to express identities (laws); no term algebra for this signature exists."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib/repo for equational identities of algebras.",
+     "name": "Kourovka.«8.4».Satisfies / laws",
+     "why_needed": "`Satisfies L (s, t)` : ∀ assignment v, s.eval v = t.eval v; `laws L` is the set of identities holding in L."
+    },
+    {
+     "closest_existing_considered": "No notion of finitely based equational theory in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«8.4».HasFiniteBasis",
+     "why_needed": "'The laws of L have a finite basis': ∃ finite S ⊆ laws L such that every loop satisfying S satisfies all laws of L."
+    },
+    {
+     "closest_existing_considered": "Mathlib `upperCentralSeries` and `Group.IsNilpotent` (require `Group`, i.e. associativity, and are not applicable to loops).",
+     "name": "Kourovka.«8.4».IsCentralMod / upperCentralSeries / IsCentrallyNilpotent",
+     "why_needed": "Bruck's upper central series of a loop and central nilpotency; Mathlib's `upperCentralSeries`/`Group.IsNilpotent` are for groups only."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.4»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ (L : Type) (_ : Loop L), Finite L ∧ IsCentrallyNilpotent L ∧ ¬ HasFiniteBasis L`. Mathlib and the repo have no loops/quasigroups, no loop term algebra, no equational 'finitely based' notion and no loop nilpotency, so these are defined in the file: `Loop` (signature (·, \\, /, 1) with the standard Evans axioms), `LoopTerm`/`Satisfies`/`laws`, `HasFiniteBasis` (∃ finite S ⊆ laws L such that every loop satisfying S satisfies every law of L), and Bruck's upper central series `upperCentralSeries` (Z₀ = {1}, Z_{n+1} = elements central modulo Z_n, written without quotients via `(x*a)⧵(a*x) ∈ Z_n` etc.) with `IsCentrallyNilpotent L := ∃ n, Z_n = univ`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.4»": "/--\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nDoes there exist a finite, centrally nilpotent loop `L` whose laws have no finite basis?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.4» : answer(sorry) ↔\n    ∃ (L : Type) (_ : Loop L), Finite L ∧ IsCentrallyNilpotent L ∧ ¬ HasFiniteBasis L := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.4\n\nby M. R. Vaughan-Lee\n\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nA loop is a set with a binary multiplication, a two-sided identity element $1$, and unique\nleft and right division: the equations $a x = b$ and $y a = b$ have unique solutions\n$x = a \\backslash b$ and $y = b / a$. Loops form a variety of algebras in the signature\n$(\\cdot, \\backslash, /, 1)$, and the laws of a loop $L$ are the identities $s \\approx t$ in this\nsignature that hold in $L$. A basis for the laws of $L$ is a set of laws of $L$ from which every\nlaw of $L$ follows; by Birkhoff's completeness theorem for equational logic, this means that every\nalgebra of the signature satisfying the basis satisfies every law of $L$.\n\nNilpotency is Bruck's central nilpotency. The centre of a loop $L$ is\n$Z(L) = \\{a \\in L : a x = x a,\\ (a x) y = a (x y),\\ (x a) y = x (a y),\\ (x y) a = x (y a)\n\\text{ for all } x, y \\in L\\}$, a normal subloop. The upper central series is given by\n$Z_0 = \\{1\\}$ and $Z_{i+1} / Z_i = Z(L / Z_i)$; the loop $L$ is nilpotent if $Z_n = L$ for some $n$.\n\nBy the Oates–Powell theorem, the laws of every finite group have a finite basis. The problem asks\nfor a finite nilpotent loop showing that this fails for loops.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.4»\n\nopen FirstOrder FirstOrder.Language\n\n/-- A loop: a multiplication `*` with a two-sided identity `1`, together with a left division\n`ldiv` and a right division `rdiv` such that `ldiv a b` is the unique solution `x` of `a * x = b`\nand `rdiv b a` is the unique solution `y` of `y * a = b`. -/\nclass Loop (L : Type*) extends Mul L, One L where\n  /-- Left division: `ldiv a b` is the solution `x` of `a * x = b`. -/\n  ldiv : L → L → L\n  /-- Right division: `rdiv b a` is the solution `y` of `y * a = b`. -/\n  rdiv : L → L → L\n  one_mul : ∀ x : L, 1 * x = x\n  mul_one : ∀ x : L, x * 1 = x\n  mul_ldiv : ∀ a b : L, a * ldiv a b = b\n  ldiv_mul : ∀ a x : L, ldiv a (a * x) = x\n  rdiv_mul : ∀ a b : L, rdiv b a * a = b\n  mul_rdiv : ∀ a y : L, rdiv (y * a) a = y\n\n/-- Every group is a loop, with `ldiv a b = a⁻¹ * b` and `rdiv b a = b * a⁻¹`. The instance is\nscoped, so that it does not add a second path from `Group G` to `Mul G` outside this namespace. -/\nscoped instance (G : Type*) [Group G] : Loop G where\n  ldiv a b := a⁻¹ * b\n  rdiv b a := b * a⁻¹\n  one_mul := one_mul\n  mul_one := mul_one\n  mul_ldiv := mul_inv_cancel_left\n  ldiv_mul := inv_mul_cancel_left\n  rdiv_mul a b := inv_mul_cancel_right b a\n  mul_rdiv a y := mul_inv_cancel_right y a\n\n/-- The function symbols of the language of loops: multiplication, left division, right division\n(all binary) and the identity element (a constant). -/\ninductive LoopFunc : ℕ → Type\n  | mul : LoopFunc 2\n  | ldiv : LoopFunc 2\n  | rdiv : LoopFunc 2\n  | one : LoopFunc 0\n\n/-- The first-order language of loops, in the signature $(\\cdot, \\backslash, /, 1)$, with no\nrelation symbols. -/\ndef loopLanguage : Language where\n  Functions := LoopFunc\n  Relations _ := Empty\n\n/-- `LoopFunc.mul`, with the type `loopLanguage.Functions 2`. -/\nabbrev mulFunc : loopLanguage.Functions 2 := LoopFunc.mul\n\n/-- A loop is a structure for the language of loops, interpreting the symbols by the loop\noperations. -/\ninstance Loop.toStructure (L : Type*) [Loop L] : loopLanguage.Structure L where\n  funMap {n} f :=\n    match n, f with\n    | _, .mul => fun x => x 0 * x 1\n    | _, .ldiv => fun x => Loop.ldiv (x 0) (x 1)\n    | _, .rdiv => fun x => Loop.rdiv (x 0) (x 1)\n    | _, .one => fun _ => 1\n  RelMap r := r.elim\n\n/-- An identity (law) in the language of loops: a pair of terms `(s, t)` with variables indexed\nby `ℕ`, read as the identity `s ≈ t`. -/\nabbrev LoopIdentity : Type := loopLanguage.Term ℕ × loopLanguage.Term ℕ\n\n/-- The identity `e = (s, t)` holds in the structure `M`: `s` and `t` take the same value under\nevery assignment of values in `M` to the variables. -/\ndef Satisfies (M : Type*) [loopLanguage.Structure M] (e : LoopIdentity) : Prop :=\n  ∀ v : ℕ → M, e.1.realize v = e.2.realize v\n\n/-- The laws of `M`: the set of all identities in the language of loops that hold in `M`. -/\ndef laws (M : Type*) [loopLanguage.Structure M] : Set LoopIdentity :=\n  {e | Satisfies M e}\n\n/-- The associative law `(x * y) * z ≈ x * (y * z)` is a law of a loop `L` if and only if\nthe multiplication of `L` is associative. -/\n@[category test, AMS 8 20]\ntheorem assoc_mem_laws_iff (L : Type*) [Loop L] :\n    (mulFunc.apply₂ (mulFunc.apply₂ (Term.var 0) (Term.var 1)) (Term.var 2),\n      mulFunc.apply₂ (Term.var 0) (mulFunc.apply₂ (Term.var 1) (Term.var 2))) ∈ laws L ↔\n      ∀ x y z : L, x * y * z = x * (y * z) :=\n  ⟨fun h x y z => h fun n => match n with | 0 => x | 1 => y | _ => z,\n    fun h v => h (v 0) (v 1) (v 2)⟩\n\n/-- The laws of `M` have a finite basis: there is a finite set `S` of laws of `M` such that every\nlaw of `M` is an equational consequence of `S`, i.e. every structure `N` for the language of loops\nin which the identities of `S` hold satisfies all the laws of `M`. -/\ndef HasFiniteBasis (M : Type*) [loopLanguage.Structure M] : Prop :=\n  ∃ S : Set LoopIdentity, S.Finite ∧ S ⊆ laws M ∧\n    ∀ (N : Type) [loopLanguage.Structure N], S ⊆ laws N → laws M ⊆ laws N\n\n/-- `u` and `v` are congruent modulo the subset `N` of the loop `L`: `v ∈ u N`, i.e. `v = u * n`\nfor some `n ∈ N`. When `N` is a normal subloop, this is the congruence of `L` whose class of `1`\nis `N`, so `Loop.ModEq N u v` says that `u` and `v` have the same image in `L / N`. -/\ndef Loop.ModEq {L : Type*} [Loop L] (N : Set L) (u v : L) : Prop :=\n  ∃ n ∈ N, v = u * n\n\n/-- The elements of the loop `L` that are central modulo the subset `N`: those `a` such that\n`a x ≡ x a`, `(a x) y ≡ a (x y)`, `(x a) y ≡ x (a y)` and `(x y) a ≡ x (y a)` modulo `N` for all\n`x y`. When `N` is a normal subloop, this is the preimage in `L` of the centre `Z(L / N)`. -/\ndef Loop.centerMod {L : Type*} [Loop L] (N : Set L) : Set L :=\n  {a | ∀ x y : L,\n    Loop.ModEq N (a * x) (x * a) ∧\n    Loop.ModEq N (a * x * y) (a * (x * y)) ∧\n    Loop.ModEq N (x * a * y) (x * (a * y)) ∧\n    Loop.ModEq N (x * y * a) (x * (y * a))}\n\nvariable (L : Type*) [Loop L]\n\n/-- The centre of the loop `L` (Bruck): the elements `a` with `a x = x a`, `(a x) y = a (x y)`,\n`(x a) y = x (a y)` and `(x y) a = x (y a)` for all `x y`. -/\ndef Loop.center : Set L :=\n  {a | ∀ x y : L,\n    a * x = x * a ∧ a * x * y = a * (x * y) ∧ x * a * y = x * (a * y) ∧ x * y * a = x * (y * a)}\n\n/-- The upper central series of the loop `L`: `Z₀ = {1}` and `Zₙ₊₁` is the preimage of the centre\nof `L / Zₙ`, i.e. the set of elements central modulo `Zₙ`. Each `Zₙ` is a normal subloop of `L`. -/\ndef Loop.upperCentralSeries : ℕ → Set L\n  | 0 => {1}\n  | n + 1 => Loop.centerMod (Loop.upperCentralSeries n)\n\n/-- A loop is (centrally) nilpotent if its upper central series reaches `L` in finitely many\nsteps. -/\ndef Loop.IsNilpotent : Prop :=\n  ∃ n : ℕ, Loop.upperCentralSeries L n = Set.univ\n\n/-- The first term of the upper central series is the centre. -/\n@[category test, AMS 20]\ntheorem Loop.upperCentralSeries_one : Loop.upperCentralSeries L 1 = Loop.center L := by\n  ext a\n  simp only [Loop.upperCentralSeries, Loop.centerMod, Loop.ModEq, Loop.center, Set.mem_setOf_eq,\n    Set.mem_singleton_iff, exists_eq_left, Loop.mul_one]\n  exact forall₂_congr fun x y =>\n    by rw [eq_comm, eq_comm (a := a * x * y), eq_comm (a := x * a * y), eq_comm (a := x * y * a)]\n\n/-- A commutative group is a nilpotent loop. -/\n@[category test, AMS 20]\ntheorem Loop.isNilpotent_of_commGroup (G : Type*) [CommGroup G] : Loop.IsNilpotent G := by\n  refine ⟨1, Set.eq_univ_of_forall fun a x y =>\n    ⟨⟨1, rfl, ?_⟩, ⟨1, rfl, ?_⟩, ⟨1, rfl, ?_⟩, ⟨1, rfl, ?_⟩⟩⟩\n  · exact (mul_comm a x).symm.trans (mul_one (a * x)).symm\n  · exact (mul_assoc a x y).symm.trans (mul_one (a * x * y)).symm\n  · exact (mul_assoc x a y).symm.trans (mul_one (x * a * y)).symm\n  · exact (mul_assoc x y a).symm.trans (mul_one (x * y * a)).symm\n\n/--\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nThat is, there is a finite loop `L` which is centrally nilpotent (its upper central series\nreaches `L`) and whose laws, the identities in the signature $(\\cdot, \\backslash, /, 1)$ that\nhold in `L`, have no finite basis.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (_ : Loop L), Finite L ∧ Loop.IsNilpotent L ∧ ¬ HasFiniteBasis L := by\n  sorry\n\nend Kourovka.«8.4»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single slot is well-posed; the notes' reading (existence of a finite, Bruck-centrally-nilpotent loop whose laws in the loop signature are not finitely based) is the one formalized.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Imperative 'Construct …' is stated as a plain existence theorem `∃ …` (following the repo precedent for 'Construct'-type problems, e.g. Wikipedia/SteinerSystem, Paper/WeaklyFirstCountable) rather than `answer(sorry) ↔ ∃ …`; if the problem is ever resolved negatively the repo convention is to negate the statement.",
+    "Loops are defined equationally (Evans' presentation) as a class with multiplication, identity, left division `ldiv` and right division `rdiv` satisfying `a * ldiv a b = b`, `ldiv a (a * b) = b`, `rdiv b a * a = b`, `rdiv (b * a) a = b`, `1 * x = x`, `x * 1 = x`; this is equivalent to 'binary operation with two-sided identity and unique left/right division'.",
+    "'Laws' are identities in the loop signature (·, \\, /, 1) with countably many variables (indexed by ℕ), encoded as pairs of `loopLanguage.Term ℕ`. Including the divisions and the constant is the standard loop signature; for a finite loop the divisions and the identity are term-definable from multiplication, so the algebras are term-equivalent and finite basedness does not depend on this choice.",
+    "'Finite basis' is semantic: a finite set S of laws of L such that every structure N (of the loop language, over `Type`) satisfying S satisfies all laws of L. By Birkhoff's completeness theorem this equals equational derivability. Restricting N to universe `Type` is harmless (a countable counter-model always exists). Consequence over all algebras of the signature vs. over loops only is equivalent since the finitely many loop axioms are themselves laws of L.",
+    "'Nilpotent' is Bruck's central nilpotency: the centre is `{a | ∀ x y, a x = x a ∧ (a x) y = a (x y) ∧ (x a) y = x (a y) ∧ (x y) a = x (y a)}`; the upper central series is defined without quotient loops via `Loop.centerMod N` (elements central modulo N), where `u ≡ v (mod N)` is `∃ n ∈ N, v = u * n`, i.e. `v ∈ uN`. For a normal subloop N this is exactly the congruence of L/N, and each term of the upper central series is normal (Bruck), so `Loop.upperCentralSeries` agrees with Bruck's `Z_{i+1}/Z_i = Z(L/Z_i)`. Nilpotent := ∃ n, Z_n = L.",
+    "The witness loop L is quantified over `Type` (universe 0), as in the other Kourovka files.",
+    "Included `@[category test]` sanity checks: the associative law is in `laws L` iff multiplication is associative (validates the term encoding), `Z_1 = Z(L)`, and commutative groups are nilpotent loops. The `Group G → Loop G` instance is `scoped` so it does not add a second `Group → Mul` path outside the namespace."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `Group`/`Monoid`/`MulOneClass` (all associative or lacking division); `EquationalTheories_677_255.Magma` in the repo (only a binary operation, no identity/division).",
+     "name": "Kourovka.«8.4».Loop",
+     "why_needed": "Mathlib has no class for loops or quasigroups; needed to state 'loop'."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.ring` (wrong symbols), `Language.mk₂` (would use an unnamed `Fin 3` for the binary operations).",
+     "name": "Kourovka.«8.4».LoopFunc / loopLanguage / mulFunc",
+     "why_needed": "The first-order signature (·, \\, /, 1) of loops, needed to talk about identities; modelled on Mathlib's `FirstOrder.Language.ring` / `ringFunc`."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Ring.compatibleRingOfRing` (rings only).",
+     "name": "Kourovka.«8.4».Loop.toStructure",
+     "why_needed": "Interprets the loop language in a loop so that `Term.realize` can evaluate terms."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Theory` and `Sentence` realization (would require quantifier prefixes over bounded formulas; identities are more directly pairs of terms with universal valuations), `Term.bdEqual`.",
+     "name": "Kourovka.«8.4».LoopIdentity / Satisfies / laws",
+     "why_needed": "Identities as pairs of terms, satisfaction in a structure, and the set of laws of a structure; Mathlib has no equational-logic layer."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Theory.IsComplete`/`ModelsBoundedFormula` (first-order, not equational; no finiteness-of-axiom-set notion).",
+     "name": "Kourovka.«8.4».HasFiniteBasis",
+     "why_needed": "'Finite basis for its laws': no notion of finitely based equational theory exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "`Subgroup.center`, `upperCentralSeries`, `Group.IsNilpotent`, `Con` (multiplicative congruences only, not for the full loop signature).",
+     "name": "Kourovka.«8.4».Loop.ModEq / Loop.centerMod / Loop.center / Loop.upperCentralSeries / Loop.IsNilpotent",
+     "why_needed": "Bruck's centre, upper central series and central nilpotency for loops; Mathlib's `Subgroup.center`, `upperCentralSeries`, `Group.IsNilpotent` are group-only and rely on associativity/inverses."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.4»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `∃ (L : Type) (_ : Loop L), Finite L ∧ Loop.IsNilpotent L ∧ ¬ HasFiniteBasis L`. Mathlib has no loop/quasigroup class, no equational-theory/finite-basis notion, and no loop centre, so bespoke definitions were needed; terms and identities are built on Mathlib's `FirstOrder.Language`/`Term.realize`. Nilpotency is Bruck's central nilpotency via the upper central series; finite basedness is semantic equational consequence (equivalent to derivability by Birkhoff's completeness theorem)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.4»": "/--\nConstruct a finite nilpotent loop with no finite basis for its laws.\n\nThat is, there is a finite loop `L` which is centrally nilpotent (its upper central series\nreaches `L`) and whose laws, the identities in the signature $(\\cdot, \\backslash, /, 1)$ that\nhold in `L`, have no finite basis.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (_ : Loop L), Finite L ∧ Loop.IsNilpotent L ∧ ¬ HasFiniteBasis L := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.4\n\nby M. R. Vaughan-Lee\n\nConstruct a finite centrally nilpotent loop whose laws have no finite basis.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.4»\n\n/-- A loop, with left and right division included as primitive operations. -/\nstructure Loop where\n  Carrier : Type\n  one : Carrier\n  mul : Carrier → Carrier → Carrier\n  ldiv : Carrier → Carrier → Carrier\n  rdiv : Carrier → Carrier → Carrier\n  one_mul : ∀ x, mul one x = x\n  mul_one : ∀ x, mul x one = x\n  ldiv_mul : ∀ x y, ldiv x (mul x y) = y\n  mul_ldiv : ∀ x y, mul x (ldiv x y) = y\n  mul_rdiv : ∀ x y, rdiv (mul x y) y = x\n  rdiv_mul : ∀ x y, mul (rdiv x y) y = x\n\n/-- Terms in the loop signature, with variables indexed by natural numbers. -/\ninductive LoopTerm where\n  | var : ℕ → LoopTerm\n  | one : LoopTerm\n  | mul : LoopTerm → LoopTerm → LoopTerm\n  | ldiv : LoopTerm → LoopTerm → LoopTerm\n  | rdiv : LoopTerm → LoopTerm → LoopTerm\n  deriving DecidableEq\n\n/-- Evaluation of a term in a loop under an assignment of its variables. -/\ndef LoopTerm.eval (L : Loop) (v : ℕ → L.Carrier) : LoopTerm → L.Carrier\n  | .var n => v n\n  | .one => L.one\n  | .mul s t => L.mul (s.eval L v) (t.eval L v)\n  | .ldiv s t => L.ldiv (s.eval L v) (t.eval L v)\n  | .rdiv s t => L.rdiv (s.eval L v) (t.eval L v)\n\n/-- An identity (law) in the signature of loops. -/\nabbrev LoopLaw := LoopTerm × LoopTerm\n\n/-- A loop satisfies a law when the two terms agree under every assignment. -/\ndef Satisfies (L : Loop) (e : LoopLaw) : Prop :=\n  ∀ v : ℕ → L.Carrier, e.1.eval L v = e.2.eval L v\n\n/-- Semantic equational consequence within the variety of loops. -/\ndef Entails (E : Set LoopLaw) (e : LoopLaw) : Prop :=\n  ∀ L : Loop, (∀ f ∈ E, Satisfies L f) → Satisfies L e\n\n/-- The laws of a loop are finitely based if some finite collection of its laws entails every law\nof the loop. -/\ndef IsFinitelyBased (L : Loop) : Prop :=\n  ∃ E : Finset LoopLaw,\n    (∀ e ∈ E, Satisfies L e) ∧ ∀ e, Satisfies L e → Entails (E : Set LoopLaw) e\n\n/-- A subloop, recorded as a subset closed under all operations in the loop signature. -/\nstructure Subloop (L : Loop) where\n  carrier : Set L.Carrier\n  one_mem : L.one ∈ carrier\n  mul_mem : ∀ {x y}, x ∈ carrier → y ∈ carrier → L.mul x y ∈ carrier\n  ldiv_mem : ∀ {x y}, x ∈ carrier → y ∈ carrier → L.ldiv x y ∈ carrier\n  rdiv_mem : ∀ {x y}, x ∈ carrier → y ∈ carrier → L.rdiv x y ∈ carrier\n\n/-- A normal subloop, represented by a compatible loop congruence whose identity class is the\nsubloop. -/\nstructure NormalSubloop (L : Loop) extends Subloop L where\n  congruence : Setoid L.Carrier\n  mul_compatible : ∀ {a b c d}, congruence.r a b → congruence.r c d →\n    congruence.r (L.mul a c) (L.mul b d)\n  ldiv_compatible : ∀ {a b c d}, congruence.r a b → congruence.r c d →\n    congruence.r (L.ldiv a c) (L.ldiv b d)\n  rdiv_compatible : ∀ {a b c d}, congruence.r a b → congruence.r c d →\n    congruence.r (L.rdiv a c) (L.rdiv b d)\n  rel_one_iff : ∀ x, congruence.r x L.one ↔ x ∈ carrier\n\n/-- Membership of a normal subloop. -/\ndef NormalSubloop.Mem {L : Loop} (N : NormalSubloop L) (x : L.Carrier) : Prop :=\n  x ∈ N.carrier\n\n/-- A finite central series for a loop. At each step, the next normal subloop modulo the preceding\none lies in the center of the corresponding quotient loop. -/\ndef HasCentralSeries (L : Loop) (n : ℕ) : Prop :=\n  ∃ N : Fin (n + 1) → NormalSubloop L,\n    (∀ x, (N 0).Mem x ↔ x = L.one) ∧\n    (∀ x, (N (Fin.last n)).Mem x) ∧\n    (∀ i : Fin n, ∀ x, (N i.castSucc).Mem x → (N i.succ).Mem x) ∧\n    ∀ i : Fin n, ∀ a, (N i.succ).Mem a → ∀ x y,\n      let R := (N i.castSucc).congruence.r\n      R (L.mul a x) (L.mul x a) ∧\n      R (L.mul (L.mul a x) y) (L.mul a (L.mul x y)) ∧\n      R (L.mul (L.mul x a) y) (L.mul x (L.mul a y)) ∧\n      R (L.mul (L.mul x y) a) (L.mul x (L.mul y a))\n\n/-- A loop is centrally nilpotent when it has a finite central series. -/\ndef IsCentrallyNilpotent (L : Loop) : Prop :=\n  ∃ n : ℕ, HasCentralSeries L n\n\n/--\nConstruct a finite nilpotent loop with no finite basis for its laws. Here nilpotence means central\nnilpotence in the sense of Bruck, and laws and their consequences are taken in the full loop\nsignature consisting of the identity, multiplication, left division, and right division.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.4» :\n    ∃ L : Loop, Finite L.Carrier ∧ IsCentrallyNilpotent L ∧ ¬ IsFinitelyBased L := by\n  sorry\n\nend Kourovka.«8.4»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled a loop as a bundled type with primitive identity, multiplication, left division, and right division, together with the standard loop equations; no associativity is assumed.",
+    "Represented laws as equations between terms with variables indexed by natural numbers in the full loop signature.",
+    "Interpreted equational consequence semantically over all loops. By completeness of equational logic, this matches derivability from a set of identities.",
+    "Defined a finite basis as a finite set consisting of laws of the given loop that entails every law of that loop.",
+    "Expressed Bruck central nilpotency through a finite ascending central series of normal subloops. A normal subloop is represented as the identity class of an operation-compatible congruence, and each successive factor is central via commutation and all three nucleus identities modulo the preceding congruence.",
+    "Used `Finite L.Carrier` rather than a chosen `Fintype` to state mathematical finiteness."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's group and division-monoid hierarchy imposes associativity and therefore is not faithful.",
+     "name": "Loop",
+     "why_needed": "Mathlib has no type for nonassociative algebraic loops with primitive left and right division."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FreeMagma` only handles a binary operation and does not include the loop identity or two division operations.",
+     "name": "LoopTerm",
+     "why_needed": "Terms in the full loop signature are needed to define identities and finite equational bases."
+    },
+    {
+     "closest_existing_considered": "No general universal-algebra term evaluation API was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "LoopTerm.eval",
+     "why_needed": "Defines interpretation of loop terms under variable assignments."
+    },
+    {
+     "closest_existing_considered": "No general equational-law type for this signature was found.",
+     "name": "LoopLaw",
+     "why_needed": "Names equations between loop terms."
+    },
+    {
+     "closest_existing_considered": "No suitable universal-algebra satisfaction predicate was found.",
+     "name": "Satisfies",
+     "why_needed": "States that a loop satisfies an identity under every variable assignment."
+    },
+    {
+     "closest_existing_considered": "No equational consequence or deductive-closure API was found; semantic consequence is the standard equivalent formulation.",
+     "name": "Entails",
+     "why_needed": "Captures equational consequence within the variety of loops."
+    },
+    {
+     "closest_existing_considered": "No finite-basis predicate for algebraic identities was found.",
+     "name": "IsFinitelyBased",
+     "why_needed": "Formalizes finite basability of the complete equational theory of a loop."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Subgroup` requires a group and hence associativity.",
+     "name": "Subloop",
+     "why_needed": "Subloops of a nonassociative loop are not covered by Mathlib's associative subobject hierarchy."
+    },
+    {
+     "closest_existing_considered": "Mathlib's normal subgroups apply only to associative groups, and no loop congruence API was found.",
+     "name": "NormalSubloop",
+     "why_needed": "Quotient factors in a loop central series require normal subloops; these are represented faithfully as identity classes of compatible loop congruences."
+    },
+    {
+     "closest_existing_considered": "No coercion/API exists for the bespoke structure.",
+     "name": "NormalSubloop.Mem",
+     "why_needed": "Provides a concise membership predicate for the local normal-subloop structure."
+    },
+    {
+     "closest_existing_considered": "Mathlib has group-theoretic central series but no nonassociative loop central series.",
+     "name": "HasCentralSeries",
+     "why_needed": "States the finite central-series condition defining Bruck central nilpotency for loops."
+    },
+    {
+     "closest_existing_considered": "Existing nilpotency predicates in Mathlib concern associative groups, rings, or endomorphisms and are not applicable.",
+     "name": "IsCentrallyNilpotent",
+     "why_needed": "Names Bruck central nilpotency as existence of a finite central series."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.4»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.4»": "/--\nConstruct a finite nilpotent loop with no finite basis for its laws. Here nilpotence means central\nnilpotence in the sense of Bruck, and laws and their consequences are taken in the full loop\nsignature consisting of the identity, multiplication, left division, and right division.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.4» :\n    ∃ L : Loop, Finite L.Carrier ∧ IsCentrallyNilpotent L ∧ ¬ IsFinitelyBased L := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.4\n\nby M. R. Vaughan-Lee\n\nConstruct a finite centrally nilpotent loop whose laws have no finite basis.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.4»\n\n/-- A loop, with both division operations included in its signature. -/\nstructure Loop (L : Type) where\n  one : L\n  mul : L → L → L\n  leftDiv : L → L → L\n  rightDiv : L → L → L\n  one_mul : ∀ x, mul one x = x\n  mul_one : ∀ x, mul x one = x\n  leftDiv_mul : ∀ x y, leftDiv x (mul x y) = y\n  mul_leftDiv : ∀ x y, mul x (leftDiv x y) = y\n  rightDiv_mul : ∀ x y, rightDiv (mul x y) y = x\n  rightDiv_mul' : ∀ x y, mul (rightDiv x y) y = x\n\n/-- Terms in the loop signature, with variables indexed by natural numbers. -/\ninductive LoopTerm where\n  | var : ℕ → LoopTerm\n  | one : LoopTerm\n  | mul : LoopTerm → LoopTerm → LoopTerm\n  | leftDiv : LoopTerm → LoopTerm → LoopTerm\n  | rightDiv : LoopTerm → LoopTerm → LoopTerm\n\n/-- Evaluation of a term in a loop under an assignment of its variables. -/\ndef LoopTerm.eval {L : Type} (loop : Loop L) (v : ℕ → L) : LoopTerm → L\n  | .var n => v n\n  | .one => loop.one\n  | .mul t u => loop.mul (t.eval loop v) (u.eval loop v)\n  | .leftDiv t u => loop.leftDiv (t.eval loop v) (u.eval loop v)\n  | .rightDiv t u => loop.rightDiv (t.eval loop v) (u.eval loop v)\n\n/-- An identity (law) in the loop signature is an equation between two terms. -/\nabbrev LoopLaw := LoopTerm × LoopTerm\n\n/-- A law holds in a loop if it holds under every assignment of its variables. -/\ndef LawHolds {L : Type} (loop : Loop L) (law : LoopLaw) : Prop :=\n  ∀ v : ℕ → L, law.1.eval loop v = law.2.eval loop v\n\n/-- The equational theory, or set of all laws, of a loop. -/\ndef laws {L : Type} (loop : Loop L) : Set LoopLaw :=\n  {law | LawHolds loop law}\n\n/-- Semantic equational consequence within the class of loops. -/\ndef Entails (S : Set LoopLaw) (law : LoopLaw) : Prop :=\n  ∀ (M : Type) (loop : Loop M), (∀ e ∈ S, LawHolds loop e) → LawHolds loop law\n\n/-- A finite basis for the laws of a loop is a finite subset of its laws from\nwhich every law of the loop is an equational consequence. -/\ndef HasFiniteBasis {L : Type} (loop : Loop L) : Prop :=\n  ∃ B : Set LoopLaw, B.Finite ∧ B ⊆ laws loop ∧\n    ∀ law ∈ laws loop, Entails B law\n\n/-- A congruence of a loop in the signature containing multiplication and both\ndivision operations. -/\nstructure LoopCongruence {L : Type} (loop : Loop L) where\n  rel : L → L → Prop\n  refl : ∀ x, rel x x\n  symm : ∀ {x y}, rel x y → rel y x\n  trans : ∀ {x y z}, rel x y → rel y z → rel x z\n  mul_compat : ∀ {x₁ x₂ y₁ y₂}, rel x₁ x₂ → rel y₁ y₂ →\n    rel (loop.mul x₁ y₁) (loop.mul x₂ y₂)\n  leftDiv_compat : ∀ {x₁ x₂ y₁ y₂}, rel x₁ x₂ → rel y₁ y₂ →\n    rel (loop.leftDiv x₁ y₁) (loop.leftDiv x₂ y₂)\n  rightDiv_compat : ∀ {x₁ x₂ y₁ y₂}, rel x₁ x₂ → rel y₁ y₂ →\n    rel (loop.rightDiv x₁ y₁) (loop.rightDiv x₂ y₂)\n\n/-- Inclusion of loop congruences. -/\ndef LoopCongruence.LE {L : Type} {loop : Loop L}\n    (θ φ : LoopCongruence loop) : Prop :=\n  ∀ ⦃x y⦄, θ.rel x y → φ.rel x y\n\n/-- The equality congruence. -/\ndef LoopCongruence.bottom {L : Type} (loop : Loop L) : LoopCongruence loop where\n  rel := (· = ·)\n  refl := fun _ => rfl\n  symm := Eq.symm\n  trans := Eq.trans\n  mul_compat := by rintro _ _ _ _ rfl rfl; rfl\n  leftDiv_compat := by rintro _ _ _ _ rfl rfl; rfl\n  rightDiv_compat := by rintro _ _ _ _ rfl rfl; rfl\n\n/-- The universal congruence. -/\ndef LoopCongruence.top {L : Type} (loop : Loop L) : LoopCongruence loop where\n  rel := fun _ _ => True\n  refl := fun _ => trivial\n  symm := fun _ => trivial\n  trans := fun _ _ => trivial\n  mul_compat := fun _ _ => trivial\n  leftDiv_compat := fun _ _ => trivial\n  rightDiv_compat := fun _ _ => trivial\n\n/-- The step from `θ` to `φ` is central if `θ ≤ φ` and the kernel of `φ / θ`\nis contained in the center of the quotient loop by `θ`. The last four clauses\nexpress commutation and association in the left, middle, and right positions. -/\ndef IsCentralStep {L : Type} {loop : Loop L}\n    (θ φ : LoopCongruence loop) : Prop :=\n  θ.LE φ ∧ ∀ x, φ.rel x loop.one → ∀ y z,\n    θ.rel (loop.mul x y) (loop.mul y x) ∧\n    θ.rel (loop.mul x (loop.mul y z)) (loop.mul (loop.mul x y) z) ∧\n    θ.rel (loop.mul (loop.mul y x) z) (loop.mul y (loop.mul x z)) ∧\n    θ.rel (loop.mul (loop.mul y z) x) (loop.mul y (loop.mul z x))\n\n/-- Bruck central nilpotency: there is a finite central series of congruences\nfrom equality to the universal congruence. Equivalently, the upper central\nseries of the loop reaches the whole loop after finitely many steps. -/\ndef IsCentrallyNilpotent {L : Type} (loop : Loop L) : Prop :=\n  ∃ (n : ℕ) (c : ℕ → LoopCongruence loop),\n    c 0 = LoopCongruence.bottom loop ∧\n    c n = LoopCongruence.top loop ∧\n    ∀ i < n, IsCentralStep (c i) (c (i + 1))\n\n/--\nConstruct a finite nilpotent loop with no finite basis for its laws. Here\nnilpotence is Bruck central nilpotence, and laws and their consequences are\ninterpreted in the full loop signature consisting of the identity,\nmultiplication, left division, and right division.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (loop : Loop L),\n      Finite L ∧ IsCentrallyNilpotent loop ∧ ¬ HasFiniteBasis loop := by\n  sorry\n\nend Kourovka.«8.4»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The imperative “Construct” is formalized directly as existence, not with `answer(sorry)`.",
+    "A loop is represented in the full equational signature with identity, multiplication, left division, and right division, together with the six standard loop identities.",
+    "Laws use terms with natural-number-indexed variables; consequence is semantic consequence over all loops in this signature. Restricting consequence models to loops does not change finite basability relative to unrestricted signature algebras, since the loop identities form a finite basis for the ambient variety and hold in the given loop.",
+    "Bruck central nilpotency is encoded by a finite ascending series of loop congruences from equality to the universal congruence. At each step, elements in the next kernel commute and associate in the left, middle, and right positions modulo the preceding congruence; equivalently, the factor is contained in the center of the quotient.",
+    "Finiteness is represented by `Finite L`, without choosing an enumeration or a `Fintype` instance."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib group and unbundled multiplication/division classes, which impose associativity or do not express both loop divisions.",
+     "name": "Loop",
+     "why_needed": "Mathlib has no algebraic loop/quasigroup structure with both division operations; the full loop signature is required by the statement."
+    },
+    {
+     "closest_existing_considered": "`FirstOrder.Language.Term`; its general first-order encoding is substantially heavier and provides no loop language or finite-basis notion.",
+     "name": "LoopTerm",
+     "why_needed": "The statement concerns all identities in the specific loop signature, for which no equational term API exists in the repository."
+    },
+    {
+     "closest_existing_considered": "First-order term realization, which would require a bespoke first-order loop language and structure anyway.",
+     "name": "LoopTerm.eval",
+     "why_needed": "Interprets loop terms under variable assignments in a loop."
+    },
+    {
+     "closest_existing_considered": "First-order atomic formulas.",
+     "name": "LoopLaw",
+     "why_needed": "Represents equations between terms in the loop signature."
+    },
+    {
+     "closest_existing_considered": "First-order formula realization.",
+     "name": "LawHolds",
+     "why_needed": "Defines when a universally quantified loop identity holds."
+    },
+    {
+     "closest_existing_considered": "First-order complete theories, which include non-equational sentences.",
+     "name": "laws",
+     "why_needed": "Collects exactly the equational theory of the given loop."
+    },
+    {
+     "closest_existing_considered": "First-order theory semantic consequence; no existing API specializes it to loop identities.",
+     "name": "Entails",
+     "why_needed": "Expresses equational consequence needed by finite basability."
+    },
+    {
+     "closest_existing_considered": "Set finiteness plus first-order theory consequence.",
+     "name": "HasFiniteBasis",
+     "why_needed": "No Mathlib or repository predicate expresses finite basability of an algebra's identities."
+    },
+    {
+     "closest_existing_considered": "`Setoid` and group normal subgroups; `Setoid` alone does not record operation compatibility, while group normal subgroups assume associativity.",
+     "name": "LoopCongruence",
+     "why_needed": "Bruck central series require normal factors/congruences, and no loop congruence structure exists."
+    },
+    {
+     "closest_existing_considered": "Pointwise relation implication; no lattice instance exists for the bespoke congruences.",
+     "name": "LoopCongruence.LE",
+     "why_needed": "Expresses inclusion between successive congruences in a central series."
+    },
+    {
+     "closest_existing_considered": "The equality `Setoid`, which does not package compatibility with the loop operations.",
+     "name": "LoopCongruence.bottom",
+     "why_needed": "Provides the equality endpoint of the central series."
+    },
+    {
+     "closest_existing_considered": "The universal `Setoid`, which does not package compatibility with the loop operations.",
+     "name": "LoopCongruence.top",
+     "why_needed": "Provides the universal endpoint of the central series."
+    },
+    {
+     "closest_existing_considered": "Group central-series predicates, which rely on associativity and do not describe loop centers.",
+     "name": "IsCentralStep",
+     "why_needed": "Expresses that a congruence factor lies in the center of the quotient loop, including all three associativity positions."
+    },
+    {
+     "closest_existing_considered": "`Group.IsNilpotent`, which is a group-theoretic notion and is explicitly not the intended reading.",
+     "name": "IsCentrallyNilpotent",
+     "why_needed": "Mathlib has no Bruck central nilpotency predicate for loops."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.4»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.4»": "/--\nConstruct a finite nilpotent loop with no finite basis for its laws. Here\nnilpotence is Bruck central nilpotence, and laws and their consequences are\ninterpreted in the full loop signature consisting of the identity,\nmultiplication, left division, and right division.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.4» :\n    ∃ (L : Type) (loop : Loop L),\n      Finite L ∧ IsCentrallyNilpotent loop ∧ ¬ HasFiniteBasis loop := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«8.4»": "c03"
+ },
+ "id": "kourovka-8.4",
+ "main_attempt": "c03"
+}

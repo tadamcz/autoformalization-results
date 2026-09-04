@@ -9,12 +9,17 @@ function basename(path: string): string {
 
 export function Crumbs({ entry, meta, search }: { entry: Entry; meta: Meta; search: string }) {
   const ams = [...new Set(entry.blocks.flatMap((b) => b.ams ?? []))].sort((a, b) => a - b);
-  const areaParams = new URLSearchParams(search);
+  const sourceParams = new URLSearchParams(search);
+  sourceParams.set("src", entry.source);
+  sourceParams.delete("area");
+  sourceParams.delete("sub");
+  const areaParams = new URLSearchParams(sourceParams);
   areaParams.set("area", entry.area);
   if (entry.subarea) areaParams.set("sub", entry.subarea);
-  else areaParams.delete("sub");
   return (
     <div className="crumbs">
+      <Link to={{ pathname: "/", search: sourceParams.toString() }}>{meta.sources[entry.source]?.short_name ?? entry.source}</Link>
+      {" › "}
       <Link to={{ pathname: "/", search: areaParams.toString() }}>
         {capitalize(entry.area)}
         {entry.subarea ? ` › ${entry.subarea}` : ""}

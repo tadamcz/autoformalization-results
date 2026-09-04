@@ -1,0 +1,408 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.53\n\nby D. J. S. Robinson\n\nIs the isomorphism problem soluble for finitely presented soluble groups of\nfinite rank?\n\nHere “finite rank” means finite Prüfer rank: there is a uniform finite bound on\nthe number of generators needed by every finitely generated subgroup.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.53»\n\n/-- An encoded finite group presentation. A signed letter `(i, b)` refers to\nthe generator with index `i`; the Boolean records its sign. -/\nstructure FinitePresentation where\n  generatorCount : ℕ\n  relators : List (List (ℕ × Bool))\n  deriving Encodable\n\nnamespace FinitePresentation\n\n/-- Every generator index appearing in a presentation is in range. -/\ndef WellFormed (P : FinitePresentation) : Prop :=\n  ∀ w ∈ P.relators, ∀ x ∈ w, x.1 < P.generatorCount\n\n/-- Interpret a word in the free group on the presentation's generators.\nOut-of-range letters are discarded; `WellFormed` excludes them in the promise\nused by the conjecture. -/\ndef word (P : FinitePresentation) (w : List (ℕ × Bool)) :\n    FreeGroup (Fin P.generatorCount) :=\n  FreeGroup.mk <| w.filterMap fun x =>\n    if h : x.1 < P.generatorCount then some (⟨x.1, h⟩, x.2) else none\n\n/-- The set of relators represented by a finite presentation. -/\ndef relations (P : FinitePresentation) : Set (FreeGroup (Fin P.generatorCount)) :=\n  word P '' {w | w ∈ P.relators}\n\n/-- The group represented by a finite presentation. -/\ndef Group (P : FinitePresentation) : Type :=\n  PresentedGroup P.relations\n\ninstance (P : FinitePresentation) : _root_.Group P.Group := by\n  change _root_.Group (PresentedGroup P.relations)\n  infer_instance\n\nend FinitePresentation\n\n/-- A group has finite Prüfer rank if some `r` uniformly bounds the number of\ngenerators required by each of its finitely generated subgroups. -/\ndef HasFinitePrueferRank (G : Type*) [Group G] : Prop :=\n  ∃ r : ℕ, ∀ H : Subgroup G, H.FG →\n    ∃ S : Finset H, S.card ≤ r ∧ Subgroup.closure (S : Set H) = ⊤\n\n/-- The promise on an encoded presentation in Problem 9.53: it is well formed\nand represents a soluble group of finite Prüfer rank. -/\ndef FinitePresentation.IsSolubleFiniteRank (P : FinitePresentation) : Prop :=\n  P.WellFormed ∧ IsSolvable P.Group ∧ HasFinitePrueferRank P.Group\n\n/--\nIs the isomorphism problem soluble for finitely presented soluble groups of\nfinite rank?\n\nPrecisely, does there exist a computable predicate on pairs of encoded finite\npresentations which correctly decides group isomorphism whenever both\npresentations represent soluble groups of finite Prüfer rank? This is a promise\nproblem: the predicate is unconstrained on presentations outside that class.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ decideIsomorphic : ℕ → ℕ → Bool, Computable₂ decideIsomorphic ∧\n      ∀ P Q : FinitePresentation,\n        P.IsSolubleFiniteRank → Q.IsSolubleFiniteRank →\n          (decideIsomorphic (Encodable.encode P) (Encodable.encode Q) = true ↔\n            Nonempty (P.Group ≃* Q.Group)) := by\n  sorry\n\nend Kourovka.«9.53»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite presentations are encoded by a natural generator count and a finite list of relator words, with letters represented by a natural generator index and a Boolean sign.",
+    "Only well-formed presentation encodings are included in the promise; the interpretation of malformed words discards out-of-range letters, but this behavior cannot affect the promised inputs.",
+    "The presented group is Mathlib's `PresentedGroup` on the finite set of interpreted relators, so each listed relator is imposed as equal to the identity via normal closure.",
+    "Finite rank is interpreted as finite Prüfer rank: one natural number uniformly bounds the size of a generating set for every finitely generated subgroup.",
+    "The algorithm is a total `Computable₂` Boolean function on pairs of natural-number encodings. Its behavior is constrained only when both encoded presentations represent solvable groups of finite Prüfer rank.",
+    "Abstract group isomorphism is represented by `Nonempty (P.Group ≃* Q.Group)`."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup`, which gives semantics for a set of free-group relators but not finite presentation syntax or an input encoding.",
+     "name": "Kourovka.«9.53».FinitePresentation",
+     "why_needed": "Mathlib provides presented groups but no finite, effectively encodable syntax for finite group presentations."
+    },
+    {
+     "closest_existing_considered": "No group-presentation well-formedness predicate exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«9.53».FinitePresentation.WellFormed",
+     "why_needed": "The raw effective syntax uses natural generator indices, so valid finite presentations must require every index to be below the declared generator count."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.mk`, which is used internally after converting in-range natural indices to `Fin`.",
+     "name": "Kourovka.«9.53».FinitePresentation.word",
+     "why_needed": "Raw signed-index words must be interpreted as elements of Mathlib's free group on `Fin generatorCount`."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup` accepts a `Set (FreeGroup α)` but does not perform this conversion from encoded finite syntax.",
+     "name": "Kourovka.«9.53».FinitePresentation.relations",
+     "why_needed": "The finite relator list must be converted to the set of free-group elements expected by `PresentedGroup`."
+    },
+    {
+     "closest_existing_considered": "This is a direct wrapper around Mathlib's `PresentedGroup`.",
+     "name": "Kourovka.«9.53».FinitePresentation.Group",
+     "why_needed": "A concise dependent type is needed for the group represented by each encoded finite presentation."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Group.rank`, `Group.FG`, and `Subgroup.FG`; `Group.rank` requires a typeclass witness per subgroup, so the predicate is stated directly using finite generating sets.",
+     "name": "Kourovka.«9.53».HasFinitePrueferRank",
+     "why_needed": "Mathlib has the minimum rank of an individual finitely generated group, but no predicate asserting a uniform finite generator bound over every finitely generated subgroup."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsSolvable` supplies the solvability component, but there is no existing combined promise predicate.",
+     "name": "Kourovka.«9.53».FinitePresentation.IsSolubleFiniteRank",
+     "why_needed": "The promise class for the decision problem must combine syntactic well-formedness, Mathlib solvability, and finite Prüfer rank."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.53»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.53»": "/--\nIs the isomorphism problem soluble for finitely presented soluble groups of\nfinite rank?\n\nPrecisely, does there exist a computable predicate on pairs of encoded finite\npresentations which correctly decides group isomorphism whenever both\npresentations represent soluble groups of finite Prüfer rank? This is a promise\nproblem: the predicate is unconstrained on presentations outside that class.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ decideIsomorphic : ℕ → ℕ → Bool, Computable₂ decideIsomorphic ∧\n      ∀ P Q : FinitePresentation,\n        P.IsSolubleFiniteRank → Q.IsSolubleFiniteRank →\n          (decideIsomorphic (Encodable.encode P) (Encodable.encode Q) = true ↔\n            Nonempty (P.Group ≃* Q.Group)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.53\n\nby D. J. S. Robinson\n\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nHere \"soluble\" applied to the isomorphism problem means decidable: there is an algorithm\nwhich, given two finite presentations of groups in the class, halts and decides whether the\ntwo presented groups are isomorphic. Membership in the class is not decidable, so this is a\npromise problem: on pairs of finite presentations that do not both present soluble (solvable)\ngroups of finite rank the algorithm may answer arbitrarily or fail to halt.\n\nA group has *finite rank* (in the sense of Prüfer and Mal'cev) if there is an integer $r$\nsuch that every finitely generated subgroup can be generated by $r$ elements.\n\nA finite presentation $\\langle x_0, \\dots, x_{n-1} \\mid R \\rangle$ is encoded by the number\n$n$ of generators together with a finite list of relators, each a word in the letters\n$x_i^{\\pm 1}$. An algorithm is a partial recursive function (`Partrec₂`) on these encodings.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.53»\n\n/-- A finite group presentation $\\langle x_0, \\dots, x_{n-1} \\mid R \\rangle$.\nA letter `(i, b)` of a relator stands for $x_i$ if `b = true` and for $x_i^{-1}$ if\n`b = false`. -/\nstructure FinitePresentation where\n  /-- The number $n$ of generators $x_0, \\dots, x_{n-1}$. -/\n  numGenerators : ℕ\n  /-- The finite list of relators, each a word in the letters $x_i^{\\pm 1}$. -/\n  relators : List (List (ℕ × Bool))\n  /-- Every letter of every relator refers to one of the generators. -/\n  index_lt : ∀ w ∈ relators, ∀ l ∈ w, l.1 < numGenerators\n\nnamespace FinitePresentation\n\n/-- A finite presentation is the same thing as a pair `(n, R)` in which every letter of every\nword of `R` has index less than `n`. -/\ndef equivSubtype :\n    FinitePresentation ≃\n      {p : ℕ × List (List (ℕ × Bool)) // ∀ w ∈ p.2, ∀ l ∈ w, l.1 < p.1} where\n  toFun P := ⟨(P.numGenerators, P.relators), P.index_lt⟩\n  invFun p := ⟨p.1.1, p.1.2, p.2⟩\n  left_inv _ := rfl\n  right_inv _ := rfl\n\nopen Primrec in\n/-- The condition that every letter of every word has index less than `n` is primitive\nrecursive. -/\ntheorem primrecPred_index_lt :\n    PrimrecPred fun p : ℕ × List (List (ℕ × Bool)) =>\n      ∀ w ∈ p.2, ∀ l ∈ w, l.1 < p.1 := by\n  have hh : Primrec₂ fun (p : ℕ × List (List (ℕ × Bool))) (ls : (ℕ × Bool) × Bool) =>\n      (decide (ls.1.1 < p.1) && ls.2) :=\n    to₂ <| Primrec.and.comp\n      ((nat_lt.comp (fst.comp (fst.comp snd)) (fst.comp fst)).decide) (snd.comp snd)\n  refine (Primrec.eq.comp (list_foldr (list_flatten.comp snd) (const true) hh)\n    (const true)).of_eq fun p => ?_\n  rw [← List.forall_mem_flatten]\n  induction p.2.flatten with\n  | nil => simp\n  | cons l L ih => simp [ih]\n\n/-- Finite presentations are finite data, so they can be fed to algorithms. -/\ninstance : Primcodable FinitePresentation :=\n  @Primcodable.ofEquiv _ _ (Primcodable.subtype primrecPred_index_lt) equivSubtype\n\n/-- The relators of `P`, as elements of the free group on the generators\n$x_0, \\dots, x_{n-1}$. -/\ndef relatorSet (P : FinitePresentation) : Set (FreeGroup (Fin P.numGenerators)) :=\n  {r | ∃ (w : List (ℕ × Bool)) (hw : w ∈ P.relators),\n    r = FreeGroup.mk (w.pmap (fun l hl => (⟨l.1, hl⟩, l.2)) (P.index_lt w hw))}\n\n/-- The group $\\langle x_0, \\dots, x_{n-1} \\mid R \\rangle$ presented by `P`. -/\nabbrev PresentedGroup (P : FinitePresentation) : Type :=\n  _root_.PresentedGroup P.relatorSet\n\nend FinitePresentation\n\n/-- A group has finite (Prüfer) rank if there is an integer $r$ such that every finitely\ngenerated subgroup can be generated by $r$ elements. -/\ndef HasFiniteRank (G : Type*) [Group G] : Prop :=\n  ∃ r : ℕ, ∀ H : Subgroup G, H.FG →\n    ∃ S : Finset G, S.card ≤ r ∧ Subgroup.closure (S : Set G) = H\n\n/--\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nThat is, is there an algorithm which, given two finite presentations $P$ and $Q$ of soluble\ngroups of finite rank, halts with the answer `true` if the groups presented by $P$ and $Q$\nare isomorphic and with the answer `false` otherwise? When $P$ or $Q$ does not present a\nsoluble group of finite rank, the algorithm may answer arbitrarily or fail to halt.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ f : FinitePresentation → FinitePresentation →. Bool, Partrec₂ f ∧\n      ∀ P Q : FinitePresentation,\n        IsSolvable P.PresentedGroup → HasFiniteRank P.PresentedGroup →\n        IsSolvable Q.PresentedGroup → HasFiniteRank Q.PresentedGroup →\n        ∃ b ∈ f P Q, (b = true ↔ Nonempty (P.PresentedGroup ≃* Q.PresentedGroup)) := by\n  sorry\n\n/-- The trivial group has finite rank. -/\n@[category test, AMS 20]\ntheorem hasFiniteRank_of_subsingleton (G : Type*) [Group G] [Subsingleton G] :\n    HasFiniteRank G := by\n  refine ⟨0, fun H _ => ⟨∅, le_rfl, ?_⟩⟩\n  rw [Finset.coe_empty, Subgroup.closure_empty]\n  exact Subsingleton.elim _ _\n\n/-- A presentation without generators presents the trivial group. -/\n@[category test, AMS 20]\ntheorem subsingleton_presentedGroup_of_numGenerators_eq_zero (P : FinitePresentation)\n    (h : P.numGenerators = 0) : Subsingleton P.PresentedGroup := by\n  have : IsEmpty (Fin P.numGenerators) := by rw [h]; infer_instance\n  refine ⟨fun a b => ?_⟩\n  obtain ⟨x, rfl⟩ := PresentedGroup.mk_surjective _ a\n  obtain ⟨y, rfl⟩ := PresentedGroup.mk_surjective _ b\n  rw [Subsingleton.elim x y]\n\nend Kourovka.«9.53»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "Minor: the notes describe the algorithm as a 'computable predicate on pairs of encoded finite presentations' (suggesting a total function) while also saying behaviour outside the class is 'unconstrained'. These are not equivalent in general (a partial algorithm correct on the class need not have a total computable extension, since the class is neither c.e. nor co-c.e.). I followed the 'unconstrained' reading and the literature's usage by allowing a partial recursive algorithm that must halt only on the promise set; a reviewer preferring the total reading should replace `→. Bool, Partrec₂ f` by `→ Bool, Computable₂ f` and `∃ b ∈ f P Q, (b = true ↔ …)` by `(f P Q = true ↔ …)`.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Soluble isomorphism problem' is modelled as a promise problem with a PARTIAL recursive function (Partrec₂): on pairs of presentations that both present soluble groups of finite rank, f must halt and output true iff the groups are isomorphic; outside the promise f may output anything or fail to halt. This follows standard promise-problem semantics and matches how such algorithms are given in the literature (e.g. Segal's algorithm for polycyclic-by-finite groups does not halt on other inputs). A total Computable₂ version would be a stronger statement, not provably equivalent since the class is neither c.e. nor co-c.e.",
+    "'Finite rank' is Prüfer/Mal'cev rank: ∃ r, ∀ finitely generated subgroup H, ∃ S : Finset G with S.card ≤ r and Subgroup.closure S = H (as in the decomposition notes; equals finite abelian section rank / minimax for f.g. soluble groups).",
+    "A finite presentation is encoded as (n, list of relator words over ℕ × Bool) with the well-formedness condition that all indices are < n; the letter (i, true) is x_i and (i, false) is x_i⁻¹ (Mathlib's FreeGroup.mk convention). Relators form a List (order/repetition irrelevant to the group).",
+    "Isomorphism is Nonempty (P.PresentedGroup ≃* Q.PresentedGroup); 'soluble group' is Mathlib's IsSolvable.",
+    "The promise is imposed on P and Q separately (each presents a soluble group of finite rank), and the pair is passed to the algorithm; nothing is assumed about the polycyclic-by-finite case.",
+    "AMS tags 3 (logic/computability) and 20 (group theory)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "PresentedGroup, FreeGroup.mk, Primcodable.list/prod/fin, BranchingVAS.Bvas (repo idiom of a structure with a Primcodable instance via ofEquiv)",
+     "name": "Kourovka.«9.53».FinitePresentation (with FinitePresentation.equivSubtype, FinitePresentation.primrecPred_index_lt, the Primcodable instance, FinitePresentation.relatorSet, FinitePresentation.PresentedGroup)",
+     "why_needed": "An algorithm must take finite presentations as (encodable) input. Mathlib's PresentedGroup takes an arbitrary Set (FreeGroup α) and has no Primcodable/Encodable structure. The natural dependent type Σ n, List (List (Fin n × Bool)) has no Primcodable instance in Mathlib (no Sigma instance), so a finite presentation is encoded as a number of generators n plus a list of words over ℕ × Bool with a proof that all letter indices are < n; the Primcodable instance comes from Primcodable.subtype with a proved PrimrecPred, and the presented group is Mathlib's PresentedGroup on Fin n with the relators read via FreeGroup.mk."
+    },
+    {
+     "closest_existing_considered": "Group.rank (needs a Group.FG instance and gives the rank of one group, not a uniform bound over all f.g. subgroups), Subgroup.FG, Module.rank (not applicable)",
+     "name": "Kourovka.«9.53».HasFiniteRank",
+     "why_needed": "Robinson's 'finite rank' is the Prüfer (Mal'cev special) rank: ∃ r, every finitely generated subgroup can be generated by r elements. Mathlib has Group.rank only for a single finitely generated group and no notion of a group having finite Prüfer rank."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.53»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∃ f : FinitePresentation → FinitePresentation →. Bool, Partrec₂ f ∧ ∀ P Q, (P and Q present soluble groups of finite Prüfer rank) → ∃ b ∈ f P Q, (b = true ↔ Nonempty (P.PresentedGroup ≃* Q.PresentedGroup)). Needed bespoke definitions for finite presentations (with a Primcodable instance so that algorithms on them make sense) and for finite (Prüfer) rank, neither of which exists in Mathlib or FormalConjecturesForMathlib."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.53»": "/--\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nThat is, is there an algorithm which, given two finite presentations $P$ and $Q$ of soluble\ngroups of finite rank, halts with the answer `true` if the groups presented by $P$ and $Q$\nare isomorphic and with the answer `false` otherwise? When $P$ or $Q$ does not present a\nsoluble group of finite rank, the algorithm may answer arbitrarily or fail to halt.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ f : FinitePresentation → FinitePresentation →. Bool, Partrec₂ f ∧\n      ∀ P Q : FinitePresentation,\n        IsSolvable P.PresentedGroup → HasFiniteRank P.PresentedGroup →\n        IsSolvable Q.PresentedGroup → HasFiniteRank Q.PresentedGroup →\n        ∃ b ∈ f P Q, (b = true ↔ Nonempty (P.PresentedGroup ≃* Q.PresentedGroup)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.53\n\nby D. J. S. Robinson\n\nIs the isomorphism problem decidable for finitely presented solvable groups of\nfinite Prüfer rank?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.53»\n\n/-- An encoding of a finite group presentation by its number of generators and\nits finite list of relators. A letter is a generator index together with a\nBoolean which is true when the generator is inverted. Out-of-range generator\nindices are ignored. -/\nabbrev FinitePresentation := ℕ × List (List (ℕ × Bool))\n\n/-- The element of the free group represented by an encoded relator. -/\ndef evalWord (n : ℕ) (w : List (ℕ × Bool)) : FreeGroup (Fin n) :=\n  ((w.filterMap fun x => if h : x.1 < n then some (⟨x.1, h⟩, x.2) else none).map\n    fun x => if x.2 then (FreeGroup.of x.1)⁻¹ else FreeGroup.of x.1).prod\n\n/-- The group defined by an encoded finite presentation. -/\nabbrev presentedGroup (P : FinitePresentation) :=\n  PresentedGroup (evalWord P.1 '' {w | w ∈ P.2})\n\n/-- A group has finite Prüfer rank if some uniform finite bound suffices to\ngenerate every finitely generated subgroup. -/\ndef IsFinitePrueferRank (G : Type*) [Group G] : Prop :=\n  ∃ r : ℕ, ∀ H : Subgroup G, H.FG →\n    ∃ s : Finset H, s.card ≤ r ∧ Subgroup.closure (s : Set H) = ⊤\n\n/--\nIs the isomorphism problem decidable for finitely presented solvable groups of\nfinite Prüfer rank?\n\nMore precisely, is there a computable Boolean predicate on pairs of encoded\nfinite presentations which correctly determines whether their presented groups\nare isomorphic whenever both groups are solvable and have finite Prüfer rank?\nNo condition is imposed when either presentation lies outside this promised\nclass.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ decideIsomorphic : FinitePresentation × FinitePresentation → Bool,\n      Computable decideIsomorphic ∧\n      ∀ P Q : FinitePresentation,\n        (IsSolvable (presentedGroup P) ∧ IsFinitePrueferRank (presentedGroup P)) →\n        (IsSolvable (presentedGroup Q) ∧ IsFinitePrueferRank (presentedGroup Q)) →\n        (decideIsomorphic (P, Q) = true ↔\n          Nonempty (presentedGroup P ≃* presentedGroup Q)) := by\n  sorry\n\nend Kourovka.«9.53»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite presentations are concretely encoded as a natural number of generators and a finite list of finite signed words; out-of-range generator indices are discarded, giving a total semantics for every code while retaining representations of all ordinary finite presentations.",
+    "A positive answer means existence of a total `Computable` Boolean function. Its correctness is required only when both presented groups satisfy the solvability and finite-rank promises, so behavior outside the class is unconstrained.",
+    "Finite rank is formalized as finite Prüfer rank: there is one natural-number bound such that every finitely generated subgroup has a generating finite set of cardinality at most that bound.",
+    "Presented groups use Mathlib's `PresentedGroup`, and isomorphism is expressed by nonemptiness of a multiplicative equivalence."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup` takes an arbitrary set of free-group relators and does not itself encode finite presentation data; Mathlib finite-presentation APIs found by search concern algebras rather than groups.",
+     "name": "FinitePresentation",
+     "why_needed": "Mathlib has `PresentedGroup` semantics but no primitive-codable concrete syntax for finite group presentations suitable as the input type of a computable decider."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.of` supplies generator semantics, but no matching evaluator exists for this concrete primitive-codable signed-word encoding.",
+     "name": "evalWord",
+     "why_needed": "Interprets the finite signed-word syntax as an element of the relevant Mathlib free group."
+    },
+    {
+     "closest_existing_considered": "`PresentedGroup` is used internally, but requires a set of free-group relators rather than the encoded finite relator list.",
+     "name": "presentedGroup",
+     "why_needed": "Connects the concrete finite-presentation encoding to Mathlib's quotient-group semantics."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Group.FG`, `Subgroup.FG`, and subgroup generating-set APIs express finite generation but not a uniform bound on the numbers of generators of all finitely generated subgroups.",
+     "name": "IsFinitePrueferRank",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib provides the group-theoretic finite Prüfer-rank predicate needed by the statement."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.53»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.53»": "/--\nIs the isomorphism problem decidable for finitely presented solvable groups of\nfinite Prüfer rank?\n\nMore precisely, is there a computable Boolean predicate on pairs of encoded\nfinite presentations which correctly determines whether their presented groups\nare isomorphic whenever both groups are solvable and have finite Prüfer rank?\nNo condition is imposed when either presentation lies outside this promised\nclass.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ decideIsomorphic : FinitePresentation × FinitePresentation → Bool,\n      Computable decideIsomorphic ∧\n      ∀ P Q : FinitePresentation,\n        (IsSolvable (presentedGroup P) ∧ IsFinitePrueferRank (presentedGroup P)) →\n        (IsSolvable (presentedGroup Q) ∧ IsFinitePrueferRank (presentedGroup Q)) →\n        (decideIsomorphic (P, Q) = true ↔\n          Nonempty (presentedGroup P ≃* presentedGroup Q)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.53\n\nby D. J. S. Robinson\n\nIs the isomorphism problem decidable for finitely presented solvable groups of\nfinite Prüfer rank?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.53»\n\n/-- A code for a finite group presentation. The first component is the number\nof generators. The second is a finite list of relators, each represented as a\nfinite list of signed, natural-numbered generators. -/\nabbrev FiniteGroupPresentation := ℕ × List (List (ℕ × Bool))\n\n/-- The relators in the free group represented by a finite-presentation code.\nGenerator labels outside the declared range are ignored. -/\ndef presentationRelators (P : FiniteGroupPresentation) : Set (FreeGroup (Fin P.1)) :=\n  {r | ∃ w ∈ P.2, r = FreeGroup.mk (w.filterMap fun x =>\n    if h : x.1 < P.1 then some (⟨x.1, h⟩, x.2) else none)}\n\n/-- The group represented by a finite-presentation code. -/\nabbrev presentedGroup (P : FiniteGroupPresentation) := PresentedGroup (presentationRelators P)\n\n/-- A group has finite Prüfer rank if there is a uniform finite bound on the\nnumber of generators needed for each of its finitely generated subgroups. -/\ndef HasFinitePruferRank (G : Type*) [Group G] : Prop :=\n  ∃ r : ℕ, ∀ H : Subgroup G, H.FG →\n    ∃ S : Finset H, S.card ≤ r ∧ Subgroup.closure (S : Set H) = ⊤\n\n/--\nIs the isomorphism problem decidable for finitely presented solvable groups of\nfinite Prüfer rank? More precisely, does a computable Boolean predicate on\npairs of finite-presentation codes correctly decide whether the represented\ngroups are isomorphic whenever both groups are solvable and have finite\nPrüfer rank? No behavior is required outside this promised class.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ decideIso : FiniteGroupPresentation → FiniteGroupPresentation → Bool,\n      Computable₂ decideIso ∧\n      ∀ P Q, IsSolvable (presentedGroup P) → HasFinitePruferRank (presentedGroup P) →\n        IsSolvable (presentedGroup Q) → HasFinitePruferRank (presentedGroup Q) →\n        (decideIso P Q = true ↔ Nonempty (presentedGroup P ≃* presentedGroup Q)) := by\n  sorry\n\nend Kourovka.«9.53»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite presentations are effectively coded as a natural number of generators together with a finite list of finite signed words whose generator labels are natural numbers. Out-of-range labels are ignored; thus every code denotes an ordinary finite presentation and every ordinary finite presentation is representable.",
+    "The isomorphism problem is stated as existence of a total `Computable₂` Boolean predicate. Its correctness is imposed only when both presented groups satisfy the solvability and finite-Prüfer-rank promises, so behavior outside the promised class is unconstrained.",
+    "Finite rank is Robinson's finite Prüfer rank: there is one natural-number bound such that every finitely generated subgroup has a generating finset of at most that cardinality.",
+    "Group isomorphism is represented by `Nonempty (G ≃* H)`, and solvability uses Mathlib's `IsSolvable` derived-series predicate."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup` and `FreeGroup`; neither packages a finite, primitive-codable presentation code.",
+     "name": "FiniteGroupPresentation",
+     "why_needed": "A computability statement needs a concrete primitive-codable syntax for finite group presentations; Mathlib's `PresentedGroup` accepts a semantic set of free-group relators rather than finite syntactic input."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.mk` interprets one bounded signed word, and `PresentedGroup` consumes a set of relators, but no existing definition bridges this finite raw syntax to that set.",
+     "name": "presentationRelators",
+     "why_needed": "Interprets the finite list of signed raw words as a set of elements of the free group on the declared finite generator type."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup`; the new abbreviation specializes it to the relator set interpreted from a code.",
+     "name": "presentedGroup",
+     "why_needed": "Names the group denoted by a finite-presentation code so the promise and isomorphism conditions can be stated directly."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Group.rank`, `Group.FG`, and `Subgroup.FG`; these supply components but not finite Prüfer rank itself.",
+     "name": "HasFinitePruferRank",
+     "why_needed": "Mathlib has the minimum generator count `Group.rank` only for one finitely generated group, but no predicate asserting a uniform bound over all finitely generated subgroups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.53»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.53»": "/--\nIs the isomorphism problem decidable for finitely presented solvable groups of\nfinite Prüfer rank? More precisely, does a computable Boolean predicate on\npairs of finite-presentation codes correctly decide whether the represented\ngroups are isomorphic whenever both groups are solvable and have finite\nPrüfer rank? No behavior is required outside this promised class.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ decideIso : FiniteGroupPresentation → FiniteGroupPresentation → Bool,\n      Computable₂ decideIso ∧\n      ∀ P Q, IsSolvable (presentedGroup P) → HasFinitePruferRank (presentedGroup P) →\n        IsSolvable (presentedGroup Q) → HasFinitePruferRank (presentedGroup Q) →\n        (decideIso P Q = true ↔ Nonempty (presentedGroup P ≃* presentedGroup Q)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.53\n\nby D. J. S. Robinson\n\nIs the isomorphism problem decidable for finitely presented solvable groups of\nfinite Prüfer rank?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.53»\n\n/-- An effective code for a finite group presentation. The first component is\nthe number of generators. A Boolean on a generator occurrence records whether\nthat occurrence is inverted. Generator indices are reduced modulo the number\nof generators; when that number is zero, every word denotes the identity. -/\nabbrev FinitePresentation := ℕ × List (List (ℕ × Bool))\n\n/-- Interpret a signed generator occurrence in the free group on `n`\ngenerators. -/\ndef presentationLetter : (n : ℕ) → ℕ × Bool → FreeGroup (Fin n)\n  | 0, _ => 1\n  | n + 1, letter =>\n      let x := FreeGroup.of\n        ⟨letter.1 % (n + 1), Nat.mod_lt _ (Nat.succ_pos _)⟩\n      if letter.2 then x⁻¹ else x\n\n/-- The group defined by an effectively encoded finite presentation. -/\nabbrev FinitePresentation.group (p : FinitePresentation) :=\n  PresentedGroup {r | r ∈ p.2.map fun w ↦ (w.map (presentationLetter p.1)).prod}\n\n/-- A group has finite Prüfer rank if some uniform finite bound suffices for\nthe number of generators of each of its finitely generated subgroups. -/\ndef HasFinitePrueferRank (G : Type*) [Group G] : Prop :=\n  ∃ r : ℕ, ∀ H : Subgroup G, H.FG →\n    ∃ S : Finset H, S.card ≤ r ∧ Subgroup.closure (S : Set H) = ⊤\n\n/--\nIs the isomorphism problem decidable for finitely presented solvable groups of\nfinite Prüfer rank? More precisely, is there a computable Boolean procedure\nwhich, for any two finite presentations promised to define solvable groups of\nfinite Prüfer rank, decides whether the presented groups are isomorphic? No\ncondition is imposed on the procedure outside this promised class.\n-/\n@[category research open, AMS 20 68]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ decideIso : FinitePresentation → FinitePresentation → Bool,\n      Computable₂ decideIso ∧\n      ∀ P Q : FinitePresentation,\n        IsSolvable P.group → HasFinitePrueferRank P.group →\n        IsSolvable Q.group → HasFinitePrueferRank Q.group →\n        (decideIso P Q = true ↔ Nonempty (P.group ≃* Q.group)) := by\n  sorry\n\nend Kourovka.«9.53»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.95,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Finite presentations are effectively encoded by a natural number of generators and a finite list of finite signed words. Natural generator indices are reduced modulo the generator count, making every code semantic while retaining representatives of every ordinary finite presentation; zero-generator words denote the identity.",
+    "The presented group is Mathlib's `PresentedGroup` on the interpreted finite relation set.",
+    "Finite rank is Robinson's finite Prüfer rank: there exists a uniform natural bound such that every finitely generated subgroup has a generating set of at most that size.",
+    "Solubility of the isomorphism problem is modeled by existence of a total `Computable₂` Boolean. Its correctness is required only when both input presentations define solvable finite-Prüfer-rank groups, so this is a promise problem and behavior outside the class is unconstrained.",
+    "Group isomorphism is represented by `Nonempty (P.group ≃* Q.group)`, avoiding any choice of a specific isomorphism."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has `PresentedGroup` for semantics but no effective finite-presentation input structure.",
+     "name": "FinitePresentation",
+     "why_needed": "A primitive-recursively codable type of finite group-presentation inputs is needed to state the algorithmic problem."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.of` supplies individual generators, but there is no interpreter for this presentation encoding.",
+     "name": "presentationLetter",
+     "why_needed": "The signed-word syntax must be interpreted as elements of the free group on the declared finite generator type."
+    },
+    {
+     "closest_existing_considered": "Defined directly as an abbreviation using Mathlib's `PresentedGroup`.",
+     "name": "FinitePresentation.group",
+     "why_needed": "Connects the effective finite syntax to the abstract group whose isomorphism is to be decided."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Group.rank` gives the minimum generator count of one finitely generated group, but does not express a uniform bound over every finitely generated subgroup.",
+     "name": "HasFinitePrueferRank",
+     "why_needed": "The problem uses finite Prüfer rank, for which no existing predicate was found."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.53»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.53»": "/--\nIs the isomorphism problem decidable for finitely presented solvable groups of\nfinite Prüfer rank? More precisely, is there a computable Boolean procedure\nwhich, for any two finite presentations promised to define solvable groups of\nfinite Prüfer rank, decides whether the presented groups are isomorphic? No\ncondition is imposed on the procedure outside this promised class.\n-/\n@[category research open, AMS 20 68]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ decideIso : FinitePresentation → FinitePresentation → Bool,\n      Computable₂ decideIso ∧\n      ∀ P Q : FinitePresentation,\n        IsSolvable P.group → HasFinitePrueferRank P.group →\n        IsSolvable Q.group → HasFinitePrueferRank Q.group →\n        (decideIso P Q = true ↔ Nonempty (P.group ≃* Q.group)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.53\n\nby D. J. S. Robinson\n\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nThe *isomorphism problem* for a class $\\mathcal{C}$ of finitely presented groups asks for an\nalgorithm which, given two finite presentations of groups in $\\mathcal{C}$, decides whether the\npresented groups are isomorphic. It is *soluble* if such an algorithm exists. Nothing is\nrequired of the algorithm on presentations of groups outside $\\mathcal{C}$ (membership in\n$\\mathcal{C}$ is itself undecidable in general), so this is a promise problem.\n\nA group has *finite rank* (finite Prüfer rank, also called finite special rank) if there is an\n$r$ such that every finitely generated subgroup can be generated by at most $r$ elements.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.53»\n\n/--\nA finite presentation $\\langle x_0, \\dots, x_{n-1} \\mid w_1, \\dots, w_k \\rangle$: a number $n$ of\ngenerators together with a finite list of relator words. A word is a list of letters\n$(i, b) \\in \\{0, \\dots, n-1\\} \\times \\mathrm{Bool}$, where $(i, \\mathrm{true})$ stands for $x_i$\nand $(i, \\mathrm{false})$ for $x_i^{-1}$, following the convention of `FreeGroup.mk`.\n-/\ndef FinitePresentation : Type :=\n  Σ n : ℕ, List (List (Fin n × Bool))\n\nnamespace FinitePresentation\n\n/-- The relators of a finite presentation, as elements of the free group on the generators. -/\ndef relators (P : FinitePresentation) : Set (FreeGroup (Fin P.1)) :=\n  {r | ∃ w ∈ P.2, FreeGroup.mk w = r}\n\n/-- The group defined by a finite presentation. -/\nabbrev toGroup (P : FinitePresentation) : Type :=\n  PresentedGroup P.relators\n\n/-- A raw presentation: a number of generators and a list of words whose letters are arbitrary\nnatural numbers. Used to encode `FinitePresentation` as a `Primcodable` type. -/\nprivate abbrev Raw : Type :=\n  ℕ × List (List (ℕ × Bool))\n\n/-- A raw presentation is valid if every letter refers to one of the generators. -/\nprivate def IsValid (R : Raw) : Prop :=\n  ∀ w ∈ R.2, ∀ l ∈ w, l.1 < R.1\n\nprivate theorem primrecPred_isValid : PrimrecPred IsValid := by\n  have h : PrimrecRel fun (l : ℕ × Bool) (n : ℕ) => l.1 < n :=\n    Primrec.nat_lt.comp₂ (Primrec.fst.comp Primrec.fst) Primrec.snd\n  exact h.forall_mem_list.forall_mem_list.comp Primrec.snd Primrec.fst\n\n/-- Finite presentations correspond to valid raw presentations. -/\nprivate def equivValid : FinitePresentation ≃ {R : Raw // IsValid R} where\n  toFun P := ⟨(P.1, P.2.map (List.map (Prod.map Fin.val id))), by\n    intro w hw l hl\n    obtain ⟨w', -, rfl⟩ := List.mem_map.1 hw\n    obtain ⟨l', -, rfl⟩ := List.mem_map.1 hl\n    exact l'.1.isLt⟩\n  invFun R := ⟨R.1.1, R.1.2.pmap\n    (fun w hw => w.pmap (fun l hl => (⟨l.1, R.2 w hw l hl⟩, l.2)) fun _ h => h) fun _ h => h⟩\n  left_inv P := by\n    obtain ⟨n, rels⟩ := P\n    simp [List.pmap_map]\n  right_inv R := by\n    obtain ⟨⟨n, rels⟩, h⟩ := R\n    simp [List.map_pmap]\n\ninstance : Primcodable FinitePresentation :=\n  letI : DecidablePred IsValid := fun R =>\n    inferInstanceAs (Decidable (∀ w ∈ R.2, ∀ l ∈ w, l.1 < R.1))\n  letI := Primcodable.subtype primrecPred_isValid\n  Primcodable.ofEquiv _ equivValid\n\n/-- A presentation without relators has no relators. -/\n@[category test, AMS 20]\ntheorem relators_nil (n : ℕ) : relators ⟨n, []⟩ = ∅ := by\n  simp [relators]\n\nend FinitePresentation\n\n/--\nA group has finite (Prüfer) rank if there is an $r$ such that every finitely generated\nsubgroup can be generated by at most $r$ elements.\n-/\ndef HasFinitePruferRank (G : Type*) [Group G] : Prop :=\n  ∃ r : ℕ, ∀ H : Subgroup G, H.FG →\n    ∃ S : Finset G, S.card ≤ r ∧ Subgroup.closure ↑S = H\n\n/-- A finite group has finite Prüfer rank. -/\n@[category test, AMS 20]\ntheorem hasFinitePruferRank_of_finite (G : Type*) [Group G] [Finite G] :\n    HasFinitePruferRank G := by\n  classical\n  have := Fintype.ofFinite G\n  refine ⟨Nat.card G, fun H _ => ⟨(H : Set G).toFinset, ?_, by simp⟩⟩\n  rw [Set.toFinset_card, ← Nat.card_eq_fintype_card]\n  exact H.card_le_card_group\n\n/--\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nThat is, is there an algorithm which, given two finite presentations $P$ and $Q$ such that the\ngroups they present are soluble of finite (Prüfer) rank, decides whether the presented groups\nare isomorphic? The behaviour of the algorithm on other presentations is unconstrained.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ f : FinitePresentation → FinitePresentation → Bool, Computable₂ f ∧\n      ∀ P Q : FinitePresentation,\n        IsSolvable P.toGroup → HasFinitePruferRank P.toGroup →\n        IsSolvable Q.toGroup → HasFinitePruferRank Q.toGroup →\n        (f P Q = true ↔ Nonempty (P.toGroup ≃* Q.toGroup)) := by\n  sorry\n\nend Kourovka.«9.53»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot decomposition and its reading (promise-problem decidability, Prüfer rank) match the source.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Decidability is modelled as a total computable function `f : FinitePresentation → FinitePresentation → Bool` (`Computable₂ f`) whose output is constrained only when both inputs present soluble groups of finite rank (promise problem); behaviour outside the class is unconstrained, following the decomposition notes.",
+    "'Finite rank' is read as finite Prüfer (special) rank: `∃ r, ∀ H : Subgroup G, H.FG → ∃ S : Finset G, S.card ≤ r ∧ Subgroup.closure ↑S = H`. For finitely generated soluble groups this coincides with the other standard readings (finite abelian section rank, minimax).",
+    "Finite presentations are encoded as `Σ n : ℕ, List (List (Fin n × Bool))`, with letter `(i, true)` = xᵢ and `(i, false)` = xᵢ⁻¹ (the `FreeGroup.mk` convention); the `Primcodable` instance is the obvious one obtained from the standard instances on ℕ, List, Prod, Fin and Bool via the evident equivalence with valid raw presentations, so the notion of computability is the standard one.",
+    "Isomorphism is `Nonempty (P.toGroup ≃* Q.toGroup)`; 'soluble group' is Mathlib's `IsSolvable`.",
+    "The solved polycyclic-by-finite special case is not added, as instructed.",
+    "Two `@[category test]` lemmas (`relators_nil`, `hasFinitePruferRank_of_finite`) exercise the bespoke definitions; the private helper definitions for the `Primcodable` instance are kept in the problem file since the task allows only a single candidate file (a reviewer may prefer moving the `Primcodable` construction to FormalConjecturesForMathlib)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`PresentedGroup` (used for the group), `FreeGroup.mk` (used for words); no `Primcodable`/finite-presentation type exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«9.53».FinitePresentation",
+     "why_needed": "Mathlib has `PresentedGroup` for arbitrary relator sets but no data type of finite presentations that can be fed to an algorithm (it needs a `Primcodable` instance). Defined as `Σ n : ℕ, List (List (Fin n × Bool))` with `relators` (image under `FreeGroup.mk`) and `toGroup := PresentedGroup relators`."
+    },
+    {
+     "closest_existing_considered": "`Primcodable.prod`, `Primcodable.list`, `Primcodable.fin`, `Primcodable.subtype` (all used as building blocks); `Sigma.encodable` gives only `Encodable`, not `Primcodable`.",
+     "name": "Kourovka.«9.53».FinitePresentation.instPrimcodable (with private helpers Raw, IsValid, primrecPred_isValid, equivValid)",
+     "why_needed": "`Computable₂` requires `Primcodable` on the input type; Mathlib has no `Primcodable` instance for `Sigma` types. Built via `Primcodable.ofEquiv` from an explicit equivalence with the subtype of `ℕ × List (List (ℕ × Bool))` whose letters are all `< n`, using `Primcodable.subtype` and the primitive recursiveness of that bounded-letter predicate (`PrimrecRel.forall_mem_list`, `Primrec.nat_lt`). Checked with `#eval` that encode/decode round-trips."
+    },
+    {
+     "closest_existing_considered": "`Group.rank` (minimal number of generators of a single f.g. group, requires `Group.FG`) and `Subgroup.FG`; `HasFinitePruferRank` is stated directly with `Subgroup.FG` and `Finset` generating sets to avoid instance plumbing.",
+     "name": "Kourovka.«9.53».HasFinitePruferRank",
+     "why_needed": "'Finite rank' in Robinson's sense (finite Prüfer/special rank): ∃ r, every finitely generated subgroup is generated by at most r elements. Not in Mathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.53»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ f : FinitePresentation → FinitePresentation → Bool, Computable₂ f ∧ ∀ P Q, (P, Q present soluble groups of finite Prüfer rank) → (f P Q = true ↔ Nonempty (P.toGroup ≃* Q.toGroup))`. A finite presentation is `Σ n, List (List (Fin n × Bool))` (generator count plus finitely many relator words), the presented group is Mathlib's `PresentedGroup`, 'soluble' is Mathlib's `IsSolvable`, and 'finite rank' is finite Prüfer rank (bespoke `HasFinitePruferRank`). The algorithm is a total computable Bool-valued function on pairs of presentations, constrained only on presentations in the class (promise problem), exactly as the decomposition notes prescribe."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.53»": "/--\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nThat is, is there an algorithm which, given two finite presentations $P$ and $Q$ such that the\ngroups they present are soluble of finite (Prüfer) rank, decides whether the presented groups\nare isomorphic? The behaviour of the algorithm on other presentations is unconstrained.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ f : FinitePresentation → FinitePresentation → Bool, Computable₂ f ∧\n      ∀ P Q : FinitePresentation,\n        IsSolvable P.toGroup → HasFinitePruferRank P.toGroup →\n        IsSolvable Q.toGroup → HasFinitePruferRank Q.toGroup →\n        (f P Q = true ↔ Nonempty (P.toGroup ≃* Q.toGroup)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.53\n\nby D. J. S. Robinson\n\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nA finite presentation is encoded as a number $n$ of generators $x_0, \\dots, x_{n-1}$ together\nwith a finite list of relators, each a word in the letters $x_i^{\\pm 1}$. The isomorphism problem\nfor a class $\\mathcal{C}$ of finitely presented groups is soluble if there is an algorithm which,\ngiven two finite presentations of groups in $\\mathcal{C}$, decides whether the presented groups\nare isomorphic. Membership in $\\mathcal{C}$ is a promise: the behaviour of the algorithm on\npresentations of groups outside $\\mathcal{C}$ is not constrained.\n\nHere \"soluble\" means solvable, and a group has finite rank (Prüfer rank, also called Mal'cev\nspecial rank) if there is an $r$ such that every finitely generated subgroup can be generated by\nat most $r$ elements.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.53»\n\n/-- A finite group presentation $\\langle x_0, \\dots, x_{n-1} \\mid w_1, \\dots, w_m \\rangle$.\nThe letter `(i, true)` stands for $x_i$ and the letter `(i, false)` for $x_i^{-1}$. Every letter\nof every relator refers to one of the `n` generators. -/\nstructure FinitePresentation where\n  /-- The number `n` of generators. -/\n  numGenerators : ℕ\n  /-- The relators, as words in the letters `(i, b)`. -/\n  relators : List (List (ℕ × Bool))\n  /-- Every letter of every relator refers to one of the generators. -/\n  letter_lt : ∀ w ∈ relators, ∀ l ∈ w, l.1 < numGenerators\n\n/-- The condition that every letter of every relator refers to a generator is a primitive\nrecursive predicate on the raw data of a presentation. -/\n@[category API, AMS 3 20]\ntheorem primrecPred_letter_lt :\n    PrimrecPred fun p : ℕ × List (List (ℕ × Bool)) => ∀ w ∈ p.2, ∀ l ∈ w, l.1 < p.1 :=\n  ((Primrec.nat_lt.comp₂ (Primrec.fst.comp₂ Primrec₂.left) Primrec₂.right).forall_mem_list\n    |>.forall_mem_list).comp Primrec.snd Primrec.fst\n\n/-- Finite presentations are effectively encoded by natural numbers. -/\ninstance : Primcodable FinitePresentation :=\n  haveI := Primcodable.subtype primrecPred_letter_lt\n  Primcodable.ofEquiv\n    {p : ℕ × List (List (ℕ × Bool)) // ∀ w ∈ p.2, ∀ l ∈ w, l.1 < p.1}\n    { toFun := fun P => ⟨(P.numGenerators, P.relators), P.letter_lt⟩\n      invFun := fun q => ⟨q.1.1, q.1.2, q.2⟩\n      left_inv := fun _ => rfl\n      right_inv := fun _ => rfl }\n\n/-- The relator `w` of the presentation `P`, as an element of the free group on the generators. -/\ndef FinitePresentation.relator (P : FinitePresentation) (w : List (ℕ × Bool))\n    (hw : w ∈ P.relators) : FreeGroup (Fin P.numGenerators) :=\n  FreeGroup.mk (w.pmap (fun l h => (⟨l.1, h⟩, l.2)) (P.letter_lt w hw))\n\n/-- The group presented by `P`: the free group on the generators of `P` modulo the normal\nclosure of the relators of `P`. -/\ndef FinitePresentation.Group (P : FinitePresentation) : Type :=\n  PresentedGroup {r | ∃ w, ∃ hw : w ∈ P.relators, P.relator w hw = r}\n\ninstance (P : FinitePresentation) : Group P.Group :=\n  inferInstanceAs (Group (PresentedGroup _))\n\n/-- A group has finite (Prüfer) rank if there is an `r` such that every finitely generated\nsubgroup can be generated by at most `r` elements. -/\ndef HasFiniteRank (G : Type*) [Group G] : Prop :=\n  ∃ r : ℕ, ∀ H : Subgroup G, H.FG →\n    ∃ S : Finset G, S.card ≤ r ∧ Subgroup.closure (S : Set G) = H\n\n/--\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nThat is, is there an algorithm which, given two finite presentations $P$ and $Q$ of soluble\ngroups of finite rank, decides whether the presented groups are isomorphic? The algorithm is a\ncomputable function $f$ from pairs of finite presentations to `Bool`. Its value is only\nconstrained when both $P$ and $Q$ present soluble groups of finite rank.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ f : FinitePresentation → FinitePresentation → Bool, Computable₂ f ∧\n      ∀ P Q : FinitePresentation,\n        IsSolvable P.Group → HasFiniteRank P.Group →\n        IsSolvable Q.Group → HasFiniteRank Q.Group →\n        (f P Q = true ↔ Nonempty (P.Group ≃* Q.Group)) := by\n  sorry\n\n/-- A finite group has finite rank. -/\n@[category test, AMS 20]\ntheorem hasFiniteRank_of_finite (G : Type*) [Group G] [Finite G] : HasFiniteRank G := by\n  classical\n  haveI := Fintype.ofFinite G\n  refine ⟨Fintype.card G, fun H _ =>\n    ⟨Finset.univ.filter (· ∈ H), Finset.card_filter_le _ _, ?_⟩⟩\n  have : ((Finset.univ.filter (· ∈ H) : Finset G) : Set G) = H := by ext; simp\n  rw [this, Subgroup.closure_eq]\n\n/-- The presentation with no generators and no relators presents the trivial group. -/\n@[category test, AMS 20]\ntheorem subsingleton_group_trivialPresentation :\n    Subsingleton (FinitePresentation.Group ⟨0, [], by simp⟩) :=\n  QuotientGroup.subsingleton_iff.mpr (Subsingleton.elim _ _)\n\nend Kourovka.«9.53»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The single-slot promise-problem reading with finite Prüfer rank is the canonical one and was followed exactly.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Promise-problem formulation: the algorithm is a total computable Bool-valued function `f` on pairs of finite presentations (`Computable₂ f`), and correctness (`f P Q = true ↔ Nonempty (P.Group ≃* Q.Group)`) is required only when both P and Q present soluble groups of finite rank. Behaviour on other presentations is unconstrained, since class membership is itself undecidable. `ComputablePred` was not used because the class of pairs in question is not a Primcodable subtype.",
+    "'Soluble' is formalized as Mathlib's `IsSolvable` (derived series reaches ⊥), valid for arbitrary (infinite) groups.",
+    "'Finite rank' is formalized as finite Prüfer rank (`HasFiniteRank`): ∃ r, every finitely generated subgroup is the closure of a Finset of cardinality ≤ r. Per the decomposition notes this coincides with finite abelian section rank / minimax for finitely generated soluble groups.",
+    "Finite presentations are encoded as (n, relators) with relators as words over `ℕ × Bool` plus an invariant that letter indices are < n, rather than the dependent type `Σ n, List (List (Fin n × Bool))`, because Mathlib lacks `Primcodable (Sigma _)`. The `Primcodable` instance is derived honestly from a proved `PrimrecPred` (API lemma `primrecPred_letter_lt`), not assumed.",
+    "Isomorphism of the presented groups is `Nonempty (P.Group ≃* Q.Group)`.",
+    "Uniformity: a single algorithm for all numbers of generators (not `∀ n, ∃ algorithm_n`), matching the standard meaning of the isomorphism problem for a class of finitely presented groups.",
+    "The solved polycyclic-by-finite special case is deliberately not included, as instructed by the decomposition notes.",
+    "Two short `category test` lemmas are included as API sanity checks: finite groups have finite rank, and the empty presentation presents the trivial group (showing the promise class is nonempty, so the statement is not vacuous)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`PresentedGroup rels` (takes an arbitrary Set of relators, not finite data, and is not encodable); `Σ n, List (List (Fin n × Bool))` (no `Primcodable (Sigma _)` instance exists in Mathlib); `Group.FG`/`Subgroup.FG` (finite generation only, no presentation data); `RingHom.FinitePresentation`/`Algebra.FinitePresentation` (rings, irrelevant).",
+     "name": "Kourovka.«9.53».FinitePresentation",
+     "why_needed": "Mathlib has no type of finite group presentations that is Primcodable (needed for `Computable₂`). The structure stores the number n of generators and a list of relator words over letters (i, b) : ℕ × Bool with the invariant that every letter index is < n. A `Primcodable` instance is built via `Primcodable.subtype` from the accompanying API lemma `primrecPred_letter_lt` (proved using `PrimrecRel.forall_mem_list`), so the encoding is genuinely effective rather than assumed."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.mk` directly (requires letters already in `Fin n`), `FreeGroup.lift`/`FreeGroup.map` (would need an arbitrary default for out-of-range letters).",
+     "name": "Kourovka.«9.53».FinitePresentation.relator",
+     "why_needed": "Converts a relator word (with the range invariant, via `List.pmap`) into an element of `FreeGroup (Fin n)` using `FreeGroup.mk`; letter (i,true) ↦ x_i, (i,false) ↦ x_i⁻¹ (verified against Mathlib's `FreeGroup.inv_mk` convention)."
+    },
+    {
+     "closest_existing_considered": "`PresentedGroup` (used directly as the underlying definition).",
+     "name": "Kourovka.«9.53».FinitePresentation.Group",
+     "why_needed": "The group presented by a `FinitePresentation`, defined as `PresentedGroup` of the set of its relators in `FreeGroup (Fin n)`, with the inherited `Group` instance."
+    },
+    {
+     "closest_existing_considered": "`Group.rank` (minimal number of generators of a single FG group, not a uniform bound over all FG subgroups); `Module.rank`/`Module.finrank` (modules, not groups); `Subgroup.FG` (used inside the definition).",
+     "name": "Kourovka.«9.53».HasFiniteRank",
+     "why_needed": "Finite Prüfer (Mal'cev special) rank: ∃ r, every finitely generated subgroup is generated by at most r elements. Mathlib has no Prüfer rank notion for groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.53»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∃ f : FinitePresentation → FinitePresentation → Bool, Computable₂ f ∧ ∀ P Q, (P.Group and Q.Group soluble of finite rank) → (f P Q = true ↔ Nonempty (P.Group ≃* Q.Group)). This is the promise-problem reading prescribed by the decomposition notes: a single algorithm on pairs of encoded finite presentations, correct on every pair of presentations of soluble groups of finite Prüfer rank, unconstrained elsewhere. Mathlib lacks a Primcodable type of finite group presentations and a Prüfer-rank predicate, so bespoke definitions were added."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.53»": "/--\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nThat is, is there an algorithm which, given two finite presentations $P$ and $Q$ of soluble\ngroups of finite rank, decides whether the presented groups are isomorphic? The algorithm is a\ncomputable function $f$ from pairs of finite presentations to `Bool`. Its value is only\nconstrained when both $P$ and $Q$ present soluble groups of finite rank.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ f : FinitePresentation → FinitePresentation → Bool, Computable₂ f ∧\n      ∀ P Q : FinitePresentation,\n        IsSolvable P.Group → HasFiniteRank P.Group →\n        IsSolvable Q.Group → HasFiniteRank Q.Group →\n        (f P Q = true ↔ Nonempty (P.Group ≃* Q.Group)) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.53\n\nby D. J. S. Robinson\n\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nHere a group has *finite rank* (finite Prüfer rank, also called finite special rank) if there\nis an integer $r$ such that every finitely generated subgroup can be generated by at most $r$\nelements. For finitely generated soluble groups this is equivalent to having finite abelian\nsection rank and to being minimax.\n\nThe isomorphism problem is *soluble* for a class $\\mathfrak{X}$ of finitely presented groups if\nthere is an algorithm which, given two finite presentations of groups in $\\mathfrak{X}$,\ndecides whether the presented groups are isomorphic. Since membership in $\\mathfrak{X}$ is not\nitself required to be decidable, this is a promise problem: the behaviour of the algorithm on\npresentations of groups outside $\\mathfrak{X}$ is unconstrained.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.53»\n\n/-- A group $G$ has finite (Prüfer) rank if there is $r \\in \\mathbb{N}$ such that every finitely\ngenerated subgroup of $G$ can be generated by at most $r$ elements. -/\ndef HasFiniteRank (G : Type*) [Group G] : Prop :=\n  ∃ r : ℕ, ∀ (H : Subgroup G) [Group.FG H], Group.rank H ≤ r\n\n/-- A finite group has finite rank. -/\n@[category test, AMS 20]\ntheorem hasFiniteRank_of_finite (G : Type*) [Group G] [Finite G] : HasFiniteRank G := by\n  classical\n  refine ⟨Nat.card G, fun H _ => ?_⟩\n  have : Fintype H := Fintype.ofFinite H\n  calc Group.rank H ≤ (Finset.univ : Finset H).card := Group.rank_le (by simp)\n    _ = Nat.card H := by simp [Nat.card_eq_fintype_card]\n    _ ≤ Nat.card G := Subgroup.card_le_card_group H\n\n/-- A cyclic group has finite rank. -/\n@[category test, AMS 20]\ntheorem hasFiniteRank_of_isCyclic (G : Type*) [Group G] [IsCyclic G] : HasFiniteRank G := by\n  refine ⟨1, fun H _ => ?_⟩\n  obtain ⟨g, hg⟩ := isCyclic_iff_exists_zpowers_eq_top.mp (inferInstanceAs (IsCyclic H))\n  calc Group.rank H ≤ ({g} : Finset H).card :=\n        Group.rank_le (by rw [Finset.coe_singleton, ← Subgroup.zpowers_eq_closure, hg])\n    _ = 1 := Finset.card_singleton g\n\n/-- A finite presentation of a group: a number `numGenerators` of generators together with a\nfinite list of relators, each relator being a word in the generators and their inverses. A\nletter `(i, b)` stands for the generator with index `i` if `b = true` and for its inverse\nif `b = false`. Letters with index `≥ numGenerators` are ignored (they are read as the\nidentity), so that every list encodes a finite presentation and every finite presentation on\n`numGenerators` generators is encoded. -/\nstructure FinitePresentation where\n  /-- The number of generators. -/\n  numGenerators : ℕ\n  /-- The relators, as words in the letters `(i, b)`. -/\n  relators : List (List (ℕ × Bool))\n\n/-- Finite presentations are encoded as pairs `(numGenerators, relators)`; this is the\nencoding with respect to which algorithms are required to be computable. -/\ninstance : Primcodable FinitePresentation :=\n  .ofEquiv (ℕ × List (List (ℕ × Bool)))\n    { toFun := fun P => (P.numGenerators, P.relators)\n      invFun := fun p => ⟨p.1, p.2⟩\n      left_inv := fun _ => rfl\n      right_inv := fun _ => rfl }\n\n/-- The element of the free group on `Fin n` read from a word in the letters `(i, b)`;\nletters with `n ≤ i` are read as the identity. -/\ndef FinitePresentation.toFreeGroup (n : ℕ) (w : List (ℕ × Bool)) : FreeGroup (Fin n) :=\n  FreeGroup.lift (fun i => if h : i < n then FreeGroup.of (⟨i, h⟩ : Fin n) else 1)\n    (FreeGroup.mk w)\n\n/-- The group defined by a finite presentation `P`: the quotient of the free group on\n`P.numGenerators` generators by the normal closure of the relators of `P`. -/\nabbrev FinitePresentation.group (P : FinitePresentation) : Type :=\n  PresentedGroup {r | r ∈ P.relators.map (FinitePresentation.toFreeGroup P.numGenerators)}\n\n/-- The group defined by a finite presentation is finitely generated. -/\n@[category API, AMS 20]\ntheorem FinitePresentation.group_fg (P : FinitePresentation) : Group.FG P.group :=\n  have : Group.FG (FreeGroup (Fin P.numGenerators)) :=\n    Group.fg_iff.mpr ⟨Set.range FreeGroup.of, FreeGroup.closure_range_of _, Set.finite_range _⟩\n  Group.fg_of_surjective (QuotientGroup.mk'_surjective _)\n\n/--\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nThat is, is there an algorithm (a partial recursive function `f`) which, given any two finite\npresentations `P` and `Q` of soluble groups of finite rank, halts and returns `true` if the\npresented groups are isomorphic and `false` otherwise? The behaviour of `f` on presentations of\ngroups that are not soluble of finite rank is unconstrained.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ f : FinitePresentation → FinitePresentation →. Bool, Partrec₂ f ∧\n      ∀ P Q : FinitePresentation,\n        IsSolvable P.group → HasFiniteRank P.group →\n        IsSolvable Q.group → HasFiniteRank Q.group →\n        ∃ b, b ∈ f P Q ∧ (b = true ↔ Nonempty (P.group ≃* Q.group)) := by\n  sorry\n\nend Kourovka.«9.53»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "Minor: the notes gloss 'algorithm' as a 'computable predicate' (total), while also stating that behaviour outside the class is unconstrained. These two readings differ for promise problems; the file follows the second (partial recursive function correct on the class), which matches the literal meaning of 'soluble isomorphism problem for a class' in the group-theoretic literature and how positive results there are proved. Otherwise the single-slot decomposition is agreed with.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "'Algorithm' is modelled as a partial recursive function f : FinitePresentation → FinitePresentation →. Bool (Partrec₂ f), required to halt with the correct answer only on pairs of presentations of soluble groups of finite rank. The decomposition notes say 'computable predicate' but also that 'behaviour outside the class is unconstrained'; the partial-recursive reading is chosen because it is literally what group-theoretic solubility of the isomorphism problem for a class means (algorithms in the literature, e.g. Segal's for polycyclic-by-finite groups, enumerate until a nice presentation is found and need not halt off the class), and because promise problems with a partial decider need not admit a total one in general. A total (Computable) variant would be a strictly stronger positive requirement. Reviewers should check they agree.",
+    "'Finite rank' is finite Prüfer (special) rank: ∃ r, ∀ f.g. subgroup H, Group.rank H ≤ r, as prescribed by the decomposition table.",
+    "Finite presentations are encoded as (numGenerators : ℕ, relators : List (List (ℕ × Bool))); letters (i, b) with i ≥ numGenerators are read as the identity, so every encoding is a genuine finite presentation on Fin numGenerators and the encoding is surjective onto finite presentations. This convention is needed because Mathlib has no Primcodable instance for Σ n, List (List (Fin n × Bool)).",
+    "Isomorphism is Nonempty (P.group ≃* Q.group); solubility is Mathlib's IsSolvable; the promise is imposed as hypotheses on both inputs and nothing is required of f otherwise.",
+    "Two `test` lemmas (finite and cyclic groups have finite rank) and one `API` lemma (the presented group is finitely generated) are included as basic checks of the bespoke definitions; the polycyclic-by-finite solved case is deliberately not added."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Group.rank (minimal number of generators of a f.g. group) is used to define it; Module.rank / finrank are about modules, not groups; no Prüfer rank, abelian section rank or minimax notion exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«9.53».HasFiniteRank",
+     "why_needed": "Mathlib has no notion of (Prüfer/special) rank of a group: ∃ r, every finitely generated subgroup H has Group.rank H ≤ r."
+    },
+    {
+     "closest_existing_considered": "PresentedGroup (Set (FreeGroup α)) is a Type, not encodable data; RingTheory FinitePresentation is about algebras; ComplexityTheory.DecisionProblem in Millenium/PvsNP is for List Bool inputs only.",
+     "name": "Kourovka.«9.53».FinitePresentation (with its Primcodable instance)",
+     "why_needed": "To speak about an algorithm on finite presentations one needs an encodable (Primcodable) data type of presentations: number of generators plus a finite list of relator words over letters (ℕ × Bool). Mathlib has no Primcodable instance for Sigma types, so a structure equivalent to ℕ × List (List (ℕ × Bool)) is used, with Primcodable.ofEquiv."
+    },
+    {
+     "closest_existing_considered": "PresentedGroup and FreeGroup.mk / FreeGroup.lift from Mathlib, which are used directly.",
+     "name": "Kourovka.«9.53».FinitePresentation.toFreeGroup and FinitePresentation.group",
+     "why_needed": "Reads a relator word into FreeGroup (Fin n) (letters with index ≥ n are read as 1, via FreeGroup.lift) and defines the presented group as PresentedGroup of the finite relator set, so that every encoded object is a finite presentation and every finite presentation on n generators is encoded."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.53»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∃ partial recursive f on pairs of encoded finite presentations such that, whenever both presentations define soluble groups of finite Prüfer rank, f halts and returns true iff the presented groups are isomorphic (Nonempty (P.group ≃* Q.group)). Needed bespoke definitions: finite Prüfer rank, an encodable type of finite presentations with a Primcodable instance, and the group it presents."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.53»": "/--\nIs the isomorphism problem soluble for finitely presented soluble groups of finite rank?\n\nThat is, is there an algorithm (a partial recursive function `f`) which, given any two finite\npresentations `P` and `Q` of soluble groups of finite rank, halts and returns `true` if the\npresented groups are isomorphic and `false` otherwise? The behaviour of `f` on presentations of\ngroups that are not soluble of finite rank is unconstrained.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«9.53» : answer(sorry) ↔\n    ∃ f : FinitePresentation → FinitePresentation →. Bool, Partrec₂ f ∧\n      ∀ P Q : FinitePresentation,\n        IsSolvable P.group → HasFiniteRank P.group →\n        IsSolvable Q.group → HasFiniteRank Q.group →\n        ∃ b, b ∈ f P Q ∧ (b = true ↔ Nonempty (P.group ≃* Q.group)) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«9.53»": "c02"
+ },
+ "id": "kourovka-9.53",
+ "main_attempt": "c02"
+}

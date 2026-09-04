@@ -1,0 +1,532 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.5\n\nby V. A. Gorbunov\n\nA variety of groups is called *primitive* if each of its subquasivarieties is a\nvariety. Describe all primitive varieties of groups. Is every primitive variety\nof groups locally finite?\n\nHere a *variety* of groups is a class of groups defined by a set of identities\n(laws) $w(x_1, \\dots, x_n) = 1$, and a *quasivariety* of groups is a class of\ngroups defined by a set of quasi-identities\n$u_1 = 1 \\wedge \\dots \\wedge u_m = 1 \\Rightarrow w = 1$, where the $u_i$ and $w$\nare words in the free group on countably many variables. (By the theorems of\nBirkhoff and Mal'cev these are exactly the classes closed under isomorphic copies,\nsubgroups, direct products and, respectively, homomorphic images or ultraproducts.)\nA variety is *locally finite* if all of its finitely generated members are finite.\n\nOnly the yes/no question is formalised. The request to describe all primitive\nvarieties of groups is not a proposition.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.5»\n\n/-- A class of groups, given as a predicate on groups (with carrier in `Type`). -/\nabbrev GroupClass := ∀ (G : Type) [Group G], Prop\n\n/-- A group `G` satisfies the law (identity) $w = 1$, where `w` is a word in the free group\non the countably many variables $x_0, x_1, \\dots$, if every substitution of elements of\n`G` for the variables (i.e. every homomorphism `FreeGroup ℕ →* G`) sends `w` to `1`. -/\ndef SatisfiesLaw (G : Type*) [Group G] (w : FreeGroup ℕ) : Prop :=\n  ∀ φ : FreeGroup ℕ →* G, φ w = 1\n\n/-- A quasi-identity of groups\n$u_1 = 1 \\wedge \\dots \\wedge u_m = 1 \\Rightarrow w = 1$: a finite list of premises\n$u_1, \\dots, u_m$ and a conclusion $w$, all words in the free group on countably many\nvariables. (Every equation $u = v$ between words is equivalent to $u v^{-1} = 1$, so this\nloses no generality.) -/\nstructure QuasiIdentity where\n  /-- The premises $u_1, \\dots, u_m$ of the quasi-identity. -/\n  premises : List (FreeGroup ℕ)\n  /-- The conclusion $w$ of the quasi-identity. -/\n  conclusion : FreeGroup ℕ\n\n/-- A group `G` satisfies the quasi-identity `q` if for every substitution of elements of `G`\nfor the variables (i.e. every homomorphism `FreeGroup ℕ →* G`) under which all premises of `q`\nbecome `1`, the conclusion of `q` becomes `1` as well. -/\ndef SatisfiesQuasiIdentity (G : Type*) [Group G] (q : QuasiIdentity) : Prop :=\n  ∀ φ : FreeGroup ℕ →* G, (∀ u ∈ q.premises, φ u = 1) → φ q.conclusion = 1\n\n/-- A class of groups is a *variety* if it consists exactly of the groups satisfying some\nset of laws. -/\ndef IsVariety (𝔙 : GroupClass) : Prop :=\n  ∃ S : Set (FreeGroup ℕ), ∀ (G : Type) [Group G], 𝔙 G ↔ ∀ w ∈ S, SatisfiesLaw G w\n\n/-- A class of groups is a *quasivariety* if it consists exactly of the groups satisfying\nsome set of quasi-identities. -/\ndef IsQuasivariety (𝔔 : GroupClass) : Prop :=\n  ∃ Q : Set QuasiIdentity,\n    ∀ (G : Type) [Group G], 𝔔 G ↔ ∀ q ∈ Q, SatisfiesQuasiIdentity G q\n\n/-- A variety of groups `𝔙` is *primitive* if each of its subquasivarieties (quasivarieties\nof groups contained in `𝔙`) is a variety. -/\ndef IsPrimitiveVariety (𝔙 : GroupClass) : Prop :=\n  IsVariety 𝔙 ∧\n    ∀ 𝔔 : GroupClass, IsQuasivariety 𝔔 → (∀ (G : Type) [Group G], 𝔔 G → 𝔙 G) →\n      IsVariety 𝔔\n\n/-- A class of groups is *locally finite* if every finitely generated group in it is finite.\nFor a variety this is the same as every group in it being locally finite, since varieties are\nclosed under subgroups. -/\ndef IsLocallyFinite (𝔙 : GroupClass) : Prop :=\n  ∀ (G : Type) [Group G], 𝔙 G → Group.FG G → Finite G\n\n/-- Every law $w = 1$ is the quasi-identity with no premises and conclusion $w$, so every\nvariety of groups is a quasivariety. -/\n@[category API, AMS 8 20]\ntheorem IsVariety.isQuasivariety {𝔙 : GroupClass} (h : IsVariety 𝔙) :\n    IsQuasivariety 𝔙 := by\n  obtain ⟨S, hS⟩ := h\n  refine ⟨(fun w ↦ ⟨[], w⟩) '' S, fun G _ ↦ (hS G).trans ?_⟩\n  simp [SatisfiesLaw, SatisfiesQuasiIdentity]\n\n/-- The class of all groups is a variety (defined by the empty set of laws). -/\n@[category test, AMS 8 20]\ntheorem isVariety_top : IsVariety (fun _ _ ↦ True) :=\n  ⟨∅, fun _ _ ↦ by simp⟩\n\n/-- The class of abelian groups is a variety (defined by the law $[x_0, x_1] = 1$). -/\n@[category test, AMS 8 20]\ntheorem isVariety_commGroup :\n    IsVariety (fun G _ ↦ ∀ x y : G, x * y = y * x) := by\n  refine ⟨{⁅FreeGroup.of 0, FreeGroup.of 1⁆}, fun G _ ↦ ?_⟩\n  simp only [Set.mem_singleton_iff, forall_eq, SatisfiesLaw, map_commutatorElement,\n    commutatorElement_eq_one_iff_mul_comm]\n  constructor\n  · intro h φ\n    exact h _ _\n  · intro h x y\n    have := h (FreeGroup.lift fun n ↦ if n = 0 then x else y)\n    simpa using this\n\n/--\nIs every primitive variety of groups locally finite?\n\nA variety of groups is called *primitive* if each of its subquasivarieties is a variety.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ 𝔙 : GroupClass, IsPrimitiveVariety 𝔙 → IsLocallyFinite 𝔙 := by\n  sorry\n\nend Kourovka.«9.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The table correctly isolates the single yes/no question and drops the non-propositional 'Describe all primitive varieties of groups'.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Varieties and quasivarieties are defined syntactically (by sets of laws / sets of finitary quasi-identities over `FreeGroup ℕ`) rather than by closure properties (HSP / ISPP_u). These are equivalent by Birkhoff's and Mal'cev's theorems; the syntactic definitions are the textbook ones and avoid encoding ultraproducts of dependent families.",
+    "Quasi-identities use premises and conclusion of the form `u = 1` rather than `u = v`; in groups `u = v ⟺ u v⁻¹ = 1`, so no generality is lost. Premises are a `List` (finite), as required for genuine quasi-identities.",
+    "Countably many variables (`FreeGroup ℕ`) suffice since each law/quasi-identity involves only finitely many variables.",
+    "Classes of groups are predicates on groups with carrier in `Type` (universe 0), following the repository idiom. Because satisfaction of laws/quasi-identities by a group is determined by its finitely generated (hence countable) subgroups, equalities/inclusions between such classes over `Type` coincide with the universe-free ones, so this restriction is faithful.",
+    "'Locally finite variety' is formalised as: every finitely generated group in the class is finite (Neumann's definition). For varieties this coincides with every member being a locally finite group, since varieties are closed under subgroups.",
+    "`IsPrimitiveVariety` includes the hypothesis `IsVariety 𝔙`, so the universal quantifier ranges exactly over varieties, as in 'every primitive variety of groups'.",
+    "Three short auxiliary statements (`@[category API]` every variety is a quasivariety; `@[category test]` the class of all groups and the class of abelian groups are varieties) are included with proofs as sanity checks of the bespoke definitions, per CONTRIBUTING's request for basic API tests of bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Set Grp` (Mathlib's bundled category of groups); rejected in favour of the predicate form matching the repo idiom of quantifying over `(G : Type) [Group G]`.",
+     "name": "Kourovka.«9.5».GroupClass",
+     "why_needed": "A 'class of groups' is needed to talk about varieties/quasivarieties as classes; defined as the predicate type `∀ (G : Type) [Group G], Prop`."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`, and Mathlib's ModelTheory `Sentence`/`Theory.Model` machinery (no language of groups with laws/universal Horn sentences available).",
+     "name": "Kourovka.«9.5».SatisfiesLaw",
+     "why_needed": "Group `G` satisfies the identity `w = 1` (`w : FreeGroup ℕ`) iff every hom `FreeGroup ℕ →* G` kills `w`. Mathlib has no notion of a group satisfying a law/identity."
+    },
+    {
+     "closest_existing_considered": "Mathlib ModelTheory first-order formulas; no universal-Horn / quasi-identity notion exists there.",
+     "name": "Kourovka.«9.5».QuasiIdentity",
+     "why_needed": "A quasi-identity u₁ = 1 ∧ … ∧ uₘ = 1 ⇒ w = 1 of groups: a finite `List` of premise words and a conclusion word in `FreeGroup ℕ`. Finiteness of the premise list is essential (infinitary premises would define a strictly larger class of 'prevarieties')."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "Kourovka.«9.5».SatisfiesQuasiIdentity",
+     "why_needed": "Satisfaction of a quasi-identity by a group: for every hom `FreeGroup ℕ →* G` killing all premises, the conclusion is killed."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib or FormalConjecturesForMathlib (only algebraic-geometry varieties).",
+     "name": "Kourovka.«9.5».IsVariety",
+     "why_needed": "A class of groups is a variety iff it is exactly the class of groups satisfying some set of laws (standard definition, equivalent to HSP-closure by Birkhoff's theorem)."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib; Mathlib's `Filter.Product`/ModelTheory ultraproducts could support a closure-based definition but the syntactic one is the textbook definition and less error-prone.",
+     "name": "Kourovka.«9.5».IsQuasivariety",
+     "why_needed": "A class of groups is a quasivariety iff it is exactly the class of groups satisfying some set of quasi-identities (standard definition, equivalent to closure under I, S, P, P_u by Mal'cev's theorem)."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«9.5».IsPrimitiveVariety",
+     "why_needed": "Gorbunov's notion from the problem statement: a variety each of whose subquasivarieties (quasivarieties contained in it) is a variety."
+    },
+    {
+     "closest_existing_considered": "`Group.FG` and `Finite` (used); Mathlib has no `LocallyFinite` predicate for groups (only topological `LocallyFinite` and `LocallyFiniteOrder`).",
+     "name": "Kourovka.«9.5».IsLocallyFinite",
+     "why_needed": "A class of groups is locally finite if every finitely generated group in it is finite (Neumann's definition of a locally finite variety; equivalent to all members being locally finite groups since varieties are closed under subgroups)."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ 𝔙 : GroupClass, IsPrimitiveVariety 𝔙 → IsLocallyFinite 𝔙`, with variety/quasivariety defined syntactically (sets of laws / sets of finitary quasi-identities over FreeGroup ℕ), primitive = variety all of whose subquasivarieties are varieties, locally finite = every finitely generated member is finite. No Mathlib/repo primitives exist for varieties or quasivarieties of groups, so bespoke definitions were needed."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.5»": "/--\nIs every primitive variety of groups locally finite?\n\nA variety of groups is called *primitive* if each of its subquasivarieties is a variety.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ 𝔙 : GroupClass, IsPrimitiveVariety 𝔙 → IsLocallyFinite 𝔙 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.5\n\nby V. A. Gorbunov\n\nA variety of groups is called *primitive* if each of its subquasivarieties is a variety.\nDescribe all primitive varieties of groups. Is every primitive variety of groups locally\nfinite?\n\nA *variety* of groups is a class of groups defined by a set of identities (laws) $w = 1$,\nwhere $w$ is a word in countably many variables. A *quasivariety* of groups is a class of\ngroups defined by a set of quasi-identities\n$w_1 = 1 \\wedge \\dots \\wedge w_n = 1 \\Rightarrow w = 1$ (Mal'cev). By the theorems of\nBirkhoff and Mal'cev, the varieties are exactly the classes of groups closed under\nsubgroups, homomorphic images and direct products, and the quasivarieties are exactly the\nclasses of groups closed under subgroups, direct products (including the trivial group) and\nultraproducts. Every variety is a quasivariety. A variety is *locally finite* if every group\nin it is locally finite, i.e. every finitely generated subgroup of a group in the variety is\nfinite.\n\nOnly the yes/no question is formalized here. The request to describe all primitive\nvarieties of groups is not a proposition.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.5»\n\n/-- A class of groups, given as a predicate on groups whose carrier lives in `Type`. -/\nabbrev GroupClass : Type 1 := ∀ (G : Type) [Group G], Prop\n\n/-- A group `G` satisfies the law (identity) $w = 1$, for a word $w$ in the free group on\ncountably many variables $x_0, x_1, \\dots$, if $w$ evaluates to $1$ under every assignment of\nthe variables in `G`. -/\ndef IsLaw (w : FreeGroup ℕ) (G : Type*) [Group G] : Prop :=\n  ∀ f : ℕ → G, FreeGroup.lift f w = 1\n\n/-- A quasi-identity in the language of groups, in countably many variables\n$x_0, x_1, \\dots$: a finite set of premise words $w_1, \\dots, w_n$ and a conclusion word $w$,\nread as the universally quantified implication\n$w_1 = 1 \\wedge \\dots \\wedge w_n = 1 \\Rightarrow w = 1$. Identities are the quasi-identities\nwith no premises. -/\nstructure QuasiIdentity where\n  /-- The premise words $w_1, \\dots, w_n$. -/\n  premises : Finset (FreeGroup ℕ)\n  /-- The conclusion word $w$. -/\n  conclusion : FreeGroup ℕ\n\n/-- A group `G` satisfies a quasi-identity if, under every assignment of the variables in `G`\nfor which all premise words evaluate to $1$, the conclusion word evaluates to $1$. -/\ndef QuasiIdentity.Holds (q : QuasiIdentity) (G : Type*) [Group G] : Prop :=\n  ∀ f : ℕ → G, (∀ w ∈ q.premises, FreeGroup.lift f w = 1) → FreeGroup.lift f q.conclusion = 1\n\n/-- A class of groups is a *variety* if it consists exactly of the groups satisfying some set\nof laws. -/\ndef IsVariety (𝒦 : GroupClass) : Prop :=\n  ∃ W : Set (FreeGroup ℕ), ∀ (G : Type) [Group G], 𝒦 G ↔ ∀ w ∈ W, IsLaw w G\n\n/-- A class of groups is a *quasivariety* if it consists exactly of the groups satisfying some\nset of quasi-identities. -/\ndef IsQuasivariety (𝒦 : GroupClass) : Prop :=\n  ∃ Q : Set QuasiIdentity, ∀ (G : Type) [Group G], 𝒦 G ↔ ∀ q ∈ Q, q.Holds G\n\n/-- A variety of groups `𝒱` is *primitive* if each of its subquasivarieties (quasivarieties\ncontained in `𝒱`) is a variety. -/\ndef IsPrimitive (𝒱 : GroupClass) : Prop :=\n  IsVariety 𝒱 ∧\n    ∀ 𝒦 : GroupClass, IsQuasivariety 𝒦 → (∀ (G : Type) [Group G], 𝒦 G → 𝒱 G) → IsVariety 𝒦\n\n/-- A group is *locally finite* if each of its finitely generated subgroups is finite. -/\ndef IsLocallyFinite (G : Type*) [Group G] : Prop :=\n  ∀ H : Subgroup G, H.FG → Finite H\n\n/-- Every variety of groups is a quasivariety. -/\n@[category API, AMS 8 20]\ntheorem IsVariety.isQuasivariety {𝒦 : GroupClass} (h : IsVariety 𝒦) : IsQuasivariety 𝒦 := by\n  obtain ⟨W, hW⟩ := h\n  refine ⟨(fun w ↦ ⟨∅, w⟩) '' W, fun G _ ↦ (hW G).trans ⟨?_, ?_⟩⟩\n  · rintro h _ ⟨w, hw, rfl⟩ f -\n    exact h w hw f\n  · intro h w hw f\n    exact h _ ⟨w, hw, rfl⟩ f (by simp)\n\n/-- The class of abelian groups is the variety defined by the law $[x_0, x_1] = 1$. -/\n@[category test, AMS 8 20]\ntheorem isVariety_isMulCommutative :\n    IsVariety fun G _ ↦ IsMulCommutative G := by\n  refine ⟨{⁅FreeGroup.of 0, FreeGroup.of 1⁆}, fun G _ ↦ ?_⟩\n  simp only [Set.mem_singleton_iff, forall_eq, IsLaw, map_commutatorElement,\n    FreeGroup.lift_apply_of, commutatorElement_eq_one_iff_mul_comm]\n  exact ⟨fun h f ↦ h.is_comm.comm _ _, fun h ↦ ⟨⟨fun a b ↦ h fun n ↦ if n = 0 then a else b⟩⟩⟩\n\n/--\nIs every primitive variety of groups locally finite?\n\nThat is, if `𝒱` is a variety of groups each of whose subquasivarieties is a variety, is\nevery group in `𝒱` locally finite, i.e. is every finitely generated subgroup of a group in\n`𝒱` finite?\n\nClasses of groups are taken as predicates on groups with carrier in `Type`. This loses\nnothing: a (quasi)variety is determined by its finitely generated, hence countable, members,\nand so is local finiteness.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ 𝒱 : GroupClass, IsPrimitive 𝒱 → ∀ (G : Type) [Group G], 𝒱 G → IsLocallyFinite G := by\n  sorry\n\nend Kourovka.«9.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table correctly keeps only the yes/no question; 'Describe all primitive varieties of groups' has no statable Prop.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Varieties and quasivarieties are defined syntactically (Birkhoff/Mal'cev): a class is a variety iff it is exactly the class of groups satisfying some set of laws w = 1 (w ∈ FreeGroup ℕ), and a quasivariety iff it is exactly the class of groups satisfying some set of quasi-identities (finite set of premise words, one conclusion word). This is equivalent to the closure-based definitions (closed under S, H, P, resp. S, P, ultraproducts and containing the trivial group) and avoids formalizing ultraproducts of families of groups. Premises/conclusion use the form w = 1 rather than u = v, which is equivalent in groups.",
+    "Quasi-identities are allowed to have an empty premise set (so identities are quasi-identities); this matches the standard convention and IsVariety.isQuasivariety is proved as API.",
+    "Classes of groups are predicates ∀ (G : Type) [Group G], Prop (universe 0), following the other Kourovka files. This is faithful because satisfaction of (quasi-)identities passes to subgroups and any failure is witnessed by a finitely generated, hence countable, subgroup, so containment/equality of (quasi)variety classes and local finiteness are universe-independent.",
+    "'Locally finite variety' is read literally as: every group in the variety is locally finite, i.e. every finitely generated subgroup (Subgroup.FG) is finite. Since varieties are closed under subgroups this is equivalent to the decomposition note's 'every finitely generated group in V is finite'.",
+    "IsPrimitive bundles the hypothesis that 𝒱 is a variety, so the theorem's universal quantifier ranges exactly over primitive varieties.",
+    "Two short proved auxiliary statements are included (category API: every variety is a quasivariety; category test: abelian groups form the variety of the law [x₀,x₁] = 1) to sanity-check the bespoke definitions, as CONTRIBUTING.md requests for bespoke definitions.",
+    "AMS tags 8 (general algebraic systems: varieties/quasivarieties) and 20 (group theory)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "No Mathlib notion of a class of groups; Set (Bundled Group) / CategoryTheory.Grp would be heavier and less idiomatic for this repo.",
+     "name": "Kourovka.«9.5».GroupClass",
+     "why_needed": "A type for 'a class of groups' (predicate on groups with carrier in Type) to quantify over varieties and quasivarieties."
+    },
+    {
+     "closest_existing_considered": "Mathlib has FreeGroup.lift but no notion of a group satisfying a law/identity.",
+     "name": "Kourovka.«9.5».IsLaw",
+     "why_needed": "A group satisfies the identity w = 1 for a word w ∈ FreeGroup ℕ under every assignment of variables (via FreeGroup.lift)."
+    },
+    {
+     "closest_existing_considered": "Mathlib's ModelTheory (FirstOrder.Language.Sentence, ultraproducts) is far heavier and has no ready-made language of groups with quasi-identities; Filter.Product for ultraproducts of families was considered for a closure-based definition but rejected in favour of the syntactic one.",
+     "name": "Kourovka.«9.5».QuasiIdentity and QuasiIdentity.Holds",
+     "why_needed": "Quasi-identities (finite set of premise words, conclusion word) and their satisfaction in a group, needed to define quasivarieties à la Mal'cev."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or FormalConjecturesForMathlib (only algebraic varieties / equational-theory magma files elsewhere in the repo).",
+     "name": "Kourovka.«9.5».IsVariety",
+     "why_needed": "A class of groups is a variety iff it is the class of models of some set of laws."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«9.5».IsQuasivariety",
+     "why_needed": "A class of groups is a quasivariety iff it is the class of models of some set of quasi-identities."
+    },
+    {
+     "closest_existing_considered": "None (problem-specific).",
+     "name": "Kourovka.«9.5».IsPrimitive",
+     "why_needed": "The notebook's definition: a variety each of whose subquasivarieties is a variety."
+    },
+    {
+     "closest_existing_considered": "Mathlib has LocallyFiniteOrder (unrelated) and Group.FG / Subgroup.FG / Finite, but no 'locally finite group' predicate.",
+     "name": "Kourovka.«9.5».IsLocallyFinite",
+     "why_needed": "Locally finite group: every finitely generated subgroup is finite."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ 𝒱 : GroupClass, IsPrimitive 𝒱 → ∀ (G : Type) [Group G], 𝒱 G → IsLocallyFinite G, where IsPrimitive 𝒱 := IsVariety 𝒱 ∧ every quasivariety contained in 𝒱 is a variety. Mathlib and FormalConjecturesForMathlib have no notion of variety/quasivariety of groups or locally finite group, so these are defined in the problem file (Mal'cev-style, via laws and quasi-identities in FreeGroup ℕ)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.5»": "/--\nIs every primitive variety of groups locally finite?\n\nThat is, if `𝒱` is a variety of groups each of whose subquasivarieties is a variety, is\nevery group in `𝒱` locally finite, i.e. is every finitely generated subgroup of a group in\n`𝒱` finite?\n\nClasses of groups are taken as predicates on groups with carrier in `Type`. This loses\nnothing: a (quasi)variety is determined by its finitely generated, hence countable, members,\nand so is local finiteness.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ 𝒱 : GroupClass, IsPrimitive 𝒱 → ∀ (G : Type) [Group G], 𝒱 G → IsLocallyFinite G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.5\n\nby V. A. Gorbunov\n\nA variety of groups is called primitive if each of its subquasivarieties is a variety.\nDescribe all primitive varieties of groups. Is every primitive variety of groups locally finite?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.5»\n\nuniverse u\n\n/-- A class of group structures whose underlying types lie in `Type u`. -/\ndef GroupClass := (G : Type u) → Group G → Prop\n\n/-- Membership of a group in a class of groups. -/\ndef GroupClass.Mem (V : GroupClass.{u}) (G : Type u) [Group G] : Prop :=\n  V G inferInstance\n\n/-- A class of groups is a variety if it is closed under isomorphisms, subgroups,\nquotients, and arbitrary direct products. -/\ndef IsVariety (V : GroupClass.{u}) : Prop :=\n  (∀ (G H : Type u) [Group G] [Group H], G ≃* H → V.Mem G → V.Mem H) ∧\n  (∀ (G : Type u) [Group G] (H : Subgroup G), V.Mem G → V.Mem H) ∧\n  (∀ (G : Type u) [Group G] (N : Subgroup G) [N.Normal], V.Mem G → V.Mem (G ⧸ N)) ∧\n  (∀ (I : Type u) (G : I → Type u) [∀ i, Group (G i)],\n    (∀ i, V.Mem (G i)) → V.Mem (∀ i, G i))\n\n/-- A class of groups is a quasivariety if it contains the trivial group and is closed under\nisomorphisms, subgroups, arbitrary direct products, and ultraproducts. In the presence of subgroup\nand product closure, closure under ultraproducts is equivalently expressed by closure under\nultrapowers, as done here. -/\ndef IsQuasivariety (V : GroupClass.{u}) : Prop :=\n  V.Mem PUnit ∧\n  (∀ (G H : Type u) [Group G] [Group H], G ≃* H → V.Mem G → V.Mem H) ∧\n  (∀ (G : Type u) [Group G] (H : Subgroup G), V.Mem G → V.Mem H) ∧\n  (∀ (I : Type u) (G : I → Type u) [∀ i, Group (G i)],\n    (∀ i, V.Mem (G i)) → V.Mem (∀ i, G i)) ∧\n  (∀ (I G : Type u) [Group G] (U : Ultrafilter I),\n    V.Mem G → V.Mem (Filter.Germ (U : Filter I) G))\n\n/-- A variety of groups is primitive if every quasivariety contained in it is a variety. -/\ndef IsPrimitive (V : GroupClass.{u}) : Prop :=\n  IsVariety V ∧ ∀ Q : GroupClass.{u}, IsQuasivariety Q →\n    (∀ (G : Type u) [Group G], Q.Mem G → V.Mem G) → IsVariety Q\n\n/-- A class of groups is locally finite if every finitely generated group in the class is finite. -/\ndef IsLocallyFinite (V : GroupClass.{u}) : Prop :=\n  ∀ (G : Type u) [Group G], V.Mem G → Group.FG G → Finite G\n\n/--\nIs every primitive variety of groups locally finite?\n\nA primitive variety is a variety for which every subquasivariety is itself a variety. A group\nvariety is locally finite when each of its finitely generated groups is finite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ V : GroupClass.{u}, IsPrimitive V → IsLocallyFinite V := by\n  sorry\n\nend Kourovka.«9.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A class of groups is represented universe-polymorphically as a predicate on types equipped with explicit `Group` structures; closure under multiplicative equivalence makes membership invariant under group isomorphism.",
+    "Varieties are represented by the standard HSP characterization: closure under subgroups, quotients by normal subgroups, and arbitrary direct products, together with explicit isomorphism closure.",
+    "Quasivarieties are represented by the standard SPU characterization, with explicit containment of the trivial group and isomorphism closure. Because Mathlib lacks a dependent-family group ultraproduct, ultraproduct closure is stated equivalently as ultrapower closure in the presence of subgroup and arbitrary-product closure: a varying-family ultraproduct embeds into an ultrapower of the full direct product.",
+    "All classes, group types, product index types, and ultrapower index types live in one arbitrary universe `u`; the declaration is universe-polymorphic.",
+    "Local finiteness uses Mathlib's `Group.FG` and `Finite`: every finitely generated group belonging to the class is finite."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's bundled group categories and ordinary `Set`; neither directly represents a predicate over all group structures in a fixed universe with convenient typeclass operations.",
+     "name": "Kourovka.«9.5».GroupClass",
+     "why_needed": "Represents universe-controlled classes of group structures, which Mathlib and FormalConjecturesForMathlib do not provide."
+    },
+    {
+     "closest_existing_considered": "Ordinary set membership cannot range over unbundled types with their `Group` structures.",
+     "name": "Kourovka.«9.5».GroupClass.Mem",
+     "why_needed": "Provides typeclass-aware membership of a group in a `GroupClass`."
+    },
+    {
+     "closest_existing_considered": "The hard search found no universal-algebraic variety or group-variety primitive; the definition uses the standard HSP closure characterization.",
+     "name": "Kourovka.«9.5».IsVariety",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no notion of an equational variety of groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Ultrafilter` and `Filter.Germ` (ultrapowers), but no quasivariety API or dependent-family group ultraproduct structure; the definition uses the equivalent SPU/ultrapower closure characterization.",
+     "name": "Kourovka.«9.5».IsQuasivariety",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no notion of a quasivariety of groups."
+    },
+    {
+     "closest_existing_considered": "No existing primitive-variety notion was found; unrelated uses of 'primitive' in Mathlib do not express this property.",
+     "name": "Kourovka.«9.5».IsPrimitive",
+     "why_needed": "The problem introduces this specialized property of a group variety."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Group.FG` and `Finite` are used as components; topology/order/graph notions named locally finite are unrelated.",
+     "name": "Kourovka.«9.5».IsLocallyFinite",
+     "why_needed": "Mathlib has finitely generated groups but no predicate saying every finitely generated member of a class of groups is finite."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.5»": "/--\nIs every primitive variety of groups locally finite?\n\nA primitive variety is a variety for which every subquasivariety is itself a variety. A group\nvariety is locally finite when each of its finitely generated groups is finite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ V : GroupClass.{u}, IsPrimitive V → IsLocallyFinite V := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.5\n\nby V. A. Gorbunov\n\nA variety of groups is called primitive if each of its subquasivarieties is a variety.\nIs every primitive variety of groups locally finite?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Set Filter\n\nuniverse u\n\nnamespace Kourovka.«9.5»\n\n/-- A class of groups whose underlying types lie in `Type u`. -/\nabbrev GroupClass := Set GrpCat.{u}\n\n/-- The normal subgroup of a direct product consisting of the functions which equal $1$\non a set belonging to the ultrafilter $U$. -/\ndef ultrafilterKernel {ι : Type u} (G : ι → GrpCat.{u}) (U : Ultrafilter ι) :\n    Subgroup (∀ i, G i) where\n  carrier := {x | {i | x i = 1} ∈ U}\n  one_mem' := by\n    change {i | (1 : ∀ i, G i) i = 1} ∈ (U : Filter ι)\n    simp\n  mul_mem' {x y} hx hy := by\n    filter_upwards [hx, hy] with i hxi hyi\n    simp [hxi, hyi]\n  inv_mem' {x} hx := by\n    filter_upwards [hx] with i hxi\n    simp [hxi]\n\n/-- The subgroup used to form a group ultraproduct is normal. -/\ninstance ultrafilterKernel_normal {ι : Type u} (G : ι → GrpCat.{u}) (U : Ultrafilter ι) :\n    (ultrafilterKernel G U).Normal where\n  conj_mem x hx g := by\n    change {i | x i = 1} ∈ U at hx\n    change {i | g i * x i * (g i)⁻¹ = 1} ∈ U\n    filter_upwards [hx] with i hi\n    simp [hi]\n\n/-- The group ultraproduct of the groups $G_i$ by the ultrafilter $U$. -/\nabbrev ultraproduct {ι : Type u} (G : ι → GrpCat.{u}) (U : Ultrafilter ι) : GrpCat.{u} :=\n  GrpCat.of ((∀ i, G i) ⧸ ultrafilterKernel G U)\n\n/-- A class of groups is replete if it is closed under group isomorphism. -/\ndef IsReplete (C : GroupClass.{u}) : Prop :=\n  ∀ ⦃G H : GrpCat.{u}⦄, G ∈ C → Nonempty (G ≃* H) → H ∈ C\n\n/-- An equational variety of groups, expressed by closure under isomorphisms, subgroups,\nquotients, and arbitrary direct products. -/\ndef IsVariety (V : GroupClass.{u}) : Prop :=\n  IsReplete V ∧\n  (∀ ⦃G : GrpCat.{u}⦄, G ∈ V → ∀ H : Subgroup G, GrpCat.of H ∈ V) ∧\n  (∀ ⦃G : GrpCat.{u}⦄, G ∈ V → ∀ (N : Subgroup G) [N.Normal],\n    GrpCat.of (G ⧸ N) ∈ V) ∧\n  (∀ {ι : Type u} (G : ι → GrpCat.{u}),\n    (∀ i, G i ∈ V) → GrpCat.of (∀ i, G i) ∈ V)\n\n/-- A quasivariety of groups, expressed by containing the trivial group and closure under\nisomorphisms, subgroups, arbitrary direct products, and ultraproducts. -/\ndef IsQuasivariety (Q : GroupClass.{u}) : Prop :=\n  IsReplete Q ∧ GrpCat.of PUnit ∈ Q ∧\n  (∀ ⦃G : GrpCat.{u}⦄, G ∈ Q → ∀ H : Subgroup G, GrpCat.of H ∈ Q) ∧\n  (∀ {ι : Type u} (G : ι → GrpCat.{u}),\n    (∀ i, G i ∈ Q) → GrpCat.of (∀ i, G i) ∈ Q) ∧\n  (∀ {ι : Type u} (G : ι → GrpCat.{u}) (U : Ultrafilter ι),\n    (∀ i, G i ∈ Q) → ultraproduct G U ∈ Q)\n\n/-- A variety is primitive if every quasivariety contained in it is itself a variety. -/\ndef IsPrimitive (V : GroupClass.{u}) : Prop :=\n  IsVariety V ∧ ∀ Q : GroupClass.{u}, Q ⊆ V → IsQuasivariety Q → IsVariety Q\n\n/-- A class of groups is locally finite if each of its finitely generated groups is finite. -/\ndef IsLocallyFinite (V : GroupClass.{u}) : Prop :=\n  ∀ ⦃G : GrpCat.{u}⦄, G ∈ V → Group.FG G → Finite G\n\n/--\nIs every primitive variety of groups locally finite? Here a primitive variety is a variety\nfor which every subquasivariety is again a variety.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ V : GroupClass.{u}, IsPrimitive V → IsLocallyFinite V := by\n  sorry\n\nend Kourovka.«9.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Classes are sets of bundled groups `GrpCat` in a fixed but universe-polymorphic universe, avoiding dependence on a separately supplied `Group` instance.",
+    "An equational variety is represented by the HSP closure characterization: closure under group isomorphisms, subgroups, quotients, and arbitrary same-universe direct products.",
+    "A quasivariety is represented by containing the trivial group and closure under group isomorphisms, subgroups, arbitrary same-universe direct products, and ultraproducts, matching the decomposition table's semantic characterization.",
+    "The group ultraproduct is concretely the direct product modulo the normal subgroup of functions equal to one on an ultrafilter-large set.",
+    "`IsPrimitive V` packages both that `V` is a variety and that every quasivariety `Q` contained in `V` is a variety.",
+    "Local finiteness is stated exactly as finiteness of every finitely generated group belonging to the class."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Set GrpCat`; this definition is a local abbreviation, and no group-class alias was found.",
+     "name": "GroupClass",
+     "why_needed": "Provides the universe-controlled type of classes of bundled groups quantified over by the conjecture."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FirstOrder.Language.Ultraproduct` is for first-order structures and does not directly provide a bundled group ultraproduct.",
+     "name": "ultrafilterKernel",
+     "why_needed": "Constructs the normal subgroup used to define an ultraproduct of a family of groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib's model-theoretic ultraproduct API was considered, but a direct quotient-group construction is needed for this group-class encoding.",
+     "name": "ultraproduct",
+     "why_needed": "Quasivariety closure requires the group ultraproduct as a bundled group."
+    },
+    {
+     "closest_existing_considered": "No closure-under-group-isomorphism predicate for sets of `GrpCat` objects was found.",
+     "name": "IsReplete",
+     "why_needed": "Closure under isomorphism is necessary for predicates on bundled representatives to represent genuine classes of groups."
+    },
+    {
+     "closest_existing_considered": "No variety-of-groups or HSP-class predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsVariety",
+     "why_needed": "Represents equational varieties of groups by their standard isomorphism/subgroup/quotient/product closure properties."
+    },
+    {
+     "closest_existing_considered": "No quasivariety or quasi-identity class predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsQuasivariety",
+     "why_needed": "Represents group quasivarieties by the trivial-group, isomorphism, subgroup, product, and ultraproduct closure characterization."
+    },
+    {
+     "closest_existing_considered": "Mathlib's uses of 'primitive' concern unrelated notions such as permutation actions.",
+     "name": "IsPrimitive",
+     "why_needed": "Formalizes the source's definition that every subquasivariety of the variety is a variety."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Group.FG` and `Finite`, but no local-finiteness predicate for a class of groups.",
+     "name": "IsLocallyFinite",
+     "why_needed": "States local finiteness for a class of groups as finiteness of all finitely generated members."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Mathlib and FormalConjecturesForMathlib do not define varieties or quasivarieties of groups, so the file supplies extensional closure-based definitions and a concrete group ultraproduct."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.5»": "/--\nIs every primitive variety of groups locally finite? Here a primitive variety is a variety\nfor which every subquasivariety is again a variety.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ V : GroupClass.{u}, IsPrimitive V → IsLocallyFinite V := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.5\n\nby V. A. Gorbunov\n\nA variety of groups is called *primitive* if each of its subquasivarieties is a variety.\nIs every primitive variety of groups locally finite?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.5»\n\nuniverse u\n\n/-- A class of groups in a fixed universe. -/\ndef GroupClass := (G : Type u) → [Group G] → Prop\n\n/-- The normal subgroup of a direct product consisting of the tuples which are equal to the\nidentity on a set belonging to `F`. -/\ndef filterKernel {I : Type u} (G : I → Type u) [∀ i, Group (G i)] (F : Filter I) :\n    Subgroup (∀ i, G i) where\n  carrier := {x | ∀ᶠ i in F, x i = 1}\n  one_mem' := by simp\n  mul_mem' hx hy := (hx.and hy).mono fun _ ⟨hxi, hyi⟩ => by simp [hxi, hyi]\n  inv_mem' hx := hx.mono fun _ hxi => by simp [hxi]\n\ninstance filterKernelNormal {I : Type u} (G : I → Type u) [∀ i, Group (G i)]\n    (F : Filter I) : (filterKernel G F).Normal where\n  conj_mem x hx y := hx.mono fun _ hxi => by simp [hxi]\n\n/-- The filter product of a family of groups, constructed as the quotient of their direct product\nby the tuples which are equal to the identity on a filter-large set. For an ultrafilter this is the\nusual group ultraproduct. -/\nabbrev groupFilterProduct {I : Type u} (G : I → Type u) [∀ i, Group (G i)] (F : Filter I) :=\n  (∀ i, G i) ⧸ filterKernel G F\n\n/-- A class of groups is a variety if it is closed under isomorphisms, contains the trivial groups,\nand is closed under subgroups, quotient groups, and arbitrary direct products. -/\ndef IsGroupVariety (V : GroupClass.{u}) : Prop :=\n  (∀ (G H : Type u) [Group G] [Group H], V G → (G ≃* H) → V H) ∧\n  (∀ (G : Type u) [Group G] [Subsingleton G], V G) ∧\n  (∀ (G : Type u) [Group G], V G → ∀ H : Subgroup G, V H) ∧\n  (∀ (G : Type u) [Group G], V G → ∀ (N : Subgroup G) [N.Normal], V (G ⧸ N)) ∧\n  (∀ (I : Type u) (G : I → Type u) [∀ i, Group (G i)], (∀ i, V (G i)) → V (∀ i, G i))\n\n/-- A class of groups is a quasivariety if it is closed under isomorphisms, contains the trivial\ngroups, and is closed under subgroups, arbitrary direct products, and ultraproducts. -/\ndef IsGroupQuasivariety (V : GroupClass.{u}) : Prop :=\n  (∀ (G H : Type u) [Group G] [Group H], V G → (G ≃* H) → V H) ∧\n  (∀ (G : Type u) [Group G] [Subsingleton G], V G) ∧\n  (∀ (G : Type u) [Group G], V G → ∀ H : Subgroup G, V H) ∧\n  (∀ (I : Type u) (G : I → Type u) [∀ i, Group (G i)], (∀ i, V (G i)) → V (∀ i, G i)) ∧\n  (∀ (I : Type u) (G : I → Type u) [∀ i, Group (G i)], (∀ i, V (G i)) →\n    ∀ U : Ultrafilter I, V (groupFilterProduct G U.toFilter))\n\n/-- A variety is primitive if every quasivariety contained in it is itself a variety. -/\ndef IsPrimitive (V : GroupClass.{u}) : Prop :=\n  IsGroupVariety V ∧\n    ∀ W : GroupClass.{u}, (∀ (G : Type u) [Group G], W G → V G) →\n      IsGroupQuasivariety W → IsGroupVariety W\n\n/-- A class of groups is locally finite if every finitely generated group in the class is finite. -/\ndef IsLocallyFinite (V : GroupClass.{u}) : Prop :=\n  ∀ (G : Type u) [Group G], V G → Group.FG G → Finite G\n\n/--\nIs every primitive variety of groups locally finite?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ V : GroupClass.{u}, IsPrimitive V → IsLocallyFinite V := by\n  sorry\n\nend Kourovka.«9.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented a class of groups in a fixed universe as a predicate on types equipped with a `Group` instance; the theorem is universe-polymorphic.",
+    "Used the HSP characterization for varieties: closure under group isomorphisms, trivial groups, subgroups, normal quotients, and arbitrary direct products.",
+    "Used the SPU characterization for quasivarieties: closure under group isomorphisms, trivial groups, subgroups, arbitrary direct products, and ultraproducts.",
+    "Interpreted a subquasivariety of `V` as a quasivariety `W` whose members all belong to `V`.",
+    "Constructed varying-family group ultraproducts as quotients of direct products by the normal subgroup of tuples equal to the identity on an ultrafilter-large set.",
+    "Formalized local finiteness as finiteness (`Finite G`) of every member satisfying Mathlib's `Group.FG`.",
+    "Included isomorphism closure explicitly so that predicates on Lean presentations represent genuine classes of groups rather than representation-dependent collections."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Bundled categorical groups such as `Grp`, which do not by themselves provide predicates and closure notions for (quasi)varieties.",
+     "name": "GroupClass",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no type for universe-controlled classes of groups."
+    },
+    {
+     "closest_existing_considered": "`Filter.Product`, `Filter.Germ`, and Mathlib's model-theoretic ultraproduct construction.",
+     "name": "filterKernel",
+     "why_needed": "A varying-family group ultraproduct needs the normal subgroup of tuples equal to one almost everywhere; Mathlib's dependent `Filter.Product` lacks the required dependent group instance."
+    },
+    {
+     "closest_existing_considered": "`Filter.Product` and `FirstOrder.Language.Ultraproduct`; neither directly yields a group on a varying family of group types for this statement.",
+     "name": "groupFilterProduct",
+     "why_needed": "Provides the varying-family reduced product whose specialization to an ultrafilter is the group ultraproduct used in quasivariety closure."
+    },
+    {
+     "closest_existing_considered": "The standard Birkhoff HSP characterization, encoded directly using Mathlib subgroups, quotient groups, and products.",
+     "name": "IsGroupVariety",
+     "why_needed": "No group-variety predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "The standard SPU characterization, encoded directly using Mathlib subgroups, products, ultrafilters, and the bespoke group filter product.",
+     "name": "IsGroupQuasivariety",
+     "why_needed": "No group-quasivariety predicate exists in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Direct quantification over contained `IsGroupQuasivariety` classes.",
+     "name": "IsPrimitive",
+     "why_needed": "The problem's specialized meaning of primitive variety is not present in existing libraries."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Group.FG` and `Finite`, which are used to define this predicate.",
+     "name": "IsLocallyFinite",
+     "why_needed": "Existing `LocallyFinite` names concern topology or order, not algebraic classes in which finitely generated groups are finite."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.5»": "/--\nIs every primitive variety of groups locally finite?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ V : GroupClass.{u}, IsPrimitive V → IsLocallyFinite V := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.5\n\nby V. A. Gorbunov\n\nA variety of groups is called *primitive* if each of its subquasivarieties is a\nvariety. Describe all primitive varieties of groups. Is every primitive variety of\ngroups locally finite?\n\nA *variety* of groups is the class of all groups satisfying some set of laws\n(identities) $w = 1$, where $w$ ranges over words in the free group on the countably\nmany variables $x_0, x_1, \\dots$. By Birkhoff's theorem these are exactly the classes\nof groups closed under subgroups, homomorphic images and arbitrary direct products.\nA *quasivariety* of groups is the class of all groups satisfying some set of\nquasi-identities\n$$u_1 = 1 \\wedge \\dots \\wedge u_n = 1 \\implies w = 1 \\qquad (n \\geq 0).$$\nBy Mal'cev's theorem these are exactly the classes of groups closed under subgroups,\ndirect products (including the empty product, the trivial group) and ultraproducts.\nA *subquasivariety* of a variety $\\mathfrak{V}$ is a quasivariety contained in\n$\\mathfrak{V}$. A variety is *locally finite* if every finitely generated group in it\nis finite; since a variety is closed under subgroups, this is the same as every group\nin it being locally finite.\n\nOnly the yes/no question is formalised here.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.5»\n\nuniverse u\n\n/-- A group `G` satisfies the law `w = 1`, where `w : FreeGroup ℕ` is a word in the\nvariables `x₀, x₁, …`, if every substitution `f` of elements of `G` for the variables\nsends `w` to `1`. -/\ndef SatisfiesLaw (G : Type*) [Group G] (w : FreeGroup ℕ) : Prop :=\n  ∀ f : ℕ → G, FreeGroup.lift f w = 1\n\n/-- A quasi-identity in the language of groups: finitely many premises `u = 1`\n(for `u ∈ premises`) and a conclusion `conclusion = 1`, all words in the variables\n`x₀, x₁, …`. A quasi-identity with no premises is a law. -/\nstructure QuasiIdentity where\n  /-- The words `u` appearing in the premises `u = 1`. -/\n  premises : Finset (FreeGroup ℕ)\n  /-- The word `w` of the conclusion `w = 1`. -/\n  conclusion : FreeGroup ℕ\n\n/-- A group `G` satisfies a quasi-identity `q` if for every substitution `f` of elements\nof `G` for the variables under which all premises of `q` evaluate to `1`, the conclusion\nof `q` evaluates to `1`. -/\ndef SatisfiesQuasiIdentity (G : Type*) [Group G] (q : QuasiIdentity) : Prop :=\n  ∀ f : ℕ → G, (∀ u ∈ q.premises, FreeGroup.lift f u = 1) →\n    FreeGroup.lift f q.conclusion = 1\n\n/-- A class `𝔙` of groups is a *variety* if it consists exactly of the groups satisfying\nsome set `L` of laws. -/\ndef IsVariety (𝔙 : ∀ (G : Type u) [Group G], Prop) : Prop :=\n  ∃ L : Set (FreeGroup ℕ), ∀ (G : Type u) [Group G], 𝔙 G ↔ ∀ w ∈ L, SatisfiesLaw G w\n\n/-- A class `𝔎` of groups is a *quasivariety* if it consists exactly of the groups\nsatisfying some set `Q` of quasi-identities. -/\ndef IsQuasivariety (𝔎 : ∀ (G : Type u) [Group G], Prop) : Prop :=\n  ∃ Q : Set QuasiIdentity,\n    ∀ (G : Type u) [Group G], 𝔎 G ↔ ∀ q ∈ Q, SatisfiesQuasiIdentity G q\n\n/-- A variety `𝔙` of groups is *primitive* if each of its subquasivarieties, i.e. each\nquasivariety of groups contained in `𝔙`, is a variety. -/\ndef IsPrimitive (𝔙 : ∀ (G : Type u) [Group G], Prop) : Prop :=\n  ∀ 𝔎 : ∀ (G : Type u) [Group G], Prop,\n    IsQuasivariety 𝔎 → (∀ (G : Type u) [Group G], 𝔎 G → 𝔙 G) → IsVariety 𝔎\n\n/-- Every variety of groups is a quasivariety. -/\n@[category API, AMS 8 20]\ntheorem IsVariety.isQuasivariety {𝔙 : ∀ (G : Type u) [Group G], Prop} (h : IsVariety 𝔙) :\n    IsQuasivariety 𝔙 := by\n  obtain ⟨L, hL⟩ := h\n  refine ⟨(fun w ↦ ⟨∅, w⟩) '' L, fun G _ ↦ (hL G).trans ?_⟩\n  simp [SatisfiesLaw, SatisfiesQuasiIdentity]\n\n/-- The class of all groups is a variety (defined by the empty set of laws). -/\n@[category test, AMS 8 20]\ntheorem isVariety_all : IsVariety fun (G : Type u) [Group G] ↦ True :=\n  ⟨∅, by simp⟩\n\n/-- The class of trivial groups is a variety (defined by the law `x₀ = 1`). -/\n@[category test, AMS 8 20]\ntheorem isVariety_subsingleton : IsVariety fun (G : Type u) [Group G] ↦ Subsingleton G := by\n  refine ⟨{FreeGroup.of 0}, fun G _ ↦ ?_⟩\n  simp only [Set.mem_singleton_iff, forall_eq, SatisfiesLaw, FreeGroup.lift_apply_of]\n  exact ⟨fun _ f ↦ Subsingleton.elim _ _,\n    fun h ↦ subsingleton_of_forall_eq 1 fun g ↦ h fun _ ↦ g⟩\n\n/--\nIs every primitive variety of groups locally finite?\n\nA variety `𝔙` is locally finite if every finitely generated group in `𝔙` is finite.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ 𝔙 : ∀ (G : Type) [Group G], Prop, IsVariety 𝔙 → IsPrimitive 𝔙 →\n      ∀ (G : Type) [Group G], 𝔙 G → Group.FG G → Finite G := by\n  sorry\n\nend Kourovka.«9.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table correctly isolates the yes/no question and drops the descriptive part 'Describe all primitive varieties of groups', which has no statable proposition.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "(Quasi)varieties are defined syntactically (classes of groups defined by a set of laws / of finitary quasi-identities) rather than by closure properties (S, H, P / S, P, ultraproducts). These are equivalent by Birkhoff's and Mal'cev's theorems; the syntactic route avoids building group-structured ultraproducts of dependent families, which Mathlib lacks. In particular every quasivariety so defined is isomorphism-closed and contains the trivial groups, and the empty class is not a quasivariety, matching the standard convention.",
+    "Laws and quasi-identity atoms are written in the form `w = 1` with `w : FreeGroup ℕ` (countably many variables x₀, x₁, …), rather than `w = v`; in groups `w = v` is equivalent to `w v⁻¹ = 1`, so no generality is lost. Quasi-identities are finitary (a `Finset` of premises), as is standard; the empty premise set makes laws special cases of quasi-identities (proved as the API lemma `IsVariety.isQuasivariety`).",
+    "A class of groups is modelled as a predicate `∀ (G : Type u) [Group G], Prop`; the definitions are universe-polymorphic and the theorem instantiates them at `Type` (universe 0), following the repository convention (e.g. Kourovka/1_40). This is mathematically universe-independent: membership in a quasivariety/variety and the locally-finite conclusion are all determined by finitely generated (hence countable) groups, which exist up to isomorphism in every universe.",
+    "\"Locally finite variety\" is formalized as: every finitely generated group in the variety is finite (Neumann's definition). Since a variety is closed under subgroups, this is equivalent to every group in the variety being locally finite. The hypothesis `IsVariety 𝔙` is kept separate from `IsPrimitive 𝔙` (which only quantifies over subquasivarieties), mirroring the notebook's phrasing 'a variety ... is called primitive if ...'.",
+    "The Gothic letters 𝔙 and 𝔎 are used as Lean variable names for the classes, matching the notebook's notation for varieties/quasivarieties."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FreeGroup.lift (used to evaluate the word); Mathlib's ModelTheory `Theory`/`Sentence` machinery has no language of groups and would be far heavier.",
+     "name": "Kourovka.«9.5».SatisfiesLaw",
+     "why_needed": "Mathlib has no notion of a group satisfying a law (identity) w = 1 for a word w in the free group on countably many variables; needed to define varieties of groups."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Sentence / universal Horn sentences in Mathlib.ModelTheory (no group language available; no Horn-fragment notion).",
+     "name": "Kourovka.«9.5».QuasiIdentity",
+     "why_needed": "A quasi-identity (finitely many premises u = 1 and a conclusion w = 1) has no counterpart in Mathlib; needed to define quasivarieties."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Sentence.Realize (unusable without a Mathlib language of groups).",
+     "name": "Kourovka.«9.5».SatisfiesQuasiIdentity",
+     "why_needed": "Satisfaction of a quasi-identity by a group; no Mathlib counterpart."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjecturesForMathlib for 'variety', 'Birkhoff', 'equational'; only algebraic-geometry varieties and the EquationalTheories magma files exist, none applicable to classes of groups.",
+     "name": "Kourovka.«9.5».IsVariety",
+     "why_needed": "Varieties of groups (equationally defined classes) are absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Filter.Product / FirstOrder.Language.Ultraproduct (only a first-order Structure on ultraproducts, no Group instance for dependent families of groups), hence the syntactic definition instead.",
+     "name": "Kourovka.«9.5».IsQuasivariety",
+     "why_needed": "Quasivarieties of groups (classes defined by quasi-identities, equivalently closed under S, P, ultraproducts) are absent from Mathlib."
+    },
+    {
+     "closest_existing_considered": "None exists; built from IsVariety and IsQuasivariety.",
+     "name": "Kourovka.«9.5».IsPrimitive",
+     "why_needed": "The notebook's problem-specific notion: a variety all of whose subquasivarieties are varieties."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ 𝔙 (class of groups in Type), IsVariety 𝔙 → IsPrimitive 𝔙 → ∀ G, 𝔙 G → Group.FG G → Finite G. Mathlib and the repo have no notion of (quasi)variety of groups, so these are defined syntactically in the file (laws as words in FreeGroup ℕ; quasi-identities with a Finset of premises), which is the standard textbook definition and Birkhoff/Mal'cev-equivalent to the closure-property descriptions in the decomposition notes."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.5»": "/--\nIs every primitive variety of groups locally finite?\n\nA variety `𝔙` is locally finite if every finitely generated group in `𝔙` is finite.\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ 𝔙 : ∀ (G : Type) [Group G], Prop, IsVariety 𝔙 → IsPrimitive 𝔙 →\n      ∀ (G : Type) [Group G], 𝔙 G → Group.FG G → Finite G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.5\n\nby V. A. Gorbunov\n\nA variety of groups is called primitive if each of its subquasivarieties is a\nvariety. Describe all primitive varieties of groups. Is every primitive\nvariety of groups locally finite?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«9.5»\n\nuniverse u\n\n/-- A class of groups whose underlying types lie in `Type u`. -/\nabbrev GroupClass := Set GrpCat.{u}\n\n/-- The normal subgroup of a direct product consisting of the functions that\nare equal to $1$ on an ultrafilter-large set. -/\ndef eventuallyOne {I : Type u} (G : I → Type u) [∀ i, Group (G i)]\n    (𝒰 : Ultrafilter I) : Subgroup (∀ i, G i) where\n  carrier := {x | ∀ᶠ i in (𝒰 : Filter I), x i = 1}\n  one_mem' := Filter.Eventually.of_forall fun _ ↦ rfl\n  mul_mem' := fun hx hy ↦ by\n    filter_upwards [hx, hy] with i hxi hyi\n    simp [hxi, hyi]\n  inv_mem' := fun hx ↦ by\n    filter_upwards [hx] with i hxi\n    simp [hxi]\n\ninstance eventuallyOne_normal {I : Type u} (G : I → Type u) [∀ i, Group (G i)]\n    (𝒰 : Ultrafilter I) : (eventuallyOne G 𝒰).Normal where\n  conj_mem h hh x := by\n    filter_upwards [hh] with i hi\n    simp [hi]\n\n/-- The ultraproduct of a family of groups. -/\nabbrev GroupUltraproduct {I : Type u} (G : I → Type u) [∀ i, Group (G i)]\n    (𝒰 : Ultrafilter I) := (∀ i, G i) ⧸ eventuallyOne G 𝒰\n\n/-- A class of groups is a variety if it contains the trivial group and is\nclosed under isomorphic copies, subgroups, homomorphic images, and arbitrary\ndirect products. -/\ndef IsGroupVariety (C : GroupClass.{u}) : Prop :=\n  C (GrpCat.of PUnit) ∧\n  (∀ {G H : Type u} [Group G] [Group H],\n    C (GrpCat.of G) → (G ≃* H) → C (GrpCat.of H)) ∧\n  (∀ {G : Type u} [Group G] (H : Subgroup G),\n    C (GrpCat.of G) → C (GrpCat.of H)) ∧\n  (∀ {G H : Type u} [Group G] [Group H] (f : G →* H),\n    C (GrpCat.of G) → Function.Surjective f → C (GrpCat.of H)) ∧\n  (∀ (I : Type u) (G : I → Type u) [∀ i, Group (G i)],\n    (∀ i, C (GrpCat.of (G i))) → C (GrpCat.of (∀ i, G i)))\n\n/-- A class of groups is a quasivariety if it contains the trivial group and\nis closed under isomorphic copies, subgroups, arbitrary direct products, and\nultraproducts. -/\ndef IsGroupQuasivariety (C : GroupClass.{u}) : Prop :=\n  C (GrpCat.of PUnit) ∧\n  (∀ {G H : Type u} [Group G] [Group H],\n    C (GrpCat.of G) → (G ≃* H) → C (GrpCat.of H)) ∧\n  (∀ {G : Type u} [Group G] (H : Subgroup G),\n    C (GrpCat.of G) → C (GrpCat.of H)) ∧\n  (∀ (I : Type u) (G : I → Type u) [∀ i, Group (G i)],\n    (∀ i, C (GrpCat.of (G i))) → C (GrpCat.of (∀ i, G i))) ∧\n  (∀ (I : Type u) (G : I → Type u) [∀ i, Group (G i)] (𝒰 : Ultrafilter I),\n    (∀ i, C (GrpCat.of (G i))) → C (GrpCat.of (GroupUltraproduct G 𝒰)))\n\n/-- A variety of groups is primitive if each quasivariety contained in it is a\nvariety. -/\ndef IsPrimitiveGroupVariety (C : GroupClass.{u}) : Prop :=\n  IsGroupVariety C ∧\n    ∀ Q : GroupClass.{u}, Q ⊆ C → IsGroupQuasivariety Q → IsGroupVariety Q\n\n/-- A class of groups is locally finite if each of its finitely generated\ngroups is finite. -/\ndef IsLocallyFiniteGroupClass (C : GroupClass.{u}) : Prop :=\n  ∀ (G : Type u) [Group G], C (GrpCat.of G) → Group.FG G → Finite G\n\n/--\nIs every primitive variety of groups locally finite? Here a variety is a class\ncontaining the trivial group and closed under isomorphic copies, subgroups,\nhomomorphic images, and arbitrary direct products. It is primitive when every\nsubclass that contains the trivial group and is closed under isomorphic copies,\nsubgroups, arbitrary direct products, and ultraproducts is itself a variety.\nLocally finite means that every finitely generated group in the class is finite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ C : GroupClass.{u}, IsPrimitiveGroupVariety C → IsLocallyFiniteGroupClass C := by\n  sorry\n\nend Kourovka.«9.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A class of groups is represented as a set of bundled groups `Set GrpCat.{u}`. The theorem is universe-polymorphic, while each individual class and all products/ultraproducts in its closure conditions remain within one universe `u`.",
+    "Varieties are characterized as classes containing the trivial group and closed under isomorphic copies, subgroups, surjective homomorphic images, and arbitrary same-universe direct products (the HSP characterization).",
+    "Quasivarieties are characterized as classes containing the trivial group and closed under isomorphic copies, subgroups, arbitrary same-universe direct products, and ultraproducts (the standard SPU characterization).",
+    "The ultraproduct of groups is represented as the direct product modulo the normal subgroup of functions equal to the identity on an ultrafilter-large set.",
+    "Local finiteness is stated as `Group.FG G → Finite G` for every member group."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`GrpCat` bundles small groups, and `Set GrpCat` provides the extensional class representation.",
+     "name": "GroupClass",
+     "why_needed": "Mathlib and FormalConjecturesForMathlib have no notion of a class or variety of groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides `Ultrafilter`, dependent product group instances, and quotient groups, but no reduced product or ultraproduct of groups.",
+     "name": "eventuallyOne",
+     "why_needed": "The kernel congruence subgroup is needed to construct a group ultraproduct, which Mathlib does not provide."
+    },
+    {
+     "closest_existing_considered": "Mathlib's filter germs and ultrafilters do not provide an algebraic group ultraproduct.",
+     "name": "GroupUltraproduct",
+     "why_needed": "Closure under ultraproducts is part of the standard semantic characterization of quasivarieties."
+    },
+    {
+     "closest_existing_considered": "The definition uses existing `Subgroup`, `MonoidHom`, `MulEquiv`, dependent product, and bundled-group primitives to encode HSP closure.",
+     "name": "IsGroupVariety",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines varieties of groups."
+    },
+    {
+     "closest_existing_considered": "The definition uses existing subgroup/product/isomorphism primitives together with the bespoke `GroupUltraproduct` to encode SPU closure.",
+     "name": "IsGroupQuasivariety",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines quasivarieties of groups."
+    },
+    {
+     "closest_existing_considered": "No existing primitive-variety notion was found.",
+     "name": "IsPrimitiveGroupVariety",
+     "why_needed": "This is the problem-specific property that every subquasivariety of a variety is a variety."
+    },
+    {
+     "closest_existing_considered": "The existing `Group.FG` and `Finite` predicates supply the constituent notions.",
+     "name": "IsLocallyFiniteGroupClass",
+     "why_needed": "Mathlib's notions named `LocallyFinite` concern topology or locally finite orders, not classes of groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "The statement is formalized using bespoke definitions of same-universe classes of groups, varieties and quasivarieties via the standard HSP/SPU closure characterizations, primitive varieties, ultraproducts, and local finiteness."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.5»": "/--\nIs every primitive variety of groups locally finite? Here a variety is a class\ncontaining the trivial group and closed under isomorphic copies, subgroups,\nhomomorphic images, and arbitrary direct products. It is primitive when every\nsubclass that contains the trivial group and is closed under isomorphic copies,\nsubgroups, arbitrary direct products, and ultraproducts is itself a variety.\nLocally finite means that every finitely generated group in the class is finite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ C : GroupClass.{u}, IsPrimitiveGroupVariety C → IsLocallyFiniteGroupClass C := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 9.5\n\nby V. A. Gorbunov\n\nA variety of groups is called *primitive* if each of its subquasivarieties is a\nvariety. Describe all primitive varieties of groups. Is every primitive variety\nof groups locally finite?\n\nHere a *variety* of groups is the class of all groups satisfying some set of\nlaws (identities) $w(x_1, \\dots, x_n) = 1$, and a *quasivariety* of groups is the\nclass of all groups satisfying some set of quasi-identities\n$u_1 = v_1 \\wedge \\dots \\wedge u_m = v_m \\to u = v$, where the $u_i, v_i, u, v$\nare group words. A subquasivariety of a variety $\\mathfrak{V}$ is a quasivariety\ncontained in $\\mathfrak{V}$. A variety is *locally finite* if all of its finitely\ngenerated groups are finite.\n\nOnly the yes/no question is formalised; \"Describe all primitive varieties of\ngroups\" has no statable proposition.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nuniverse u\n\nnamespace Kourovka.«9.5»\n\n/-- A quasi-identity in the language of groups: finitely many premises $u_i = v_i$\nand a conclusion $u = v$, where all of $u_i, v_i, u, v$ are group words in the\ncountably many variables $x_0, x_1, x_2, \\dots$, i.e. elements of the free group on `ℕ`. -/\nstructure QuasiIdentity where\n  /-- The premises $u_i = v_i$ of the quasi-identity. -/\n  premises : Finset (FreeGroup ℕ × FreeGroup ℕ)\n  /-- The conclusion $u = v$ of the quasi-identity. -/\n  conclusion : FreeGroup ℕ × FreeGroup ℕ\n\n/-- A group `G` satisfies a quasi-identity if every assignment of values in `G` to the\nvariables (i.e. every homomorphism `FreeGroup ℕ →* G`) that makes all premises true\nalso makes the conclusion true. -/\ndef QuasiIdentity.Holds (q : QuasiIdentity) (G : Type*) [Group G] : Prop :=\n  ∀ φ : FreeGroup ℕ →* G,\n    (∀ p ∈ q.premises, φ p.1 = φ p.2) → φ q.conclusion.1 = φ q.conclusion.2\n\n/-- A class of groups `V` is a *variety* if it is the class of all groups satisfying some\nset `S` of laws, where the law `w` holds in `G` if $w$ evaluates to $1$ under every\nassignment of values in `G` to the variables. -/\ndef IsVariety (V : ∀ (G : Type u) [Group G], Prop) : Prop :=\n  ∃ S : Set (FreeGroup ℕ), ∀ (G : Type u) [Group G],\n    V G ↔ ∀ w ∈ S, ∀ φ : FreeGroup ℕ →* G, φ w = 1\n\n/-- A class of groups `K` is a *quasivariety* if it is the class of all groups satisfying\nsome set `Q` of quasi-identities. -/\ndef IsQuasivariety (K : ∀ (G : Type u) [Group G], Prop) : Prop :=\n  ∃ Q : Set QuasiIdentity, ∀ (G : Type u) [Group G], K G ↔ ∀ q ∈ Q, q.Holds G\n\n/-- A class of groups `V` is *primitive* if every subquasivariety of `V`, i.e. every\nquasivariety `K` contained in `V`, is a variety. -/\ndef IsPrimitive (V : ∀ (G : Type u) [Group G], Prop) : Prop :=\n  ∀ K : ∀ (G : Type u) [Group G], Prop,\n    IsQuasivariety K → (∀ (G : Type u) [Group G], K G → V G) → IsVariety K\n\n/-- A class of groups `V` is *locally finite* if every finitely generated group in `V`\nis finite. -/\ndef IsLocallyFinite (V : ∀ (G : Type u) [Group G], Prop) : Prop :=\n  ∀ (G : Type u) [Group G], V G → Group.FG G → Finite G\n\n/-- Every variety is a quasivariety: a law $w = 1$ is a quasi-identity with no premises. -/\n@[category API, AMS 8 20]\ntheorem IsVariety.isQuasivariety {V : ∀ (G : Type u) [Group G], Prop} (hV : IsVariety V) :\n    IsQuasivariety V := by\n  obtain ⟨S, hS⟩ := hV\n  refine ⟨(fun w ↦ ⟨∅, (w, 1)⟩) '' S, fun G _ ↦ ?_⟩\n  rw [hS]\n  simp [QuasiIdentity.Holds]\n\n/--\nIs every primitive variety of groups locally finite? That is, if $\\mathfrak{V}$ is a\nvariety of groups such that every subquasivariety of $\\mathfrak{V}$ is a variety, is every\nfinitely generated group in $\\mathfrak{V}$ finite?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ V : ∀ (G : Type) [Group G], Prop, IsVariety V → IsPrimitive V → IsLocallyFinite V := by\n  sorry\n\nend Kourovka.«9.5»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The table correctly drops 'Describe all primitive varieties of groups' as having no statable proposition, and the remaining yes/no question is formalised as described.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Classes of groups are modelled as predicates `∀ (G : Type u) [Group G], Prop`; the theorem fixes u = 0 (`Type`), following the other Kourovka files. This is faithful because laws and quasi-identities are universal Horn sentences: a (quasi)variety is determined by its countable members (a universal sentence holds in G iff it holds in all finitely generated subgroups), inclusion between quasivarieties and being a variety are detected on countable members, and finitely generated groups are countable.",
+    "Varieties and quasivarieties are defined syntactically (classes defined by sets of laws / quasi-identities), which is the primary definition in Neumann's 'Varieties of Groups' and Mal'cev's work, rather than by the equivalent closure conditions (H,S,P resp. I,S,P,P_u + trivial group) mentioned in the decomposition notes. The syntactic definition makes isomorphism-invariance and membership of the trivial group automatic; the equivalence is Birkhoff's/Mal'cev's theorem.",
+    "Laws and quasi-identities use words in `FreeGroup ℕ` (countably many variables x_0, x_1, …); every law/quasi-identity involves finitely many variables, so this is the standard generality. Quasi-identity premises are a `Finset` of pairs of words (finitely many premises, as required for the ultraproduct characterisation); a law w is expressed as φ w = 1 for every homomorphism φ : FreeGroup ℕ →* G.",
+    "`IsPrimitive V` encodes only the sub-quasivariety condition; the theorem separately assumes `IsVariety V`, mirroring the text 'A variety of groups is called primitive if …'.",
+    "Local finiteness of a variety is stated as 'every finitely generated group in V is finite' (Group.FG G → Finite G), which for a subgroup-closed class is equivalent to 'every group in V is locally finite'.",
+    "An additional `@[category API]` lemma `IsVariety.isQuasivariety` (every variety is a quasivariety) is included with a short proof as a test of the bespoke definitions, per CONTRIBUTING's request for basic API tests; AMS tags 8 (general algebraic systems) and 20 (group theory) are used."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FirstOrder.Language.Sentence / FirstOrder.Language.Theory (ModelTheory) — no connection to Mathlib's Group structure; Filter.Product / Filter.Germ (for an ultraproduct-closure formulation) — no dependent-family group instance.",
+     "name": "Kourovka.«9.5».QuasiIdentity",
+     "why_needed": "A quasi-identity in the language of groups (finitely many premises u_i = v_i and a conclusion u = v, all group words in countably many variables, i.e. elements of FreeGroup ℕ). Mathlib has no notion of quasi-identities/quasivarieties; its ModelTheory library has first-order sentences but no group-language bridge and no Horn-formula classes."
+    },
+    {
+     "closest_existing_considered": "FirstOrder.Language.Sentence.Realize — not usable with Mathlib groups without building a language/structure bridge.",
+     "name": "Kourovka.«9.5».QuasiIdentity.Holds",
+     "why_needed": "Satisfaction of a quasi-identity in a group: every homomorphism FreeGroup ℕ →* G (= variable assignment) making all premises true makes the conclusion true."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib/FormalConjecturesForMathlib (grep for variety/quasivariety only finds algebraic-geometry uses).",
+     "name": "Kourovka.«9.5».IsVariety",
+     "why_needed": "Variety of groups: a class of groups (predicate on `Type u` with `Group` instance) equal to the class of all groups satisfying some set of laws. Neither Mathlib nor FormalConjecturesForMathlib has varieties of groups (only algebraic varieties)."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«9.5».IsQuasivariety",
+     "why_needed": "Quasivariety of groups: a class equal to the class of all groups satisfying some set of quasi-identities."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«9.5».IsPrimitive",
+     "why_needed": "The notebook's own defined term: every subquasivariety (quasivariety contained in V) is a variety."
+    },
+    {
+     "closest_existing_considered": "Group.FG, Finite (used in the definition); LocallyFiniteOrder is unrelated.",
+     "name": "Kourovka.«9.5».IsLocallyFinite",
+     "why_needed": "Local finiteness of a class of groups: every finitely generated group in the class is finite. Mathlib has Group.FG and Finite but no named 'locally finite' predicate for groups or classes of groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«9.5»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ V : (∀ (G : Type) [Group G], Prop), IsVariety V → IsPrimitive V → IsLocallyFinite V, with bespoke definitions of variety (class of all groups satisfying a set of laws w = 1, w ∈ FreeGroup ℕ), quasivariety (class of all groups satisfying a set of quasi-identities with finitely many premises), primitive (every quasivariety contained in V is a variety) and locally finite (every finitely generated member is finite). Mathlib has none of these notions."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«9.5»": "/--\nIs every primitive variety of groups locally finite? That is, if $\\mathfrak{V}$ is a\nvariety of groups such that every subquasivariety of $\\mathfrak{V}$ is a variety, is every\nfinitely generated group in $\\mathfrak{V}$ finite?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«9.5» : answer(sorry) ↔\n    ∀ V : ∀ (G : Type) [Group G], Prop, IsVariety V → IsPrimitive V → IsLocallyFinite V := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«9.5»": "c06"
+ },
+ "id": "kourovka-9.5",
+ "main_attempt": "c06"
+}

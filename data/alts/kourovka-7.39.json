@@ -1,0 +1,474 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.39\n\nby J. Mennicke\n\nLet $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{2/\\sigma} b)^2 = 1 \\rangle$,\nwhere $p$ is a prime and $\\sigma$ is an integer not divisible by $p$. The group $PSL_2(p)$ is\na factor-group of $G$, so that there is a short exact sequence\n$1 \\to N \\to G \\to PSL_2(p) \\to 1$. For each $p > 2$ there is $\\sigma$ such that $N = 1$,\nfor example $\\sigma = 4$. Let $N^{ab}$ denote the factor-group of $N$ by its commutator\nsubgroup. It is known that for some $p$ there is $\\sigma$ such that $N^{ab}$ is infinite\n(for example, for $p = 41$ one can take $\\sigma^2 \\equiv 2 \\pmod{41}$), whereas for some\nother $p$ (for example, for $p = 43$) the group $N^{ab}$ is finite for every $\\sigma$.\n\na) Is the set of primes $p$ for which $N^{ab}$ is finite for every $\\sigma$ infinite?\n\nb) Is there an arithmetic condition on $\\sigma$ which ensures that $N^{ab}$ is finite?\n\nPart b) asks for an unspecified \"arithmetic condition\" and is not formalised.\n\n## Formalisation notes\n\n* Since $a^p = 1$ in $G$, the exponent $2/\\sigma$ only matters modulo $p$: it is any integer\n  $\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$ (such $\\tau$ exists since $p$ is prime and\n  $p \\nmid \\sigma$). We therefore let $G$ depend on $p$, $\\sigma$ and $\\tau$; for a fixed\n  $\\sigma$ all admissible $\\tau$ give the same group, so the statement quantifies over all of\n  them.\n* The epimorphism $G \\to PSL_2(p)$ is the one induced by the natural epimorphism\n  $PSL_2(\\mathbb{Z}) = \\langle a, b \\mid (ab)^3 = b^2 = 1 \\rangle \\to PSL_2(p)$ (reduction\n  modulo $p$), i.e. $a \\mapsto \\pm\\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$ and\n  $b \\mapsto \\pm\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$. The relators of $G$ are\n  checked to lie in its kernel (the last one because\n  $\\operatorname{tr}(a^{\\sigma} b a^{\\tau} b) = \\sigma\\tau - 2 \\equiv 0 \\pmod p$), and $N$ is\n  the kernel of the induced homomorphism $G \\to PSL_2(p)$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), problem 7.39.\n-/\n\nnamespace Kourovka.«7.39»\n\nopen Matrix ModularGroup\nopen scoped MatrixGroups\n\n/-- The relators $a^p$, $(ab)^3$, $b^2$, $(a^{\\sigma} b a^{\\tau} b)^2$ of the group $G$, as\nwords in the free group on the two generators `a = FreeGroup.of 0` and `b = FreeGroup.of 1`.\nHere $\\tau$ plays the role of $2/\\sigma$, i.e. $\\sigma \\tau \\equiv 2 \\pmod p$. -/\ndef rels (p : ℕ) (σ τ : ℤ) : Set (FreeGroup (Fin 2)) :=\n  letI a := FreeGroup.of (0 : Fin 2)\n  letI b := FreeGroup.of (1 : Fin 2)\n  {a ^ p, (a * b) ^ 3, b ^ 2, (a ^ σ * b * a ^ τ * b) ^ 2}\n\n/-- The group $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{\\tau} b)^2 = 1 \\rangle$,\nwhere $\\tau$ plays the role of $2/\\sigma$, i.e. $\\sigma \\tau \\equiv 2 \\pmod p$. -/\nabbrev G (p : ℕ) (σ τ : ℤ) : Type :=\n  PresentedGroup (rels p σ τ)\n\n/-- Reduction modulo $p$, as a homomorphism $SL_2(\\mathbb{Z}) \\to PSL_2(p)$. -/\ndef reductionMod (p : ℕ) : SL(2, ℤ) →* PSL(2, ZMod p) :=\n  (QuotientGroup.mk' _).comp (Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)))\n\nlemma reductionMod_eq_one_of_map_eq_neg_one (p : ℕ) (g : SL(2, ℤ))\n    (hg : Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) g = -1) :\n    reductionMod p g = 1 := by\n  simp only [reductionMod, MonoidHom.comp_apply, QuotientGroup.mk'_apply, QuotientGroup.eq_one_iff,\n    hg]\n  exact Subgroup.mem_center_iff.mpr fun g => by simp\n\nlemma reductionMod_T_pow (p : ℕ) : reductionMod p T ^ p = 1 := by\n  rw [← map_pow, ← zpow_natCast]\n  simp only [reductionMod, MonoidHom.comp_apply, QuotientGroup.mk'_apply, QuotientGroup.eq_one_iff]\n  have : Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) (T ^ (p : ℤ)) = 1 := by\n    ext i j\n    rw [Matrix.SpecialLinearGroup.map_apply_coe, RingHom.mapMatrix_apply, coe_T_zpow]\n    fin_cases i <;> fin_cases j <;> simp\n  rw [this]\n  exact Subgroup.one_mem _\n\nlemma reductionMod_T_mul_S_pow_three (p : ℕ) : (reductionMod p T * reductionMod p S) ^ 3 = 1 := by\n  rw [← map_mul, ← map_pow]\n  refine reductionMod_eq_one_of_map_eq_neg_one p _ ?_\n  have : (T * S) ^ 3 = (-1 : SL(2, ℤ)) := by\n    ext i j\n    fin_cases i <;> fin_cases j <;> rfl\n  rw [this]\n  ext i j\n  fin_cases i <;> fin_cases j <;> simp\n\nlemma reductionMod_S_pow_two (p : ℕ) : reductionMod p S ^ 2 = 1 := by\n  rw [← map_pow]\n  refine reductionMod_eq_one_of_map_eq_neg_one p _ ?_\n  have : S ^ 2 = (-1 : SL(2, ℤ)) := by\n    ext i j\n    fin_cases i <;> fin_cases j <;> rfl\n  rw [this]\n  ext i j\n  fin_cases i <;> fin_cases j <;> simp\n\nlemma reductionMod_rel_pow_two (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) :\n    (reductionMod p T ^ σ * reductionMod p S * reductionMod p T ^ τ * reductionMod p S) ^ 2 =\n      1 := by\n  rw [← map_zpow, ← map_zpow, ← map_mul, ← map_mul, ← map_mul, ← map_pow]\n  refine reductionMod_eq_one_of_map_eq_neg_one p _ ?_\n  have hst : (σ : ZMod p) * (τ : ZMod p) = 2 := by\n    have := (ZMod.intCast_eq_intCast_iff _ _ _).mpr h\n    push_cast at this\n    exact this\n  have hM : (((T ^ σ * S * T ^ τ * S) ^ 2 : SL(2, ℤ)) : Matrix (Fin 2) (Fin 2) ℤ) =\n      !![(σ * τ - 1) ^ 2 - σ * τ, -σ * (σ * τ - 1) + σ;\n        τ * (σ * τ - 1) - τ, -σ * τ + 1] := by\n    simp only [Matrix.SpecialLinearGroup.coe_mul, coe_T_zpow, coe_S, pow_two,\n      Matrix.mul_fin_two]\n    congrm !![?_, ?_; ?_, ?_] <;> ring\n  ext i j\n  simp only [Matrix.SpecialLinearGroup.map_apply_coe, RingHom.mapMatrix_apply, hM,\n    Matrix.map_apply, Matrix.SpecialLinearGroup.coe_neg, Matrix.SpecialLinearGroup.coe_one]\n  fin_cases i <;> fin_cases j <;> simp [hst] <;> ring\n\n/-- The homomorphism $G \\to PSL_2(p)$ sending\n$a \\mapsto \\pm\\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$ and\n$b \\mapsto \\pm\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$, i.e. the map induced by reduction\nmodulo $p$ on $PSL_2(\\mathbb{Z}) = \\langle a, b \\mid (ab)^3 = b^2 = 1 \\rangle$. -/\ndef toPSL (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) : G p σ τ →* PSL(2, ZMod p) :=\n  PresentedGroup.toGroup (f := ![reductionMod p T, reductionMod p S]) fun r hr => by\n    simp only [rels, Set.mem_insert_iff, Set.mem_singleton_iff] at hr\n    rcases hr with rfl | rfl | rfl | rfl\n    · simpa using reductionMod_T_pow p\n    · simpa using reductionMod_T_mul_S_pow_three p\n    · simpa using reductionMod_S_pow_two p\n    · simpa using reductionMod_rel_pow_two p σ τ h\n\n/-- The generator $a$ of $G$ is sent to (the class of)\n$T = \\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$. -/\n@[category API, AMS 20]\nlemma toPSL_of_zero (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) :\n    toPSL p σ τ h (PresentedGroup.of 0) = reductionMod p T :=\n  PresentedGroup.toGroup.of _\n\n/-- The generator $b$ of $G$ is sent to (the class of)\n$S = \\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$. -/\n@[category API, AMS 20]\nlemma toPSL_of_one (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) :\n    toPSL p σ τ h (PresentedGroup.of 1) = reductionMod p S :=\n  PresentedGroup.toGroup.of _\n\n/-- The kernel $N$ of the homomorphism $G \\to PSL_2(p)$. -/\ndef N (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) : Subgroup (G p σ τ) :=\n  (toPSL p σ τ h).ker\n\n/--\nLet $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{2/\\sigma} b)^2 = 1 \\rangle$,\nwhere $p$ is a prime and $\\sigma$ is an integer not divisible by $p$, and let $N$ be the kernel\nof the natural epimorphism $G \\to PSL_2(p)$. Is the set of primes $p$ for which $N^{ab}$ is\nfinite for every $\\sigma$ infinite?\n\nHere $2/\\sigma$ is any integer $\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$; all such $\\tau$ give\nthe same group $G$, since $a^p = 1$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.39».parts.a : answer(sorry) ↔\n    {p : ℕ | p.Prime ∧ ∀ σ τ : ℤ, ¬ (p : ℤ) ∣ σ → (h : σ * τ ≡ 2 [ZMOD p]) →\n      Finite (Abelianization (N p σ τ h))}.Infinite := by\n  sorry\n\nend Kourovka.«7.39»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The table's single slot (part a) is stated as specified; part b) ('is there an arithmetic condition on σ…') has no statable Prop and was correctly dropped. The preamble facts are background and were not formalized.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The exponent 2/σ is modelled by an extra integer parameter τ with hypothesis σ * τ ≡ 2 [ZMOD p]; the theorem quantifies over all such τ. This is faithful because a^p = 1 makes a^τ depend only on τ mod p (all admissible τ give the same presented group up to canonical isomorphism), and for p prime with p ∤ σ such τ exists, so the inner implication is never vacuous.",
+    "The epimorphism G → PSL₂(p) is fixed as a ↦ ±[[1,1],[0,1]] (ModularGroup.T), b ↦ ±[[0,-1],[1,0]] (ModularGroup.S), reduced modulo p, i.e. the map induced by the natural reduction PSL₂(ℤ) → PSL₂(p). This matches the decomposition notes; N depends on this choice. Lean checks (not assumes) that the four relators are killed, the last via tr(a^σ b a^τ b) = στ − 2 ≡ 0 mod p.",
+    "PSL₂(p) is Mathlib's Matrix.ProjectiveSpecialLinearGroup (Fin 2) (ZMod p) = SL(2, ZMod p) ⧸ center; for p prime this is the usual PSL₂(p) (for p = 2 the center is trivial and PSL₂(2) = SL₂(2), which is consistent).",
+    "Generators are indexed by Fin 2 with a = FreeGroup.of 0, b = FreeGroup.of 1 (as in FormalConjectures/Wikipedia/Kaplansky.lean).",
+    "p is a natural number with p.Prime inside the set-builder; the condition 'σ not divisible by p' is ¬ (p : ℤ) ∣ σ. p = 2 is not excluded, in line with the source (only the remark about σ = 4 requires p > 2).",
+    "N^{ab} is Abelianization ↥N and 'finite' is the Finite typeclass.",
+    "Two short proved @[category API] lemmas (toPSL_of_zero, toPSL_of_one) record the images of the generators, per the repository's request for basic API tests of bespoke definitions; the preamble facts (σ = 4 gives N = 1, p = 41, p = 43) and part b) are not stated.",
+    "Surjectivity of G → PSL₂(p) (asserted as background in the source) is not stated or needed to define N."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "PresentedGroup takes a Set (FreeGroup α); no existing constant for this particular relator set.",
+     "name": "Kourovka.«7.39».rels",
+     "why_needed": "The set of relators a^p, (ab)^3, b^2, (a^σ b a^τ b)^2 in FreeGroup (Fin 2) defining the problem-specific group G."
+    },
+    {
+     "closest_existing_considered": "PresentedGroup (used directly).",
+     "name": "Kourovka.«7.39».G",
+     "why_needed": "abbrev for PresentedGroup (rels p σ τ), the group G of the problem."
+    },
+    {
+     "closest_existing_considered": "Matrix.SpecialLinearGroup.map, QuotientGroup.mk'; Mathlib has no ready-made SL(2,ℤ) → PSL(2, ZMod p) map.",
+     "name": "Kourovka.«7.39».reductionMod",
+     "why_needed": "The reduction-mod-p homomorphism SL(2, ℤ) →* PSL(2, ZMod p), composed from Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) and QuotientGroup.mk'."
+    },
+    {
+     "closest_existing_considered": "PresentedGroup.toGroup (used); ModularGroup.T, ModularGroup.S (used).",
+     "name": "Kourovka.«7.39».toPSL",
+     "why_needed": "The fixed epimorphism G →* PSL(2, ZMod p), a ↦ T, b ↦ S, built with PresentedGroup.toGroup together with proofs (helper lemmas reductionMod_*) that all relators map to 1."
+    },
+    {
+     "closest_existing_considered": "MonoidHom.ker (used directly).",
+     "name": "Kourovka.«7.39».N",
+     "why_needed": "The kernel N of toPSL, the subgroup whose abelianization the problem asks about."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.39».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ {p : ℕ | p.Prime ∧ ∀ σ τ : ℤ, ¬ (p:ℤ) ∣ σ → σ * τ ≡ 2 [ZMOD p] → Finite (Abelianization (N p σ τ h))}.Infinite, where G p σ τ = PresentedGroup {a^p, (ab)^3, b^2, (a^σ b a^τ b)^2} on FreeGroup (Fin 2), toPSL : G →* PSL(2, ZMod p) is PresentedGroup.toGroup for a ↦ T=[[1,1],[0,1]], b ↦ S=[[0,-1],[1,0]] reduced mod p (all four relators are proved to map to 1), and N = (toPSL p σ τ h).ker. Needed bespoke definitions for G, the epimorphism, and N."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.39».parts.a": "/--\nLet $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{2/\\sigma} b)^2 = 1 \\rangle$,\nwhere $p$ is a prime and $\\sigma$ is an integer not divisible by $p$, and let $N$ be the kernel\nof the natural epimorphism $G \\to PSL_2(p)$. Is the set of primes $p$ for which $N^{ab}$ is\nfinite for every $\\sigma$ infinite?\n\nHere $2/\\sigma$ is any integer $\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$; all such $\\tau$ give\nthe same group $G$, since $a^p = 1$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.39».parts.a : answer(sorry) ↔\n    {p : ℕ | p.Prime ∧ ∀ σ τ : ℤ, ¬ (p : ℤ) ∣ σ → (h : σ * τ ≡ 2 [ZMOD p]) →\n      Finite (Abelianization (N p σ τ h))}.Infinite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.39\n\nby J. Mennicke\n\nLet $G=\\left< a,\\, b\\mid a^p=(ab)^3=b^2=(a^{\\sigma}ba^{2/\\sigma}b)^2=1\\right>$, where $p$ is a\nprime, $\\sigma$ is an integer not divisible by $p$. The group $PSL_2(p)$ is a factor-group of $G$\nso that there is a short exact sequence $1 \\rightarrow N \\rightarrow G \\rightarrow PSL_2(p)\n\\rightarrow 1$. For each $p > 2$ there is $\\sigma$ such that $N=1$, for example, $\\sigma = 4$.\nLet $N^{ab}$ denote the factor-group of $N$ by its commutator subgroup. It is known that for some\n$p$ there is $\\sigma$ such that $N^{ab}$ is infinite (for example, for $p=41$ one can take\n$\\sigma^2 \\equiv 2 \\pmod{41}$), whereas for some other $p$ (for example, for $p=43$) the group\n$N^{ab}$ is finite for every $\\sigma$.\n\na) Is the set of primes $p$ for which $N^{ab}$ is finite for every $\\sigma$ infinite?\n\nb) Is there an arithmetic condition on $\\sigma$ which ensures that $N^{ab}$ is finite?\n\nOnly part a) is formalised here; part b) asks for an (unspecified) arithmetic condition and has\nno precise formal counterpart.\n\n## Formalisation notes\n\n* Since $a^p = 1$ in $G$, the exponent $2/\\sigma$ only matters modulo $p$; it is realised by an\n  integer $\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$. Different choices of $\\tau$ give the same\n  group, so the group is parametrised by $(p, \\sigma, \\tau)$.\n* The epimorphism $G \\to PSL_2(p)$ is the natural one, sending $a$ to the image of\n  $T = \\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$ and $b$ to the image of\n  $S = \\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$, i.e. it is induced by reduction modulo $p$\n  from the modular group $PSL_2(\\mathbb{Z}) = \\langle a, b \\mid b^2 = (ab)^3 = 1 \\rangle$.\n  Here $PSL_2(p)$ is `PSL(2, ZMod p)`, the quotient of `SL(2, ZMod p)` by its centre.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Matrix ModularGroup\nopen scoped MatrixGroups\n\nnamespace Kourovka.«7.39»\n\n/-- The relators $a^p$, $(ab)^3$, $b^2$, $(a^{\\sigma} b a^{\\tau} b)^2$ in the free group on the\ntwo generators $a$ (`0`) and $b$ (`1`). -/\ndef rels (p : ℕ) (σ τ : ℤ) : Set (FreeGroup (Fin 2)) :=\n  letI a := FreeGroup.of (0 : Fin 2)\n  letI b := FreeGroup.of (1 : Fin 2)\n  {a ^ p, (a * b) ^ 3, b ^ 2, (a ^ σ * b * a ^ τ * b) ^ 2}\n\n/-- The group $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{\\tau} b)^2 = 1 \\rangle$,\nwhere $\\tau$ is an integer representing $2/\\sigma$ modulo $p$. -/\nabbrev G (p : ℕ) (σ τ : ℤ) : Type := PresentedGroup (rels p σ τ)\n\n/-- Reduction modulo $p$ followed by the projection to the projective special linear group:\n$SL_2(\\mathbb{Z}) \\to SL_2(\\mathbb{Z}/p) \\to PSL_2(\\mathbb{Z}/p)$. -/\ndef toPSL (p : ℕ) : SL(2, ℤ) →* PSL(2, ZMod p) :=\n  (QuotientGroup.mk' _).comp (Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)))\n\n/-- The images of the generators $a$ and $b$ in $PSL_2(\\mathbb{Z}/p)$: the classes of\n$T = \\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$ and $S = \\begin{pmatrix} 0 & -1 \\\\ 1 & 0\n\\end{pmatrix}$ respectively. -/\ndef gens (p : ℕ) : Fin 2 → PSL(2, ZMod p) := ![toPSL p T, toPSL p S]\n\n/-- An element of `SL(2, ℤ)` reducing to `1` modulo `p` maps to `1` in `PSL(2, ZMod p)`. -/\n@[category API, AMS 20]\nlemma toPSL_eq_one_of_map_eq_one {p : ℕ} {g : SL(2, ℤ)}\n    (h : Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) g = 1) : toPSL p g = 1 := by\n  simp [toPSL, h]\n\n/-- An element of `SL(2, ℤ)` reducing to `-1` modulo `p` maps to `1` in `PSL(2, ZMod p)`. -/\n@[category API, AMS 20]\nlemma toPSL_eq_one_of_map_eq_neg_one {p : ℕ} {g : SL(2, ℤ)}\n    (h : Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) g = -1) : toPSL p g = 1 := by\n  simp only [toPSL, MonoidHom.coe_comp, Function.comp_apply, h]\n  rw [QuotientGroup.mk'_apply, QuotientGroup.eq_one_iff]\n  exact Subgroup.mem_center_iff.mpr fun _ => by simp\n\n/-- The element `-1` of `SL(2, ℤ)` maps to `1` in `PSL(2, ZMod p)`. -/\n@[category API, AMS 20]\nlemma toPSL_eq_one_of_eq_neg_one {p : ℕ} {g : SL(2, ℤ)} (h : g = -1) : toPSL p g = 1 := by\n  apply toPSL_eq_one_of_map_eq_neg_one\n  ext i j\n  rw [h]\n  fin_cases i <;> fin_cases j <;> simp\n\n/-- The relation $(TS)^3 = -1$ in $SL_2(\\mathbb{Z})$. -/\n@[category API, AMS 20]\nlemma T_mul_S_pow_three : (T * S) ^ 3 = -1 := by\n  ext i j\n  fin_cases i <;> fin_cases j <;> decide\n\n/-- The relation $S^2 = -1$ in $SL_2(\\mathbb{Z})$. -/\n@[category API, AMS 20]\nlemma S_sq : S ^ 2 = -1 := by\n  ext i j\n  fin_cases i <;> fin_cases j <;> decide\n\n/-- The relation $a^p = 1$ holds in $PSL_2(\\mathbb{Z}/p)$. -/\n@[category API, AMS 20]\nlemma toPSL_T_pow_self (p : ℕ) : toPSL p (T ^ p) = 1 := by\n  apply toPSL_eq_one_of_map_eq_one\n  ext i j\n  rw [Matrix.SpecialLinearGroup.map_apply_coe, ← zpow_natCast, coe_T_zpow]\n  fin_cases i <;> fin_cases j <;> simp\n\n/-- The relation $(a^{\\sigma} b a^{\\tau} b)^2 = 1$ holds in $PSL_2(\\mathbb{Z}/p)$ whenever\n$\\sigma \\tau \\equiv 2 \\pmod p$. -/\n@[category API, AMS 20]\nlemma toPSL_rel (p : ℕ) {σ τ : ℤ} (h : σ * τ ≡ 2 [ZMOD p]) :\n    toPSL p ((T ^ σ * S * T ^ τ * S) ^ 2) = 1 := by\n  apply toPSL_eq_one_of_map_eq_neg_one\n  have h' : (σ : ZMod p) * τ = 2 := by\n    exact_mod_cast (ZMod.intCast_eq_intCast_iff _ _ _).mpr h\n  have h1 : ((T ^ σ * S * T ^ τ * S : SL(2, ℤ)) : Matrix (Fin 2) (Fin 2) ℤ) =\n      !![σ * τ - 1, -σ; τ, -1] := by\n    simp only [Matrix.SpecialLinearGroup.coe_mul, coe_T_zpow, coe_S, Matrix.mul_fin_two]\n    ext i j\n    fin_cases i <;> fin_cases j <;> simp [sub_eq_add_neg]\n  ext i j\n  rw [Matrix.SpecialLinearGroup.map_apply_coe, RingHom.mapMatrix_apply,\n    Matrix.SpecialLinearGroup.coe_pow, h1]\n  fin_cases i <;> fin_cases j <;> simp [pow_two]\n  · linear_combination ((σ : ZMod p) * τ - 1) * h'\n  · linear_combination (-(σ : ZMod p)) * h'\n  · linear_combination (τ : ZMod p) * h'\n  · linear_combination (-1 : ZMod p) * h'\n\n/-- The generators' images satisfy the defining relations of $G$ in $PSL_2(\\mathbb{Z}/p)$. -/\n@[category API, AMS 20]\nlemma lift_gens_rels_eq_one (p : ℕ) {σ τ : ℤ} (h : σ * τ ≡ 2 [ZMOD p]) :\n    ∀ r ∈ rels p σ τ, FreeGroup.lift (gens p) r = 1 := by\n  simp only [rels, Set.mem_insert_iff, Set.mem_singleton_iff]\n  rintro r (rfl | rfl | rfl | rfl) <;>\n    simp only [map_pow, map_mul, map_zpow, FreeGroup.lift_apply_of, gens, Matrix.cons_val_zero,\n      Matrix.cons_val_one] <;>\n    simp only [← map_pow (toPSL p), ← map_mul (toPSL p), ← map_zpow (toPSL p)]\n  · exact toPSL_T_pow_self p\n  · exact toPSL_eq_one_of_eq_neg_one T_mul_S_pow_three\n  · exact toPSL_eq_one_of_eq_neg_one S_sq\n  · exact toPSL_rel p h\n\n/-- The natural epimorphism $G \\to PSL_2(\\mathbb{Z}/p)$, $a \\mapsto \\pm T$, $b \\mapsto \\pm S$. -/\ndef toPSLHom (p : ℕ) {σ τ : ℤ} (h : σ * τ ≡ 2 [ZMOD p]) : G p σ τ →* PSL(2, ZMod p) :=\n  PresentedGroup.toGroup (lift_gens_rels_eq_one p h)\n\n/-- The kernel $N$ of the natural epimorphism $G \\to PSL_2(\\mathbb{Z}/p)$, so that\n$1 \\to N \\to G \\to PSL_2(p) \\to 1$ is a short exact sequence. -/\ndef N (p : ℕ) {σ τ : ℤ} (h : σ * τ ≡ 2 [ZMOD p]) : Subgroup (G p σ τ) :=\n  (toPSLHom p h).ker\n\n@[category API, AMS 20]\nlemma toPSLHom_of_zero (p : ℕ) {σ τ : ℤ} (h : σ * τ ≡ 2 [ZMOD p]) :\n    toPSLHom p h (PresentedGroup.of 0) = toPSL p T := by\n  simp [toPSLHom, gens]\n\n@[category API, AMS 20]\nlemma toPSLHom_of_one (p : ℕ) {σ τ : ℤ} (h : σ * τ ≡ 2 [ZMOD p]) :\n    toPSLHom p h (PresentedGroup.of 1) = toPSL p S := by\n  simp [toPSLHom, gens]\n\n/--\nLet $G=\\left< a,\\, b\\mid a^p=(ab)^3=b^2=(a^{\\sigma}ba^{2/\\sigma}b)^2=1\\right>$, where $p$ is a\nprime and $\\sigma$ is an integer not divisible by $p$, and let $N$ be the kernel of the natural\nepimorphism $G \\to PSL_2(p)$, $a \\mapsto \\pm\\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$,\n$b \\mapsto \\pm\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$. Is the set of primes $p$ for which\n$N^{ab} = N / [N, N]$ is finite for every $\\sigma$ infinite?\n\nHere $2/\\sigma$ is realised by any integer $\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$; since\n$a^p = 1$ in $G$, the group does not depend on this choice.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.39».parts.a : answer(sorry) ↔\n    {p : ℕ | p.Prime ∧ ∀ σ τ : ℤ, ¬ (p : ℤ) ∣ σ → (h : σ * τ ≡ 2 [ZMOD p]) →\n      Finite (Abelianization (N p h))}.Infinite := by\n  sorry\n\nend Kourovka.«7.39»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.86,
+   "decomposition_objections": "None. The single slot (part a) is a well-posed yes/no question; part b) rightly has no statable Prop. The preamble facts (σ = 4 gives N = 1; p = 41 vs p = 43) are background and were not formalised.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The exponent 2/σ is realised by an integer τ with σ·τ ≡ 2 (mod p) (`σ * τ ≡ 2 [ZMOD p]`), and the group/kernel are parametrised by (p, σ, τ). The theorem quantifies universally over both σ and τ; this is equivalent to the notebook's 'for every σ' because a^p = 1 makes G_{p,σ,τ} canonically the same group for all τ ≡ τ' (mod p), and for p ∤ σ such a τ exists.",
+    "PSL₂(p) is taken to be Mathlib's `PSL(2, ZMod p)` = `SL(2, ZMod p) ⧸ Subgroup.center`. The epimorphism is the natural one induced from the modular group: a ↦ class of T = [[1,1],[0,1]], b ↦ class of S = [[0,-1],[1,0]] (via reduction mod p `toPSL`). For odd p every epimorphism G → PSL₂(p) differs from this one by an automorphism of PSL₂(p) (PGL₂(p)-conjugation), so N does not depend on the choice; for p = 2, G ≅ S₃ and N = 1 in any case.",
+    "The relations a^p = (ab)^3 = b^2 = (a^σ b a^τ b)^2 = 1 are proved to hold for the generator images (so `toPSLHom` is a genuine homomorphism, no sorry in definitions); surjectivity of `toPSLHom` is true (T, S generate SL₂(ℤ), which surjects onto SL₂(Z/p)) but is not proved in the file since the statement only needs the kernel.",
+    "The hypothesis `¬ (p : ℤ) ∣ σ` is kept verbatim from the statement although it is redundant for odd primes (σ·τ ≡ 2 mod p already forces p ∤ σ); for p = 2 it forces τ even, matching 2/σ ≡ 0 (mod 2). p = 2 is a degenerate case (G ≅ S₃, N trivial) and lies in the set regardless, so it does not affect infinitude.",
+    "N^{ab} finite is stated as `Finite (Abelianization ↥(N p h))`.",
+    "Generators are encoded as `Fin 2` with `0 = a`, `1 = b`, following FormalConjectures/Wikipedia/Kaplansky.lean.",
+    "Helper lemmas (relation checks, generator images) are tagged `@[category API, AMS 20]` so the file passes the repository's category/AMS linters, which are enabled in the FormalConjectures library build.",
+    "Part b) is only mentioned in the module docstring as not formalised, per the decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Inline set literal as in Kaplansky.lean's `PromislowGroup`; separated out so that `PresentedGroup.toGroup` and the relation-check lemma can refer to it.",
+     "name": "Kourovka.«7.39».rels",
+     "why_needed": "The set of relators a^p, (ab)^3, b^2, (a^σ b a^τ b)^2 in `FreeGroup (Fin 2)`, parametrised by p, σ, τ."
+    },
+    {
+     "closest_existing_considered": "`PresentedGroup` (used directly).",
+     "name": "Kourovka.«7.39».G",
+     "why_needed": "The presented group G_{p,σ,τ} = PresentedGroup (rels p σ τ); an abbrev so the Group instance is found."
+    },
+    {
+     "closest_existing_considered": "`Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p))` and `QuotientGroup.mk'`; no Mathlib composite exists.",
+     "name": "Kourovka.«7.39».toPSL",
+     "why_needed": "The homomorphism SL(2, ℤ) →* PSL(2, ZMod p) (reduction mod p composed with the quotient by the centre), used to define the generator images and prove the relations from Mathlib's `ModularGroup.T`/`S` facts."
+    },
+    {
+     "closest_existing_considered": "`ModularGroup.T`, `ModularGroup.S` (used).",
+     "name": "Kourovka.«7.39».gens",
+     "why_needed": "The images `![toPSL p T, toPSL p S]` of the two generators a, b in PSL(2, ZMod p), fixing the epimorphism explicitly."
+    },
+    {
+     "closest_existing_considered": "`PresentedGroup.toGroup` (used); a Mathlib map from the modular group's presentation to PSL₂(Z/p) does not exist.",
+     "name": "Kourovka.«7.39».toPSLHom",
+     "why_needed": "The natural epimorphism G_{p,σ,τ} →* PSL(2, ZMod p) obtained from `PresentedGroup.toGroup` and the proved relation lemma `lift_gens_rels_eq_one` (requires σ·τ ≡ 2 mod p)."
+    },
+    {
+     "closest_existing_considered": "`MonoidHom.ker` (used directly).",
+     "name": "Kourovka.«7.39».N",
+     "why_needed": "The kernel N of `toPSLHom`, the subgroup whose abelianization the problem asks about."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.39».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ {p : ℕ | p.Prime ∧ ∀ σ τ : ℤ, ¬ (p : ℤ) ∣ σ → σ * τ ≡ 2 [ZMOD p] → Finite (Abelianization (N p h))}.Infinite`, where `G p σ τ` is the `PresentedGroup` ⟨a,b | a^p, (ab)^3, b^2, (a^σ b a^τ b)^2⟩ and `N` is the kernel of the explicitly fixed epimorphism G → PSL(2, ZMod p), a ↦ ±[[1,1],[0,1]], b ↦ ±[[0,-1],[1,0]] (built with `PresentedGroup.toGroup`, with the four relations actually proved in PSL₂(Z/p))."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.39».parts.a": "/--\nLet $G=\\left< a,\\, b\\mid a^p=(ab)^3=b^2=(a^{\\sigma}ba^{2/\\sigma}b)^2=1\\right>$, where $p$ is a\nprime and $\\sigma$ is an integer not divisible by $p$, and let $N$ be the kernel of the natural\nepimorphism $G \\to PSL_2(p)$, $a \\mapsto \\pm\\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$,\n$b \\mapsto \\pm\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$. Is the set of primes $p$ for which\n$N^{ab} = N / [N, N]$ is finite for every $\\sigma$ infinite?\n\nHere $2/\\sigma$ is realised by any integer $\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$; since\n$a^p = 1$ in $G$, the group does not depend on this choice.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.39».parts.a : answer(sorry) ↔\n    {p : ℕ | p.Prime ∧ ∀ σ τ : ℤ, ¬ (p : ℤ) ∣ σ → (h : σ * τ ≡ 2 [ZMOD p]) →\n      Finite (Abelianization (N p h))}.Infinite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.39\n\nby J. Mennicke\n\nLet\n$$\nG = \\langle a,b \\mid a^p=(ab)^3=b^2=(a^\\sigma b a^{2/\\sigma}b)^2=1\\rangle.\n$$\nwhere $p$ is prime and $p \\nmid \\sigma$. There is a natural epimorphism from $G$ to\n$PSL_2(p)$ sending $a$ to the class of $\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix}$ and $b$ to\nthe class of $\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}$. Write $N$ for its kernel and\n$N^{\\mathrm{ab}}$ for the abelianization of $N$.\n\nIs the set of primes $p$ for which $N^{\\mathrm{ab}}$ is finite for every $\\sigma$\ninfinite?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.39»\n\nopen scoped MatrixGroups\n\n/-- A canonical integer representative of $2/\\sigma$ modulo $p$. -/\ndef inverseExponent (p : ℕ) (σ : ℤ) : ℤ :=\n  (((2 : ZMod p) * (σ : ZMod p)⁻¹).val : ℤ)\n\n/-- The four relators in the presentation of $G_{p,\\sigma}$. The generators indexed by\n`0` and `1` represent $a$ and $b$, respectively. -/\ndef relations (p : ℕ) (σ : ℤ) : Set (FreeGroup (Fin 2)) :=\n  let a := FreeGroup.of (0 : Fin 2)\n  let b := FreeGroup.of (1 : Fin 2)\n  {a ^ p, (a * b) ^ 3, b ^ 2, (a ^ σ * b * a ^ inverseExponent p σ * b) ^ 2}\n\n/-- The group\n$\\langle a,b \\mid a^p=(ab)^3=b^2=(a^\\sigma b a^{2/\\sigma}b)^2=1\\rangle$. -/\nabbrev group (p : ℕ) (σ : ℤ) := PresentedGroup (relations p σ)\n\n/-- The class in $PSL_2(p)$ of $\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix}$. -/\ndef projectiveA (p : ℕ) : Matrix.ProjectiveSpecialLinearGroup (Fin 2) (ZMod p) :=\n  QuotientGroup.mk' _\n    (⟨!![1, 1; 0, 1], by simp [Matrix.det_fin_two_of]⟩ :\n      Matrix.SpecialLinearGroup (Fin 2) (ZMod p))\n\n/-- The class in $PSL_2(p)$ of $\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}$. -/\ndef projectiveB (p : ℕ) : Matrix.ProjectiveSpecialLinearGroup (Fin 2) (ZMod p) :=\n  QuotientGroup.mk' _\n    (⟨!![0, -1; 1, 0], by simp [Matrix.det_fin_two_of]⟩ :\n      Matrix.SpecialLinearGroup (Fin 2) (ZMod p))\n\n/--\nIs the set of primes $p$ such that, for every integer $\\sigma$ not divisible by $p$,\nthe abelianization $N^{\\mathrm{ab}}$ of the kernel of the natural epimorphism\n$G_{p,\\sigma} \\to PSL_2(p)$ finite, an infinite set?\n\nHere $2/\\sigma$ is represented by the canonical integer `inverseExponent p σ`, whose\nproduct with $\\sigma$ is congruent to $2$ modulo $p$. The natural epimorphism is fixed\nby requiring that it send $a$ and $b$ to `projectiveA p` and `projectiveB p`.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    Set.Infinite {p : ℕ | p.Prime ∧\n      ∀ σ : ℤ, ¬ (p : ℤ) ∣ σ →\n        ∃ φ : group p σ →* Matrix.ProjectiveSpecialLinearGroup (Fin 2) (ZMod p),\n          Function.Surjective φ ∧\n          φ (PresentedGroup.of (0 : Fin 2)) = projectiveA p ∧\n          φ (PresentedGroup.of (1 : Fin 2)) = projectiveB p ∧\n          Finite (Abelianization φ.ker)} := by\n  sorry\n\nend Kourovka.«7.39»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The two presentation generators are indexed by `Fin 2`, with `0` representing a and `1` representing b.",
+    "The integer exponent 2/σ is the canonical natural-valued representative of `2 * σ⁻¹` in `ZMod p`, coerced to ℤ. Under the theorem's assumptions that p is prime and p does not divide σ, its product with σ is congruent to 2 modulo p. Different valid representatives define the same presented group because a^p = 1.",
+    "`PSL₂(p)` is modeled by Mathlib's `Matrix.ProjectiveSpecialLinearGroup (Fin 2) (ZMod p)`, namely the special linear group modulo its center.",
+    "The natural epimorphism is existentially packaged but fixed explicitly by requiring surjectivity and the prescribed images of both canonical generators. A homomorphism from the presented group is uniquely determined by those generator images, so this does not introduce a choice of kernel.",
+    "The four displayed equalities to 1 are represented as the four relators `a^p`, `(a*b)^3`, `b^2`, and `(a^σ*b*a^(2/σ)*b)^2` in a `PresentedGroup`.",
+    "Finiteness is stated as `Finite (Abelianization φ.ker)`, where `φ.ker` is the subtype group underlying the kernel N."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`ZMod` inversion and `ZMod.val`; Mathlib has the modular operations but no problem-specific integer representative of 2/σ.",
+     "name": "Kourovka.«7.39».inverseExponent",
+     "why_needed": "Selects a concrete integer exponent representing 2/σ modulo p for use in a free-group word."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `FreeGroup` and `PresentedGroup`; no existing relation set matches this presentation.",
+     "name": "Kourovka.«7.39».relations",
+     "why_needed": "Defines the exact four problem-specific relators on two generators."
+    },
+    {
+     "closest_existing_considered": "Mathlib's generic `PresentedGroup`, which is used directly in the abbreviation.",
+     "name": "Kourovka.«7.39».group",
+     "why_needed": "Names the problem-specific presented group G_{p,σ}."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Matrix.SpecialLinearGroup`, `Matrix.ProjectiveSpecialLinearGroup`, and `QuotientGroup.mk'`; no existing ZMod-parametrized named element has this exact type.",
+     "name": "Kourovka.«7.39».projectiveA",
+     "why_needed": "Names the prescribed image of generator a in PSL₂(p)."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Matrix.SpecialLinearGroup`, `Matrix.ProjectiveSpecialLinearGroup`, and `QuotientGroup.mk'`; the existing modular-group matrix S is specialized to integer coefficients rather than this projective ZMod target.",
+     "name": "Kourovka.«7.39».projectiveB",
+     "why_needed": "Names the prescribed image of generator b in PSL₂(p)."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.39».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.39».parts.a": "/--\nIs the set of primes $p$ such that, for every integer $\\sigma$ not divisible by $p$,\nthe abelianization $N^{\\mathrm{ab}}$ of the kernel of the natural epimorphism\n$G_{p,\\sigma} \\to PSL_2(p)$ finite, an infinite set?\n\nHere $2/\\sigma$ is represented by the canonical integer `inverseExponent p σ`, whose\nproduct with $\\sigma$ is congruent to $2$ modulo $p$. The natural epimorphism is fixed\nby requiring that it send $a$ and $b$ to `projectiveA p` and `projectiveB p`.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    Set.Infinite {p : ℕ | p.Prime ∧\n      ∀ σ : ℤ, ¬ (p : ℤ) ∣ σ →\n        ∃ φ : group p σ →* Matrix.ProjectiveSpecialLinearGroup (Fin 2) (ZMod p),\n          Function.Surjective φ ∧\n          φ (PresentedGroup.of (0 : Fin 2)) = projectiveA p ∧\n          φ (PresentedGroup.of (1 : Fin 2)) = projectiveB p ∧\n          Finite (Abelianization φ.ker)} := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.39\n\nby J. Mennicke\n\nFor a prime $p$ and an integer $\\sigma$ not divisible by $p$, consider\n$$\n  G = \\langle a,b \\mid a^p=(ab)^3=b^2=(a^\\sigma b a^{2/\\sigma}b)^2=1\\rangle.\n$$\nHere $2/\\sigma$ denotes an integer whose product with $\\sigma$ is congruent to $2$\nmodulo $p$. The standard images\n$$\n a\\longmapsto \\mathord\\pm\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix},\\qquad\n b\\longmapsto \\mathord\\pm\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}\n$$\ndefine an epimorphism from $G$ to $\\operatorname{PSL}_2(p)$. Let $N$ be its kernel.\nProblem 7.39(a) asks whether there are infinitely many primes $p$ for which the\nabelianization $N^{\\mathrm{ab}}$ is finite for every admissible $\\sigma$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.39»\n\nopen Matrix MatrixGroups\n\n/-- The group in Problem 7.39, with $\\tau$ representing $2/\\sigma$ modulo $p$. -/\ndef mennickeGroup (p : ℕ) (σ τ : ℤ) : Type :=\n  let a := FreeGroup.of (0 : Fin 2)\n  let b := FreeGroup.of (1 : Fin 2)\n  PresentedGroup {a ^ p, (a * b) ^ (3 : ℕ), b ^ (2 : ℕ),\n    (a ^ σ * b * a ^ τ * b) ^ (2 : ℕ)}\n\ninstance (p : ℕ) (σ τ : ℤ) : Group (mennickeGroup p σ τ) :=\n  PresentedGroup.instGroup _\n\n/-- The image $\\mathord\\pm\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix}$ in\n$\\operatorname{PSL}_2(p)$. -/\ndef standardA (p : ℕ) : PSL(2, ZMod p) :=\n  QuotientGroup.mk' (Subgroup.center (SL(2, ZMod p)))\n    (Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) ModularGroup.T)\n\n/-- The image $\\mathord\\pm\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}$ in\n$\\operatorname{PSL}_2(p)$. -/\ndef standardB (p : ℕ) : PSL(2, ZMod p) :=\n  QuotientGroup.mk' (Subgroup.center (SL(2, ZMod p)))\n    (Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) ModularGroup.S)\n\n/--\nIs the set of primes $p$ for which $N^{\\mathrm{ab}}$ is finite for every integer\n$\\sigma$ not divisible by $p$ infinite? Here $2/\\sigma$ is represented by any\ninteger $\\tau$ with $\\sigma\\tau \\equiv 2 \\pmod p$, and $N$ is the kernel of the\nepimorphism to $\\operatorname{PSL}_2(p)$ that sends the two displayed generators\nto $\\mathord\\pm\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix}$ and\n$\\mathord\\pm\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}$, respectively.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔ Set.Infinite {p : ℕ | p.Prime ∧\n    ∀ (σ : ℤ), ¬ (p : ℤ) ∣ σ → ∀ (τ : ℤ), Int.ModEq p (σ * τ) 2 →\n      ∃ φ : mennickeGroup p σ τ →* PSL(2, ZMod p),\n        Function.Surjective φ ∧\n        φ (PresentedGroup.of (0 : Fin 2)) = standardA p ∧\n        φ (PresentedGroup.of (1 : Fin 2)) = standardB p ∧\n        Finite (Abelianization φ.ker)} := by\n  sorry\n\nend Kourovka.«7.39»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented the notebook's integer `2/σ` by an explicit integer τ satisfying `Int.ModEq p (σ * τ) 2`. The theorem quantifies over every such τ; representatives differ by a multiple of p, and the relation `a^p = 1` makes the resulting relator independent of that choice.",
+    "Expressed the fixed natural epimorphism by existentially quantifying a surjective homomorphism and requiring its values on both canonical presented-group generators to equal the explicitly defined standard projective matrices. The generator equations uniquely determine a homomorphism from a presented group, while the existential also records the preamble's existence assertion and avoids a vacuous kernel predicate.",
+    "Modeled `PSL₂(p)` as Mathlib's `PSL(2, ZMod p)`, namely `SL(2, ZMod p)` modulo its center.",
+    "Used natural powers for the relators with exponents p, 3, and 2, and integer powers for σ and τ."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup`; it supplies the construction but not this problem-specific presentation.",
+     "name": "mennickeGroup",
+     "why_needed": "Packages the exact two-generator, four-relator presentation from Problem 7.39, with an explicit modular-inverse representative τ."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `ModularGroup.T` and `Matrix.SpecialLinearGroup.map`; these provide the integral matrix and scalar-change map, but not its projective class over `ZMod p`.",
+     "name": "standardA",
+     "why_needed": "Explicitly fixes the image of generator a in `PSL(2, ZMod p)` as the projective class of [[1,1],[0,1]]."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `ModularGroup.S` and `Matrix.SpecialLinearGroup.map`; these provide the integral matrix and scalar-change map, but not its projective class over `ZMod p`.",
+     "name": "standardB",
+     "why_needed": "Explicitly fixes the image of generator b in `PSL(2, ZMod p)` as the projective class of [[0,-1],[1,0]]."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.39».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.39».parts.a": "/--\nIs the set of primes $p$ for which $N^{\\mathrm{ab}}$ is finite for every integer\n$\\sigma$ not divisible by $p$ infinite? Here $2/\\sigma$ is represented by any\ninteger $\\tau$ with $\\sigma\\tau \\equiv 2 \\pmod p$, and $N$ is the kernel of the\nepimorphism to $\\operatorname{PSL}_2(p)$ that sends the two displayed generators\nto $\\mathord\\pm\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix}$ and\n$\\mathord\\pm\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}$, respectively.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔ Set.Infinite {p : ℕ | p.Prime ∧\n    ∀ (σ : ℤ), ¬ (p : ℤ) ∣ σ → ∀ (τ : ℤ), Int.ModEq p (σ * τ) 2 →\n      ∃ φ : mennickeGroup p σ τ →* PSL(2, ZMod p),\n        Function.Surjective φ ∧\n        φ (PresentedGroup.of (0 : Fin 2)) = standardA p ∧\n        φ (PresentedGroup.of (1 : Fin 2)) = standardB p ∧\n        Finite (Abelianization φ.ker)} := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.39\n\nby J. Mennicke\n\nLet $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{2/\\sigma} b)^2 = 1 \\rangle$,\nwhere $p$ is a prime and $\\sigma$ is an integer not divisible by $p$. The group $PSL_2(p)$ is a\nfactor-group of $G$, so that there is a short exact sequence\n$1 \\to N \\to G \\to PSL_2(p) \\to 1$. For each $p > 2$ there is $\\sigma$ such that $N = 1$, for\nexample $\\sigma = 4$. Let $N^{ab}$ denote the factor-group of $N$ by its commutator subgroup. It is\nknown that for some $p$ there is $\\sigma$ such that $N^{ab}$ is infinite (for example, for\n$p = 41$ one can take $\\sigma^2 \\equiv 2 \\pmod{41}$), whereas for some other $p$ (for example, for\n$p = 43$) the group $N^{ab}$ is finite for every $\\sigma$.\n\na) Is the set of primes $p$ for which $N^{ab}$ is finite for every $\\sigma$ infinite?\n\nb) Is there an arithmetic condition on $\\sigma$ which ensures that $N^{ab}$ is finite?\n\nOnly part a) is formalised here; part b) asks for an unspecified arithmetic condition and has no\nformal statement.\n\nThe exponent $2/\\sigma$ is an integer $\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$; since $a^p = 1$\nin $G$, the group $G$ does not depend on the choice of $\\tau$. The epimorphism $G \\to PSL_2(p)$ is\nthe one sending $a \\mapsto \\pm\\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$ and\n$b \\mapsto \\pm\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$; for $\\sigma = 4$ the presentation\nof $G$ is Sunday's presentation of $PSL_2(p)$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Matrix\nopen scoped MatrixGroups\n\nnamespace Kourovka.«7.39»\n\n/-- The relators $a^p,\\ (ab)^3,\\ b^2,\\ (a^{\\sigma} b a^{\\tau} b)^2$ in the free group on the two\ngenerators $a, b$ (indexed by `0, 1 : Fin 2`). -/\ndef rels (p : ℕ) (σ τ : ℤ) : Set (FreeGroup (Fin 2)) :=\n  letI a := FreeGroup.of (0 : Fin 2)\n  letI b := FreeGroup.of (1 : Fin 2)\n  {a ^ p, (a * b) ^ 3, b ^ 2, (a ^ σ * b * a ^ τ * b) ^ 2}\n\n/-- The group $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{\\tau} b)^2 = 1 \\rangle$,\nwhere $\\tau$ plays the role of $2/\\sigma$, i.e. $\\sigma \\tau \\equiv 2 \\pmod p$. -/\nabbrev G (p : ℕ) (σ τ : ℤ) : Type := PresentedGroup (rels p σ τ)\n\n/-- The matrix $\\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$ in $SL_2(\\mathbb{Z}/p)$. -/\ndef matA (p : ℕ) : SL(2, ZMod p) := (ModularGroup.T : SL(2, ZMod p))\n\n/-- The matrix $\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$ in $SL_2(\\mathbb{Z}/p)$. -/\ndef matB (p : ℕ) : SL(2, ZMod p) := (ModularGroup.S : SL(2, ZMod p))\n\n/-- The images $\\pm\\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$ of $a$ and\n$\\pm\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$ of $b$ in $PSL_2(\\mathbb{Z}/p)$. -/\ndef gens (p : ℕ) : Fin 2 → PSL(2, ZMod p) :=\n  ![(matA p : PSL(2, ZMod p)), (matB p : PSL(2, ZMod p))]\n\n@[category API, AMS 20]\nlemma coe_matA_zpow (p : ℕ) (n : ℤ) : (matA p ^ n).1 = !![1, (n : ZMod p); 0, 1] := by\n  rw [matA, ← map_zpow, Matrix.SpecialLinearGroup.coe_matrix_coe, ModularGroup.coe_T_zpow]\n  ext i j\n  fin_cases i <;> fin_cases j <;> simp\n\n@[category API, AMS 20]\nlemma coe_matB (p : ℕ) : (matB p).1 = !![0, -1; 1, 0] := by\n  rw [matB, Matrix.SpecialLinearGroup.coe_matrix_coe, ModularGroup.coe_S]\n  ext i j\n  fin_cases i <;> fin_cases j <;> simp\n\n@[category API, AMS 20]\nlemma neg_one_mem_center (p : ℕ) : (-1 : SL(2, ZMod p)) ∈ Subgroup.center (SL(2, ZMod p)) :=\n  Matrix.SpecialLinearGroup.mem_center_iff.mpr\n    ⟨-1, by simp, by ext i j; fin_cases i <;> fin_cases j <;> simp⟩\n\n@[category API, AMS 20]\nlemma matA_pow_self (p : ℕ) : matA p ^ p = 1 := by\n  ext i j\n  rw [← zpow_natCast, coe_matA_zpow]\n  fin_cases i <;> fin_cases j <;> simp\n\n@[category API, AMS 20]\nlemma matB_sq (p : ℕ) : matB p ^ 2 = -1 := by\n  ext i j\n  simp only [pow_two, Matrix.SpecialLinearGroup.coe_mul, coe_matB,\n    Matrix.SpecialLinearGroup.coe_neg, Matrix.SpecialLinearGroup.coe_one]\n  fin_cases i <;> fin_cases j <;> simp\n\n@[category API, AMS 20]\nlemma matA_mul_matB_pow_three (p : ℕ) : (matA p * matB p) ^ 3 = -1 := by\n  ext i j\n  have h := coe_matA_zpow p 1\n  rw [zpow_one] at h\n  simp only [pow_succ, pow_zero, one_mul, Matrix.SpecialLinearGroup.coe_mul, coe_matB, h,\n    Matrix.SpecialLinearGroup.coe_neg, Matrix.SpecialLinearGroup.coe_one]\n  fin_cases i <;> fin_cases j <;> simp\n\n@[category API, AMS 20]\nlemma rel_sq (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) :\n    (matA p ^ σ * matB p * matA p ^ τ * matB p) ^ 2 = -1 := by\n  have h' : (σ : ZMod p) * τ = 2 := by\n    have := (ZMod.intCast_eq_intCast_iff _ _ _).mpr h\n    push_cast at this\n    exact this\n  ext i j\n  simp only [pow_two, Matrix.SpecialLinearGroup.coe_mul, coe_matB, coe_matA_zpow,\n    Matrix.SpecialLinearGroup.coe_neg, Matrix.SpecialLinearGroup.coe_one]\n  fin_cases i <;> fin_cases j <;> simp\n  · linear_combination ((σ : ZMod p) * τ - 1) * h'\n  · linear_combination (-(σ : ZMod p)) * h'\n  · linear_combination (τ : ZMod p) * h'\n  · linear_combination (-1 : ZMod p) * h'\n\n/-- If $\\sigma \\tau \\equiv 2 \\pmod p$, the images of $a, b$ in $PSL_2(\\mathbb{Z}/p)$ satisfy the\ndefining relations of $G$. -/\n@[category API, AMS 20]\nlemma gens_rels (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) :\n    ∀ r ∈ rels p σ τ, FreeGroup.lift (gens p) r = 1 := by\n  simp only [rels, Set.mem_insert_iff, Set.mem_singleton_iff, forall_eq_or_imp, forall_eq,\n    map_pow, map_mul, map_zpow, FreeGroup.lift_apply_of, gens, cons_val_zero, cons_val_one,\n    ← QuotientGroup.mk_mul, ← QuotientGroup.mk_pow, ← QuotientGroup.mk_zpow,\n    QuotientGroup.eq_one_iff, matA_pow_self, matB_sq, matA_mul_matB_pow_three, rel_sq p σ τ h]\n  exact ⟨Subgroup.one_mem _, neg_one_mem_center p, neg_one_mem_center p, neg_one_mem_center p⟩\n\n/-- The homomorphism $G \\to PSL_2(p)$ sending $a \\mapsto \\pm\\begin{pmatrix} 1 & 1 \\\\ 0 & 1\n\\end{pmatrix}$ and $b \\mapsto \\pm\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$. It is surjective\n(so that $PSL_2(p)$ is a factor-group of $G$), but this is not needed to state the problem. -/\ndef toPSL (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) : G p σ τ →* PSL(2, ZMod p) :=\n  PresentedGroup.toGroup (gens_rels p σ τ h)\n\n@[category test, AMS 20]\nlemma toPSL_of_zero (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) :\n    toPSL p σ τ h (PresentedGroup.of 0) = (matA p : PSL(2, ZMod p)) := by\n  simp [toPSL, gens]\n\n@[category test, AMS 20]\nlemma toPSL_of_one (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) :\n    toPSL p σ τ h (PresentedGroup.of 1) = (matB p : PSL(2, ZMod p)) := by\n  simp [toPSL, gens]\n\n/-- The normal subgroup $N$ of $G$: the kernel of the epimorphism $G \\to PSL_2(p)$, so that\n$1 \\to N \\to G \\to PSL_2(p) \\to 1$ is a short exact sequence. -/\ndef N (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) : Subgroup (G p σ τ) :=\n  (toPSL p σ τ h).ker\n\n/--\nLet $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{2/\\sigma} b)^2 = 1 \\rangle$,\nwhere $p$ is a prime and $\\sigma$ is an integer not divisible by $p$, let $N$ be the kernel of the\nepimorphism $G \\to PSL_2(p)$, and let $N^{ab}$ be the factor-group of $N$ by its commutator\nsubgroup. Is the set of primes $p$ for which $N^{ab}$ is finite for every $\\sigma$ infinite?\n\nHere $2/\\sigma$ stands for any integer $\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$; all such $\\tau$\ngive the same group $G$ and the same subgroup $N$, since $a^p = 1$ in $G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.39».parts.a : answer(sorry) ↔\n    {p : ℕ | p.Prime ∧ ∀ σ τ : ℤ, ¬ (p : ℤ) ∣ σ → (h : σ * τ ≡ 2 [ZMOD p]) →\n      Finite (Abelianization (N p σ τ h))}.Infinite := by\n  sorry\n\nend Kourovka.«7.39»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. Dropping part b) is correct: 'is there an arithmetic condition on σ' has no faithful Prop. The table's identification of the epimorphism is mathematically harmless since N is in fact independent of the choice of epimorphism (see modeling decisions).",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "`2/σ` is modelled by quantifying over all integers τ with σ·τ ≡ 2 [ZMOD p] (as a dependent hypothesis `h` that also feeds the construction of the homomorphism). Since a^p = 1 in G, the normal closure of the relators—and hence G and N—is the same for all such τ, so `∀ τ` is equivalent to picking any one inverse; for p prime and p ∤ σ such τ exist, so the quantification is never vacuous.",
+    "The hypothesis `¬ (p:ℤ) ∣ σ` from the statement is kept explicitly even though for odd p it follows from σ·τ ≡ 2 (mod p); it is needed for p = 2 where the congruence is vacuous.",
+    "PSL₂(p) is `Matrix.ProjectiveSpecialLinearGroup (Fin 2) (ZMod p)` = SL(2, ZMod p) ⧸ center, which for prime p is SL₂(p)/{±1}. The prime p ranges over ℕ (`Nat.Prime`), including p = 2 as the statement says only 'p is a prime'.",
+    "The epimorphism is fixed as a ↦ ±[[1,1],[0,1]], b ↦ ±[[0,-1],[1,0]] per the decomposition table (consistent with Sunday's presentation for σ = 4). Any other epimorphism sending a to an element of order p and b to an involution with ab of order 3 differs from this one by an automorphism of PSL₂(p) composed with conjugation by a power of a, so N is independent of this choice; the surjectivity of `toPSL` is asserted only in a docstring, not proved (Mathlib lacks 'S, T generate SL₂(ℤ)').",
+    "N^{ab} is `Abelianization ↥(N p σ τ h)`, finiteness is `Finite`, and the answer idiom is `answer(sorry) ↔ Set.Infinite {...}` so that `answer(True)` means 'yes, infinitely many such primes'.",
+    "Helper lemmas (`coe_matA_zpow`, `coe_matB`, `neg_one_mem_center`, `matA_pow_self`, `matB_sq`, `matA_mul_matB_pow_three`, `rel_sq`, `gens_rels`) are fully proved and tagged `@[category API]`; the two `@[category test]` lemmas check `toPSL` sends the generators to the intended matrices. The set-builder uses `Nat.Prime p` and `(p : ℤ) ∣ σ` with the ℕ→ℤ cast."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `PresentedGroup` (used directly); no existing definition of this particular group.",
+     "name": "Kourovka.«7.39».rels / Kourovka.«7.39».G",
+     "why_needed": "The Mennicke group ⟨a, b | a^p = (ab)^3 = b^2 = (a^σ b a^τ b)^2 = 1⟩ is specific to this problem; realised as `PresentedGroup` over `FreeGroup (Fin 2)` (0 ↦ a, 1 ↦ b), with `a^p` an ℕ-power and `a^σ`, `a^τ` ℤ-powers."
+    },
+    {
+     "closest_existing_considered": "`ModularGroup.T`, `ModularGroup.S` (over ℤ) and the `SL(n, ℤ) → SL(n, R)` coercion; `Matrix.ProjectiveSpecialLinearGroup` for PSL₂(p).",
+     "name": "Kourovka.«7.39».matA / matB / gens",
+     "why_needed": "The images ±[[1,1],[0,1]], ±[[0,-1],[1,0]] of the generators in PSL(2, ZMod p); defined as the reductions mod p of Mathlib's `ModularGroup.T` and `ModularGroup.S`, pushed to the quotient `PSL(2, ZMod p) = SL(2, ZMod p) ⧸ center`."
+    },
+    {
+     "closest_existing_considered": "`PresentedGroup.toGroup` (used); no existing hom from a presented group to PSL₂.",
+     "name": "Kourovka.«7.39».toPSL",
+     "why_needed": "The epimorphism G → PSL₂(p) fixed by the decomposition table; built with `PresentedGroup.toGroup` from the (proved) lemma `gens_rels` that all four relators map to 1 in PSL(2, ZMod p) when σ·τ ≡ 2 (mod p). The kernel N genuinely depends on which homomorphism is chosen, so it had to be made explicit rather than existentially quantified."
+    },
+    {
+     "closest_existing_considered": "`MonoidHom.ker` (used directly as the definition body).",
+     "name": "Kourovka.«7.39».N",
+     "why_needed": "The normal subgroup N = ker(G → PSL₂(p)) from the short exact sequence 1 → N → G → PSL₂(p) → 1."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.39».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ {p : ℕ | p.Prime ∧ ∀ σ τ : ℤ, ¬ (p:ℤ) ∣ σ → (h : σ * τ ≡ 2 [ZMOD p]) → Finite (Abelianization (N p σ τ h))}.Infinite`, where `G p σ τ = PresentedGroup {a^p, (a*b)^3, b^2, (a^σ * b * a^τ * b)^2}` on `Fin 2`, `toPSL` is the homomorphism `G → PSL(2, ZMod p)` with `a ↦ ±[[1,1],[0,1]]`, `b ↦ ±[[0,-1],[1,0]]` (constructed via `PresentedGroup.toGroup` with a full proof that the relators die in PSL₂), and `N` is its kernel. Problem-specific definitions were needed since neither Mathlib nor FormalConjecturesForMathlib has this group."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.39».parts.a": "/--\nLet $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{2/\\sigma} b)^2 = 1 \\rangle$,\nwhere $p$ is a prime and $\\sigma$ is an integer not divisible by $p$, let $N$ be the kernel of the\nepimorphism $G \\to PSL_2(p)$, and let $N^{ab}$ be the factor-group of $N$ by its commutator\nsubgroup. Is the set of primes $p$ for which $N^{ab}$ is finite for every $\\sigma$ infinite?\n\nHere $2/\\sigma$ stands for any integer $\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$; all such $\\tau$\ngive the same group $G$ and the same subgroup $N$, since $a^p = 1$ in $G$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.39».parts.a : answer(sorry) ↔\n    {p : ℕ | p.Prime ∧ ∀ σ τ : ℤ, ¬ (p : ℤ) ∣ σ → (h : σ * τ ≡ 2 [ZMOD p]) →\n      Finite (Abelianization (N p σ τ h))}.Infinite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.39\n\nby J. Mennicke\n\nLet\n$$\nG = \\langle a,b \\mid a^p=(ab)^3=b^2=(a^\\sigma b a^{2/\\sigma}b)^2=1\\rangle,\n$$\nwhere $p$ is prime and $p\\nmid\\sigma$. The natural map to\n$\\operatorname{PSL}_2(p)$ sends $a$ and $b$ to the classes of\n$\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix}$ and\n$\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}$, respectively. Let $N$ be its kernel.\nIs the set of primes $p$ for which $N^{\\mathrm{ab}}$ is finite for every\n$\\sigma$ infinite?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen scoped MatrixGroups\n\nnamespace Kourovka.«7.39»\n\n/-- The two generators in the presentation from Problem 7.39. -/\ninductive Generator\n  | a | b\n  deriving DecidableEq\n\nopen Generator\n\n/-- A canonical integer representative of $2/\\sigma$ modulo $p$. -/\nnoncomputable def inverseExponent (p : ℕ) (σ : ℤ) : ℤ :=\n  ((2 * (σ : ZMod p)⁻¹).val : ℕ)\n\nprivate abbrev A : FreeGroup Generator := FreeGroup.of a\nprivate abbrev B : FreeGroup Generator := FreeGroup.of b\n\n/-- The relators $a^p$, $(ab)^3$, $b^2$, and\n$(a^\\sigma b a^{2/\\sigma}b)^2$ from Problem 7.39. -/\ndef relations (p : ℕ) (σ : ℤ) : Set (FreeGroup Generator) :=\n  {A ^ p, (A * B) ^ 3, B ^ 2,\n    (A ^ σ * B * A ^ inverseExponent p σ * B) ^ 2}\n\n/-- The group $G$ in Problem 7.39. -/\nabbrev Presented (p : ℕ) (σ : ℤ) := PresentedGroup (relations p σ)\n\nprivate def aSL (p : ℕ) : PSL(2, ZMod p) :=\n  QuotientGroup.mk' _\n    (Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) ModularGroup.T)\n\nprivate def bSL (p : ℕ) : PSL(2, ZMod p) :=\n  QuotientGroup.mk' _\n    (Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) ModularGroup.S)\n\nprivate def aSLRepresentative (p : ℕ) : Matrix.SpecialLinearGroup (Fin 2) (ZMod p) :=\n  Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) ModularGroup.T\n\nprivate def bSLRepresentative (p : ℕ) : Matrix.SpecialLinearGroup (Fin 2) (ZMod p) :=\n  Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) ModularGroup.S\n\nprivate lemma coe_aSLRepresentative_zpow (p : ℕ) (n : ℤ) :\n    ((aSLRepresentative p ^ n : SL(2, ZMod p)) : Matrix _ _ _) =\n      !![1, (n : ZMod p); 0, 1] := by\n  unfold aSLRepresentative\n  rw [← map_zpow]\n  change (ModularGroup.T ^ n).1.map (Int.castRingHom (ZMod p)) = _\n  rw [ModularGroup.coe_T_zpow]\n  ext i j\n  fin_cases i <;> fin_cases j <;> simp\n\nprivate lemma coe_bSLRepresentative (p : ℕ) :\n    ((bSLRepresentative p : SL(2, ZMod p)) : Matrix _ _ _) =\n      (!![0, -1; 1, 0] : Matrix (Fin 2) (Fin 2) (ZMod p)) := by\n  ext i j\n  fin_cases i <;> fin_cases j <;> simp [bSLRepresentative, ModularGroup.coe_S]\n\nprivate lemma coe_aSLRepresentative (p : ℕ) :\n    ((aSLRepresentative p : SL(2, ZMod p)) : Matrix _ _ _) =\n      !![1, (1 : ZMod p); 0, 1] := by\n  simpa using coe_aSLRepresentative_zpow p 1\n\nprivate lemma rel_a (p : ℕ) : aSL p ^ p = 1 := by\n  have h : aSLRepresentative p ^ p = 1 := by\n    apply Matrix.SpecialLinearGroup.ext\n    intro i j\n    rw [show aSLRepresentative p ^ p = aSLRepresentative p ^ (p : ℤ) by simp,\n      coe_aSLRepresentative_zpow]\n    fin_cases i <;> fin_cases j <;> simp\n  calc\n    aSL p ^ p = QuotientGroup.mk' _ (aSLRepresentative p ^ p) := by\n      simp [aSL, aSLRepresentative]\n    _ = QuotientGroup.mk' _ 1 := congrArg _ h\n    _ = 1 := map_one _\n\nprivate lemma rel_ab (p : ℕ) : (aSL p * bSL p) ^ 3 = 1 := by\n  have h : (aSLRepresentative p * bSLRepresentative p) ^ 3 = -1 := by\n    apply Matrix.SpecialLinearGroup.ext\n    intro i j\n    fin_cases i <;> fin_cases j <;>\n      simp [Matrix.SpecialLinearGroup.coe_mul, coe_aSLRepresentative,\n        coe_bSLRepresentative, pow_succ]\n  calc\n    (aSL p * bSL p) ^ 3 =\n        QuotientGroup.mk' _ ((aSLRepresentative p * bSLRepresentative p) ^ 3) := by\n      simp [aSL, bSL, aSLRepresentative, bSLRepresentative]\n    _ = QuotientGroup.mk' _ (-1) := congrArg _ h\n    _ = 1 := (QuotientGroup.eq_one_iff (-1)).mpr (by\n      rw [Subgroup.mem_center_iff]\n      intro g\n      simp)\n\nprivate lemma rel_b (p : ℕ) : bSL p ^ 2 = 1 := by\n  have h : bSLRepresentative p ^ 2 = -1 := by\n    apply Matrix.SpecialLinearGroup.ext\n    intro i j\n    fin_cases i <;> fin_cases j <;>\n      simp [Matrix.SpecialLinearGroup.coe_mul, coe_bSLRepresentative, pow_two]\n  calc\n    bSL p ^ 2 = QuotientGroup.mk' _ (bSLRepresentative p ^ 2) := by\n      simp [bSL, bSLRepresentative]\n    _ = QuotientGroup.mk' _ (-1) := congrArg _ h\n    _ = 1 := (QuotientGroup.eq_one_iff (-1)).mpr (by\n      rw [Subgroup.mem_center_iff]\n      intro g\n      simp)\n\nprivate lemma rel_sigma (p : ℕ) (hp : p.Prime) (σ : ℤ) (hσ : ¬ (p : ℤ) ∣ σ) :\n    (aSL p ^ σ * bSL p * aSL p ^ inverseExponent p σ * bSL p) ^ 2 = 1 := by\n  letI : NeZero p := ⟨hp.ne_zero⟩\n  letI : Fact p.Prime := ⟨hp⟩\n  have hs : (σ : ZMod p) ≠ 0 := by\n    rwa [Ne, ZMod.intCast_zmod_eq_zero_iff_dvd]\n  have hinv : (inverseExponent p σ : ZMod p) = 2 * (σ : ZMod p)⁻¹ := by\n    unfold inverseExponent\n    rw [Int.cast_natCast, ZMod.natCast_zmod_val]\n  have h : (aSLRepresentative p ^ σ * bSLRepresentative p *\n      aSLRepresentative p ^ inverseExponent p σ * bSLRepresentative p) ^ 2 = -1 := by\n    apply Matrix.SpecialLinearGroup.ext\n    intro i j\n    fin_cases i <;> fin_cases j <;>\n      simp [Matrix.SpecialLinearGroup.coe_mul, coe_aSLRepresentative_zpow,\n        coe_bSLRepresentative, pow_two, hinv] <;> field_simp <;> ring\n  calc\n    (aSL p ^ σ * bSL p * aSL p ^ inverseExponent p σ * bSL p) ^ 2 =\n        QuotientGroup.mk' _ ((aSLRepresentative p ^ σ * bSLRepresentative p *\n          aSLRepresentative p ^ inverseExponent p σ * bSLRepresentative p) ^ 2) := by\n      simp [aSL, bSL, aSLRepresentative, bSLRepresentative]\n    _ = QuotientGroup.mk' _ (-1) := congrArg _ h\n    _ = 1 := (QuotientGroup.eq_one_iff (-1)).mpr (by\n      rw [Subgroup.mem_center_iff]\n      intro g\n      simp)\n\nprivate def projectiveGenerator (p : ℕ) : Generator → PSL(2, ZMod p)\n  | a => aSL p\n  | b => bSL p\n\nprivate theorem relations_hold (p : ℕ) (hp : p.Prime) (σ : ℤ) (hσ : ¬ (p : ℤ) ∣ σ) :\n    ∀ r ∈ relations p σ, FreeGroup.lift (projectiveGenerator p) r = 1 := by\n  intro r hr\n  simp only [relations, Set.mem_insert_iff, Set.mem_singleton_iff] at hr\n  rcases hr with rfl | rfl | rfl | rfl\n  · simpa [projectiveGenerator] using rel_a p\n  · simpa [projectiveGenerator] using rel_ab p\n  · simpa [projectiveGenerator] using rel_b p\n  · simpa [projectiveGenerator] using rel_sigma p hp σ hσ\n\n/-- The natural homomorphism $G\\to\\operatorname{PSL}_2(p)$ specified in Problem 7.39. -/\ndef naturalMap (p : ℕ) (hp : p.Prime) (σ : ℤ) (hσ : ¬ (p : ℤ) ∣ σ) :\n    Presented p σ →* PSL(2, ZMod p) :=\n  PresentedGroup.toGroup (relations_hold p hp σ hσ)\n\n/-- The subgroup $N$, defined as the kernel of the specified natural map to\n$\\operatorname{PSL}_2(p)$. -/\ndef kernel (p : ℕ) (hp : p.Prime) (σ : ℤ) (hσ : ¬ (p : ℤ) ∣ σ) :\n    Subgroup (Presented p σ) :=\n  MonoidHom.ker (naturalMap p hp σ hσ)\n\n/--\nIs the set of primes $p$ for which $N^{\\mathrm{ab}}$ is finite for every\ninteger $\\sigma$ not divisible by $p$ infinite? Here $N$ is the kernel of the\nnatural map sending\n$a\\mapsto\\pm\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix}$ and\n$b\\mapsto\\pm\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}$.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    Set.Infinite {p : ℕ | p.Prime ∧\n      ∀ (hp : p.Prime) (σ : ℤ) (hσ : ¬ (p : ℤ) ∣ σ),\n        Finite (Abelianization (kernel p hp σ hσ))} := by\n  sorry\n\nend Kourovka.«7.39»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Primes are natural numbers satisfying `Nat.Prime`; the set includes `p.Prime` explicitly and quantifies over every proof of primality, which is harmless by proof irrelevance.",
+    "The exponent `2/σ` is the integer obtained from the canonical `ZMod p` representative of `2 * σ⁻¹`. This faithfully selects a solution of `σ * τ ≡ 2 (mod p)`; different representatives give the same presented group because `a^p = 1`.",
+    "`PSL₂(p)` is Mathlib's `Matrix.ProjectiveSpecialLinearGroup (Fin 2) (ZMod p)`, the quotient of `SL₂(ZMod p)` by its center.",
+    "The map defining `N` is fixed explicitly by sending `a` to the projective class of `[[1,1],[0,1]]` and `b` to the projective class of `[[0,-1],[1,0]]`. The file verifies that all four relators map to the identity.",
+    "`N` is represented by the subtype of the kernel subgroup, and `N^{ab}` by Mathlib's `Abelianization` of that subtype.",
+    "Part (b) is omitted as required by the fixed decomposition table."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Fin 2`; a bespoke inductive type preserves the mathematical names `a` and `b` and makes the presentation readable.",
+     "name": "Generator",
+     "why_needed": "Provides the two named generators of this problem-specific presentation."
+    },
+    {
+     "closest_existing_considered": "`ZMod` inversion and `ZMod.val` are used internally, but no existing definition packages the required integer representative.",
+     "name": "inverseExponent",
+     "why_needed": "Chooses an integer exponent representing `2/σ` modulo `p`."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup` accepts a `Set (FreeGroup α)` but does not define these problem-specific relators.",
+     "name": "relations",
+     "why_needed": "Encodes the exact four relators in the stated presentation."
+    },
+    {
+     "closest_existing_considered": "Abbreviates Mathlib's `PresentedGroup (relations p σ)`.",
+     "name": "Presented",
+     "why_needed": "Names the problem-specific presented group `G`."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `ModularGroup.T`, `ModularGroup.S`, `Matrix.SpecialLinearGroup.map`, and `QuotientGroup.mk'` are composed to construct them.",
+     "name": "aSL, bSL",
+     "why_needed": "Private helpers for the two explicitly specified elements of the projective special linear group."
+    },
+    {
+     "closest_existing_considered": "Built directly by mapping Mathlib's existing `ModularGroup.T` and `ModularGroup.S`.",
+     "name": "aSLRepresentative, bSLRepresentative",
+     "why_needed": "Private `SL₂(ZMod p)` representatives used to verify the presentation relations before passage to the projective quotient."
+    },
+    {
+     "closest_existing_considered": "Required as the generator function consumed by `FreeGroup.lift` and `PresentedGroup.toGroup`.",
+     "name": "projectiveGenerator",
+     "why_needed": "Private function assigning the two free generators their specified projective matrix images."
+    },
+    {
+     "closest_existing_considered": "Constructed using Mathlib's `PresentedGroup.toGroup`; no existing map has this problem-specific source presentation and generator assignment.",
+     "name": "naturalMap",
+     "why_needed": "Fixes the particular homomorphism to `PSL₂(p)` on which the definition of `N` depends."
+    },
+    {
+     "closest_existing_considered": "Defined directly with Mathlib's `MonoidHom.ker`.",
+     "name": "kernel",
+     "why_needed": "Names the subgroup `N` from the problem as the kernel of the fixed natural map."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.39».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.39».parts.a": "/--\nIs the set of primes $p$ for which $N^{\\mathrm{ab}}$ is finite for every\ninteger $\\sigma$ not divisible by $p$ infinite? Here $N$ is the kernel of the\nnatural map sending\n$a\\mapsto\\pm\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix}$ and\n$b\\mapsto\\pm\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}$.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    Set.Infinite {p : ℕ | p.Prime ∧\n      ∀ (hp : p.Prime) (σ : ℤ) (hσ : ¬ (p : ℤ) ∣ σ),\n        Finite (Abelianization (kernel p hp σ hσ))} := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.39\n\nby J. Mennicke\n\nLet $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{2/\\sigma} b)^2 = 1 \\rangle$,\nwhere $p$ is a prime and $\\sigma$ is an integer not divisible by $p$. The group $PSL_2(p)$\nis a factor-group of $G$, so that there is a short exact sequence\n$1 \\to N \\to G \\to PSL_2(p) \\to 1$. For each $p > 2$ there is $\\sigma$ such that $N = 1$,\nfor example $\\sigma = 4$. Let $N^{ab}$ denote the factor-group of $N$ by its commutator\nsubgroup. It is known that for some $p$ there is $\\sigma$ such that $N^{ab}$ is infinite\n(for example, for $p = 41$ one can take $\\sigma^2 \\equiv 2 \\pmod{41}$), whereas for some\nother $p$ (for example, for $p = 43$) the group $N^{ab}$ is finite for every $\\sigma$.\n\na) Is the set of primes $p$ for which $N^{ab}$ is finite for every $\\sigma$ infinite?\n\nb) Is there an arithmetic condition on $\\sigma$ which ensures that $N^{ab}$ is finite?\n\nOnly part a) is formalised here; part b) asks for a condition rather than for a yes/no answer.\n\nFormalisation notes. Since $a^p = 1$ in $G$, the exponent $2/\\sigma$ stands for an integer\n$\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$; the group $G$ does not depend on the choice of\n$\\tau$, and the statement quantifies over all such $\\tau$. The epimorphism $G \\to PSL_2(p)$\nis the natural one, sending $a$ to the class of $\\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$\nand $b$ to the class of $\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$; $N$ is its kernel.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen scoped MatrixGroups\n\nnamespace Kourovka.«7.39»\n\n/-- The two generators $a$ and $b$ of the group $G$. -/\ninductive Generator\n  | a\n  | b\n\n/-- The relators $a^p$, $(ab)^3$, $b^2$ and $(a^{\\sigma} b a^{\\tau} b)^2$ of the group $G$,\nwhere the integer $\\tau$ plays the role of $2/\\sigma$, i.e. $\\sigma \\tau \\equiv 2 \\pmod p$. -/\ndef rels (p : ℕ) (σ τ : ℤ) : Set (FreeGroup Generator) :=\n  letI a := FreeGroup.of Generator.a\n  letI b := FreeGroup.of Generator.b\n  {a ^ p, (a * b) ^ 3, b ^ 2, (a ^ σ * b * a ^ τ * b) ^ 2}\n\n/-- The group $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{\\tau} b)^2 = 1 \\rangle$,\nwhere $\\tau$ plays the role of $2/\\sigma$. -/\nabbrev G (p : ℕ) (σ τ : ℤ) : Type := PresentedGroup (rels p σ τ)\n\n/-- The natural homomorphism $SL_2(\\mathbb{Z}) \\to PSL_2(p)$: reduce the entries modulo $p$\nand pass to the quotient by the centre. -/\ndef reduceMod (p : ℕ) : SL(2, ℤ) →* PSL(2, ZMod p) :=\n  (QuotientGroup.mk' _).comp (Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)))\n\n/-- The images of the generators: $a \\mapsto \\pm\\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$\nand $b \\mapsto \\pm\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$. -/\ndef generatorImage (p : ℕ) : Generator → PSL(2, ZMod p)\n  | .a => reduceMod p ModularGroup.T\n  | .b => reduceMod p ModularGroup.S\n\n/-- A matrix in $SL_2(\\mathbb{Z})$ that reduces to the identity modulo $p$ maps to $1$ in\n$PSL_2(p)$. -/\n@[category API, AMS 20]\nlemma reduceMod_eq_one_of_map_eq_one {p : ℕ} {A : SL(2, ℤ)}\n    (h : (A : Matrix (Fin 2) (Fin 2) ℤ).map (Int.castRingHom (ZMod p)) = 1) :\n    reduceMod p A = 1 := by\n  have hA : Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) A = 1 :=\n    Subtype.ext (by simpa [Matrix.SpecialLinearGroup.map_apply_coe] using h)\n  simp [reduceMod, hA]\n\n/-- A matrix in $SL_2(\\mathbb{Z})$ that reduces to minus the identity modulo $p$ maps to $1$ in\n$PSL_2(p)$. -/\n@[category API, AMS 20]\nlemma reduceMod_eq_one_of_map_eq_neg_one {p : ℕ} {A : SL(2, ℤ)}\n    (h : (A : Matrix (Fin 2) (Fin 2) ℤ).map (Int.castRingHom (ZMod p)) = -1) :\n    reduceMod p A = 1 := by\n  have hA : (Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) A :\n      Matrix (Fin 2) (Fin 2) (ZMod p)) = -1 := by\n    simpa [Matrix.SpecialLinearGroup.map_apply_coe] using h\n  simp only [reduceMod, MonoidHom.coe_comp, QuotientGroup.coe_mk', Function.comp_apply]\n  rw [QuotientGroup.eq_one_iff, Subgroup.mem_center_iff]\n  intro B\n  exact Subtype.ext (by simp [Matrix.SpecialLinearGroup.coe_mul, hA])\n\n/-- If $\\sigma \\tau \\equiv 2 \\pmod p$, then the images of $a$ and $b$ in $PSL_2(p)$ satisfy the\ndefining relations of $G$. -/\n@[category API, AMS 20]\nlemma generatorImage_rels (p : ℕ) (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]) :\n    ∀ r ∈ rels p σ τ, FreeGroup.lift (generatorImage p) r = 1 := by\n  have hστ : (σ : ZMod p) * τ = 2 := by\n    have := (ZMod.intCast_eq_intCast_iff _ _ _).mpr h\n    push_cast at this\n    exact this\n  simp only [rels, Set.mem_insert_iff, Set.mem_singleton_iff]\n  rintro r (rfl | rfl | rfl | rfl)\n  · simp only [map_pow, FreeGroup.lift_apply_of, generatorImage]\n    rw [← map_pow]\n    apply reduceMod_eq_one_of_map_eq_one\n    rw [← zpow_natCast, ModularGroup.coe_T_zpow]\n    ext i j\n    fin_cases i <;> fin_cases j <;> simp\n  · simp only [map_pow, map_mul, FreeGroup.lift_apply_of, generatorImage]\n    rw [← map_mul, ← map_pow]\n    apply reduceMod_eq_one_of_map_eq_neg_one\n    ext i j\n    fin_cases i <;> fin_cases j <;>\n      simp [pow_succ, Matrix.SpecialLinearGroup.coe_mul, ModularGroup.coe_T, ModularGroup.coe_S]\n  · simp only [map_pow, FreeGroup.lift_apply_of, generatorImage]\n    rw [← map_pow]\n    apply reduceMod_eq_one_of_map_eq_neg_one\n    ext i j\n    fin_cases i <;> fin_cases j <;>\n      simp [pow_succ, Matrix.SpecialLinearGroup.coe_mul, ModularGroup.coe_S]\n  · simp only [map_pow, map_mul, map_zpow, FreeGroup.lift_apply_of, generatorImage]\n    rw [← map_zpow, ← map_zpow, ← map_mul, ← map_mul, ← map_mul, ← map_pow]\n    apply reduceMod_eq_one_of_map_eq_neg_one\n    ext i j\n    fin_cases i <;> fin_cases j <;>\n      simp [pow_succ, Matrix.SpecialLinearGroup.coe_mul, ModularGroup.coe_T_zpow,\n        ModularGroup.coe_S]\n    · linear_combination (↑σ * ↑τ - 1) * hστ\n    · linear_combination (-↑σ) * hστ\n    · linear_combination (↑τ) * hστ\n    · linear_combination (-1 : ZMod p) * hστ\n\n/-- The natural epimorphism $G \\to PSL_2(p)$, sending $a$ to the class of\n$\\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$ and $b$ to the class of\n$\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$. It is well defined because\n$\\sigma \\tau \\equiv 2 \\pmod p$. -/\ndef G.toPSL {p : ℕ} {σ τ : ℤ} (h : σ * τ ≡ 2 [ZMOD p]) : G p σ τ →* PSL(2, ZMod p) :=\n  PresentedGroup.toGroup (generatorImage_rels p σ τ h)\n\n/-- The normal subgroup $N$ of $G$: the kernel of the natural epimorphism $G \\to PSL_2(p)$. -/\ndef N {p : ℕ} {σ τ : ℤ} (h : σ * τ ≡ 2 [ZMOD p]) : Subgroup (G p σ τ) :=\n  (G.toPSL h).ker\n\n/-- The natural epimorphism sends $a$ to the class of\n$\\begin{pmatrix} 1 & 1 \\\\ 0 & 1 \\end{pmatrix}$. -/\n@[category test, AMS 20]\ntheorem G.toPSL_of_a {p : ℕ} {σ τ : ℤ} (h : σ * τ ≡ 2 [ZMOD p]) :\n    G.toPSL h (PresentedGroup.of .a) = reduceMod p ModularGroup.T :=\n  PresentedGroup.toGroup.of _\n\n/-- The natural epimorphism sends $b$ to the class of\n$\\begin{pmatrix} 0 & -1 \\\\ 1 & 0 \\end{pmatrix}$. -/\n@[category test, AMS 20]\ntheorem G.toPSL_of_b {p : ℕ} {σ τ : ℤ} (h : σ * τ ≡ 2 [ZMOD p]) :\n    G.toPSL h (PresentedGroup.of .b) = reduceMod p ModularGroup.S :=\n  PresentedGroup.toGroup.of _\n\n/--\nLet $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{2/\\sigma} b)^2 = 1 \\rangle$,\nwhere $p$ is a prime and $\\sigma$ is an integer not divisible by $p$, and let $N$ be the kernel\nof the natural epimorphism $G \\to PSL_2(p)$. Is the set of primes $p$ for which $N^{ab}$ is\nfinite for every $\\sigma$ infinite?\n\nHere $2/\\sigma$ stands for any integer $\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$; the group\n$G$ does not depend on this choice since $a^p = 1$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.39».parts.a : answer(sorry) ↔\n    {p : ℕ | p.Prime ∧ ∀ (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]), ¬ (p : ℤ) ∣ σ →\n      Finite (Abelianization (N h))}.Infinite := by\n  sorry\n\nend Kourovka.«7.39»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None of substance. One remark: the notes say \"N depends on the chosen epimorphism\"; in fact every epimorphism G → PSL₂(p) is the natural one composed with an automorphism of PSL₂(p) (any such map sends a to an element of order p and b to an involution with ab of order 3, and all such generating pairs are conjugate under PGL₂(p) = Aut(PSL₂(p))), so N is canonical. The file nevertheless fixes the map explicitly as the notes prescribe.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The exponent 2/σ is modelled by an integer τ with σ·τ ≡ 2 (mod p) (`σ * τ ≡ 2 [ZMOD p]`), and the statement quantifies over all such τ. Since a^p = 1 in G, the groups for different valid τ are canonically isomorphic (identity on generators, compatible with the map to PSL₂(p)), so this is equivalent to fixing one τ. For p prime and p ∤ σ such τ always exists, so no vacuity.",
+    "The hypothesis `¬ (p : ℤ) ∣ σ` ('σ not divisible by p') is kept explicitly even though it follows from σ τ ≡ 2 (mod p) for odd p; for p = 2 it is not implied, so it is included for faithfulness.",
+    "The epimorphism G → PSL₂(p) is fixed explicitly as in the decomposition notes: a ↦ ±[[1,1],[0,1]] (ModularGroup.T reduced mod p), b ↦ ±[[0,-1],[1,0]] (ModularGroup.S reduced mod p). PSL₂(p) is Mathlib's `PSL(2, ZMod p)` = SL(2, ZMod p) ⧸ center. (Remark: every epimorphism G → PSL₂(p) is in fact this one composed with an automorphism of PSL₂(p) — a ↦ order-p element, b ↦ involution with ab of order 3, all such pairs being conjugate under PGL₂(p) — so N is actually independent of the choice; fixing the map explicitly is nevertheless the safest reading.)",
+    "The homomorphism `G.toPSL` takes the proof `h : σ * τ ≡ 2 [ZMOD p]` as an argument, since the fourth relator only maps to 1 under this hypothesis; the proof that all four relators map to 1 is carried out in `generatorImage_rels` (no sorry).",
+    "`N^{ab}` is `Abelianization ↥(N h)` and 'finite' is the `Finite` typeclass predicate.",
+    "`p.Prime` (Nat.Prime) is part of the set-builder predicate, so the set is a set of primes; `Set.Infinite` expresses 'infinite'. A positive answer (`answer(True)`) means the set is infinite.",
+    "Part b) is not formalised (as required by the decomposition table); this is stated in the module docstring."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Fin 2 / Bool (used e.g. in FormalConjectures/Wikipedia/Kaplansky.lean); a named inductive is used for readability.",
+     "name": "Kourovka.«7.39».Generator",
+     "why_needed": "Two-element type indexing the generators a, b of the free group underlying the presentation."
+    },
+    {
+     "closest_existing_considered": "No existing definition; needed as the argument of PresentedGroup.",
+     "name": "Kourovka.«7.39».rels",
+     "why_needed": "The set of relators {a^p, (ab)^3, b^2, (a^σ b a^τ b)^2} in FreeGroup Generator, with p : ℕ and σ τ : ℤ."
+    },
+    {
+     "closest_existing_considered": "PresentedGroup (Mathlib) — used directly; G is an abbrev for it.",
+     "name": "Kourovka.«7.39».G",
+     "why_needed": "The presented group G = PresentedGroup (rels p σ τ) of the problem."
+    },
+    {
+     "closest_existing_considered": "Matrix.SpecialLinearGroup.map (Int.castRingHom (ZMod p)) and QuotientGroup.mk' (Subgroup.center _) — used as its two components.",
+     "name": "Kourovka.«7.39».reduceMod",
+     "why_needed": "The natural homomorphism SL(2, ℤ) →* PSL(2, ZMod p) (reduction mod p followed by the quotient by the centre); Mathlib has the two pieces but no bundled composite."
+    },
+    {
+     "closest_existing_considered": "ModularGroup.T, ModularGroup.S (Mathlib) — used as the matrices.",
+     "name": "Kourovka.«7.39».generatorImage",
+     "why_needed": "The assignment a ↦ class of ModularGroup.T, b ↦ class of ModularGroup.S in PSL(2, ZMod p), needed as the input of PresentedGroup.toGroup."
+    },
+    {
+     "closest_existing_considered": "PresentedGroup.toGroup (Mathlib) — used directly.",
+     "name": "Kourovka.«7.39».G.toPSL",
+     "why_needed": "The natural epimorphism G → PSL₂(p) of the problem, obtained from PresentedGroup.toGroup and the (proved) lemma that the relators map to 1 when σ τ ≡ 2 (mod p)."
+    },
+    {
+     "closest_existing_considered": "MonoidHom.ker (Mathlib) — N is defined as (G.toPSL h).ker.",
+     "name": "Kourovka.«7.39».N",
+     "why_needed": "The kernel N of the natural epimorphism G → PSL₂(p), whose abelianization the problem asks about."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.39».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ {p : ℕ | p.Prime ∧ ∀ (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]), ¬ (p : ℤ) ∣ σ → Finite (Abelianization (N h))}.Infinite`, where G p σ τ = PresentedGroup {a^p, (ab)^3, b^2, (a^σ b a^τ b)^2}, τ plays the role of 2/σ, and N h is the kernel of the explicit homomorphism G → PSL(2, ZMod p) sending a ↦ class of [[1,1],[0,1]] (ModularGroup.T) and b ↦ class of [[0,-1],[1,0]] (ModularGroup.S). The relation-preservation proofs are complete (no sorry outside the main theorem)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.39».parts.a": "/--\nLet $G = \\langle a, b \\mid a^p = (ab)^3 = b^2 = (a^{\\sigma} b a^{2/\\sigma} b)^2 = 1 \\rangle$,\nwhere $p$ is a prime and $\\sigma$ is an integer not divisible by $p$, and let $N$ be the kernel\nof the natural epimorphism $G \\to PSL_2(p)$. Is the set of primes $p$ for which $N^{ab}$ is\nfinite for every $\\sigma$ infinite?\n\nHere $2/\\sigma$ stands for any integer $\\tau$ with $\\sigma \\tau \\equiv 2 \\pmod p$; the group\n$G$ does not depend on this choice since $a^p = 1$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«7.39».parts.a : answer(sorry) ↔\n    {p : ℕ | p.Prime ∧ ∀ (σ τ : ℤ) (h : σ * τ ≡ 2 [ZMOD p]), ¬ (p : ℤ) ∣ σ →\n      Finite (Abelianization (N h))}.Infinite := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 7.39\n\nby J. Mennicke\n\nFor a prime $p$ and an integer $\\sigma$ not divisible by $p$, consider\n$$\nG = \\langle a,b \\mid a^p=(ab)^3=b^2=(a^\\sigma b a^{2/\\sigma}b)^2=1\\rangle.\n$$\nThere is a natural epimorphism from $G$ to $PSL_2(p)$. Problem 7.39(a) asks\nwhether there are infinitely many primes for which the abelianization of its\nkernel is finite for every $\\sigma$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«7.39»\n\nopen scoped MatrixGroups\n\n/-- The canonical integer representative of $2/\\sigma$ modulo $p$.\n\nThe inverse operation on `ZMod p` is total. In the application below, $p$ is\nprime and $p \\nmid \\sigma$, so this is an integer $\\tau$ satisfying\n$\\sigma\\tau \\equiv 2 \\pmod p$.\n-/\ndef twoDivExponent (p : ℕ) (σ : ℤ) : ℤ :=\n  (((2 : ZMod p) * (σ : ZMod p)⁻¹).val : ℕ)\n\n/-- The group\n$\\langle a,b \\mid a^p=(ab)^3=b^2=(a^\\sigma b a^{2/\\sigma}b)^2=1\\rangle$.\n\nThe generators $a$ and $b$ are represented by `0` and `1`, respectively. The\nexponent $2/\\sigma$ is represented by `twoDivExponent p σ`; changing this\ninteger representative modulo $p$ does not change the presentation because of\nthe relation $a^p=1$.\n-/\nabbrev presentation (p : ℕ) (σ : ℤ) : Type :=\n  let a := FreeGroup.of (0 : Fin 2)\n  let b := FreeGroup.of (1 : Fin 2)\n  PresentedGroup\n    {a ^ p, (a * b) ^ 3, b ^ 2,\n      (a ^ σ * b * a ^ twoDivExponent p σ * b) ^ 2}\n\n/-- The image $\\pm\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix}$ of $a$ in\n$PSL_2(\\mathbb{Z}/p\\mathbb{Z})$. -/\ndef projectiveA (p : ℕ) : PSL(2, ZMod p) :=\n  QuotientGroup.mk' (Subgroup.center (SL(2, ZMod p)))\n    ⟨!![1, 1; 0, 1], by simp [Matrix.det_fin_two_of]⟩\n\n/-- The image $\\pm\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}$ of $b$ in\n$PSL_2(\\mathbb{Z}/p\\mathbb{Z})$. -/\ndef projectiveB (p : ℕ) : PSL(2, ZMod p) :=\n  QuotientGroup.mk' (Subgroup.center (SL(2, ZMod p)))\n    ⟨!![0, -1; 1, 0], by simp [Matrix.det_fin_two_of]⟩\n\n/--\nIs the set of primes $p$ for which $N^{\\mathrm{ab}}$ is finite for every\ninteger $\\sigma$ not divisible by $p$ infinite?\n\nHere $N$ is the kernel of the natural epimorphism\n$G \\to PSL_2(\\mathbb{Z}/p\\mathbb{Z})$ sending\n$a \\mapsto \\pm\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix}$ and\n$b \\mapsto \\pm\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}$. The homomorphism is\nbound existentially but is uniquely fixed by these two generator images.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    Set.Infinite {p : ℕ | p.Prime ∧\n      ∀ σ : ℤ, ¬ (p : ℤ) ∣ σ →\n        ∃ f : presentation p σ →* PSL(2, ZMod p),\n          Function.Surjective f ∧\n          f (PresentedGroup.of (0 : Fin 2)) = projectiveA p ∧\n          f (PresentedGroup.of (1 : Fin 2)) = projectiveB p ∧\n          Finite (Abelianization f.ker)} := by\n  sorry\n\nend Kourovka.«7.39»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted PSL₂(p) as Mathlib's `Matrix.ProjectiveSpecialLinearGroup (Fin 2) (ZMod p)`, namely `SL(2, ZMod p)` modulo its center.",
+    "Represented the exponent 2/σ by the canonical integer lift of `2 * σ⁻¹` in `ZMod p`; under the prime and nondivisibility hypotheses this is congruent to 2/σ modulo p.",
+    "Represented the two presentation generators by `0, 1 : Fin 2`.",
+    "Bound the epimorphism existentially, required it to be surjective, and fixed its values on both presentation generators to the prescribed projective matrices. Such a homomorphism is unique because the presented group is generated by those generators, so its kernel is the intended fixed N.",
+    "Included prime 2 because the posed question ranges over primes without a p > 2 restriction; the p > 2 sentence in the source is background."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`ZMod.inv` supplies modular inversion, and `ZMod.val` supplies the canonical representative, but Mathlib has no combined definition for this problem-specific exponent.",
+     "name": "Kourovka.«7.39».twoDivExponent",
+     "why_needed": "The presentation needs an integer exponent representing 2/σ modulo p, while ordinary integer division would be incorrect."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `PresentedGroup` is used directly; no existing named presentation matches this family.",
+     "name": "Kourovka.«7.39».presentation",
+     "why_needed": "Packages the exact two-generator, four-relator group G_{p,σ} used by the question."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Matrix.SpecialLinearGroup.T` for the same integral matrix, but no directly reusable projective `ZMod p` element at varying p.",
+     "name": "Kourovka.«7.39».projectiveA",
+     "why_needed": "Fixes explicitly the prescribed image of generator a in PSL₂(p)."
+    },
+    {
+     "closest_existing_considered": "Mathlib has `Matrix.SpecialLinearGroup.S` for the same integral matrix, but no directly reusable projective `ZMod p` element at varying p.",
+     "name": "Kourovka.«7.39».projectiveB",
+     "why_needed": "Fixes explicitly the prescribed image of generator b in PSL₂(p)."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«7.39».parts.a": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«7.39».parts.a": "/--\nIs the set of primes $p$ for which $N^{\\mathrm{ab}}$ is finite for every\ninteger $\\sigma$ not divisible by $p$ infinite?\n\nHere $N$ is the kernel of the natural epimorphism\n$G \\to PSL_2(\\mathbb{Z}/p\\mathbb{Z})$ sending\n$a \\mapsto \\pm\\begin{pmatrix}1&1\\\\0&1\\end{pmatrix}$ and\n$b \\mapsto \\pm\\begin{pmatrix}0&-1\\\\1&0\\end{pmatrix}$. The homomorphism is\nbound existentially but is uniquely fixed by these two generator images.\n-/\n@[category research open, AMS 20]\ntheorem parts.a : answer(sorry) ↔\n    Set.Infinite {p : ℕ | p.Prime ∧\n      ∀ σ : ℤ, ¬ (p : ℤ) ∣ σ →\n        ∃ f : presentation p σ →* PSL(2, ZMod p),\n          Function.Surjective f ∧\n          f (PresentedGroup.of (0 : Fin 2)) = projectiveA p ∧\n          f (PresentedGroup.of (1 : Fin 2)) = projectiveB p ∧\n          Finite (Abelianization f.ker)} := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«7.39».parts.a": "c07"
+ },
+ "id": "kourovka-7.39",
+ "main_attempt": "c07"
+}

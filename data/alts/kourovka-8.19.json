@@ -1,0 +1,825 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.19\n\nby Yu. G. Kleiman\n\nWhich of the following properties of (soluble) varieties of groups are equivalent to one\nanother:\n\n1) to satisfy the minimum condition for subvarieties;\n\n2) to have at most countably many subvarieties;\n\n3) to have no infinite independent system of identities?\n\nA *variety of groups* is the class of all groups satisfying a given set of laws\n(identities) $w = 1$, where $w$ is a word in the free group on countably many letters.\nA *subvariety* of a variety $\\mathfrak{V}$ is a variety contained in $\\mathfrak{V}$.\nThe *minimum condition for subvarieties* says that every nonempty set of subvarieties of\n$\\mathfrak{V}$ has a minimal element, i.e. that the inclusion order on the subvarieties of\n$\\mathfrak{V}$ is well-founded (equivalently, there is no infinite strictly descending\nchain of subvarieties). A system of words $W$ is *independent in $\\mathfrak{V}$* if no\n$w \\in W$ is a consequence of the remaining words of $W$ together with the laws of\n$\\mathfrak{V}$. A variety is *soluble* if all of its groups are soluble.\n\nThe three properties are formalised as `WellFoundedLT (Set.Iic V)`, `Countable (Set.Iic V)`\nand `¬ ∃ W : Set (FreeGroup ℕ), W.Infinite ∧ V.IsIndependent W`, and the question is split\ninto the three pairwise equivalences, each for all varieties and for all soluble varieties.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.19»\n\n/-- A group `G` satisfies the law (identity) $w = 1$, where `w` is a word in the free group\non countably many letters, if every substitution of elements of `G` for the letters\nevaluates `w` to `1`. -/\ndef SatisfiesLaw (G : Type*) [Group G] (w : FreeGroup ℕ) : Prop :=\n  ∀ f : ℕ → G, FreeGroup.lift f w = 1\n\n@[category test, AMS 20]\ntheorem satisfiesLaw_one (G : Type*) [Group G] : SatisfiesLaw G 1 := by\n  simp [SatisfiesLaw]\n\n@[category test, AMS 20]\ntheorem satisfiesLaw_of_subsingleton (G : Type*) [Group G] [Subsingleton G] (w : FreeGroup ℕ) :\n    SatisfiesLaw G w :=\n  fun _ => Subsingleton.elim _ _\n\n/-- A variety of groups: a class of groups which consists of all the groups satisfying\nsome set of laws. -/\nstructure GroupVariety where\n  /-- The class of groups forming the variety. -/\n  Mem : (G : Type) → [Group G] → Prop\n  /-- The variety is defined by a set of laws. -/\n  exists_laws :\n    ∃ W : Set (FreeGroup ℕ), ∀ (G : Type) [Group G], Mem G ↔ ∀ w ∈ W, SatisfiesLaw G w\n\nnamespace GroupVariety\n\n@[category API, AMS 20]\ntheorem ext {U V : GroupVariety} (h : ∀ (G : Type) [Group G], U.Mem G ↔ V.Mem G) : U = V := by\n  obtain ⟨U, _⟩ := U\n  obtain ⟨V, _⟩ := V\n  congr\n  funext G _\n  exact propext (h G)\n\n/-- Varieties are ordered by inclusion: `U ≤ V` means that `U` is a subvariety of `V`, i.e.\nevery group in `U` lies in `V`. The subvarieties of `V` are thus the elements of `Set.Iic V`. -/\ninstance : PartialOrder GroupVariety where\n  le U V := ∀ (G : Type) [Group G], U.Mem G → V.Mem G\n  le_refl _ _ _ h := h\n  le_trans _ _ _ h₁ h₂ G _ h := h₂ G (h₁ G h)\n  le_antisymm _ _ h₁ h₂ := ext fun G _ => ⟨h₁ G, h₂ G⟩\n\n@[category API, AMS 20]\ntheorem le_def {U V : GroupVariety} : U ≤ V ↔ ∀ (G : Type) [Group G], U.Mem G → V.Mem G :=\n  Iff.rfl\n\n/-- The variety of all groups, defined by the empty set of laws. -/\ndef all : GroupVariety where\n  Mem _ := True\n  exists_laws := ⟨∅, by simp⟩\n\n@[category test, AMS 20]\ntheorem le_all (V : GroupVariety) : V ≤ all := fun _ _ _ => trivial\n\n/-- The trivial variety, consisting of the trivial groups; it is defined by the law $x = 1$. -/\ndef trivial : GroupVariety where\n  Mem G := Subsingleton G\n  exists_laws := by\n    refine ⟨{FreeGroup.of 0}, fun G _ => ⟨fun _ _ hw => hw ▸ satisfiesLaw_of_subsingleton G _,\n      fun h => ⟨fun a b => ?_⟩⟩⟩\n    have ha := h _ rfl (fun _ => a)\n    have hb := h _ rfl (fun _ => b)\n    simp only [FreeGroup.lift_apply_of] at ha hb\n    exact ha.trans hb.symm\n\n@[category test, AMS 20]\ntheorem trivial_le (V : GroupVariety) : trivial ≤ V := by\n  intro G _ hG\n  haveI : Subsingleton G := hG\n  obtain ⟨W, hW⟩ := V.exists_laws\n  exact (hW G).2 fun w _ => satisfiesLaw_of_subsingleton G w\n\n/-- A word `w` is a *consequence* of the set of words `W` in the variety `V` if every group\nin `V` satisfying all the laws `v = 1`, `v ∈ W`, also satisfies the law `w = 1`. In other\nwords, `w = 1` follows from the identities `W` together with the identities of `V`. -/\ndef Consequence (V : GroupVariety) (W : Set (FreeGroup ℕ)) (w : FreeGroup ℕ) : Prop :=\n  ∀ (G : Type) [Group G], V.Mem G → (∀ v ∈ W, SatisfiesLaw G v) → SatisfiesLaw G w\n\n/-- A system of identities `W` is *independent* in the variety `V` if no `w ∈ W` is a\nconsequence, in `V`, of the remaining identities `W \\ {w}`. -/\ndef IsIndependent (V : GroupVariety) (W : Set (FreeGroup ℕ)) : Prop :=\n  ∀ w ∈ W, ¬ V.Consequence (W \\ {w}) w\n\n/-- A variety of groups is *soluble* if all of its groups are soluble. (Equivalently, it is\ncontained in $\\mathfrak{A}^n$, the variety of soluble groups of derived length at most $n$,\nfor some $n$.) -/\ndef IsSoluble (V : GroupVariety) : Prop :=\n  ∀ (G : Type) [Group G], V.Mem G → IsSolvable G\n\n@[category test, AMS 20]\ntheorem isSoluble_trivial : IsSoluble trivial := fun G _ h =>\n  haveI : Subsingleton G := h\n  ⟨0, Subsingleton.elim _ _⟩\n\nend GroupVariety\n\n/--\nAre the following two properties of a variety of groups $\\mathfrak{V}$ equivalent:\n\n1) $\\mathfrak{V}$ satisfies the minimum condition for subvarieties, i.e. the inclusion order\non the subvarieties of $\\mathfrak{V}$ is well-founded;\n\n2) $\\mathfrak{V}$ has at most countably many subvarieties?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, (WellFoundedLT (Set.Iic V) ↔ Countable (Set.Iic V)) := by\n  sorry\n\n/--\nAre the following two properties of a variety of groups $\\mathfrak{V}$ equivalent:\n\n1) $\\mathfrak{V}$ satisfies the minimum condition for subvarieties, i.e. the inclusion order\non the subvarieties of $\\mathfrak{V}$ is well-founded;\n\n3) $\\mathfrak{V}$ has no infinite independent system of identities, i.e. there is no infinite\nset of words $W$ such that no $w \\in W$ follows from $W \\setminus \\{w\\}$ together with the\nidentities of $\\mathfrak{V}$?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (WellFoundedLT (Set.Iic V) ↔\n        ¬ ∃ W : Set (FreeGroup ℕ), W.Infinite ∧ V.IsIndependent W) := by\n  sorry\n\n/--\nAre the following two properties of a variety of groups $\\mathfrak{V}$ equivalent:\n\n2) $\\mathfrak{V}$ has at most countably many subvarieties;\n\n3) $\\mathfrak{V}$ has no infinite independent system of identities, i.e. there is no infinite\nset of words $W$ such that no $w \\in W$ follows from $W \\setminus \\{w\\}$ together with the\nidentities of $\\mathfrak{V}$?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (Countable (Set.Iic V) ↔\n        ¬ ∃ W : Set (FreeGroup ℕ), W.Infinite ∧ V.IsIndependent W) := by\n  sorry\n\n/--\nAre the following two properties of a soluble variety of groups $\\mathfrak{V}$ equivalent:\n\n1) $\\mathfrak{V}$ satisfies the minimum condition for subvarieties, i.e. the inclusion order\non the subvarieties of $\\mathfrak{V}$ is well-founded;\n\n2) $\\mathfrak{V}$ has at most countably many subvarieties?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (WellFoundedLT (Set.Iic V) ↔ Countable (Set.Iic V)) := by\n  sorry\n\n/--\nAre the following two properties of a soluble variety of groups $\\mathfrak{V}$ equivalent:\n\n1) $\\mathfrak{V}$ satisfies the minimum condition for subvarieties, i.e. the inclusion order\non the subvarieties of $\\mathfrak{V}$ is well-founded;\n\n3) $\\mathfrak{V}$ has no infinite independent system of identities, i.e. there is no infinite\nset of words $W$ such that no $w \\in W$ follows from $W \\setminus \\{w\\}$ together with the\nidentities of $\\mathfrak{V}$?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (WellFoundedLT (Set.Iic V) ↔\n        ¬ ∃ W : Set (FreeGroup ℕ), W.Infinite ∧ V.IsIndependent W) := by\n  sorry\n\n/--\nAre the following two properties of a soluble variety of groups $\\mathfrak{V}$ equivalent:\n\n2) $\\mathfrak{V}$ has at most countably many subvarieties;\n\n3) $\\mathfrak{V}$ has no infinite independent system of identities, i.e. there is no infinite\nset of words $W$ such that no $w \\in W$ follows from $W \\setminus \\{w\\}$ together with the\nidentities of $\\mathfrak{V}$?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (Countable (Set.Iic V) ↔\n        ¬ ∃ W : Set (FreeGroup ℕ), W.Infinite ∧ V.IsIndependent W) := by\n  sorry\n\nend Kourovka.«8.19»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The split into three pairwise equivalences plus their soluble restrictions follows the statement; note that parts.iii is logically implied by parts.i and parts.ii together (and similarly for the soluble variants), but it is posed as a co-equal pairwise question in the table and stated as such.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "A variety of groups is modelled as a class of groups in universe Type (Mem : (G : Type) → [Group G] → Prop) that is defined by a set of laws W ⊆ FreeGroup ℕ; restricting to Type is harmless since a variety is determined by its countably generated (hence Type-level) members.",
+    "Subvarieties of V are the elements of Set.Iic V for the inclusion partial order on GroupVariety; the minimum condition for subvarieties is formalised as WellFoundedLT (Set.Iic V) (every nonempty set of subvarieties has a minimal element, classically equivalent to 'no infinite strictly descending chain').",
+    "'At most countably many subvarieties' is Countable (Set.Iic V); the ext lemma GroupVariety.ext ensures equality of GroupVariety values is equality of classes, so this counts distinct subvarieties.",
+    "Consequence of identities is semantic: w is a consequence of W in V iff every Type-level group in V satisfying W satisfies w. This agrees with the syntactic notion (w lies in the verbal subgroup generated by W and the laws of V) because the relatively free group of the variety V ∧ W lives in Type.",
+    "'Independent system of identities' is read relative to V (no w ∈ W follows from W \\ {w} together with the laws of V), following the decomposition table's notes and the standard usage in the Russian literature; a 'system' is taken to be a Set of words (a family with repetitions is never independent), and 'infinite' is Set.Infinite.",
+    "'Soluble variety' is read literally as 'all groups in the variety are soluble' (IsSolvable); this is equivalent to being a subvariety of some 𝔄^n, as noted in the docstring.",
+    "Each pairwise equivalence is stated as answer(sorry) ↔ ∀ V, (P V ↔ Q V) (with an extra V.IsSoluble → hypothesis for the soluble variants); answer(True) means 'yes, the two properties are equivalent for every (soluble) variety'.",
+    "AMS tags 8 (general algebraic systems / varieties) and 20 (group theory) are used."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FreeGroup.lift (used inside); no existing 'law'/'identity' predicate for groups exists in Mathlib or FormalConjecturesForMathlib (grepped for variety/law/verbal/fully invariant).",
+     "name": "Kourovka.«8.19».SatisfiesLaw",
+     "why_needed": "Mathlib has no notion of a group satisfying a law/identity w = 1 for a word w in the free group on countably many letters. Defined as ∀ f : ℕ → G, FreeGroup.lift f w = 1."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib (no varieties of groups, no verbal or fully invariant subgroups of free groups; only fully invariant submodules in RingTheory/SimpleModule/Isotypic). Alternative representation via fully invariant subgroups of FreeGroup ℕ was considered but rejected as less literal.",
+     "name": "Kourovka.«8.19».GroupVariety",
+     "why_needed": "A variety of groups (class of all groups in Type satisfying some set of laws) does not exist in Mathlib. Structure with Mem : (G : Type) → [Group G] → Prop and a proof that Mem is defined by a set of laws. Comes with an ext lemma (so equality = equality of classes) and a PartialOrder instance by inclusion, so that subvarieties of V are Set.Iic V."
+    },
+    {
+     "closest_existing_considered": "No notion of consequence of identities / verbal closure in Mathlib.",
+     "name": "Kourovka.«8.19».GroupVariety.Consequence",
+     "why_needed": "'w follows from the identities W together with the identities of V': every group in V satisfying all v ∈ W satisfies w. Needed to define independence relative to V."
+    },
+    {
+     "closest_existing_considered": "None (linear-independence notions are unrelated).",
+     "name": "Kourovka.«8.19».GroupVariety.IsIndependent",
+     "why_needed": "'Independent system of identities in V': no w ∈ W is a consequence in V of W \\ {w}."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsSolvable for a single group (used); no notion for classes/varieties.",
+     "name": "Kourovka.«8.19».GroupVariety.IsSoluble",
+     "why_needed": "'Soluble variety': every group in the variety is soluble (IsSolvable). Needed for the soluble variants."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.19».GroupVariety.all / GroupVariety.trivial",
+     "why_needed": "Test-only examples (variety of all groups, trivial variety) used in API/test lemmas checking the bespoke definitions; not used in the problem statements."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.19».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "∀ V : GroupVariety, WellFoundedLT (Set.Iic V) ↔ Countable (Set.Iic V). Subvarieties of V are Set.Iic V under the inclusion order; WellFoundedLT is well-foundedness of strict inclusion (minimum condition); Countable = at most countably many."
+    },
+    "kourovka.«8.19».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "∀ V, WellFoundedLT (Set.Iic V) ↔ ¬ ∃ W : Set (FreeGroup ℕ), W.Infinite ∧ V.IsIndependent W, with independence taken modulo the laws of V (no w ∈ W is a consequence of W \\ {w} together with the identities of V), as the table's notes require."
+    },
+    "kourovka.«8.19».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "∀ V, Countable (Set.Iic V) ↔ ¬ ∃ W, W.Infinite ∧ V.IsIndependent W; same primitives as parts i and ii."
+    },
+    "kourovka.«8.19».variants.soluble.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.i with the hypothesis V.IsSoluble (every group in V is IsSolvable)."
+    },
+    "kourovka.«8.19».variants.soluble.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.ii restricted to soluble varieties."
+    },
+    "kourovka.«8.19».variants.soluble.parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.iii restricted to soluble varieties."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.19».parts.i": "/--\nAre the following two properties of a variety of groups $\\mathfrak{V}$ equivalent:\n\n1) $\\mathfrak{V}$ satisfies the minimum condition for subvarieties, i.e. the inclusion order\non the subvarieties of $\\mathfrak{V}$ is well-founded;\n\n2) $\\mathfrak{V}$ has at most countably many subvarieties?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, (WellFoundedLT (Set.Iic V) ↔ Countable (Set.Iic V)) := by\n  sorry",
+    "kourovka.«8.19».parts.ii": "/--\nAre the following two properties of a variety of groups $\\mathfrak{V}$ equivalent:\n\n1) $\\mathfrak{V}$ satisfies the minimum condition for subvarieties, i.e. the inclusion order\non the subvarieties of $\\mathfrak{V}$ is well-founded;\n\n3) $\\mathfrak{V}$ has no infinite independent system of identities, i.e. there is no infinite\nset of words $W$ such that no $w \\in W$ follows from $W \\setminus \\{w\\}$ together with the\nidentities of $\\mathfrak{V}$?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (WellFoundedLT (Set.Iic V) ↔\n        ¬ ∃ W : Set (FreeGroup ℕ), W.Infinite ∧ V.IsIndependent W) := by\n  sorry",
+    "kourovka.«8.19».parts.iii": "/--\nAre the following two properties of a variety of groups $\\mathfrak{V}$ equivalent:\n\n2) $\\mathfrak{V}$ has at most countably many subvarieties;\n\n3) $\\mathfrak{V}$ has no infinite independent system of identities, i.e. there is no infinite\nset of words $W$ such that no $w \\in W$ follows from $W \\setminus \\{w\\}$ together with the\nidentities of $\\mathfrak{V}$?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (Countable (Set.Iic V) ↔\n        ¬ ∃ W : Set (FreeGroup ℕ), W.Infinite ∧ V.IsIndependent W) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.i": "/--\nAre the following two properties of a soluble variety of groups $\\mathfrak{V}$ equivalent:\n\n1) $\\mathfrak{V}$ satisfies the minimum condition for subvarieties, i.e. the inclusion order\non the subvarieties of $\\mathfrak{V}$ is well-founded;\n\n2) $\\mathfrak{V}$ has at most countably many subvarieties?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (WellFoundedLT (Set.Iic V) ↔ Countable (Set.Iic V)) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.ii": "/--\nAre the following two properties of a soluble variety of groups $\\mathfrak{V}$ equivalent:\n\n1) $\\mathfrak{V}$ satisfies the minimum condition for subvarieties, i.e. the inclusion order\non the subvarieties of $\\mathfrak{V}$ is well-founded;\n\n3) $\\mathfrak{V}$ has no infinite independent system of identities, i.e. there is no infinite\nset of words $W$ such that no $w \\in W$ follows from $W \\setminus \\{w\\}$ together with the\nidentities of $\\mathfrak{V}$?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (WellFoundedLT (Set.Iic V) ↔\n        ¬ ∃ W : Set (FreeGroup ℕ), W.Infinite ∧ V.IsIndependent W) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.iii": "/--\nAre the following two properties of a soluble variety of groups $\\mathfrak{V}$ equivalent:\n\n2) $\\mathfrak{V}$ has at most countably many subvarieties;\n\n3) $\\mathfrak{V}$ has no infinite independent system of identities, i.e. there is no infinite\nset of words $W$ such that no $w \\in W$ follows from $W \\setminus \\{w\\}$ together with the\nidentities of $\\mathfrak{V}$?\n-/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (Countable (Set.Iic V) ↔\n        ¬ ∃ W : Set (FreeGroup ℕ), W.Infinite ∧ V.IsIndependent W) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.19\n\nby Yu. G. Kleiman\n\nWhich of the following properties of (soluble) varieties of groups are equivalent to one\nanother:\n\n1) to satisfy the minimum condition for subvarieties;\n\n2) to have at most countably many subvarieties;\n\n3) to have no infinite independent system of identities?\n\nAn *identity* (law) is a word $w$ in the free group on the variables $x_0, x_1, \\dots$; a group\n$G$ *satisfies* $w$ if $w$ evaluates to $1$ under every substitution of elements of $G$ for the\nvariables. A *variety of groups* is the class of all groups satisfying a given set of\nidentities, and a *subvariety* of a variety $\\mathfrak{V}$ is a variety contained in\n$\\mathfrak{V}$. A set $S$ of identities is *independent in* $\\mathfrak{V}$ if no $w \\in S$ is a\nconsequence of $S \\setminus \\{w\\}$ modulo the identities of $\\mathfrak{V}$, i.e. for every\n$w \\in S$ some group in $\\mathfrak{V}$ satisfies all identities of $S \\setminus \\{w\\}$ but\nnot $w$. A variety is *soluble* if all of its groups are soluble.\n\nEvery variety is determined by its groups of countable cardinality (it is determined by its\nrelatively free group of countable rank), so here a variety is recorded by the class of its\ngroups in `Type`.\n\nThe question is split into the three pairwise equivalences 1) ⇔ 2), 1) ⇔ 3) and 2) ⇔ 3),\neach asked for all varieties of groups and, as a variant, for all soluble varieties of groups.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.19»\n\n/-- A word `w` in the free group on the variables `x₀, x₁, …` is a *law* (identity) of the\ngroup `G` if it evaluates to `1` under every substitution of elements of `G` for the\nvariables. -/\ndef IsLaw (w : FreeGroup ℕ) (G : Type*) [Group G] : Prop :=\n  ∀ f : ℕ → G, FreeGroup.lift f w = 1\n\n@[category test, AMS 20]\ntheorem isLaw_one (G : Type*) [Group G] : IsLaw 1 G :=\n  fun _ => map_one _\n\n@[category test, AMS 20]\ntheorem isLaw_of_subsingleton (w : FreeGroup ℕ) (G : Type*) [Group G] [Subsingleton G] :\n    IsLaw w G :=\n  fun _ => Subsingleton.elim _ _\n\n/-- A *variety of groups*: the class of all groups satisfying some set of laws. -/\nstructure GroupVariety where\n  /-- The groups belonging to the variety. -/\n  Mem : ∀ (G : Type) [Group G], Prop\n  /-- The variety is the class of all groups satisfying some set `W` of laws. -/\n  exists_laws :\n    ∃ W : Set (FreeGroup ℕ), ∀ (G : Type) [Group G], Mem G ↔ ∀ w ∈ W, IsLaw w G\n\nnamespace GroupVariety\n\n/-- Varieties are ordered by inclusion: `U ≤ V` means that `U` is a subvariety of `V`. -/\ninstance : PartialOrder GroupVariety where\n  le U V := ∀ (G : Type) [Group G], U.Mem G → V.Mem G\n  le_refl _ _ _ := id\n  le_trans _ _ _ h₁ h₂ G _ hG := h₂ G (h₁ G hG)\n  le_antisymm U V h₁ h₂ := by\n    cases U\n    cases V\n    congr\n    funext G _\n    exact propext ⟨h₁ G, h₂ G⟩\n\n@[category API, AMS 20]\ntheorem le_def (U V : GroupVariety) : U ≤ V ↔ ∀ (G : Type) [Group G], U.Mem G → V.Mem G :=\n  Iff.rfl\n\n/-- The variety of all groups. -/\ninstance : OrderTop GroupVariety where\n  top := { Mem := fun _ _ => True, exists_laws := ⟨∅, fun _ _ => by simp⟩ }\n  le_top _ _ _ _ := trivial\n\n@[category API, AMS 20]\ntheorem mem_of_subsingleton (V : GroupVariety) (G : Type) [Group G] [Subsingleton G] :\n    V.Mem G := by\n  obtain ⟨W, hW⟩ := V.exists_laws\n  exact (hW G).2 fun w _ => isLaw_of_subsingleton w G\n\n/-- The word `w` is a *consequence of `S` modulo `V`*: every group in `V` in which all words\nof `S` are laws also has `w` as a law. -/\ndef IsConsequence (V : GroupVariety) (S : Set (FreeGroup ℕ)) (w : FreeGroup ℕ) : Prop :=\n  ∀ (G : Type) [Group G], V.Mem G → (∀ s ∈ S, IsLaw s G) → IsLaw w G\n\n/-- A set of words `S` is an *independent system of identities in `V`* if no `w ∈ S` is a\nconsequence of the remaining words `S \\ {w}` modulo `V`. -/\ndef IsIndependent (V : GroupVariety) (S : Set (FreeGroup ℕ)) : Prop :=\n  ∀ w ∈ S, ¬ V.IsConsequence (S \\ {w}) w\n\n@[category test, AMS 20]\ntheorem isIndependent_empty (V : GroupVariety) : V.IsIndependent ∅ :=\n  fun _ hw => hw.elim\n\n@[category API, AMS 20]\ntheorem IsIndependent.mono {V : GroupVariety} {S T : Set (FreeGroup ℕ)} (hST : S ⊆ T)\n    (hT : V.IsIndependent T) : V.IsIndependent S := by\n  intro w hw h\n  refine hT w (hST hw) fun G _ hG hS => h G hG fun s hs => ?_\n  exact hS s ⟨hST hs.1, hs.2⟩\n\n/-- Property 1) of Problem 8.19: `V` satisfies the *minimum condition for subvarieties*, i.e.\nevery nonempty set of subvarieties of `V` has a minimal element (equivalently, there is no\ninfinite strictly descending chain of subvarieties of `V`). -/\ndef HasMinConditionOnSubvarieties (V : GroupVariety) : Prop :=\n  WellFoundedLT (Set.Iic V)\n\n/-- Property 2) of Problem 8.19: `V` has at most countably many subvarieties. -/\ndef HasCountablyManySubvarieties (V : GroupVariety) : Prop :=\n  (Set.Iic V).Countable\n\n/-- Property 3) of Problem 8.19: `V` has no infinite independent system of identities, i.e.\nthere is no infinite set of words that is independent in `V`. -/\ndef HasNoInfiniteIndependentSystem (V : GroupVariety) : Prop :=\n  ¬ ∃ S : Set (FreeGroup ℕ), S.Infinite ∧ V.IsIndependent S\n\n/-- A variety of groups is *soluble* if all of its groups are soluble. -/\ndef IsSoluble (V : GroupVariety) : Prop :=\n  ∀ (G : Type) [Group G], V.Mem G → IsSolvable G\n\nend GroupVariety\n\n/-- Problem 8.19, properties 1) and 2): does a variety of groups satisfy the minimum condition\nfor subvarieties if and only if it has at most countably many subvarieties? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (V.HasMinConditionOnSubvarieties ↔ V.HasCountablyManySubvarieties) := by\n  sorry\n\n/-- Problem 8.19, properties 1) and 3): does a variety of groups satisfy the minimum condition\nfor subvarieties if and only if it has no infinite independent system of identities? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (V.HasMinConditionOnSubvarieties ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry\n\n/-- Problem 8.19, properties 2) and 3): does a variety of groups have at most countably many\nsubvarieties if and only if it has no infinite independent system of identities? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (V.HasCountablyManySubvarieties ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry\n\n/-- Problem 8.19 for soluble varieties, properties 1) and 2): does a soluble variety of groups\nsatisfy the minimum condition for subvarieties if and only if it has at most countably many\nsubvarieties? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (V.HasMinConditionOnSubvarieties ↔ V.HasCountablyManySubvarieties) := by\n  sorry\n\n/-- Problem 8.19 for soluble varieties, properties 1) and 3): does a soluble variety of groups\nsatisfy the minimum condition for subvarieties if and only if it has no infinite independent\nsystem of identities? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (V.HasMinConditionOnSubvarieties ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry\n\n/-- Problem 8.19 for soluble varieties, properties 2) and 3): does a soluble variety of groups\nhave at most countably many subvarieties if and only if it has no infinite independent system\nof identities? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (V.HasCountablyManySubvarieties ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry\n\nend Kourovka.«8.19»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "Minor: the note on parts.iii says 'neither direction is known'. Under the (required) relative reading of independence, 2) ⇒ 3) is immediate: an infinite independent system S in V yields pairwise distinct subvarieties V ∧ var(T) for all T ⊆ S, hence 2^ℵ₀ subvarieties. Likewise 1) ⇒ 2) and 1) ⇒ 3) are standard, so the open content is 3) ⇒ 1) (which implies 2) ⇒ 1) and 3) ⇒ 2)). This does not affect the formalization, which states each pairwise equivalence exactly as posed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "A variety of groups is represented by the class of its members in universe `Type` (Type 0): `Mem : ∀ (G : Type) [Group G], Prop` together with `∃ W : Set (FreeGroup ℕ), ∀ G, Mem G ↔ ∀ w ∈ W, IsLaw w G`. This loses nothing: a variety is determined by its relatively free group of countable rank, which lives in Type 0, so the lattice of these objects is isomorphic to the lattice of varieties of groups, and 'w follows from S modulo V' quantified over Type-0 groups agrees with the usual (syntactic) consequence relation.",
+    "Identities are words in `FreeGroup ℕ` (countably many variables x₀, x₁, …), the standard setting; an identity u = v corresponds to the word u v⁻¹.",
+    "'Independent system of identities' is read relative to V (as the decomposition notes require): S is independent in V iff no w ∈ S is a consequence of (S \\ {w}) together with the laws of V. This is the only reading under which the three properties are comparable; the absolute reading (independent subsets of the laws of V, or independent bases of V) would concern supervarieties and make 1) ⇔ 3) trivially false.",
+    "'Minimum condition for subvarieties' is formalized as `WellFoundedLT (Set.Iic V)` (every nonempty set of subvarieties has a minimal element; classically equivalent to the absence of infinite strictly descending chains). Subvarieties of V are `Set.Iic V`, which includes V itself and the trivial variety.",
+    "'At most countably many subvarieties' is `(Set.Iic V).Countable` (finite or countably infinite).",
+    "'Infinite independent system' uses `Set.Infinite`; since FreeGroup ℕ is countable this is the same as countably infinite, and subsets of independent systems are independent (proved as `IsIndependent.mono`).",
+    "A soluble variety is one all of whose groups are soluble (`IsSolvable`); this is equivalent to being a subvariety of some 𝔄^n.",
+    "Because the deliverable is a single problem file, the reusable definitions (IsLaw, GroupVariety, …) are placed in the problem file rather than in FormalConjecturesForMathlib; a reviewer may wish to move them. AMS tags used: 8 (general algebraic systems / varieties) and 20 (group theory)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FreeGroup.lift (used); nothing in Mathlib.GroupTheory or Mathlib.ModelTheory captures equational laws of groups.",
+     "name": "Kourovka.«8.19».IsLaw",
+     "why_needed": "Mathlib has no notion of a group identity/law. Defined as: w : FreeGroup ℕ is a law of G iff FreeGroup.lift f w = 1 for every f : ℕ → G."
+    },
+    {
+     "closest_existing_considered": "Mathlib.ModelTheory (Language/Theory/ModelSet) — it has no equational classes and would be far less transparent; Birkhoff-style HSP-closed classes would need a Birkhoff theorem argument for faithfulness. Searched Mathlib and FormalConjecturesForMathlib for 'variet', 'IsLaw', 'equational'.",
+     "name": "Kourovka.«8.19».GroupVariety",
+     "why_needed": "Mathlib has no notion of a variety of groups (or equational class). Defined as a structure: a predicate Mem on groups in Type together with a proof that Mem is the class of all groups satisfying some set W of laws (H. Neumann's definition). Comes with a PartialOrder (inclusion, so U ≤ V means U is a subvariety of V) and an OrderTop instance (the variety of all groups), plus API lemmas le_def, mem_of_subsingleton."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib.",
+     "name": "Kourovka.«8.19».GroupVariety.IsConsequence",
+     "why_needed": "'w follows from S modulo V': every group in V in which all words of S are laws has w as a law. Needed to define independence relative to V."
+    },
+    {
+     "closest_existing_considered": "LinearIndependent/AlgebraicIndependent are unrelated; nothing for equational independence.",
+     "name": "Kourovka.«8.19».GroupVariety.IsIndependent",
+     "why_needed": "A set S of words is an independent system of identities in V iff no w ∈ S is a consequence of S \\ {w} modulo V. API lemma IsIndependent.mono (subsets of independent systems are independent) and test isIndependent_empty included."
+    },
+    {
+     "closest_existing_considered": "WellFoundedLT (used directly inside the def).",
+     "name": "Kourovka.«8.19».GroupVariety.HasMinConditionOnSubvarieties",
+     "why_needed": "Property 1): WellFoundedLT (Set.Iic V), i.e. every nonempty set of subvarieties has a minimal element."
+    },
+    {
+     "closest_existing_considered": "Set.Countable (used directly).",
+     "name": "Kourovka.«8.19».GroupVariety.HasCountablyManySubvarieties",
+     "why_needed": "Property 2): (Set.Iic V).Countable."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.19».GroupVariety.HasNoInfiniteIndependentSystem",
+     "why_needed": "Property 3): ¬ ∃ S, S.Infinite ∧ V.IsIndependent S."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsSolvable (used for the member groups); no notion of a soluble class/variety exists.",
+     "name": "Kourovka.«8.19».GroupVariety.IsSoluble",
+     "why_needed": "A soluble variety: every group in V is IsSolvable. Needed for the '(soluble)' variants."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.19».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ V : GroupVariety, (WellFoundedLT (Set.Iic V) ↔ (Set.Iic V).Countable), with GroupVariety = class of all groups (in Type) satisfying some set of laws, ordered by inclusion."
+    },
+    "kourovka.«8.19».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ V, (min condition on Set.Iic V ↔ ¬∃ infinite S ⊆ FreeGroup ℕ independent in V), where S is independent in V iff for each w ∈ S some group of V satisfies all of S \\ {w} but not w (independence modulo the laws of V, as required by the notes)."
+    },
+    "kourovka.«8.19».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ V, ((Set.Iic V).Countable ↔ V.HasNoInfiniteIndependentSystem), as the co-equal pairwise equivalence posed."
+    },
+    "kourovka.«8.19».variants.soluble.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.i with hypothesis V.IsSoluble (every group in V is IsSolvable)."
+    },
+    "kourovka.«8.19».variants.soluble.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.ii restricted to soluble varieties."
+    },
+    "kourovka.«8.19».variants.soluble.parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.iii restricted to soluble varieties."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.19».parts.i": "/-- Problem 8.19, properties 1) and 2): does a variety of groups satisfy the minimum condition\nfor subvarieties if and only if it has at most countably many subvarieties? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (V.HasMinConditionOnSubvarieties ↔ V.HasCountablyManySubvarieties) := by\n  sorry",
+    "kourovka.«8.19».parts.ii": "/-- Problem 8.19, properties 1) and 3): does a variety of groups satisfy the minimum condition\nfor subvarieties if and only if it has no infinite independent system of identities? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (V.HasMinConditionOnSubvarieties ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry",
+    "kourovka.«8.19».parts.iii": "/-- Problem 8.19, properties 2) and 3): does a variety of groups have at most countably many\nsubvarieties if and only if it has no infinite independent system of identities? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (V.HasCountablyManySubvarieties ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.i": "/-- Problem 8.19 for soluble varieties, properties 1) and 2): does a soluble variety of groups\nsatisfy the minimum condition for subvarieties if and only if it has at most countably many\nsubvarieties? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (V.HasMinConditionOnSubvarieties ↔ V.HasCountablyManySubvarieties) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.ii": "/-- Problem 8.19 for soluble varieties, properties 1) and 3): does a soluble variety of groups\nsatisfy the minimum condition for subvarieties if and only if it has no infinite independent\nsystem of identities? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (V.HasMinConditionOnSubvarieties ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.iii": "/-- Problem 8.19 for soluble varieties, properties 2) and 3): does a soluble variety of groups\nhave at most countably many subvarieties if and only if it has no infinite independent system\nof identities? -/\n@[category research open, AMS 8 20]\ntheorem kourovka.«8.19».variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (V.HasCountablyManySubvarieties ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.19\n\nby Yu. G. Kleiman\n\nWhich of the following properties of (soluble) varieties of groups are equivalent to one\nanother:\n\n1) to satisfy the minimum condition for subvarieties;\n\n2) to have at most countably many subvarieties;\n\n3) to have no infinite independent system of identities?\n\nHere a *variety of groups* is the class of all groups satisfying a given set of laws\n(identities). A law is a word $w$ in the free group on the letters $x_0, x_1, x_2, \\dots$,\nand $w$ is a law of a group $G$ if $w$ evaluates to $1$ under every substitution of elements\nof $G$ for the letters. A *subvariety* of a variety $\\mathfrak{V}$ is a variety contained in\n$\\mathfrak{V}$. A system of identities is *independent* modulo $\\mathfrak{V}$ if no word in it\nis a consequence, modulo the laws of $\\mathfrak{V}$, of the remaining words of the system.\nA variety is *soluble* if all of its groups are soluble.\n\nThe question is posed both for all varieties of groups and for soluble varieties of groups.\nFor each of the three pairs of properties, the corresponding statement asks whether the two\nproperties are equivalent for every (soluble) variety.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.19»\n\nuniverse u\n\n/-- A word $w$ in the free group on the letters $x_0, x_1, x_2, \\dots$ is a *law*\n(identity) of the group $G$ if $w$ evaluates to $1$ under every substitution of elements of\n$G$ for the letters, i.e. under every homomorphism from the free group to $G$. -/\ndef IsLaw (G : Type*) [Group G] (w : FreeGroup ℕ) : Prop :=\n  ∀ φ : FreeGroup ℕ →* G, φ w = 1\n\n/-- Every word is a law of the trivial group. -/\n@[category test, AMS 20]\nlemma isLaw_of_subsingleton (G : Type*) [Group G] [Subsingleton G] (w : FreeGroup ℕ) :\n    IsLaw G w :=\n  fun _ => Subsingleton.elim _ _\n\n/-- A *variety of groups* is the class of all groups satisfying some given set of laws. -/\n@[ext]\nstructure GroupVariety where\n  /-- The class of groups belonging to the variety. -/\n  Mem : (G : Type u) → [Group G] → Prop\n  /-- The class is the class of all groups satisfying some set `W` of laws. -/\n  exists_laws :\n    ∃ W : Set (FreeGroup ℕ), ∀ (G : Type u) [Group G], Mem G ↔ ∀ w ∈ W, IsLaw G w\n\nnamespace GroupVariety\n\n/-- Varieties are ordered by inclusion of the underlying classes of groups. A variety\n`W` with `W ≤ V` is a *subvariety* of `V`. -/\ninstance : PartialOrder GroupVariety.{u} where\n  le V W := ∀ (G : Type u) [Group G], V.Mem G → W.Mem G\n  le_refl _ _ _ h := h\n  le_trans _ _ _ h₁ h₂ G _ h := h₂ G (h₁ G h)\n  le_antisymm _ _ h₁ h₂ :=\n    GroupVariety.ext (funext fun G => funext fun inst => propext ⟨@h₁ G inst, @h₂ G inst⟩)\n\n@[category API, AMS 20]\nlemma le_def (V W : GroupVariety.{u}) :\n    V ≤ W ↔ ∀ (G : Type u) [Group G], V.Mem G → W.Mem G :=\n  Iff.rfl\n\n/-- The class of all groups is a variety (defined by the empty set of laws). -/\n@[category test, AMS 20]\nlemma exists_mem_all : ∃ V : GroupVariety.{u}, ∀ (G : Type u) [Group G], V.Mem G :=\n  ⟨⟨fun _ _ => True, ∅, fun _ _ => by simp⟩, fun _ _ => trivial⟩\n\n/-- The class of abelian groups is a variety (defined by the single law $[x_0, x_1]$). -/\n@[category test, AMS 20]\nlemma exists_mem_iff_isMulCommutative :\n    ∃ V : GroupVariety.{u}, ∀ (G : Type u) [Group G], V.Mem G ↔ IsMulCommutative G := by\n  refine ⟨⟨fun G _ => IsMulCommutative G, {⁅FreeGroup.of 0, FreeGroup.of 1⁆},\n    fun G _ => ?_⟩, fun _ _ => Iff.rfl⟩\n  simp only [Set.mem_singleton_iff, forall_eq]\n  constructor\n  · intro h φ\n    rw [map_commutatorElement, commutatorElement_eq_one_iff_mul_comm]\n    exact mul_comm _ _\n  · intro h\n    refine ⟨⟨fun a b => ?_⟩⟩\n    have := h (FreeGroup.lift fun n => if n = 0 then a else b)\n    rw [map_commutatorElement, FreeGroup.lift_apply_of, FreeGroup.lift_apply_of,\n      commutatorElement_eq_one_iff_mul_comm] at this\n    simpa using this\n\n/-- A variety `V` satisfies the *minimum condition for subvarieties* if there is no infinite\nstrictly descending chain $\\mathfrak{V}_0 > \\mathfrak{V}_1 > \\mathfrak{V}_2 > \\dots$ of\nsubvarieties of `V`; equivalently, every nonempty set of subvarieties of `V` has a minimal\nelement. -/\ndef SatisfiesMinCondition (V : GroupVariety.{u}) : Prop :=\n  ∀ f : ℕ → GroupVariety.{u}, (∀ n, f n ≤ V) → ¬ StrictAnti f\n\n/-- A variety `V` has *at most countably many subvarieties* if the set of varieties `W ≤ V`\nis countable. -/\ndef HasCountablyManySubvarieties (V : GroupVariety.{u}) : Prop :=\n  (Set.Iic V).Countable\n\n/-- The word `w` is a *consequence* of the set of words `S` modulo the variety `V` if every\ngroup in `V` in which all words of `S` are laws also has `w` as a law. -/\ndef IsConsequence (V : GroupVariety.{u}) (S : Set (FreeGroup ℕ)) (w : FreeGroup ℕ) : Prop :=\n  ∀ (G : Type u) [Group G], V.Mem G → (∀ s ∈ S, IsLaw G s) → IsLaw G w\n\n/-- A set of words `S` is an *independent system of identities* modulo the variety `V` if no\nword of `S` is a consequence, modulo `V`, of the remaining words of `S`. -/\ndef IsIndependentSystem (V : GroupVariety.{u}) (S : Set (FreeGroup ℕ)) : Prop :=\n  ∀ w ∈ S, ¬ V.IsConsequence (S \\ {w}) w\n\n/-- A variety `V` has *no infinite independent system of identities* if every system of\nidentities that is independent modulo `V` is finite. -/\ndef HasNoInfiniteIndependentSystem (V : GroupVariety.{u}) : Prop :=\n  ∀ S : Set (FreeGroup ℕ), V.IsIndependentSystem S → S.Finite\n\n/-- A variety of groups is *soluble* if every group in it is soluble. -/\ndef IsSoluble (V : GroupVariety.{u}) : Prop :=\n  ∀ (G : Type u) [Group G], V.Mem G → IsSolvable G\n\nend GroupVariety\n\n/--\nIs it true that a variety of groups satisfies the minimum condition for subvarieties if and\nonly if it has at most countably many subvarieties?\n\nThis is the equivalence of properties 1) and 2) of Problem 8.19, for all varieties of groups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety.{u}, V.SatisfiesMinCondition ↔ V.HasCountablyManySubvarieties := by\n  sorry\n\n/--\nIs it true that a variety of groups satisfies the minimum condition for subvarieties if and\nonly if it has no infinite independent system of identities (independence being taken modulo\nthe laws of the variety)?\n\nThis is the equivalence of properties 1) and 3) of Problem 8.19, for all varieties of groups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety.{u}, V.SatisfiesMinCondition ↔ V.HasNoInfiniteIndependentSystem := by\n  sorry\n\n/--\nIs it true that a variety of groups has at most countably many subvarieties if and only if it\nhas no infinite independent system of identities (independence being taken modulo the laws of\nthe variety)?\n\nThis is the equivalence of properties 2) and 3) of Problem 8.19, for all varieties of groups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety.{u},\n      V.HasCountablyManySubvarieties ↔ V.HasNoInfiniteIndependentSystem := by\n  sorry\n\n/--\nIs it true that a soluble variety of groups satisfies the minimum condition for subvarieties\nif and only if it has at most countably many subvarieties?\n\nThis is the equivalence of properties 1) and 2) of Problem 8.19, for soluble varieties of\ngroups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety.{u}, V.IsSoluble →\n      (V.SatisfiesMinCondition ↔ V.HasCountablyManySubvarieties) := by\n  sorry\n\n/--\nIs it true that a soluble variety of groups satisfies the minimum condition for subvarieties\nif and only if it has no infinite independent system of identities (independence being taken\nmodulo the laws of the variety)?\n\nThis is the equivalence of properties 1) and 3) of Problem 8.19, for soluble varieties of\ngroups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety.{u}, V.IsSoluble →\n      (V.SatisfiesMinCondition ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry\n\n/--\nIs it true that a soluble variety of groups has at most countably many subvarieties if and\nonly if it has no infinite independent system of identities (independence being taken modulo\nthe laws of the variety)?\n\nThis is the equivalence of properties 2) and 3) of Problem 8.19, for soluble varieties of\ngroups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety.{u}, V.IsSoluble →\n      (V.HasCountablyManySubvarieties ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry\n\nend Kourovka.«8.19»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "Only a remark on the notes, not on the slots themselves: the note for parts.iii says \"neither direction is known\", but 2)⇒3) is immediate: if S is an infinite system independent modulo V then the subvarieties {G ∈ V | all words of T are laws} for T ⊆ S are pairwise distinct, giving 2^ℵ₀ subvarieties. Thus the known implications are 1)⇒2)⇒3) and the open content is 3)⇒1) (equivalently 2)⇒1) together with 3)⇒2)). This does not affect the formalization, which states each equivalence exactly as posed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "A variety of groups is defined equationally: a class of groups in `Type u` equal to the class of all groups satisfying some set of laws in `FreeGroup ℕ`. This is the textbook definition (e.g. Robinson §2.3); by Birkhoff's theorem it is equivalent to closure under subgroups, quotients and cartesian products.",
+    "Laws are words in the free group on countably many letters `FreeGroup ℕ`; every word involves finitely many letters, so this covers all identities in finitely many variables.",
+    "The definitions and theorems are universe polymorphic (`GroupVariety.{u}`), so each theorem is a family indexed by the universe u. The lattice of varieties is the same in every universe (it is anti-isomorphic to the lattice of fully invariant subgroups of `FreeGroup ℕ`, each variety being determined by the small relatively free group `FreeGroup ℕ ⧸ laws`), so the choice of universe does not change the mathematical claim.",
+    "The minimum condition for subvarieties is stated as the non-existence of an infinite strictly descending chain `f : ℕ → GroupVariety` of subvarieties of V (`¬ StrictAnti f`); classically this is equivalent to every nonempty set of subvarieties having a minimal element.",
+    "'At most countably many subvarieties' is `(Set.Iic V).Countable` (Mathlib's `Set.Countable` means at most countable).",
+    "'Independent system of identities' is taken relative to V, as in the decomposition notes: a set S of words such that no w ∈ S is a consequence modulo V of S \\ {w}, where 'consequence modulo V' is semantic (every group of V satisfying S \\ {w} satisfies w). This is equivalent to the syntactic notion (w in the fully invariant closure of (S \\ {w}) ∪ laws(V)). Laws of V are automatically consequences of the empty set, so they can never belong to an independent system. With this reading 1)⇒2)⇒3) are the known implications and the converses are the open content.",
+    "A soluble variety is one all of whose groups are soluble (`∀ G, V.Mem G → IsSolvable G`); this is equivalent to being a subvariety of some 𝔄^n since the countable-rank relatively free group of V lies in V.",
+    "Each pairwise equivalence is quantified as `answer(sorry) ↔ ∀ V, (P V ↔ Q V)`, so `answer(True)` means the two properties are equivalent for every (soluble) variety and `answer(False)` means some (soluble) variety separates them.",
+    "Test lemmas (`isLaw_of_subsingleton`, `exists_mem_all`, `exists_mem_iff_isMulCommutative`) and an API lemma `le_def` were added, all fully proved, to check the bespoke definitions (the trivial group, the variety of all groups, and the variety of abelian groups defined by the law [x₀, x₁])."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `FirstOrder.Language` theories/models (too heavy and unreadable for group words); `FreeGroup.lift` is used inside the definition; nothing else in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«8.19».IsLaw",
+     "why_needed": "Mathlib has no notion of a group law/identity. `IsLaw G w` says the word `w : FreeGroup ℕ` (letters x₀, x₁, …) maps to 1 under every homomorphism `FreeGroup ℕ →* G`, i.e. under every substitution."
+    },
+    {
+     "closest_existing_considered": "Searched Mathlib and FormalConjecturesForMathlib for 'variet', 'law', 'verbal', 'fully invariant': only algebraic varieties and module `IsFullyInvariant` exist; neither applies.",
+     "name": "Kourovka.«8.19».GroupVariety (structure, with `Mem`, `exists_laws`, `@[ext]`, and a `PartialOrder` instance by inclusion of classes)",
+     "why_needed": "No notion of a variety of groups exists in Mathlib or the repo. Defined as a class of groups (in `Type u`) that is the class of all groups satisfying some set of laws (the standard equational definition, equivalent to Birkhoff's HSP-closed classes). The partial order by inclusion gives the notion of subvariety (`W ≤ V`)."
+    },
+    {
+     "closest_existing_considered": "`WellFoundedLT (Set.Iic V)` would be equivalent; the explicit chain formulation was chosen for readability.",
+     "name": "Kourovka.«8.19».GroupVariety.SatisfiesMinCondition",
+     "why_needed": "Minimum condition for subvarieties: no strictly antitone sequence `ℕ → GroupVariety` of subvarieties of V (classically equivalent to every nonempty set of subvarieties having a minimal element)."
+    },
+    {
+     "closest_existing_considered": "`Set.Countable` (used directly); wrapped in a named definition for readability.",
+     "name": "Kourovka.«8.19».GroupVariety.HasCountablyManySubvarieties",
+     "why_needed": "`(Set.Iic V).Countable`: the set of subvarieties of V is at most countable."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (would correspond to membership in the fully invariant closure of S ∪ laws(V) in FreeGroup ℕ, which also does not exist).",
+     "name": "Kourovka.«8.19».GroupVariety.IsConsequence",
+     "why_needed": "`w` is a consequence of `S` modulo `V`: every group in V in which all words of S are laws has w as a law. Needed to define independence relative to V."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `LinearIndependent`/`iSupIndep` are not applicable to sets of group words.",
+     "name": "Kourovka.«8.19».GroupVariety.IsIndependentSystem",
+     "why_needed": "A set of words S is independent modulo V if no w ∈ S is a consequence modulo V of S \\ {w}."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«8.19».GroupVariety.HasNoInfiniteIndependentSystem",
+     "why_needed": "Property 3): every system of identities independent modulo V is finite."
+    },
+    {
+     "closest_existing_considered": "Mathlib `IsSolvable` (used for the individual groups).",
+     "name": "Kourovka.«8.19».GroupVariety.IsSoluble",
+     "why_needed": "A soluble variety: every group in V is soluble (`IsSolvable`). Equivalent to being contained in some 𝔄^n."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.19».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ V : GroupVariety.{u}, V.SatisfiesMinCondition ↔ V.HasCountablyManySubvarieties`, using bespoke definitions of variety of groups, minimum condition (no infinite strictly descending chain of subvarieties) and countability of the set `Set.Iic V` of subvarieties."
+    },
+    "kourovka.«8.19».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ V, V.SatisfiesMinCondition ↔ V.HasNoInfiniteIndependentSystem`; independence is taken modulo V (a word of the system is not a law of every group of V satisfying the other words), matching the decomposition notes."
+    },
+    "kourovka.«8.19».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ V, V.HasCountablyManySubvarieties ↔ V.HasNoInfiniteIndependentSystem`, with the same bespoke definitions."
+    },
+    "kourovka.«8.19».variants.soluble.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.i with the hypothesis `V.IsSoluble` (every group in V is soluble, via Mathlib's `IsSolvable`)."
+    },
+    "kourovka.«8.19».variants.soluble.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.ii restricted to soluble varieties via `V.IsSoluble →`."
+    },
+    "kourovka.«8.19».variants.soluble.parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.iii restricted to soluble varieties via `V.IsSoluble →`."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.19».parts.i": "/--\nIs it true that a variety of groups satisfies the minimum condition for subvarieties if and\nonly if it has at most countably many subvarieties?\n\nThis is the equivalence of properties 1) and 2) of Problem 8.19, for all varieties of groups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety.{u}, V.SatisfiesMinCondition ↔ V.HasCountablyManySubvarieties := by\n  sorry",
+    "kourovka.«8.19».parts.ii": "/--\nIs it true that a variety of groups satisfies the minimum condition for subvarieties if and\nonly if it has no infinite independent system of identities (independence being taken modulo\nthe laws of the variety)?\n\nThis is the equivalence of properties 1) and 3) of Problem 8.19, for all varieties of groups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety.{u}, V.SatisfiesMinCondition ↔ V.HasNoInfiniteIndependentSystem := by\n  sorry",
+    "kourovka.«8.19».parts.iii": "/--\nIs it true that a variety of groups has at most countably many subvarieties if and only if it\nhas no infinite independent system of identities (independence being taken modulo the laws of\nthe variety)?\n\nThis is the equivalence of properties 2) and 3) of Problem 8.19, for all varieties of groups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety.{u},\n      V.HasCountablyManySubvarieties ↔ V.HasNoInfiniteIndependentSystem := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.i": "/--\nIs it true that a soluble variety of groups satisfies the minimum condition for subvarieties\nif and only if it has at most countably many subvarieties?\n\nThis is the equivalence of properties 1) and 2) of Problem 8.19, for soluble varieties of\ngroups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety.{u}, V.IsSoluble →\n      (V.SatisfiesMinCondition ↔ V.HasCountablyManySubvarieties) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.ii": "/--\nIs it true that a soluble variety of groups satisfies the minimum condition for subvarieties\nif and only if it has no infinite independent system of identities (independence being taken\nmodulo the laws of the variety)?\n\nThis is the equivalence of properties 1) and 3) of Problem 8.19, for soluble varieties of\ngroups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety.{u}, V.IsSoluble →\n      (V.SatisfiesMinCondition ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.iii": "/--\nIs it true that a soluble variety of groups has at most countably many subvarieties if and\nonly if it has no infinite independent system of identities (independence being taken modulo\nthe laws of the variety)?\n\nThis is the equivalence of properties 2) and 3) of Problem 8.19, for soluble varieties of\ngroups.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety.{u}, V.IsSoluble →\n      (V.HasCountablyManySubvarieties ↔ V.HasNoInfiniteIndependentSystem) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.19\n\nby Yu. G. Kleiman\n\nWhich of the following properties of (soluble) varieties of groups are equivalent:\n\n1. the minimum condition for subvarieties;\n2. at most countably many subvarieties;\n3. no infinite independent system of identities?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.19»\n\n/-- A group word in countably many variables. -/\nabbrev GroupWord := FreeGroup ℕ\n\n/-- A group `G` satisfies the identity represented by `w` if every assignment of the\ncountably many variables in `w` evaluates it to the identity of `G`. -/\ndef SatisfiesIdentity (G : Type) [Group G] (w : GroupWord) : Prop :=\n  ∀ f : ℕ → G, FreeGroup.lift f w = 1\n\n/-- A group satisfies a set of identities if it satisfies each identity in the set. -/\ndef SatisfiesIdentities (G : Type) [Group G] (S : Set GroupWord) : Prop :=\n  ∀ ⦃w⦄, w ∈ S → SatisfiesIdentity G w\n\n/-- A variety of groups, represented canonically by its complete equational theory.\nThe closure condition says that every identity true in all models of its laws is\nalready one of its laws. -/\nstructure GroupVariety where\n  /-- The identities defining the variety. -/\n  laws : Set GroupWord\n  /-- The set of laws contains all of its semantic consequences. -/\n  consequence_closed : ∀ w,\n    (∀ (G : Type) [Group G], SatisfiesIdentities G laws → SatisfiesIdentity G w) → w ∈ laws\n\n/-- The groups belonging to a variety are precisely the groups satisfying all its laws. -/\ndef GroupVariety.Models (V : GroupVariety) (G : Type) [Group G] : Prop :=\n  SatisfiesIdentities G V.laws\n\n/-- `W` is a subvariety of `V` when every law of `V` is a law of `W`.\nThus `W` may impose additional identities. -/\ndef IsSubvariety (W V : GroupVariety) : Prop :=\n  V.laws ⊆ W.laws\n\n/-- `W` is a proper subvariety of `V`. -/\ndef IsProperSubvariety (W V : GroupVariety) : Prop :=\n  IsSubvariety W V ∧ ¬ IsSubvariety V W\n\n/-- A variety satisfies the minimum condition on subvarieties if the proper-subvariety\nrelation on its subvarieties is well-founded. Equivalently, it has no infinite strictly\ndescending chain of subvarieties. -/\ndef HasMinCondition (V : GroupVariety) : Prop :=\n  WellFounded (fun W U : {W : GroupVariety // IsSubvariety W V} =>\n    IsProperSubvariety W.1 U.1)\n\n/-- A variety has at most countably many subvarieties. -/\ndef HasCountablyManySubvarieties (V : GroupVariety) : Prop :=\n  Set.Countable {W : GroupVariety | IsSubvariety W V}\n\n/-- An identity `w` follows, modulo the laws of `V`, from a system `S` if every\ngroup in `V` satisfying all identities in `S` also satisfies `w`. -/\ndef IdentityFollows (V : GroupVariety) (S : Set GroupWord) (w : GroupWord) : Prop :=\n  ∀ (G : Type) [Group G], V.Models G → SatisfiesIdentities G S → SatisfiesIdentity G w\n\n/-- A system of identities is independent relative to a variety `V` if none of its\nmembers follows, modulo the laws of `V`, from all the other members. -/\ndef IsIndependentSystem (V : GroupVariety) (S : Set GroupWord) : Prop :=\n  ∀ w ∈ S, ¬ IdentityFollows V (S \\ {w}) w\n\n/-- A variety has no infinite independent system of identities, with independence\ntaken relative to the laws of the variety. -/\ndef HasNoInfiniteIndependentSystem (V : GroupVariety) : Prop :=\n  ¬ ∃ S : Set GroupWord, S.Infinite ∧ IsIndependentSystem V S\n\n/-- A variety is soluble if every group belonging to it is soluble. -/\ndef GroupVariety.IsSoluble (V : GroupVariety) : Prop :=\n  ∀ (G : Type) [Group G], V.Models G → IsSolvable G\n\n/--\nFor every variety of groups, is the minimum condition on subvarieties equivalent\nto having at most countably many subvarieties?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, HasMinCondition V ↔ HasCountablyManySubvarieties V := by\n  sorry\n\n/--\nFor every variety of groups, is the minimum condition on subvarieties equivalent\nto having no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, HasMinCondition V ↔ HasNoInfiniteIndependentSystem V := by\n  sorry\n\n/--\nFor every variety of groups, is having at most countably many subvarieties equivalent\nto having no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentSystem V := by\n  sorry\n\n/--\nFor every soluble variety of groups, is the minimum condition on subvarieties\nequivalent to having at most countably many subvarieties?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (HasMinCondition V ↔ HasCountablyManySubvarieties V) := by\n  sorry\n\n/--\nFor every soluble variety of groups, is the minimum condition on subvarieties\nequivalent to having no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (HasMinCondition V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry\n\n/--\nFor every soluble variety of groups, is having at most countably many subvarieties\nequivalent to having no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry\n\nend Kourovka.«8.19»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A group identity is represented by a word in `FreeGroup ℕ` asserted equal to one. Countably many variables suffice because each group word has finite support and every ordinary group equation can be rewritten in this form.",
+    "A `GroupVariety` is represented canonically by its complete semantic equational theory, not by an arbitrary presentation. The closure field ensures that two different axiom presentations are not counted as different subvarieties.",
+    "Subvariety inclusion is reverse inclusion of complete law sets: `W` is a subvariety of `V` exactly when every law of `V` is a law of `W`.",
+    "The minimum condition is well-foundedness of the relation taking a subvariety to a proper smaller subvariety. This is the no-infinite-strictly-descending-chain formulation requested by the decomposition.",
+    "Identity independence is relative to the ambient variety: for each word `w` in the system, `w` must not be a semantic consequence of the ambient laws together with the system after removing `w`.",
+    "A soluble variety is defined as one all of whose model groups are `IsSolvable`. This directly follows the stated soluble-variety restriction; in standard variety theory it is equivalent to having a uniform derived-length bound."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `FreeGroup`; used directly as the underlying representation.",
+     "name": "GroupWord",
+     "why_needed": "Provides the universe of group identities in countably many variables."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`; Mathlib has no group-identity satisfaction predicate.",
+     "name": "SatisfiesIdentity",
+     "why_needed": "Expresses semantic satisfaction of a group word identity under every variable assignment."
+    },
+    {
+     "closest_existing_considered": "Set-wise quantification over `SatisfiesIdentity`; no existing equational-theory API was found.",
+     "name": "SatisfiesIdentities",
+     "why_needed": "Expresses satisfaction of a system of group identities."
+    },
+    {
+     "closest_existing_considered": "Mathlib and FormalConjecturesForMathlib have no group-variety or equational-theory structure.",
+     "name": "GroupVariety",
+     "why_needed": "Represents a variety canonically by its complete, semantically closed set of identities."
+    },
+    {
+     "closest_existing_considered": "No existing model-of-group-variety predicate was found.",
+     "name": "GroupVariety.Models",
+     "why_needed": "Defines membership of a group in a variety through satisfaction of all laws."
+    },
+    {
+     "closest_existing_considered": "Set inclusion, used internally; no existing subvariety relation was found.",
+     "name": "IsSubvariety",
+     "why_needed": "Defines the subvariety relation through reverse inclusion of complete theories."
+    },
+    {
+     "closest_existing_considered": "Strict set inclusion; a named predicate makes the reversed law-set orientation explicit.",
+     "name": "IsProperSubvariety",
+     "why_needed": "Defines strict subvariety inclusion for the descending-chain condition."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `WellFounded`, used on the bespoke proper-subvariety relation.",
+     "name": "HasMinCondition",
+     "why_needed": "States the minimum condition on the subvariety poset."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Set.Countable`, used directly on the bespoke subvariety set.",
+     "name": "HasCountablyManySubvarieties",
+     "why_needed": "States property 2 for the subtype/set of subvarieties."
+    },
+    {
+     "closest_existing_considered": "No existing group equational consequence relation was found.",
+     "name": "IdentityFollows",
+     "why_needed": "Expresses semantic consequence modulo the ambient variety's laws."
+    },
+    {
+     "closest_existing_considered": "No existing notion applies; probabilistic and lattice independence notions are unrelated.",
+     "name": "IsIndependentSystem",
+     "why_needed": "Defines independence of identities relative to an ambient variety."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Set.Infinite`, combined with the bespoke relative-independence predicate.",
+     "name": "HasNoInfiniteIndependentSystem",
+     "why_needed": "States property 3 exactly in terms of infinite identity systems."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsSolvable` for individual groups, used universally over models of the variety.",
+     "name": "GroupVariety.IsSoluble",
+     "why_needed": "Expresses the parenthetical restriction to varieties all of whose groups are soluble."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.19».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.19».parts.i": "/--\nFor every variety of groups, is the minimum condition on subvarieties equivalent\nto having at most countably many subvarieties?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, HasMinCondition V ↔ HasCountablyManySubvarieties V := by\n  sorry",
+    "kourovka.«8.19».parts.ii": "/--\nFor every variety of groups, is the minimum condition on subvarieties equivalent\nto having no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, HasMinCondition V ↔ HasNoInfiniteIndependentSystem V := by\n  sorry",
+    "kourovka.«8.19».parts.iii": "/--\nFor every variety of groups, is having at most countably many subvarieties equivalent\nto having no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentSystem V := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.i": "/--\nFor every soluble variety of groups, is the minimum condition on subvarieties\nequivalent to having at most countably many subvarieties?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (HasMinCondition V ↔ HasCountablyManySubvarieties V) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.ii": "/--\nFor every soluble variety of groups, is the minimum condition on subvarieties\nequivalent to having no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (HasMinCondition V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.iii": "/--\nFor every soluble variety of groups, is having at most countably many subvarieties\nequivalent to having no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.19\n\nby Yu. G. Kleiman\n\nWhich of the following properties of (soluble) varieties of groups are equivalent:\n\n1. the minimum condition for subvarieties;\n2. having at most countably many subvarieties;\n3. having no infinite independent system of identities?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.19»\n\n/-- A group word in countably many variables. An identity $u = v$ is represented by the\nsingle word $uv^{-1}$, which is required to evaluate to $1$. -/\nabbrev GroupWord := FreeGroup ℕ\n\n/-- A group `G` satisfies a word identity `w` if every assignment of the variables in `w`\nevaluates `w` to the identity of `G`. -/\ndef SatisfiesIdentity (G : Type*) [Group G] (w : GroupWord) : Prop :=\n  ∀ f : ℕ → G, FreeGroup.lift f w = 1\n\n/-- The identities that follow semantically from a set `S` of group identities. It is enough to\nquantify over groups in `Type`: every evaluation of a countable set of variables lies in a\ncountably generated subgroup. -/\ndef identityConsequences (S : Set GroupWord) : Set GroupWord :=\n  {w | ∀ (G : Type) [Group G],\n    (∀ v ∈ S, SatisfiesIdentity G v) → SatisfiesIdentity G w}\n\n/-- A variety of groups, represented by its semantically closed set of identities. -/\nstructure GroupVariety where\n  laws : Set GroupWord\n  consequences_eq : identityConsequences laws = laws\n\n/-- `U` is a subvariety of `V`. Since varieties are represented by their laws, this means that\nall laws of `V` are laws of `U`. -/\ndef IsSubvariety (U V : GroupVariety) : Prop :=\n  V.laws ⊆ U.laws\n\n/-- `U` is a proper subvariety of `V`. -/\ndef IsProperSubvariety (U V : GroupVariety) : Prop :=\n  IsSubvariety U V ∧ ¬ IsSubvariety V U\n\n/-- A variety satisfies the minimum condition for subvarieties if it has no infinite strictly\ndescending chain of subvarieties. -/\ndef HasMinimumCondition (V : GroupVariety) : Prop :=\n  ¬ ∃ chain : ℕ → GroupVariety,\n    (∀ n, IsSubvariety (chain n) V) ∧\n      ∀ n, IsProperSubvariety (chain (n + 1)) (chain n)\n\n/-- A variety has at most countably many subvarieties. -/\ndef HasCountablyManySubvarieties (V : GroupVariety) : Prop :=\n  Set.Countable {U : GroupVariety | IsSubvariety U V}\n\n/-- A system `S` of identities is independent relative to `V` if no member of `S` follows from\nthe laws of `V` together with the other members of `S`. -/\ndef IsIndependentIdentitySystem (V : GroupVariety) (S : Set GroupWord) : Prop :=\n  ∀ w ∈ S, w ∉ identityConsequences (V.laws ∪ (S \\ {w}))\n\n/-- A variety has no infinite independent system of identities, with independence understood\nrelative to the laws of the variety. -/\ndef HasNoInfiniteIndependentIdentitySystem (V : GroupVariety) : Prop :=\n  ¬ ∃ S : Set GroupWord, S.Infinite ∧ IsIndependentIdentitySystem V S\n\n/-- A soluble variety: every group satisfying its laws is soluble. -/\ndef GroupVariety.IsSoluble (V : GroupVariety) : Prop :=\n  ∀ (G : Type) [Group G], (∀ w ∈ V.laws, SatisfiesIdentity G w) → IsSolvable G\n\n/--\nFor every variety of groups, is satisfying the minimum condition for subvarieties equivalent\nto having at most countably many subvarieties?\n-/\n@[category research open, AMS 20]\ntheorem parts.i : answer(sorry) ↔ ∀ V : GroupVariety,\n    HasMinimumCondition V ↔ HasCountablyManySubvarieties V := by\n  sorry\n\n/--\nFor every variety of groups, is satisfying the minimum condition for subvarieties equivalent\nto having no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem parts.ii : answer(sorry) ↔ ∀ V : GroupVariety,\n    HasMinimumCondition V ↔ HasNoInfiniteIndependentIdentitySystem V := by\n  sorry\n\n/--\nFor every variety of groups, is having at most countably many subvarieties equivalent to having\nno infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem parts.iii : answer(sorry) ↔ ∀ V : GroupVariety,\n    HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentIdentitySystem V := by\n  sorry\n\n/--\nFor every soluble variety of groups, is satisfying the minimum condition for subvarieties\nequivalent to having at most countably many subvarieties?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.i : answer(sorry) ↔ ∀ V : GroupVariety,\n    V.IsSoluble → (HasMinimumCondition V ↔ HasCountablyManySubvarieties V) := by\n  sorry\n\n/--\nFor every soluble variety of groups, is satisfying the minimum condition for subvarieties\nequivalent to having no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.ii : answer(sorry) ↔ ∀ V : GroupVariety,\n    V.IsSoluble → (HasMinimumCondition V ↔ HasNoInfiniteIndependentIdentitySystem V) := by\n  sorry\n\n/--\nFor every soluble variety of groups, is having at most countably many subvarieties equivalent to\nhaving no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.iii : answer(sorry) ↔ ∀ V : GroupVariety,\n    V.IsSoluble →\n      (HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentIdentitySystem V) := by\n  sorry\n\nend Kourovka.«8.19»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Varieties are represented extensionally by semantically closed sets of words in the free group on countably many variables. This avoids forming a universe-sized class of groups and identifies varieties exactly by their identities.",
+    "A general identity u = v is encoded by the single word u * v⁻¹ being identically equal to 1.",
+    "Semantic consequence quantifies over groups in Type. This suffices for identities in countably many variables because a failed evaluation is witnessed in a countably generated group.",
+    "Subvariety inclusion is reverse inclusion of equational theories: U is a subvariety of V exactly when every law of V is a law of U.",
+    "The minimum condition is encoded directly as the nonexistence of an ℕ-indexed strictly descending chain of subvarieties of V.",
+    "An independent system relative to V requires each member not to be a semantic consequence of the laws of V together with all other members of the system; members are not incorrectly required to be laws of V.",
+    "A soluble variety is one all of whose groups satisfying its laws are IsSolvable; this captures the uniformly soluble variety condition because the countably generated relatively free group is among these models."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's FreeGroup ℕ, which is used directly through this abbreviation.",
+     "name": "GroupWord",
+     "why_needed": "Provides a concrete type of group identities in countably many variables."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift; no existing group-law satisfaction predicate was found.",
+     "name": "SatisfiesIdentity",
+     "why_needed": "Expresses universal satisfaction of a free-group word by a group."
+    },
+    {
+     "closest_existing_considered": "No equational consequence closure for group words was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "identityConsequences",
+     "why_needed": "Expresses identities following semantically from a set of group identities."
+    },
+    {
+     "closest_existing_considered": "No group-variety or universal-algebra variety structure was found.",
+     "name": "GroupVariety",
+     "why_needed": "Represents a group variety by a semantically closed equational theory."
+    },
+    {
+     "closest_existing_considered": "Set inclusion is used internally; no existing subvariety relation was found.",
+     "name": "IsSubvariety",
+     "why_needed": "Defines subvariety inclusion in terms of reverse inclusion of laws."
+    },
+    {
+     "closest_existing_considered": "IsSubvariety together with its converse; no existing relation was available.",
+     "name": "IsProperSubvariety",
+     "why_needed": "Expresses strict subvariety inclusion for descending chains."
+    },
+    {
+     "closest_existing_considered": "WellFounded/order-chain APIs were considered, but a direct no-descending-chain definition most exactly matches the decomposition and avoids order-dual ambiguity.",
+     "name": "HasMinimumCondition",
+     "why_needed": "States the minimum condition specifically on the subvarieties of a given variety."
+    },
+    {
+     "closest_existing_considered": "Set.Countable, used on the set of subvarieties.",
+     "name": "HasCountablyManySubvarieties",
+     "why_needed": "Packages the second property of the problem."
+    },
+    {
+     "closest_existing_considered": "No matching notion of relative equational independence was found; generic pairwise/linear independence notions are not applicable.",
+     "name": "IsIndependentIdentitySystem",
+     "why_needed": "Defines independence of identities relative to the laws of a variety."
+    },
+    {
+     "closest_existing_considered": "Set.Infinite combined with IsIndependentIdentitySystem.",
+     "name": "HasNoInfiniteIndependentIdentitySystem",
+     "why_needed": "Packages the third property of the problem."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsSolvable is used for each model, but there was no predicate for a soluble variety.",
+     "name": "GroupVariety.IsSoluble",
+     "why_needed": "Expresses the restriction to soluble varieties in the three variants."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.19».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.19».variants.soluble.parts.i": "/--\nFor every soluble variety of groups, is satisfying the minimum condition for subvarieties\nequivalent to having at most countably many subvarieties?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.i : answer(sorry) ↔ ∀ V : GroupVariety,\n    V.IsSoluble → (HasMinimumCondition V ↔ HasCountablyManySubvarieties V) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.ii": "/--\nFor every soluble variety of groups, is satisfying the minimum condition for subvarieties\nequivalent to having no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.ii : answer(sorry) ↔ ∀ V : GroupVariety,\n    V.IsSoluble → (HasMinimumCondition V ↔ HasNoInfiniteIndependentIdentitySystem V) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.iii": "/--\nFor every soluble variety of groups, is having at most countably many subvarieties equivalent to\nhaving no infinite independent system of identities relative to the variety?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.iii : answer(sorry) ↔ ∀ V : GroupVariety,\n    V.IsSoluble →\n      (HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentIdentitySystem V) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.19\n\nby Yu. G. Kleiman\n\nWhich of the following properties of (soluble) varieties of groups are equivalent:\n\n1. the minimum condition for subvarieties;\n2. having at most countably many subvarieties;\n3. having no infinite independent system of identities?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.19»\n\n/-- A group identity in countably many variables, represented by a word in the free group. -/\nabbrev GroupIdentity := FreeGroup ℕ\n\n/-- A group `G` satisfies the identity `w = 1` if every assignment of the variables in `G`\nmakes the word `w` equal to the identity. -/\ndef SatisfiesIdentity (G : Type*) [Group G] (w : GroupIdentity) : Prop :=\n  ∀ f : ℕ → G, FreeGroup.lift f w = 1\n\n/-- An identity `w = 1` is a semantic consequence of a set `S` of group identities if every\n(small) group satisfying every identity in `S` also satisfies `w`. -/\ndef IsIdentityConsequence (S : Set GroupIdentity) (w : GroupIdentity) : Prop :=\n  ∀ (G : Type) [Group G], (∀ v ∈ S, SatisfiesIdentity G v) → SatisfiesIdentity G w\n\n/-- A variety of groups, represented by its equationally closed set of laws. Countably many\nvariables suffice because every group word contains only finitely many variables. -/\nstructure GroupVariety where\n  laws : Set GroupIdentity\n  is_closed : ∀ w, w ∈ laws ↔ IsIdentityConsequence laws w\n\nnamespace GroupVariety\n\ninstance : SetLike GroupVariety GroupIdentity where\n  coe := laws\n  coe_injective' V W h := by\n    cases V\n    cases W\n    simp_all\n\n/-- The order by inclusion of classes of groups. Thus `U ≤ V` means that `U` is a subvariety\nof `V`, equivalently that every law of `V` is a law of `U`. -/\ninstance : PartialOrder GroupVariety :=\n  PartialOrder.lift (fun V ↦ OrderDual.toDual V.laws) (by\n    intro V W h\n    exact SetLike.coe_injective h)\n\n/-- The type of subvarieties of `V`. -/\nabbrev Subvariety (V : GroupVariety) := Set.Iic V\n\n/-- Property 1: the minimum condition for subvarieties, i.e. no infinite strictly descending\nchain of subvarieties. -/\ndef HasMinCondition (V : GroupVariety) : Prop :=\n  ¬∃ U : ℕ → Subvariety V, ∀ n, U (n + 1) < U n\n\n/-- Property 2: `V` has at most countably many subvarieties. -/\ndef HasCountablyManySubvarieties (V : GroupVariety) : Prop :=\n  Countable (Subvariety V)\n\n/-- A sequence of identities is independent relative to `V` if no one of its members follows,\nmodulo the laws of `V`, from all the other members. -/\ndef IsIndependentSystem (V : GroupVariety) (w : ℕ → GroupIdentity) : Prop :=\n  ∀ i, ¬IsIdentityConsequence (V.laws ∪ {u | ∃ j, j ≠ i ∧ w j = u}) (w i)\n\n/-- Property 3: `V` has no infinite independent system of identities relative to `V`. -/\ndef HasNoInfiniteIndependentSystem (V : GroupVariety) : Prop :=\n  ¬∃ w : ℕ → GroupIdentity, IsIndependentSystem V w\n\n/-- A soluble variety: there is a uniform finite bound on the derived length of all its groups.\nThis is the variety-theoretic meaning of soluble, equivalently being contained in the variety\nof soluble groups of some fixed derived length. -/\ndef IsSoluble (V : GroupVariety) : Prop :=\n  ∃ n : ℕ, ∀ (G : Type) [Group G],\n    (∀ w ∈ V.laws, SatisfiesIdentity G w) → derivedSeries G n = ⊥\n\nend GroupVariety\n\nopen GroupVariety\n\n/-- Are properties 1 and 2 equivalent for every variety of groups? In other words, does a\nvariety satisfy the minimum condition (have no infinite strictly descending chain) on its\nsubvarieties if and only if it has at most countably many subvarieties? -/\n@[category research open, AMS 20]\ntheorem parts.i : answer(sorry) ↔ ∀ V : GroupVariety,\n    HasMinCondition V ↔ HasCountablyManySubvarieties V := by\n  sorry\n\n/-- Are properties 1 and 3 equivalent for every variety of groups? Here an independent system\nis relative to `V`: no identity in the system follows from the laws of `V` together with all\nother identities in the system. -/\n@[category research open, AMS 20]\ntheorem parts.ii : answer(sorry) ↔ ∀ V : GroupVariety,\n    HasMinCondition V ↔ HasNoInfiniteIndependentSystem V := by\n  sorry\n\n/-- Are properties 2 and 3 equivalent for every variety of groups? Thus, does a variety have at\nmost countably many subvarieties if and only if it has no infinite independent system of\nidentities relative to that variety? -/\n@[category research open, AMS 20]\ntheorem parts.iii : answer(sorry) ↔ ∀ V : GroupVariety,\n    HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentSystem V := by\n  sorry\n\n/-- Restricted to soluble varieties of groups, are properties 1 and 2 equivalent? That is, for\nevery variety of uniformly bounded derived length, is the minimum condition on subvarieties\nequivalent to having at most countably many subvarieties? -/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.i : answer(sorry) ↔ ∀ V : GroupVariety,\n    IsSoluble V → (HasMinCondition V ↔ HasCountablyManySubvarieties V) := by\n  sorry\n\n/-- Restricted to soluble varieties of groups, are properties 1 and 3 equivalent? Independence\nis relative to the laws of the soluble variety `V`. -/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.ii : answer(sorry) ↔ ∀ V : GroupVariety,\n    IsSoluble V → (HasMinCondition V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry\n\n/-- Restricted to soluble varieties of groups, are properties 2 and 3 equivalent? That is, does\neach such variety have at most countably many subvarieties if and only if it has no infinite\nindependent system of identities relative to its laws? -/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.iii : answer(sorry) ↔ ∀ V : GroupVariety,\n    IsSoluble V →\n      (HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry\n\nend Kourovka.«8.19»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A group identity is represented by a word in `FreeGroup ℕ`, with the equation understood as `w = 1`; countably many variables suffice because each group word has finite support.",
+    "A group variety is represented by its semantically closed set of identities, rather than by an arbitrary identity presentation. This ensures that extensionally equal varieties are counted only once.",
+    "The order on `GroupVariety` is class inclusion, hence reverse inclusion of law sets. A subvariety of `V` is an element of `Set.Iic V`.",
+    "The minimum condition is stated directly as absence of an ℕ-indexed strictly descending chain of subvarieties.",
+    "An infinite independent system is represented by an ℕ-indexed family. Independence forces distinctness, and in classical mathematics any infinite independent system has a countably infinite independent subsystem.",
+    "Independence is relative to `V`: for each word, semantic consequence is tested from the union of `V.laws` and all other words in the family.",
+    "A soluble variety is modeled by a uniform natural-number bound at which the derived series of every model becomes trivial, matching the variety-theoretic characterization as a subvariety of the variety of soluble groups of some fixed derived length.",
+    "Semantic consequence quantifies over groups in `Type`; this is sufficient for finitary group identities, since any failure is witnessed in a finitely generated subgroup, which is small."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `FreeGroup`; no existing group-identity alias or variety API was found.",
+     "name": "GroupIdentity",
+     "why_needed": "Represents group identities uniformly as words in countably many variables."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift` supplies evaluation, but Mathlib has no satisfaction predicate for group words.",
+     "name": "SatisfiesIdentity",
+     "why_needed": "Defines evaluation and satisfaction of a group identity under every variable assignment."
+    },
+    {
+     "closest_existing_considered": "Mathlib model-theory syntax and consequence-related APIs were considered, but no existing specialization faithfully captures group-word identities with the required relative semantics.",
+     "name": "IsIdentityConsequence",
+     "why_needed": "Expresses semantic consequence, needed both to close theories and to define independence relative to a variety."
+    },
+    {
+     "closest_existing_considered": "No group-variety or universal-algebra variety structure was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "GroupVariety",
+     "why_needed": "Represents an actual variety extensionally by its semantically closed equational theory, avoiding duplicate presentations."
+    },
+    {
+     "closest_existing_considered": "Uses the existing `Set.Iic` construction after defining the appropriate order; no bespoke existing subvariety notion was found.",
+     "name": "GroupVariety.Subvariety",
+     "why_needed": "Provides the type of varieties contained in a fixed variety under the reverse-law-inclusion order."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `WellFounded` was considered, but the direct chain formulation exactly matches the decomposition and avoids relying on a classical equivalence.",
+     "name": "GroupVariety.HasMinCondition",
+     "why_needed": "States property 1 as absence of an infinite strictly descending chain in the subvariety poset."
+    },
+    {
+     "closest_existing_considered": "Built from Mathlib's existing `Countable` predicate.",
+     "name": "GroupVariety.HasCountablyManySubvarieties",
+     "why_needed": "States property 2 for the subtype of subvarieties."
+    },
+    {
+     "closest_existing_considered": "No existing generic independence notion models semantic non-consequence from all remaining identities.",
+     "name": "GroupVariety.IsIndependentSystem",
+     "why_needed": "Defines independence of identities modulo the laws of a fixed variety."
+    },
+    {
+     "closest_existing_considered": "No existing predicate for independent systems of identities was found.",
+     "name": "GroupVariety.HasNoInfiniteIndependentSystem",
+     "why_needed": "States property 3 using ℕ-indexed independent systems."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsSolvable` applies to one group and does not express a uniform derived-length bound over every group in a variety; `derivedSeries` is used directly.",
+     "name": "GroupVariety.IsSoluble",
+     "why_needed": "Expresses the parenthetical soluble-variety restriction with a uniform bound on derived length."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.19».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.19».variants.soluble.parts.i": "/-- Restricted to soluble varieties of groups, are properties 1 and 2 equivalent? That is, for\nevery variety of uniformly bounded derived length, is the minimum condition on subvarieties\nequivalent to having at most countably many subvarieties? -/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.i : answer(sorry) ↔ ∀ V : GroupVariety,\n    IsSoluble V → (HasMinCondition V ↔ HasCountablyManySubvarieties V) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.ii": "/-- Restricted to soluble varieties of groups, are properties 1 and 3 equivalent? Independence\nis relative to the laws of the soluble variety `V`. -/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.ii : answer(sorry) ↔ ∀ V : GroupVariety,\n    IsSoluble V → (HasMinCondition V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.iii": "/-- Restricted to soluble varieties of groups, are properties 2 and 3 equivalent? That is, does\neach such variety have at most countably many subvarieties if and only if it has no infinite\nindependent system of identities relative to its laws? -/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.iii : answer(sorry) ↔ ∀ V : GroupVariety,\n    IsSoluble V →\n      (HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.19\n\nby Yu. G. Kleiman\n\nWhich of the following properties of (soluble) varieties of groups are equivalent:\n\n1. the minimum condition for subvarieties;\n2. having at most countably many subvarieties;\n3. having no infinite independent system of identities?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 8.19.\n-/\n\nnamespace Kourovka.«8.19»\n\n/-- A group word in countably many variables. An equation $u=v$ is represented by the\nword $uv^{-1}$, whose value is required to be $1$. -/\nabbrev GroupWord := FreeGroup ℕ\n\n/-- A group $G$ satisfies a word identity if the word evaluates to $1$ under every assignment of\nits variables in $G$. -/\ndef SatisfiesIdentity (G : Type*) [Group G] (w : GroupWord) : Prop :=\n  ∀ x : ℕ → G, FreeGroup.lift x w = 1\n\n/-- A word is a semantic consequence of a set of identities if every group satisfying all the\nidentities in the set also satisfies that word. -/\ndef IsConsequence (S : Set GroupWord) (w : GroupWord) : Prop :=\n  ∀ (G : Type) (_ : Group G), (∀ v ∈ S, SatisfiesIdentity G v) → SatisfiesIdentity G w\n\n/-- A variety of groups, represented by its semantically closed set of identities. -/\nstructure GroupVariety where\n  /-- The identities valid throughout the variety. -/\n  laws : Set GroupWord\n  /-- Every semantic consequence of the laws is already among the laws. -/\n  consequence_mem : ∀ w, IsConsequence laws w → w ∈ laws\n\n/-- $W$ is a subvariety of $V$ if every law of $V$ is also a law of $W$. -/\ndef IsSubvariety (W V : GroupVariety) : Prop :=\n  V.laws ⊆ W.laws\n\n/-- $W$ is a proper subvariety of $V$. -/\ndef IsProperSubvariety (W V : GroupVariety) : Prop :=\n  IsSubvariety W V ∧ ¬ IsSubvariety V W\n\n/-- A variety satisfies the minimum condition on subvarieties when strict descent among its\nsubvarieties is well-founded. -/\ndef HasMinimumCondition (V : GroupVariety) : Prop :=\n  WellFounded fun W U : {W : GroupVariety // IsSubvariety W V} ↦\n    IsProperSubvariety W.1 U.1\n\n/-- A variety has at most countably many subvarieties. -/\ndef HasCountablyManySubvarieties (V : GroupVariety) : Prop :=\n  Set.Countable {W : GroupVariety | IsSubvariety W V}\n\n/-- A system of identities is independent relative to $V$ if no member follows from the laws of\n$V$ together with all the other members of the system. -/\ndef IsIndependentSystem (V : GroupVariety) (S : Set GroupWord) : Prop :=\n  ∀ w ∈ S, ¬ IsConsequence (V.laws ∪ (S \\ {w})) w\n\n/-- A variety has no infinite independent system of identities, with independence understood\nrelative to its laws. -/\ndef HasNoInfiniteIndependentSystem (V : GroupVariety) : Prop :=\n  ¬ ∃ S : Set GroupWord, S.Infinite ∧ IsIndependentSystem V S\n\n/-- A variety is soluble if its groups have a common finite bound on their derived length. This is\nthe standard condition that the variety be contained in some variety $\\mathfrak A^n$. -/\ndef IsSolubleVariety (V : GroupVariety) : Prop :=\n  ∃ n : ℕ, ∀ (G : Type) (_ : Group G),\n    (∀ w ∈ V.laws, SatisfiesIdentity G w) → derivedSeries G n = ⊥\n\n/--\nFor every variety of groups $V$, is satisfying the minimum condition for subvarieties equivalent\nto having at most countably many subvarieties?\n-/\n@[category research open, AMS 20]\ntheorem parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, HasMinimumCondition V ↔ HasCountablyManySubvarieties V := by\n  sorry\n\n/--\nFor every variety of groups $V$, is satisfying the minimum condition for subvarieties equivalent\nto having no infinite independent system of identities? Independence is relative to $V$: no\nidentity in the system may follow from the laws of $V$ and the other identities in the system.\n-/\n@[category research open, AMS 20]\ntheorem parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, HasMinimumCondition V ↔ HasNoInfiniteIndependentSystem V := by\n  sorry\n\n/--\nFor every variety of groups $V$, is having at most countably many subvarieties equivalent to having\nno infinite independent system of identities? Independence is taken modulo the laws of $V$.\n-/\n@[category research open, AMS 20]\ntheorem parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentSystem V := by\n  sorry\n\n/--\nFor every soluble variety of groups $V$, is satisfying the minimum condition for subvarieties\nequivalent to having at most countably many subvarieties?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, IsSolubleVariety V →\n      (HasMinimumCondition V ↔ HasCountablyManySubvarieties V) := by\n  sorry\n\n/--\nFor every soluble variety of groups $V$, is satisfying the minimum condition for subvarieties\nequivalent to having no infinite independent system of identities relative to $V$?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, IsSolubleVariety V →\n      (HasMinimumCondition V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry\n\n/--\nFor every soluble variety of groups $V$, is having at most countably many subvarieties equivalent\nto having no infinite independent system of identities relative to $V$?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety, IsSolubleVariety V →\n      (HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry\n\nend Kourovka.«8.19»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Group identities are represented by elements of the free group on countably many variables; an equation u = v is encoded by the word u v⁻¹ required to evaluate to 1. Every individual word uses only finitely many variables.",
+    "A group variety is represented by its semantically closed equational theory. Subvariety inclusion is therefore reverse inclusion of law sets, so a proper descending subvariety chain is encoded by WellFounded on proper-subvariety inclusion.",
+    "Semantic consequence quantifies over groups whose carrier lies in Type. For identities in countably many variables this is sufficient because a failed identity or consequence has a countably generated countermodel.",
+    "An independent system relative to V means that each member fails to be a semantic consequence of the union of V's laws with all other members of the system.",
+    "A soluble variety is modeled by a uniform finite bound on derived length, matching the standard characterization as a subvariety of some product-power variety 𝔄^n.",
+    "Each pairwise equivalence is stated separately, including all three soluble restrictions, as required by the fixed decomposition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's FreeGroup; used directly as the underlying representation, but Mathlib has no group-identity alias.",
+     "name": "GroupWord",
+     "why_needed": "Provides group words/identities in countably many variables."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift supplies evaluation, but no satisfaction predicate exists.",
+     "name": "SatisfiesIdentity",
+     "why_needed": "Expresses evaluation of a group word to 1 under every assignment."
+    },
+    {
+     "closest_existing_considered": "No universal-algebra or equational-consequence predicate was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "IsConsequence",
+     "why_needed": "Defines semantic entailment of a word from a system of group identities."
+    },
+    {
+     "closest_existing_considered": "No algebraic variety/equational-theory structure was found; arbitrary classes of groups would introduce universe issues and would not enforce the variety condition.",
+     "name": "GroupVariety",
+     "why_needed": "Represents a group variety by its semantically closed set of identities."
+    },
+    {
+     "closest_existing_considered": "Generic Set inclusion exists, but there was no group-subvariety relation.",
+     "name": "IsSubvariety",
+     "why_needed": "Defines subvariety inclusion through reverse inclusion of valid identities."
+    },
+    {
+     "closest_existing_considered": "Generic strict orders exist, but GroupVariety has no pre-existing order and the local relation keeps the intended semantic orientation explicit.",
+     "name": "IsProperSubvariety",
+     "why_needed": "Defines strict subvariety inclusion for the minimum condition."
+    },
+    {
+     "closest_existing_considered": "Mathlib's WellFounded is used internally; no specialized minimum-condition predicate for varieties exists.",
+     "name": "HasMinimumCondition",
+     "why_needed": "States absence of infinite strict descent in the subvariety poset."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Set.Countable is used internally; no specialized predicate exists.",
+     "name": "HasCountablyManySubvarieties",
+     "why_needed": "States property 2 of the problem."
+    },
+    {
+     "closest_existing_considered": "No relative independent-system predicate for identities was found.",
+     "name": "IsIndependentSystem",
+     "why_needed": "Defines independence of identities relative to an ambient variety."
+    },
+    {
+     "closest_existing_considered": "Set.Infinite and IsIndependentSystem are used; no existing combined predicate exists.",
+     "name": "HasNoInfiniteIndependentSystem",
+     "why_needed": "States property 3 of the problem using relative independence."
+    },
+    {
+     "closest_existing_considered": "Mathlib's derivedSeries and IsSolvable concern individual groups, not varieties; a uniform derived-length bound is needed for a soluble variety.",
+     "name": "IsSolubleVariety",
+     "why_needed": "Expresses the parenthetical restriction to soluble varieties."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.19».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.19».variants.soluble.parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.19».variants.soluble.parts.i": "/--\nFor every soluble variety of groups $V$, is satisfying the minimum condition for subvarieties\nequivalent to having at most countably many subvarieties?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, IsSolubleVariety V →\n      (HasMinimumCondition V ↔ HasCountablyManySubvarieties V) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.ii": "/--\nFor every soluble variety of groups $V$, is satisfying the minimum condition for subvarieties\nequivalent to having no infinite independent system of identities relative to $V$?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, IsSolubleVariety V →\n      (HasMinimumCondition V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.iii": "/--\nFor every soluble variety of groups $V$, is having at most countably many subvarieties equivalent\nto having no infinite independent system of identities relative to $V$?\n-/\n@[category research open, AMS 20]\ntheorem variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety, IsSolubleVariety V →\n      (HasCountablyManySubvarieties V ↔ HasNoInfiniteIndependentSystem V) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.19\n\nby Yu. G. Kleiman\n\nWhich of the following properties of (soluble) varieties of groups are equivalent to\none another:\n\n1) to satisfy the minimum condition for subvarieties;\n\n2) to have at most countably many subvarieties;\n\n3) to have no infinite independent system of identities?\n\nA *variety of groups* is the class of all groups satisfying each identity (law) in some\nset of identities. An identity is a word $w = w(x_0, x_1, \\dots)$ in the free group on\ncountably many letters, and it is a law of a group $G$ if $w$ evaluates to $1$ under\nevery substitution of elements of $G$ for the letters. A *subvariety* of a variety\n$\\mathfrak{V}$ is a variety contained in $\\mathfrak{V}$. A system of identities $S$ is\n*independent in $\\mathfrak{V}$* if no identity of $S$ is a consequence, modulo the\nidentities of $\\mathfrak{V}$, of the remaining identities of $S$. A variety is *soluble*\nif all of its groups are soluble.\n\nIn this file a variety is a class of groups whose carrier lives in `Type`. This loses\nnothing: a variety is determined by its identities, which can be tested on its\nrelatively free group of countably infinite rank, a quotient of `FreeGroup ℕ`.\n\nThe problem is split into the three pairwise equivalences, each stated for all\nvarieties of groups (`parts`) and for all soluble varieties of groups\n(`variants.soluble`).\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.19»\n\n/-- A word `w` in the free group on the letters `x₀, x₁, …` is a *law* (identity) of the\ngroup `G` if every substitution of elements of `G` for the letters evaluates `w` to `1`. -/\ndef IsLaw (w : FreeGroup ℕ) (G : Type*) [Group G] : Prop :=\n  ∀ f : FreeGroup ℕ →* G, f w = 1\n\n/-- A word is a law of `G` exactly when it evaluates to `1` under every assignment of\nelements of `G` to the letters. -/\n@[category API, AMS 20]\ntheorem isLaw_iff (w : FreeGroup ℕ) (G : Type*) [Group G] :\n    IsLaw w G ↔ ∀ x : ℕ → G, FreeGroup.lift x w = 1 :=\n  ⟨fun h x => h _, fun h f => by rw [← FreeGroup.lift.apply_symm_apply f]; exact h _⟩\n\n@[category API, AMS 20]\ntheorem isLaw_one (G : Type*) [Group G] : IsLaw 1 G :=\n  fun f => map_one f\n\n/-- A *variety of groups*: the class of all groups satisfying each law in some set of\nwords `W`. -/\nstructure GroupVariety where\n  /-- The groups belonging to the variety. -/\n  Mem : (G : Type) → [Group G] → Prop\n  /-- The variety is the class of all groups satisfying a set of laws. -/\n  exists_laws : ∃ W : Set (FreeGroup ℕ), ∀ (G : Type) [Group G], Mem G ↔ ∀ w ∈ W, IsLaw w G\n\nnamespace GroupVariety\n\n/-- The variety of groups defined by the set of laws `W`. -/\ndef ofLaws (W : Set (FreeGroup ℕ)) : GroupVariety where\n  Mem G _ := ∀ w ∈ W, IsLaw w G\n  exists_laws := ⟨W, fun _ _ => Iff.rfl⟩\n\n@[category API, AMS 20]\ntheorem mem_ofLaws (W : Set (FreeGroup ℕ)) (G : Type) [Group G] :\n    (ofLaws W).Mem G ↔ ∀ w ∈ W, IsLaw w G :=\n  Iff.rfl\n\n/-- The variety defined by no laws is the variety of all groups. -/\n@[category test, AMS 20]\ntheorem mem_ofLaws_empty (G : Type) [Group G] : (ofLaws ∅).Mem G := by\n  simp [mem_ofLaws]\n\n@[ext, category API, AMS 20]\ntheorem ext {V W : GroupVariety} (h : ∀ (G : Type) [Group G], V.Mem G ↔ W.Mem G) : V = W := by\n  obtain ⟨V, _⟩ := V\n  obtain ⟨W, _⟩ := W\n  congr\n  funext G inst\n  exact propext (h G)\n\n/-- Varieties are ordered by inclusion; `W ≤ V` means that `W` is a subvariety of `V`. -/\ninstance : PartialOrder GroupVariety where\n  le V W := ∀ (G : Type) [Group G], V.Mem G → W.Mem G\n  le_refl _ _ _ h := h\n  le_trans _ _ _ h₁ h₂ G _ h := h₂ G (h₁ G h)\n  le_antisymm _ _ h₁ h₂ := ext fun G _ => ⟨h₁ G, h₂ G⟩\n\n@[category API, AMS 20]\ntheorem le_def {V W : GroupVariety} :\n    V ≤ W ↔ ∀ (G : Type) [Group G], V.Mem G → W.Mem G :=\n  Iff.rfl\n\n/-- The word `w` is a *consequence* of the set of words `S` in the variety `V`, i.e. modulo\nthe laws of `V`: every group of `V` in which all words of `S` are laws also has `w` as a\nlaw. -/\ndef IsConsequence (V : GroupVariety) (S : Set (FreeGroup ℕ)) (w : FreeGroup ℕ) : Prop :=\n  ∀ (G : Type) [Group G], V.Mem G → (∀ s ∈ S, IsLaw s G) → IsLaw w G\n\n/-- A set of words `S` is an *independent system of identities* in the variety `V` if no\nword of `S` is a consequence, in `V`, of the remaining words of `S`. -/\ndef IsIndependentSystem (V : GroupVariety) (S : Set (FreeGroup ℕ)) : Prop :=\n  ∀ w ∈ S, ¬ V.IsConsequence (S \\ {w}) w\n\n/-- A variety of groups is *soluble* if every group in it is soluble. -/\ndef IsSoluble (V : GroupVariety) : Prop :=\n  ∀ (G : Type) [Group G], V.Mem G → IsSolvable G\n\nend GroupVariety\n\nopen GroupVariety\n\n/--\nIs it true that a variety of groups $\\mathfrak{V}$ satisfies the minimum condition for\nsubvarieties (every non-empty set of subvarieties of $\\mathfrak{V}$ has a minimal member)\nif and only if $\\mathfrak{V}$ has at most countably many subvarieties?\n\nThis is the equivalence of properties 1) and 2) of Problem 8.19.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, (WellFoundedLT (Set.Iic V) ↔ (Set.Iic V).Countable) := by\n  sorry\n\n/--\nIs it true that a variety of groups $\\mathfrak{V}$ satisfies the minimum condition for\nsubvarieties (every non-empty set of subvarieties of $\\mathfrak{V}$ has a minimal member)\nif and only if $\\mathfrak{V}$ has no infinite independent system of identities, i.e. every\nset of words that is independent modulo the identities of $\\mathfrak{V}$ is finite?\n\nThis is the equivalence of properties 1) and 3) of Problem 8.19.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (WellFoundedLT (Set.Iic V) ↔ ∀ S, V.IsIndependentSystem S → S.Finite) := by\n  sorry\n\n/--\nIs it true that a variety of groups $\\mathfrak{V}$ has at most countably many subvarieties\nif and only if $\\mathfrak{V}$ has no infinite independent system of identities, i.e. every\nset of words that is independent modulo the identities of $\\mathfrak{V}$ is finite?\n\nThis is the equivalence of properties 2) and 3) of Problem 8.19.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      ((Set.Iic V).Countable ↔ ∀ S, V.IsIndependentSystem S → S.Finite) := by\n  sorry\n\n/--\nIs it true that a soluble variety of groups $\\mathfrak{V}$ satisfies the minimum condition\nfor subvarieties (every non-empty set of subvarieties of $\\mathfrak{V}$ has a minimal\nmember) if and only if $\\mathfrak{V}$ has at most countably many subvarieties?\n\nThis is the equivalence of properties 1) and 2) of Problem 8.19 for soluble varieties.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (WellFoundedLT (Set.Iic V) ↔ (Set.Iic V).Countable) := by\n  sorry\n\n/--\nIs it true that a soluble variety of groups $\\mathfrak{V}$ satisfies the minimum condition\nfor subvarieties (every non-empty set of subvarieties of $\\mathfrak{V}$ has a minimal\nmember) if and only if $\\mathfrak{V}$ has no infinite independent system of identities,\ni.e. every set of words that is independent modulo the identities of $\\mathfrak{V}$ is\nfinite?\n\nThis is the equivalence of properties 1) and 3) of Problem 8.19 for soluble varieties.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (WellFoundedLT (Set.Iic V) ↔ ∀ S, V.IsIndependentSystem S → S.Finite) := by\n  sorry\n\n/--\nIs it true that a soluble variety of groups $\\mathfrak{V}$ has at most countably many\nsubvarieties if and only if $\\mathfrak{V}$ has no infinite independent system of\nidentities, i.e. every set of words that is independent modulo the identities of\n$\\mathfrak{V}$ is finite?\n\nThis is the equivalence of properties 2) and 3) of Problem 8.19 for soluble varieties.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      ((Set.Iic V).Countable ↔ ∀ S, V.IsIndependentSystem S → S.Finite) := by\n  sorry\n\nend Kourovka.«8.19»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "Minor: the note on kourovka.«8.19».parts.iii says 'neither direction is known'. With independence taken modulo V (as the table itself prescribes), the direction 2) ⇒ 3) is standard: an infinite independent system S in V yields 2^|S| pairwise distinct subvarieties (one for each subset of S), so a variety with an infinite independent system has uncountably many subvarieties. This does not affect the slot, which I stated as the full pairwise equivalence as the table requires; only the note's characterization of what is known seems off.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Varieties are modelled as classes of groups whose carriers live in `Type` (universe 0), as elsewhere in the Kourovka files. This is harmless: a variety is determined by its laws, which can be tested on its relatively free group of countably infinite rank (a quotient of FreeGroup ℕ, in Type 0), so the lattice of Type-0 varieties, the subvariety orders, the counting of subvarieties, the 'consequence modulo V' relation, and solubility all agree with the universe-free notions.",
+    "A variety is defined equationally (class of all groups satisfying a set of words in FreeGroup ℕ), not as an SHP-closed class; the two are equivalent by Birkhoff's theorem, and the equational definition is the one used by H. Neumann's 'Varieties of Groups'.",
+    "'Minimum condition for subvarieties' is formalized as WellFoundedLT on the subtype Set.Iic V (every nonempty set of subvarieties has a minimal member), which is classically equivalent to the absence of infinite strictly descending chains; I verified in a scratch file that WellFoundedLT (Set.Iic V) unfolds to exactly the minimal-member formulation.",
+    "'At most countably many subvarieties' is (Set.Iic V).Countable; Set.Iic V includes V itself and the trivial variety, which does not affect countability.",
+    "Independence of a system of identities is taken relative to V (modulo the laws of V), following the decomposition notes; with this reading laws of V (and the word 1) can never belong to an independent system, which I checked in a scratch proof. Property 3) is stated as ∀ S, V.IsIndependentSystem S → S.Finite.",
+    "Identities are single words w (meaning w = 1) in FreeGroup ℕ, i.e. in countably many variables x₀, x₁, …; identities u = v are covered as u v⁻¹, and each word involves only finitely many letters as usual.",
+    "'Soluble variety' is formalized as 'every group in V is soluble' (the literal meaning), which is equivalent to V being contained in some 𝔄^n.",
+    "Each of the six slots is a yes/no question stated as answer(sorry) ↔ ∀ V : GroupVariety, [V.IsSoluble →] (P V ↔ Q V); answer(True) means the two properties are equivalent for every (soluble) variety."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FreeGroup.lift / MonoidHom (used as building blocks); nothing for laws themselves. rg for 'variet', 'law', 'identit' in Mathlib and the repo found nothing relevant.",
+     "name": "Kourovka.«8.19».IsLaw",
+     "why_needed": "No notion of a group identity/law (a word of FreeGroup ℕ vanishing under every substitution into G) exists in Mathlib or FormalConjecturesForMathlib. Defined as ∀ f : FreeGroup ℕ →* G, f w = 1; API lemma isLaw_iff shows this is the same as vanishing under every assignment ℕ → G via FreeGroup.lift."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib (no varieties/equational classes for groups); considered instead modelling varieties by fully invariant subgroups of FreeGroup ℕ, but the class-of-groups definition is the literal textbook definition and avoids relying on the (Neumann) anti-isomorphism theorem.",
+     "name": "Kourovka.«8.19».GroupVariety",
+     "why_needed": "No notion of a variety of groups exists in Mathlib or the repo. Defined as a structure: a class Mem : (G : Type) → [Group G] → Prop together with a proof that Mem is the class of all groups satisfying some set of words. Comes with GroupVariety.ofLaws, an ext lemma, and a PartialOrder instance by inclusion (so subvarieties of V are Set.Iic V)."
+    },
+    {
+     "closest_existing_considered": "None; no notion of consequence of identities in Mathlib.",
+     "name": "Kourovka.«8.19».GroupVariety.IsConsequence",
+     "why_needed": "'w follows from S modulo the laws of V': every group of V in which all words of S are laws also has w as a law. Needed to express independence relative to V."
+    },
+    {
+     "closest_existing_considered": "LinearIndependent / AlgebraicIndependent are not applicable to sets of group words modulo a variety.",
+     "name": "Kourovka.«8.19».GroupVariety.IsIndependentSystem",
+     "why_needed": "A set of words S is independent in V if no w ∈ S is a consequence in V of S \\ {w}. Property 3) is then: every independent system in V is finite."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsSolvable (used for the individual groups); no notion for varieties.",
+     "name": "Kourovka.«8.19».GroupVariety.IsSoluble",
+     "why_needed": "A soluble variety is one all of whose groups are soluble; defined as ∀ G [Group G], V.Mem G → IsSolvable G using Mathlib's IsSolvable."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.19».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ V : GroupVariety, (WellFoundedLT (Set.Iic V) ↔ (Set.Iic V).Countable). Needed bespoke GroupVariety (class of all groups satisfying a set of laws) with its inclusion order; min condition = well-foundedness of < on the subvarieties (classically: every nonempty set of subvarieties has a minimal member), countably many = Set.Countable of the set of subvarieties."
+    },
+    "kourovka.«8.19».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ V, (WellFoundedLT (Set.Iic V) ↔ ∀ S, V.IsIndependentSystem S → S.Finite). Independence is relative to V: no word of S is a consequence, in V (every group of V satisfying the other words satisfies it), of the remaining words."
+    },
+    "kourovka.«8.19».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∀ V, ((Set.Iic V).Countable ↔ ∀ S, V.IsIndependentSystem S → S.Finite), with the same bespoke definitions."
+    },
+    "kourovka.«8.19».variants.soluble.parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.i with the hypothesis V.IsSoluble (every group of V is soluble, Mathlib's IsSolvable) inserted after the quantifier over V."
+    },
+    "kourovka.«8.19».variants.soluble.parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.ii restricted to soluble varieties via V.IsSoluble →."
+    },
+    "kourovka.«8.19».variants.soluble.parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Same as parts.iii restricted to soluble varieties via V.IsSoluble →."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.19».parts.i": "/--\nIs it true that a variety of groups $\\mathfrak{V}$ satisfies the minimum condition for\nsubvarieties (every non-empty set of subvarieties of $\\mathfrak{V}$ has a minimal member)\nif and only if $\\mathfrak{V}$ has at most countably many subvarieties?\n\nThis is the equivalence of properties 1) and 2) of Problem 8.19.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, (WellFoundedLT (Set.Iic V) ↔ (Set.Iic V).Countable) := by\n  sorry",
+    "kourovka.«8.19».parts.ii": "/--\nIs it true that a variety of groups $\\mathfrak{V}$ satisfies the minimum condition for\nsubvarieties (every non-empty set of subvarieties of $\\mathfrak{V}$ has a minimal member)\nif and only if $\\mathfrak{V}$ has no infinite independent system of identities, i.e. every\nset of words that is independent modulo the identities of $\\mathfrak{V}$ is finite?\n\nThis is the equivalence of properties 1) and 3) of Problem 8.19.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      (WellFoundedLT (Set.Iic V) ↔ ∀ S, V.IsIndependentSystem S → S.Finite) := by\n  sorry",
+    "kourovka.«8.19».parts.iii": "/--\nIs it true that a variety of groups $\\mathfrak{V}$ has at most countably many subvarieties\nif and only if $\\mathfrak{V}$ has no infinite independent system of identities, i.e. every\nset of words that is independent modulo the identities of $\\mathfrak{V}$ is finite?\n\nThis is the equivalence of properties 2) and 3) of Problem 8.19.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety,\n      ((Set.Iic V).Countable ↔ ∀ S, V.IsIndependentSystem S → S.Finite) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.i": "/--\nIs it true that a soluble variety of groups $\\mathfrak{V}$ satisfies the minimum condition\nfor subvarieties (every non-empty set of subvarieties of $\\mathfrak{V}$ has a minimal\nmember) if and only if $\\mathfrak{V}$ has at most countably many subvarieties?\n\nThis is the equivalence of properties 1) and 2) of Problem 8.19 for soluble varieties.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.i : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (WellFoundedLT (Set.Iic V) ↔ (Set.Iic V).Countable) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.ii": "/--\nIs it true that a soluble variety of groups $\\mathfrak{V}$ satisfies the minimum condition\nfor subvarieties (every non-empty set of subvarieties of $\\mathfrak{V}$ has a minimal\nmember) if and only if $\\mathfrak{V}$ has no infinite independent system of identities,\ni.e. every set of words that is independent modulo the identities of $\\mathfrak{V}$ is\nfinite?\n\nThis is the equivalence of properties 1) and 3) of Problem 8.19 for soluble varieties.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.ii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      (WellFoundedLT (Set.Iic V) ↔ ∀ S, V.IsIndependentSystem S → S.Finite) := by\n  sorry",
+    "kourovka.«8.19».variants.soluble.parts.iii": "/--\nIs it true that a soluble variety of groups $\\mathfrak{V}$ has at most countably many\nsubvarieties if and only if $\\mathfrak{V}$ has no infinite independent system of\nidentities, i.e. every set of words that is independent modulo the identities of\n$\\mathfrak{V}$ is finite?\n\nThis is the equivalence of properties 2) and 3) of Problem 8.19 for soluble varieties.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.19».variants.soluble.parts.iii : answer(sorry) ↔\n    ∀ V : GroupVariety, V.IsSoluble →\n      ((Set.Iic V).Countable ↔ ∀ S, V.IsIndependentSystem S → S.Finite) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«8.19».parts.i": "c02",
+  "kourovka.«8.19».parts.ii": "c02",
+  "kourovka.«8.19».parts.iii": "c02",
+  "kourovka.«8.19».variants.soluble.parts.i": "c02",
+  "kourovka.«8.19».variants.soluble.parts.ii": "c02",
+  "kourovka.«8.19».variants.soluble.parts.iii": "c02"
+ },
+ "id": "kourovka-8.19",
+ "main_attempt": "c02"
+}

@@ -1,0 +1,415 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.82\n\nby H. Helling\n\nLet $\\mathfrak{H} = \\{(z, r) \\mid z \\in \\mathbb{C},\\ r > 0\\}$ be the three-dimensional\nPoincaré space, on which $SL_2(\\mathbb{C})$ acts by\n$$(z,r)\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} =\n\\left(\\frac{(az+b)\\overline{(cz+d)} + a\\bar{c}r^2}{|cz+d|^2 + |c|^2 r^2},\\\n\\frac{r}{|cz+d|^2 + |c|^2 r^2}\\right).$$\nLet $\\mathfrak{o}$ be the ring of integers of the field $K = \\mathbb{Q}(\\sqrt{D})$, where\n$D < 0$, let $\\pi$ be a prime such that $\\pi\\bar{\\pi}$ is a prime in $\\mathbb{Z}$, and let\n$$\\Gamma = \\left\\{ \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in SL_2(\\mathfrak{o})\n\\;\\middle|\\; b \\equiv 0 \\pmod{\\pi} \\right\\}.$$\nAdding to the space $\\Gamma \\backslash \\mathfrak{H}^3$ two vertices we get a three-dimensional\ncompact space $\\overline{\\Gamma \\backslash \\mathfrak{H}^3}$.\n\nCalculate\n$$r(\\pi) = \\dim_{\\mathbb{Q}} H_1(\\overline{\\Gamma \\backslash \\mathfrak{H}^3}, \\mathbb{Q})\n= \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q}).$$\n\nFor example, if $D = -3$ then $r(\\pi)$ is distinct from zero for the first time for\n$\\pi \\mid 73$ (then $r(\\pi) = 1$), and if $D = -4$ then $r(\\pi) = 1$ for $\\pi \\mid 137$.\n\nOnly the two examples are formalised here, using the group-theoretic description\n$r(\\pi) = \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q})$ of $r(\\pi)$. The field\n$K = \\mathbb{Q}(\\sqrt{D})$ is any number field $K$ generated over $\\mathbb{Q}$ by a square root\nof $D$, $\\mathfrak{o} = \\mathcal{O}_K$ is its ring of integers, and $\\pi\\bar{\\pi}$ is the norm\n$N_{K/\\mathbb{Q}}(\\pi)$ of $\\pi$. Since $\\Gamma$ depends on $\\pi$ only through the ideal\n$(\\pi)$, and $\\Gamma$ for $\\bar{\\pi}$ is isomorphic to $\\Gamma$ for $\\pi$, the number $r(\\pi)$\ndepends only on the rational prime $\\pi\\bar{\\pi}$; \"for the first time\" is read as ordering the\nadmissible primes $\\pi$ by $\\pi\\bar{\\pi}$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Matrix Matrix.SpecialLinearGroup IntermediateField NumberField\nopen scoped MatrixGroups TensorProduct\n\nnamespace Kourovka.«8.82»\n\nsection Definitions\n\nvariable {K : Type*} [Field K]\n\n/--\nThe group\n$\\Gamma = \\left\\{ \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in SL_2(\\mathfrak{o})\n\\;\\middle|\\; b \\equiv 0 \\pmod{\\pi} \\right\\}$,\nwhere $\\mathfrak{o} = \\mathcal{O}_K$ is the ring of integers of $K$ and $\\pi \\in \\mathfrak{o}$.\n-/\ndef Gamma (π : 𝓞 K) : Subgroup SL(2, 𝓞 K) where\n  carrier := {g | π ∣ g 0 1}\n  one_mem' := by simp\n  mul_mem' := by\n    intro a b ha hb\n    simp only [Set.mem_setOf_eq] at *\n    rw [coe_mul, (Matrix.two_mul_expl a.1 b.1).2.1]\n    exact dvd_add (dvd_mul_of_dvd_right hb _) (dvd_mul_of_dvd_left ha _)\n  inv_mem' := by\n    intro a ha\n    simp only [Set.mem_setOf_eq] at *\n    rw [SL2_inv_expl a]\n    simpa using ha\n\n@[category API, AMS 11 20]\ntheorem mem_Gamma_iff {π : 𝓞 K} {g : SL(2, 𝓞 K)} : g ∈ Gamma π ↔ π ∣ g 0 1 :=\n  Iff.rfl\n\n@[category test, AMS 11 20]\ntheorem Gamma_one_eq_top : Gamma (1 : 𝓞 K) = ⊤ := by\n  ext g\n  simp [mem_Gamma_iff]\n\n/--\n$r(\\pi) = \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q})$, the rank of the abelianization\nof $\\Gamma$, formalised as the dimension of the $\\mathbb{Q}$-vector space\n$\\mathbb{Q} \\otimes_{\\mathbb{Z}} \\Gamma^{ab}$.\n\nSince $\\Gamma$ has finite index in the finitely generated group $SL_2(\\mathfrak{o})$, it is\nfinitely generated, so this vector space is finite-dimensional and `Module.finrank` is its\ndimension.\n-/\nnoncomputable def r (π : 𝓞 K) : ℕ :=\n  Module.finrank ℚ (ℚ ⊗[ℤ] Additive (Abelianization (Gamma π)))\n\nend Definitions\n\n/--\nIf $D = -3$ then $r(\\pi)$ is distinct from zero for the first time for $\\pi \\mid 73$\n(then $r(\\pi) = 1$).\n\nThat is, let $K = \\mathbb{Q}(\\sqrt{-3})$ and let $\\pi$ be a prime of $\\mathfrak{o} = \\mathcal{O}_K$\nsuch that $\\pi\\bar{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is a prime in $\\mathbb{Z}$. Then $r(\\pi) = 0$\nwhenever $\\pi\\bar{\\pi} < 73$, and $r(\\pi) = 1$ whenever $\\pi \\mid 73$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_3 (K : Type*) [Field K] [NumberField K]\n    (hK : ∃ x : K, x ^ 2 = -3 ∧ ℚ⟮x⟯ = ⊤) (π : 𝓞 K) (hπ : Prime π)\n    (hN : Prime (Algebra.norm ℤ π)) :\n    (Algebra.norm ℤ π < 73 → r π = 0) ∧ (π ∣ 73 → r π = 1) := by\n  sorry\n\n/--\nIf $D = -4$ then $r(\\pi) = 1$ for $\\pi \\mid 137$.\n\nThat is, let $K = \\mathbb{Q}(\\sqrt{-4}) = \\mathbb{Q}(i)$, so that $\\mathfrak{o} = \\mathcal{O}_K\n= \\mathbb{Z}[i]$, and let $\\pi$ be a prime of $\\mathfrak{o}$ such that\n$\\pi\\bar{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is a prime in $\\mathbb{Z}$. If $\\pi \\mid 137$ then\n$r(\\pi) = 1$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_4 (K : Type*) [Field K] [NumberField K]\n    (hK : ∃ x : K, x ^ 2 = -4 ∧ ℚ⟮x⟯ = ⊤) (π : 𝓞 K) (hπ : Prime π)\n    (hN : Prime (Algebra.norm ℤ π)) (h : π ∣ 137) :\n    r π = 1 := by\n  sorry\n\nend Kourovka.«8.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The decomposition is sound: the primary 'Calculate r(π)' has no statable Prop, and the two examples are faithfully statable. One minor note: the table's D = -3 note says r(π) = 0 for admissible primes with N(π) < 73; this includes the ramified prime π = √-3 (N = 3), which the notebook's 'π such that ππ̄ is a prime in ℤ' does admit, so the formalisation includes it as well.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "r(π) is formalised via the notebook's group-theoretic expression dim_ℚ(Γ^ab ⊗ ℚ), not via H₁ of the compactified quotient Γ\\𝔥³ ∪ {two vertices}; the latter would require hyperbolic 3-space, the quotient orbifold, its compactification and singular homology, none of which is usable in Mathlib. The notebook asserts the two expressions are equal.",
+    "The tensor product is written ℚ ⊗[ℤ] Additive (Abelianization Γ) (ℚ on the left) so that Mathlib's TensorProduct.leftModule gives the ℚ-vector-space structure; this is canonically Γ^ab ⊗ ℚ.",
+    "Module.finrank returns 0 for infinite-dimensional spaces; this is harmless because Γ has finite index in the finitely generated Bianchi group SL₂(𝔬), so Γ^ab ⊗ ℚ is finite-dimensional. Noted in the docstring of r.",
+    "K = ℚ(√D) is modelled as an arbitrary number field K with ∃ x : K, x ^ 2 = D ∧ ℚ⟮x⟯ = ⊤ (K generated over ℚ by a square root of D), and 𝔬 = 𝓞 K. [NumberField K] is a (redundant but true) hypothesis needed for Algebra.norm ℤ on 𝓞 K to be the genuine norm.",
+    "'π a prime' is Prime π in 𝓞 K; 'ππ̄ is a prime in ℤ' is Prime (Algebra.norm ℤ π), since for an imaginary quadratic field ππ̄ = N_{K/ℚ}(π) (Algebra.coe_norm_int). The norm hypothesis is retained as a standing hypothesis even where it is implied (π ∣ 73 or π ∣ 137).",
+    "'For the first time for π ∣ 73' is read as: r(π) = 0 for every admissible π with ππ̄ < 73, and r(π) = 1 for every prime π ∣ 73 (r depends on π only through the rational prime ππ̄, since unit multiples give the same group and π ↦ π̄ gives an isomorphic one).",
+    "The condition b ≡ 0 (mod π) is applied to the (0,1) entry g 0 1, matching the notebook's matrix (a b; c d); this is Γ^0(π) in modern notation (transpose-conjugate of Γ₀(π)), and the two have isomorphic abelianizations anyway.",
+    "Category tag: both slots are tagged `research open` as instructed ('matching the status above'). A reviewer may prefer `research solved`, since these examples are established computations (Grunewald–Helling–Mennicke, 1978) asserted as facts in the notebook.",
+    "Two small helper statements (mem_Gamma_iff as API, Gamma_one_eq_top as test) are included for the bespoke definition, per the repository's request for basic API tests."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "CongruenceSubgroup.Gamma0 / Gamma (Mathlib) — only for SL(2, ℤ) modulo a natural number N, using the (1,0) entry; not applicable to SL₂ over a ring of integers modulo an element π.",
+     "name": "Kourovka.«8.82».Gamma",
+     "why_needed": "The notebook's group Γ = {(a b; c d) ∈ SL₂(𝔬) | b ≡ 0 mod π} for 𝔬 the ring of integers of an arbitrary number field K and π ∈ 𝔬. Defined as a Subgroup SL(2, 𝓞 K) with carrier {g | π ∣ g 0 1} (the (0,1) entry is b); closure proofs adapted from Mathlib's CongruenceSubgroup.Gamma0."
+    },
+    {
+     "closest_existing_considered": "Abelianization, TensorProduct, Module.finrank (all used); groupHomology (Rep.trivial ℚ Γ ℚ) 1 would be H₁(Γ, ℚ), but the notebook gives Γ^ab ⊗ ℚ, which is stated literally instead. No existing 'rank of abelianization' definition in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«8.82».r",
+     "why_needed": "The quantity r(π) = dim_ℚ(Γ^ab ⊗ ℚ) of the notebook, formalised as Module.finrank ℚ (ℚ ⊗[ℤ] Additive (Abelianization (Gamma π)))."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.82».variants.example_d_neg_3": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated for any number field K with ∃ x, x^2 = -3 ∧ ℚ⟮x⟯ = ⊤ (i.e. K = ℚ(√-3)), 𝔬 = 𝓞 K, π a Prime of 𝓞 K with Prime (Algebra.norm ℤ π) (ππ̄ a rational prime): (Algebra.norm ℤ π < 73 → r π = 0) ∧ (π ∣ 73 → r π = 1), where r π = finrank_ℚ (ℚ ⊗[ℤ] Γ^ab) and Γ = {g ∈ SL(2, 𝓞 K) | π ∣ g 0 1}. 'For the first time' is read as ordering admissible primes by ππ̄, as in the decomposition notes."
+    },
+    "kourovka.«8.82».variants.example_d_neg_4": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated for any number field K with ∃ x, x^2 = -4 ∧ ℚ⟮x⟯ = ⊤ (i.e. K = ℚ(√-4) = ℚ(i), 𝔬 = ℤ[i]), π a Prime of 𝓞 K with prime norm and π ∣ 137: r π = 1. No minimality claim is made, matching the text."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.82».variants.example_d_neg_3": "/--\nIf $D = -3$ then $r(\\pi)$ is distinct from zero for the first time for $\\pi \\mid 73$\n(then $r(\\pi) = 1$).\n\nThat is, let $K = \\mathbb{Q}(\\sqrt{-3})$ and let $\\pi$ be a prime of $\\mathfrak{o} = \\mathcal{O}_K$\nsuch that $\\pi\\bar{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is a prime in $\\mathbb{Z}$. Then $r(\\pi) = 0$\nwhenever $\\pi\\bar{\\pi} < 73$, and $r(\\pi) = 1$ whenever $\\pi \\mid 73$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_3 (K : Type*) [Field K] [NumberField K]\n    (hK : ∃ x : K, x ^ 2 = -3 ∧ ℚ⟮x⟯ = ⊤) (π : 𝓞 K) (hπ : Prime π)\n    (hN : Prime (Algebra.norm ℤ π)) :\n    (Algebra.norm ℤ π < 73 → r π = 0) ∧ (π ∣ 73 → r π = 1) := by\n  sorry",
+    "kourovka.«8.82».variants.example_d_neg_4": "/--\nIf $D = -4$ then $r(\\pi) = 1$ for $\\pi \\mid 137$.\n\nThat is, let $K = \\mathbb{Q}(\\sqrt{-4}) = \\mathbb{Q}(i)$, so that $\\mathfrak{o} = \\mathcal{O}_K\n= \\mathbb{Z}[i]$, and let $\\pi$ be a prime of $\\mathfrak{o}$ such that\n$\\pi\\bar{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is a prime in $\\mathbb{Z}$. If $\\pi \\mid 137$ then\n$r(\\pi) = 1$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_4 (K : Type*) [Field K] [NumberField K]\n    (hK : ∃ x : K, x ^ 2 = -4 ∧ ℚ⟮x⟯ = ⊤) (π : 𝓞 K) (hπ : Prime π)\n    (hN : Prime (Algebra.norm ℤ π)) (h : π ∣ 137) :\n    r π = 1 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.82\n\nby H. Helling\n\nLet $\\mathfrak{o}$ be the ring of integers in an imaginary quadratic field and let\n$\\pi$ be a prime of $\\mathfrak{o}$ whose norm is a rational prime. For the subgroup\n$$\n  \\Gamma(\\pi)=\\left\\{\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}\\in\n  \\operatorname{SL}_2(\\mathfrak{o}):\\pi\\mid b\\right\\},\n$$\nthe problem asks for the rational dimension of the abelianization of $\\Gamma(\\pi)$.\nThis file records the two example computations stated with the problem.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.82»\n\nopen Matrix Matrix.SpecialLinearGroup\nopen scoped MatrixGroups\n\n/-- The ring of integers of the imaginary quadratic field of discriminant $-3$, presented as\n$\\mathbb{Z}[\\omega]$ with $\\omega^2-\\omega+1=0$. -/\nabbrev EisensteinInt := QuadraticAlgebra ℤ (-1) 1\n\n/-- The subgroup $\\Gamma(\\pi)$ of $\\operatorname{SL}_2(R)$ consisting of matrices whose\nupper-right entry is divisible by $\\pi$. -/\ndef congruenceSubgroup {R : Type*} [CommRing R] (π : R) : Subgroup SL(2, R) where\n  carrier := {g | π ∣ g 0 1}\n  one_mem' := by simp\n  mul_mem' := by\n    intro x y hx hy\n    show π ∣ (x * y : SL(2, R)) 0 1\n    rw [show (x * y : SL(2, R)) 0 1 = x 0 0 * y 0 1 + x 0 1 * y 1 1 by\n      simpa only [coe_mul] using (Matrix.two_mul_expl x.1 y.1).2.1]\n    exact dvd_add (dvd_mul_of_dvd_right hy _) (dvd_mul_of_dvd_left hx _)\n  inv_mem' := by\n    intro x hx\n    rw [SL2_inv_expl x]\n    simpa using (dvd_neg.mpr hx)\n\n/-- The rational dimension of the abelianization of $\\Gamma(\\pi)$. The tensor factors are\nwritten in the order $\\mathbb{Q}\\otimes_{\\mathbb{Z}}\\Gamma(\\pi)^{\\mathrm{ab}}$ so that the\nrational vector-space structure is available directly. -/\nnoncomputable def r {R : Type*} [CommRing R] (π : R) : Cardinal :=\n  Module.rank ℚ (TensorProduct ℤ ℚ (Additive (Abelianization (congruenceSubgroup π))))\n\n/--\nFor $D=-3$, the first admissible primes with nonzero $r(\\pi)$, ordered by their rational\nprime norm, are those dividing $73$: every prime $\\pi\\in\\mathbb{Z}[\\omega]$ of prime norm\nless than $73$ has $r(\\pi)=0$, while every such prime dividing $73$ has\n$r(\\pi)=1$.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_3 : ∀ π : EisensteinInt,\n    Prime π → Nat.Prime (QuadraticAlgebra.norm π).natAbs →\n      ((QuadraticAlgebra.norm π).natAbs < 73 → r π = 0) ∧\n      (π ∣ (73 : EisensteinInt) → r π = 1) := by\n  sorry\n\n/--\nFor $D=-4$, so that $\\mathfrak{o}=\\mathbb{Z}[i]$, every admissible Gaussian prime\n$\\pi$ dividing $137$ has $r(\\pi)=1$.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_4 : ∀ π : GaussianInt,\n    Prime π → Nat.Prime (Zsqrtd.norm π).natAbs →\n      π ∣ (137 : GaussianInt) → r π = 1 := by\n  sorry\n\nend Kourovka.«8.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled the ring of integers for discriminant -3 as `QuadraticAlgebra ℤ (-1) 1`, with generator satisfying ω² - ω + 1 = 0; modeled the discriminant -4 ring with Mathlib's `GaussianInt`.",
+    "Modeled Γ(π) as the subgroup of `SL(2, R)` whose upper-right matrix entry is divisible by π.",
+    "Modeled admissibility as `Prime π` together with primality of the natural absolute value of the quadratic norm.",
+    "Read “for the first time” as ordering by the rational prime norm: all admissible π of norm below 73 have rank zero, and admissible π dividing 73 have rank one.",
+    "Used the cardinal-valued `Module.rank` of `ℚ ⊗[ℤ] Additive (Abelianization Γ)` to represent rational dimension without the infinite-dimensional fallback behavior of `Module.finrank`.",
+    "Interpreted π dividing 73 or 137 as divisibility in the corresponding quadratic integer ring."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`Zsqrtd (-3)` (not the full ring of integers) and `QuadraticAlgebra ℤ (-1) 1` (used as the faithful presentation).",
+     "name": "Kourovka.«8.82».EisensteinInt",
+     "why_needed": "A concrete presentation of the full ring of integers of discriminant -3 is needed, and Mathlib has no dedicated Eisenstein-integer type."
+    },
+    {
+     "closest_existing_considered": "`CongruenceSubgroup.Gamma0`, which is over ℤ and constrains the lower-left entry.",
+     "name": "Kourovka.«8.82».congruenceSubgroup",
+     "why_needed": "The problem uses a Bianchi-group congruence subgroup over quadratic integer rings with the upper-right entry divisible by π; existing congruence subgroups are specialized to `SL(2, ℤ)` and natural-number levels."
+    },
+    {
+     "closest_existing_considered": "`Abelianization`, `TensorProduct`, and `Module.rank`, which are composed directly in this definition.",
+     "name": "Kourovka.«8.82».r",
+     "why_needed": "No existing definition packages the rational dimension of the abelianization of this π-dependent subgroup."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.82».variants.example_d_neg_3": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.82».variants.example_d_neg_4": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.82».variants.example_d_neg_3": "/--\nFor $D=-3$, the first admissible primes with nonzero $r(\\pi)$, ordered by their rational\nprime norm, are those dividing $73$: every prime $\\pi\\in\\mathbb{Z}[\\omega]$ of prime norm\nless than $73$ has $r(\\pi)=0$, while every such prime dividing $73$ has\n$r(\\pi)=1$.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_3 : ∀ π : EisensteinInt,\n    Prime π → Nat.Prime (QuadraticAlgebra.norm π).natAbs →\n      ((QuadraticAlgebra.norm π).natAbs < 73 → r π = 0) ∧\n      (π ∣ (73 : EisensteinInt) → r π = 1) := by\n  sorry",
+    "kourovka.«8.82».variants.example_d_neg_4": "/--\nFor $D=-4$, so that $\\mathfrak{o}=\\mathbb{Z}[i]$, every admissible Gaussian prime\n$\\pi$ dividing $137$ has $r(\\pi)=1$.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_4 : ∀ π : GaussianInt,\n    Prime π → Nat.Prime (Zsqrtd.norm π).natAbs →\n      π ∣ (137 : GaussianInt) → r π = 1 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.82\n\nby H. Helling\n\nLet $\\mathfrak{H} = \\mathbb{C} \\times \\mathbb{R} = \\{(z, r) \\mid z \\in \\mathbb{C},\\ r > 0\\}$\nbe the three-dimensional Poincaré space which admits the following action of the group\n$SL_2(\\mathbb{C})$:\n$$(z, r) \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} =\n\\left(\\frac{(az + b)\\overline{(cz + d)} + a\\,\\overline{c}\\,r^2}{|cz + d|^2 + |c|^2 r^2},\\\n\\frac{r}{|cz + d|^2 + |c|^2 r^2}\\right).$$\nLet $\\mathfrak{o}$ be the ring of integers of the field $K = \\mathbb{Q}(\\sqrt{D})$, where\n$D < 0$, $\\pi$ a prime such that $\\pi\\overline{\\pi}$ is a prime in $\\mathbb{Z}$ and let\n$$\\Gamma = \\left\\{\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in SL_2(\\mathfrak{o})\n\\ \\middle|\\ b \\equiv 0 \\pmod{\\pi}\\right\\}.$$\nAdding to the space $\\Gamma \\backslash \\mathfrak{H}^3$ two vertices we get a three-dimensional\ncompact space $\\overline{\\Gamma \\backslash \\mathfrak{H}^3}$.\n\nCalculate\n$$r(\\pi) = \\dim_{\\mathbb{Q}} H_1(\\overline{\\Gamma \\backslash \\mathfrak{H}^3}, \\mathbb{Q})\n= \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q}).$$\n\nFor example, if $D = -3$ then $r(\\pi)$ is distinct from zero for the first time for\n$\\pi \\mid 73$ (then $r(\\pi) = 1$), and if $D = -4$ then $r(\\pi) = 1$ for $\\pi \\mid 137$.\n\nThe request \"calculate $r(\\pi)$\" is not a proposition, so this file formalizes the two\nnumerical examples. The invariant $r(\\pi)$ is taken in its group-theoretic form\n$r(\\pi) = \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q})$, and the condition on $\\pi$\nis expressed through the norm $N_{K/\\mathbb{Q}}(\\pi) = \\pi\\overline{\\pi}$.\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 8.82\n* F. Grunewald, H. Helling, J. Mennicke, *SL₂ over complex quadratic number fields. I*,\n  Algebra i Logika 17 (1978), 512–580.\n-/\n\nopen scoped MatrixGroups TensorProduct\nopen NumberField\n\nnamespace Kourovka.«8.82»\n\nvariable {R : Type*} [CommRing R]\n\n/-- For a commutative ring $R$ and an element $\\pi \\in R$, the subgroup\n$\\Gamma = \\left\\{\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in SL_2(R) \\mid\nb \\equiv 0 \\pmod{\\pi}\\right\\}$ of $SL_2(R)$. -/\ndef Gamma (π : R) : Subgroup SL(2, R) where\n  carrier := {g | π ∣ g.1 0 1}\n  one_mem' := by simp\n  mul_mem' := by\n    intro a b ha hb\n    simp only [Set.mem_setOf_eq, Matrix.SpecialLinearGroup.coe_mul, Matrix.mul_apply,\n      Fin.sum_univ_two] at *\n    exact dvd_add (dvd_mul_of_dvd_right hb _) (dvd_mul_of_dvd_left ha _)\n  inv_mem' := by\n    intro a ha\n    simp only [Set.mem_setOf_eq] at *\n    rw [Matrix.SpecialLinearGroup.SL2_inv_expl a]\n    simpa using ha\n\n@[category API, AMS 20]\ntheorem mem_Gamma {π : R} {g : SL(2, R)} : g ∈ Gamma π ↔ π ∣ g.1 0 1 := Iff.rfl\n\n@[category API, AMS 20]\ntheorem Gamma_one : Gamma (1 : R) = ⊤ :=\n  Subgroup.eq_top_iff' _ |>.mpr fun _ => one_dvd _\n\n/-- The invariant $r(\\pi) = \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q})$: the rank of the\nabelianization of $\\Gamma = \\left\\{\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in SL_2(R)\n\\mid b \\equiv 0 \\pmod{\\pi}\\right\\}$. -/\nnoncomputable def r (π : R) : ℕ :=\n  Module.finrank ℚ (ℚ ⊗[ℤ] Additive (Abelianization (Gamma π)))\n\n/--\nLet $\\mathfrak{o}$ be the ring of integers of $K = \\mathbb{Q}(\\sqrt{-3})$ and let $\\pi \\in\n\\mathfrak{o}$ be a prime such that $\\pi\\overline{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is a prime in\n$\\mathbb{Z}$. Let $\\Gamma = \\left\\{\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in\nSL_2(\\mathfrak{o}) \\mid b \\equiv 0 \\pmod{\\pi}\\right\\}$ and\n$r(\\pi) = \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q})$.\nThen $r(\\pi)$ is distinct from zero for the first time for $\\pi \\mid 73$, and then $r(\\pi) = 1$.\nThat is, ordering the primes $\\pi$ by the rational prime $\\pi\\overline{\\pi}$: $r(\\pi) = 0$\nwhenever $\\pi\\overline{\\pi} < 73$, and $r(\\pi) = 1$ whenever $\\pi \\mid 73$.\n\nHere $K$ is any quadratic extension of $\\mathbb{Q}$ containing a square root of $-3$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_3 (K : Type*) [Field K] [NumberField K]\n    [Algebra.IsQuadraticExtension ℚ K] (hK : ∃ x : K, x ^ 2 = -3)\n    (π : 𝓞 K) (hπ : Prime π) (hN : Prime (Algebra.norm ℤ π)) :\n    (Algebra.norm ℤ π < 73 → r π = 0) ∧ (π ∣ 73 → r π = 1) := by\n  sorry\n\n/--\nLet $\\mathfrak{o}$ be the ring of integers of $K = \\mathbb{Q}(\\sqrt{-4}) = \\mathbb{Q}(i)$ and let\n$\\pi \\in \\mathfrak{o}$ be a prime such that $\\pi\\overline{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is a\nprime in $\\mathbb{Z}$. Let $\\Gamma = \\left\\{\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in\nSL_2(\\mathfrak{o}) \\mid b \\equiv 0 \\pmod{\\pi}\\right\\}$ and\n$r(\\pi) = \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q})$.\nThen $r(\\pi) = 1$ for $\\pi \\mid 137$.\n\nHere $K$ is any quadratic extension of $\\mathbb{Q}$ containing a square root of $-4$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_4 (K : Type*) [Field K] [NumberField K]\n    [Algebra.IsQuadraticExtension ℚ K] (hK : ∃ x : K, x ^ 2 = -4)\n    (π : 𝓞 K) (hπ : Prime π) (hN : Prime (Algebra.norm ℤ π)) (h : π ∣ 137) :\n    r π = 1 := by\n  sorry\n\nend Kourovka.«8.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None of substance. I agree the primary ('Calculate r(π)') has no statable Prop. Minor note: the D=-3 slot's 'r(π) = 0 for N(π) < 73' reading includes the ramified prime π = √-3 (N = 3), which the notebook's phrasing also covers since it only requires ππ̄ to be a rational prime; I followed the notebook rather than restricting to split primes.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "K = ℚ(√D) is encoded as: K a number field with [Algebra.IsQuadraticExtension ℚ K] and ∃ x : K, x^2 = D (D = -3, resp. -4). All such K are isomorphic to ℚ(√-3), resp. ℚ(i), so quantifying over all such K is equivalent to the concrete field; this avoids relying on discriminant conventions (ℚ(√-4) = ℚ(i) either way). An alternative would have been NumberField.discr K = D, or the concrete rings GaussianInt / 𝓞 (CyclotomicField 3 ℚ).",
+    "'ππ̄ is a prime in ℤ' is encoded as Prime (Algebra.norm ℤ π), since N_{K/ℚ}(π) = ππ̄ for imaginary quadratic K (norm is positive, so Prime in ℤ is the usual primality). The redundant hypothesis Prime π from the notebook is kept.",
+    "Γ uses the notebook's convention b ≡ 0 (mod π) on the upper-right entry g 0 1 (Mathlib's Gamma0 uses the lower-left entry; the groups are conjugate, so r(π) is unaffected).",
+    "r(π) is taken as the group-theoretic quantity dim_ℚ(Γ^ab ⊗ ℚ) given in the notebook, not as H₁ of the compactified orbifold (which the notebook asserts to be equal; for D = -3, -4 the cusp contributions vanish rationally because 𝔬 has units of order > 2). Module.finrank would be 0 for infinite rank, but Γ is a finite-index subgroup of the finitely generated group SL₂(𝔬), so this degenerate case cannot occur.",
+    "'r(π) ≠ 0 for the first time for π | 73' is read as: r(π) = 0 for every admissible π with N(π) < 73 (ordering by the rational prime ππ̄; r depends on π only through ππ̄ up to conjugate/unit multiples) and r(π) = 1 for every π | 73. Both primes above 73 (i.e. π and π̄) are covered; nothing is claimed for N(π) > 73.",
+    "Both slot theorems are tagged `research open` as instructed by the task's status. A reviewer may prefer `research solved`, since these numerical examples are asserted as known computations (Grunewald–Helling–Mennicke) rather than open questions.",
+    "Universe-polymorphic K : Type* is used for the field; the two API lemmas for `Gamma` carry AMS 20."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "CongruenceSubgroup.Gamma0 (SL(2,ℤ) only, lower-left entry, ℕ level); Matrix.SpecialLinearGroup.diagonalSubgroup in FormalConjecturesForMathlib",
+     "name": "Kourovka.«8.82».Gamma",
+     "why_needed": "The congruence subgroup {(a b; c d) ∈ SL₂(R) | b ≡ 0 (mod π)} for a general commutative ring R and element π. Mathlib's CongruenceSubgroup.Gamma0 exists only for SL(2, ℤ) with a natural-number level and uses the lower-left entry; nothing in FormalConjecturesForMathlib covers SL₂ over a ring of integers with a principal level. Comes with two `category API` lemmas (`mem_Gamma`, `Gamma_one`), fully proved."
+    },
+    {
+     "closest_existing_considered": "Module.finrank ℤ (Additive (Abelianization _)) (equal for finitely generated groups, but the ℚ ⊗ form is the source's literal expression)",
+     "name": "Kourovka.«8.82».r",
+     "why_needed": "The notebook's invariant r(π) = dim_ℚ(Γ^ab ⊗ ℚ), defined literally as Module.finrank ℚ (ℚ ⊗[ℤ] Additive (Abelianization (Gamma π))). It is a problem-specific shorthand, used by both slots."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.82».variants.example_d_neg_3": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated for any number field K quadratic over ℚ containing a square root of -3 (i.e. K = ℚ(√-3)), 𝔬 = 𝓞 K, π ∈ 𝓞 K prime with N_{K/ℚ}(π) = ππ̄ prime in ℤ: (N(π) < 73 → r(π) = 0) ∧ (π ∣ 73 → r(π) = 1), where r(π) = dim_ℚ(Γ^ab ⊗ ℚ) and Γ = {g ∈ SL₂(𝔬) | b ≡ 0 mod π}. 'For the first time' read as ordering by the rational prime ππ̄, as in the decomposition notes."
+    },
+    "kourovka.«8.82».variants.example_d_neg_4": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated for any number field K quadratic over ℚ containing a square root of -4 (i.e. K = ℚ(i)), π ∈ 𝓞 K prime with N(π) prime in ℤ and π ∣ 137: r(π) = 1. No minimality claim, matching the source."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.82».variants.example_d_neg_3": "/--\nLet $\\mathfrak{o}$ be the ring of integers of $K = \\mathbb{Q}(\\sqrt{-3})$ and let $\\pi \\in\n\\mathfrak{o}$ be a prime such that $\\pi\\overline{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is a prime in\n$\\mathbb{Z}$. Let $\\Gamma = \\left\\{\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in\nSL_2(\\mathfrak{o}) \\mid b \\equiv 0 \\pmod{\\pi}\\right\\}$ and\n$r(\\pi) = \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q})$.\nThen $r(\\pi)$ is distinct from zero for the first time for $\\pi \\mid 73$, and then $r(\\pi) = 1$.\nThat is, ordering the primes $\\pi$ by the rational prime $\\pi\\overline{\\pi}$: $r(\\pi) = 0$\nwhenever $\\pi\\overline{\\pi} < 73$, and $r(\\pi) = 1$ whenever $\\pi \\mid 73$.\n\nHere $K$ is any quadratic extension of $\\mathbb{Q}$ containing a square root of $-3$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_3 (K : Type*) [Field K] [NumberField K]\n    [Algebra.IsQuadraticExtension ℚ K] (hK : ∃ x : K, x ^ 2 = -3)\n    (π : 𝓞 K) (hπ : Prime π) (hN : Prime (Algebra.norm ℤ π)) :\n    (Algebra.norm ℤ π < 73 → r π = 0) ∧ (π ∣ 73 → r π = 1) := by\n  sorry",
+    "kourovka.«8.82».variants.example_d_neg_4": "/--\nLet $\\mathfrak{o}$ be the ring of integers of $K = \\mathbb{Q}(\\sqrt{-4}) = \\mathbb{Q}(i)$ and let\n$\\pi \\in \\mathfrak{o}$ be a prime such that $\\pi\\overline{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is a\nprime in $\\mathbb{Z}$. Let $\\Gamma = \\left\\{\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in\nSL_2(\\mathfrak{o}) \\mid b \\equiv 0 \\pmod{\\pi}\\right\\}$ and\n$r(\\pi) = \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q})$.\nThen $r(\\pi) = 1$ for $\\pi \\mid 137$.\n\nHere $K$ is any quadratic extension of $\\mathbb{Q}$ containing a square root of $-4$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_4 (K : Type*) [Field K] [NumberField K]\n    [Algebra.IsQuadraticExtension ℚ K] (hK : ∃ x : K, x ^ 2 = -4)\n    (π : 𝓞 K) (hπ : Prime π) (hN : Prime (Algebra.norm ℤ π)) (h : π ∣ 137) :\n    r π = 1 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.82\n\nby H. Helling\n\nLet $\\mathfrak{o}$ be the ring of integers of an imaginary quadratic field. For a prime\n$\\pi \\in \\mathfrak{o}$ whose norm $\\pi\\overline{\\pi}$ is a rational prime, let\n$\\Gamma(\\pi)$ be the subgroup of $\\operatorname{SL}_2(\\mathfrak{o})$ whose upper-right\nmatrix entry is divisible by $\\pi$. The problem asks to calculate the rational first Betti\nnumber of the compactified quotient of three-dimensional Poincaré space by $\\Gamma(\\pi)$,\nequivalently the rational rank of the abelianization of $\\Gamma(\\pi)$.\n\nThis file records the two computations stated as examples in the problem.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.82»\n\nopen scoped TensorProduct\n\n/-- The Eisenstein integers $\\mathbb{Z}[\\omega]$, where $\\omega^2+\\omega+1=0$. -/\nabbrev EisensteinInt := QuadraticAlgebra ℤ (-1) (-1)\n\n/-- The subgroup of $\\operatorname{SL}_2(R)$ whose upper-right entry is divisible by $\\pi$. -/\ndef Gamma {R : Type*} [CommRing R] (π : R) :\n    Subgroup (Matrix.SpecialLinearGroup (Fin 2) R) where\n  carrier := {g | π ∣ g 0 1}\n  one_mem' := by simp\n  mul_mem' := by\n    intro a b ha hb\n    change π ∣ (↑(a * b) : Matrix (Fin 2) (Fin 2) R) 0 1\n    rw [Matrix.SpecialLinearGroup.coe_mul, Matrix.mul_apply, Fin.sum_univ_two]\n    exact dvd_add (dvd_mul_of_dvd_right hb _) (dvd_mul_of_dvd_left ha _)\n  inv_mem' := by\n    intro a ha\n    change π ∣ (↑a⁻¹ : Matrix (Fin 2) (Fin 2) R) 0 1\n    rw [Matrix.SpecialLinearGroup.SL2_inv_expl]\n    simpa using dvd_neg.mpr ha\n\n/-- The dimension over $\\mathbb{Q}$ of the rationalized abelianization of `Gamma π`. -/\nnoncomputable def r {R : Type*} [CommRing R] (π : R) : ℕ :=\n  Module.finrank ℚ (ℚ ⊗[ℤ] Additive (Abelianization (Gamma π)))\n\n/--\nFor $D=-3$, so that $\\mathfrak{o}=\\mathbb{Z}[\\omega]$, the value $r(\\pi)$ is zero\nfor every prime $\\pi$ whose rational-prime norm is less than $73$. For every prime\n$\\pi$ dividing $73$, one has $r(\\pi)=1$. Thus $73$ is the first rational-prime\nnorm for which the rank is nonzero.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_3 :\n    (∀ π : EisensteinInt, Prime π → (QuadraticAlgebra.norm π).natAbs.Prime →\n      (QuadraticAlgebra.norm π).natAbs < 73 → r π = 0) ∧\n    (∀ π : EisensteinInt, Prime π → π ∣ (73 : EisensteinInt) → r π = 1) := by\n  sorry\n\n/--\nFor $D=-4$, so that $\\mathfrak{o}=\\mathbb{Z}[i]$, one has $r(\\pi)=1$ for every\nprime $\\pi$ dividing $137$. No minimality assertion is made in this case.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_4 :\n    ∀ π : GaussianInt, Prime π → π ∣ (137 : GaussianInt) → r π = 1 := by\n  sorry\n\nend Kourovka.«8.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.96,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled the ring of integers for D = -3 as QuadraticAlgebra ℤ (-1) (-1), i.e. ℤ[ω] with ω² + ω + 1 = 0; used Mathlib's GaussianInt for D = -4.",
+    "Modeled Γ(π) as the subgroup of SL₂ over the relevant ring whose upper-right (0,1) entry is divisible by π, exactly matching the source's condition on b.",
+    "Modeled r(π) as the ℚ-finrank of ℚ ⊗[ℤ] Additive (Abelianization (Γ(π))). The tensor factors are written in this order because Mathlib supplies the resulting ℚ-module structure directly; tensor-product commutativity identifies it with the source's Γᵃᵇ ⊗ ℚ.",
+    "Read 'for the first time' for D = -3 as vanishing for every admissible prime of rational-prime norm strictly below 73, together with rank one for every prime divisor of 73, as prescribed by the decomposition table.",
+    "Did not add a minimality assertion to the D = -4 computation."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's Zsqrtd (-3) is not the full ring of integers, and Mathlib has no named EisensteinInt type; the existing generic QuadraticAlgebra provides the faithful underlying ring.",
+     "name": "Kourovka.«8.82».EisensteinInt",
+     "why_needed": "The D = -3 case requires the full ring of integers ℤ[ω], not Zsqrtd (-3), which is a proper suborder."
+    },
+    {
+     "closest_existing_considered": "Mathlib's CongruenceSubgroup.Gamma0 is specialized to SL₂(ℤ) and constrains the lower-left entry, so it does not represent this subgroup.",
+     "name": "Kourovka.«8.82».Gamma",
+     "why_needed": "The problem uses the subgroup of SL₂ over an arbitrary quadratic integer ring defined by divisibility of the upper-right matrix entry."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides Abelianization, TensorProduct, and Module.finrank separately, but no existing definition combining them into this invariant.",
+     "name": "Kourovka.«8.82».r",
+     "why_needed": "Both slots refer to the rational rank of the abelianization of the problem-specific congruence subgroup."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.82».variants.example_d_neg_3": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.82».variants.example_d_neg_4": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.82».variants.example_d_neg_3": "/--\nFor $D=-3$, so that $\\mathfrak{o}=\\mathbb{Z}[\\omega]$, the value $r(\\pi)$ is zero\nfor every prime $\\pi$ whose rational-prime norm is less than $73$. For every prime\n$\\pi$ dividing $73$, one has $r(\\pi)=1$. Thus $73$ is the first rational-prime\nnorm for which the rank is nonzero.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_3 :\n    (∀ π : EisensteinInt, Prime π → (QuadraticAlgebra.norm π).natAbs.Prime →\n      (QuadraticAlgebra.norm π).natAbs < 73 → r π = 0) ∧\n    (∀ π : EisensteinInt, Prime π → π ∣ (73 : EisensteinInt) → r π = 1) := by\n  sorry",
+    "kourovka.«8.82».variants.example_d_neg_4": "/--\nFor $D=-4$, so that $\\mathfrak{o}=\\mathbb{Z}[i]$, one has $r(\\pi)=1$ for every\nprime $\\pi$ dividing $137$. No minimality assertion is made in this case.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_4 :\n    ∀ π : GaussianInt, Prime π → π ∣ (137 : GaussianInt) → r π = 1 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.82\n\nby H. Helling\n\nFor an imaginary quadratic integer ring $\\mathfrak o$ and a prime $\\pi$ whose norm is a\nrational prime, let $\\Gamma \\leq \\operatorname{SL}_2(\\mathfrak o)$ consist of the matrices\nwhose upper-right entry is divisible by $\\pi$. The problem asks to calculate the rational\nfirst Betti number of the compactification of $\\Gamma \\backslash \\mathfrak H^3$, equivalently\nthe $\\mathbb Q$-dimension of $\\Gamma^{\\mathrm{ab}} \\otimes \\mathbb Q$.\n\nThis file states the two computations given as examples in the problem.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen scoped MatrixGroups TensorProduct\n\nnamespace Kourovka.«8.82»\n\n/-- The ring $\\mathbb Z[\\omega]$ of Eisenstein integers, presented with\n$\\omega^2 - \\omega + 1 = 0$. -/\nabbrev EisensteinInt := QuadraticAlgebra ℤ (-1) 1\n\n/-- The subgroup of $\\operatorname{SL}_2(R)$ whose upper-right entry is divisible by $\\pi$. -/\ndef heckeCongruenceSubgroup {R : Type*} [CommRing R] (π : R) : Subgroup SL(2, R) where\n  carrier := {g | π ∣ g 0 1}\n  one_mem' := by simp\n  mul_mem' := by\n    intro g h hg hh\n    obtain ⟨x, hx⟩ := hg\n    obtain ⟨y, hy⟩ := hh\n    refine ⟨g 0 0 * y + x * h 1 1, ?_⟩\n    change ((g : Matrix (Fin 2) (Fin 2) R) * h) 0 1 = _\n    rw [(Matrix.two_mul_expl (g : Matrix (Fin 2) (Fin 2) R) h).2.1, hx, hy]\n    ring\n  inv_mem' := by\n    intro g hg\n    obtain ⟨x, hx⟩ := hg\n    refine ⟨-x, ?_⟩\n    rw [Matrix.SpecialLinearGroup.SL2_inv_expl g]\n    simp [hx]\n\n/-- The $\\mathbb Q$-dimension of $G^{\\mathrm{ab}} \\otimes_{\\mathbb Z} \\mathbb Q$. -/\nnoncomputable def rationalAbelianizationRank (G : Type*) [Group G] : Cardinal :=\n  Module.rank ℚ (ℚ ⊗[ℤ] Additive (Abelianization G))\n\n/--\nFor $D=-3$, let $\\mathfrak o=\\mathbb Z[\\omega]$. For every prime $\\pi\\in\\mathfrak o$\nwhose norm $\\pi\\bar\\pi$ is a rational prime less than $73$, one has $r(\\pi)=0$.\nFor every prime $\\pi$ dividing $73$, one has $r(\\pi)=1$. Thus $r(\\pi)$ is nonzero\nfor the first time over the rational prime $73$.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_3 :\n    (∀ π : EisensteinInt, Prime π → Prime (QuadraticAlgebra.norm π) →\n      QuadraticAlgebra.norm π < 73 →\n      rationalAbelianizationRank (heckeCongruenceSubgroup π) = 0) ∧\n    (∀ π : EisensteinInt, Prime π → π ∣ (73 : EisensteinInt) →\n      rationalAbelianizationRank (heckeCongruenceSubgroup π) = 1) := by\n  sorry\n\n/--\nFor $D=-4$, so that $\\mathfrak o=\\mathbb Z[i]$, every prime $\\pi$ dividing $137$\nsatisfies $r(\\pi)=1$.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_4 :\n    ∀ π : GaussianInt, Prime π → π ∣ (137 : GaussianInt) →\n      rationalAbelianizationRank (heckeCongruenceSubgroup π) = 1 := by\n  sorry\n\nend Kourovka.«8.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Interpreted the D = -3 integer ring as the Eisenstein integers QuadraticAlgebra ℤ (-1) 1, whose generator satisfies ω² - ω + 1 = 0 and whose quadratic norm is x² + xy + y².",
+    "Modeled Γ exactly as the subgroup of SL(2,R) whose upper-right (0,1) entry is divisible by π; this is deliberately not Mathlib's usual Gamma0 subgroup, which constrains the lower-left entry.",
+    "Modeled dim_Q(Γ^ab ⊗ Q) by the cardinal-valued Module.rank of ℚ ⊗[ℤ] Additive (Abelianization Γ). Cardinal rank avoids the zero-on-infinite-dimension behavior of Module.finrank.",
+    "Read 'for the first time' as vanishing for all prime Eisenstein integers with prime integer norm strictly below 73, followed by rank one for every prime divisor of 73, as required by the fixed decomposition.",
+    "For D = -4, quantified over every prime Gaussian integer dividing 137 and made no minimality assertion."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib has GaussianInt and general QuadraticAlgebra, but no dedicated Eisenstein integer type; Zsqrtd (-3) would be the wrong order.",
+     "name": "EisensteinInt",
+     "why_needed": "The D = -3 case uses the full ring of integers ℤ[ω], which needs a concrete Lean presentation."
+    },
+    {
+     "closest_existing_considered": "Mathlib's CongruenceSubgroup.Gamma0 only handles SL₂(ℤ), a natural-number modulus, and the lower-left entry.",
+     "name": "heckeCongruenceSubgroup",
+     "why_needed": "The source's group consists of SL₂ matrices whose upper-right entry is zero modulo an arbitrary ring element π."
+    },
+    {
+     "closest_existing_considered": "Mathlib supplies Abelianization, TensorProduct, and Module.rank separately, but no existing combined group invariant with this exact meaning.",
+     "name": "rationalAbelianizationRank",
+     "why_needed": "A problem-specific wrapper is needed for the rational dimension of the scalar extension of a group's additive abelianization."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.82».variants.example_d_neg_3": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.82».variants.example_d_neg_4": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.82».variants.example_d_neg_3": "/--\nFor $D=-3$, let $\\mathfrak o=\\mathbb Z[\\omega]$. For every prime $\\pi\\in\\mathfrak o$\nwhose norm $\\pi\\bar\\pi$ is a rational prime less than $73$, one has $r(\\pi)=0$.\nFor every prime $\\pi$ dividing $73$, one has $r(\\pi)=1$. Thus $r(\\pi)$ is nonzero\nfor the first time over the rational prime $73$.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_3 :\n    (∀ π : EisensteinInt, Prime π → Prime (QuadraticAlgebra.norm π) →\n      QuadraticAlgebra.norm π < 73 →\n      rationalAbelianizationRank (heckeCongruenceSubgroup π) = 0) ∧\n    (∀ π : EisensteinInt, Prime π → π ∣ (73 : EisensteinInt) →\n      rationalAbelianizationRank (heckeCongruenceSubgroup π) = 1) := by\n  sorry",
+    "kourovka.«8.82».variants.example_d_neg_4": "/--\nFor $D=-4$, so that $\\mathfrak o=\\mathbb Z[i]$, every prime $\\pi$ dividing $137$\nsatisfies $r(\\pi)=1$.\n-/\n@[category research open, AMS 20]\ntheorem variants.example_d_neg_4 :\n    ∀ π : GaussianInt, Prime π → π ∣ (137 : GaussianInt) →\n      rationalAbelianizationRank (heckeCongruenceSubgroup π) = 1 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.82\n\nby H. Helling\n\nLet $\\mathfrak{H} = \\{(z, r) \\mid z \\in \\mathbb{C},\\ r > 0\\}$ be three-dimensional hyperbolic\nspace with its action of $SL_2(\\mathbb{C})$. Let $\\mathfrak{o}$ be the ring of integers of\n$K = \\mathbb{Q}(\\sqrt{D})$, $D < 0$, let $\\pi$ be a prime of $\\mathfrak{o}$ such that\n$\\pi \\bar{\\pi}$ is a prime in $\\mathbb{Z}$, and let\n$$\\Gamma = \\left\\{ \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in SL_2(\\mathfrak{o})\n\\ \\middle|\\ b \\equiv 0 \\pmod{\\pi} \\right\\}.$$\nAdding two vertices to $\\Gamma \\backslash \\mathfrak{H}^3$ gives a compact space\n$\\overline{\\Gamma \\backslash \\mathfrak{H}^3}$. The problem asks to calculate\n$$r(\\pi) = \\dim_{\\mathbb{Q}} H_1(\\overline{\\Gamma \\backslash \\mathfrak{H}^3}, \\mathbb{Q})\n= \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q}).$$\n\nThe notebook records two examples: for $D = -3$, $r(\\pi)$ is nonzero for the first time\nfor $\\pi \\mid 73$ (then $r(\\pi) = 1$), and for $D = -4$, $r(\\pi) = 1$ for $\\pi \\mid 137$.\n\nThis file formalizes these two examples, using $r(\\pi) = \\dim_{\\mathbb{Q}}(\\Gamma^{ab} \\otimes\n\\mathbb{Q})$ as the definition of $r(\\pi)$. The general question \"calculate $r(\\pi)$\" has no\nstatable proposition and is not formalized.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen Matrix NumberField\nopen scoped MatrixGroups TensorProduct\n\nnamespace Kourovka.«8.82»\n\nvariable {R : Type*} [CommRing R]\n\n/--\nThe group $\\Gamma = \\Gamma(\\pi)$ of the statement: the subgroup of $SL_2(R)$ of matrices\n$\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$ with $b \\equiv 0 \\pmod{\\pi}$, i.e. with $\\pi$\ndividing the top-right entry.\n-/\ndef Gamma (π : R) : Subgroup SL(2, R) where\n  carrier := {g | π ∣ g 0 1}\n  one_mem' := by simp\n  mul_mem' := by\n    intro g h hg hh\n    simp only [Set.mem_setOf_eq] at *\n    change π ∣ (g.1 * h.1) 0 1\n    rw [(Matrix.two_mul_expl g.1 h.1).2.1]\n    exact dvd_add (dvd_mul_of_dvd_right hh _) (dvd_mul_of_dvd_left hg _)\n  inv_mem' := by\n    intro g hg\n    simp only [Set.mem_setOf_eq] at *\n    rw [SpecialLinearGroup.SL2_inv_expl]\n    simpa using hg\n\n@[category test, AMS 11 20]\ntheorem mem_Gamma_iff {π : R} {g : SL(2, R)} : g ∈ Gamma π ↔ π ∣ g 0 1 :=\n  Iff.rfl\n\n/--\n$r(\\pi) = \\dim_{\\mathbb{Q}}(\\Gamma^{ab} \\otimes \\mathbb{Q})$, the rank of the abelianization of\n$\\Gamma = \\Gamma(\\pi)$.\n-/\nnoncomputable def r (π : R) : ℕ :=\n  Module.finrank ℚ (ℚ ⊗[ℤ] Additive (Abelianization (Gamma π)))\n\n/--\nLet $D = -3$, so that $K = \\mathbb{Q}(\\sqrt{-3})$ and $\\mathfrak{o} = \\mathbb{Z}[\\omega]$ with\n$\\omega$ a primitive cube root of unity. Then $r(\\pi)$ is nonzero for the first time for\n$\\pi \\mid 73$, and then $r(\\pi) = 1$. That is: $r(\\pi) = 0$ for every prime $\\pi$ of\n$\\mathfrak{o}$ with $\\pi \\bar{\\pi}$ a rational prime smaller than $73$, and $r(\\pi) = 1$ for\nevery prime $\\pi$ of $\\mathfrak{o}$ dividing $73$.\n\nHere $K$ is any number field of degree $2$ over $\\mathbb{Q}$ containing a square root of $-3$,\n$\\mathfrak{o} = \\mathcal{O}_K$, and $\\pi \\bar{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is the norm of\n$\\pi$, written `Algebra.norm ℤ π`. \"For the first time\" is read as ordering the primes $\\pi$ by\nthe rational prime $\\pi \\bar{\\pi}$.\n-/\n@[category research open, AMS 11 20 57]\ntheorem kourovka.«8.82».variants.example_d_neg_3 (K : Type*) [Field K] [NumberField K]\n    (hK : Module.finrank ℚ K = 2) (hD : ∃ x : K, x ^ 2 = -3) :\n    (∀ π : 𝓞 K, Prime π → Prime (Algebra.norm ℤ π) → Algebra.norm ℤ π < 73 → r π = 0) ∧\n    (∀ π : 𝓞 K, Prime π → Prime (Algebra.norm ℤ π) → π ∣ 73 → r π = 1) := by\n  sorry\n\n/--\nLet $D = -4$, so that $K = \\mathbb{Q}(\\sqrt{-4}) = \\mathbb{Q}(i)$ and\n$\\mathfrak{o} = \\mathbb{Z}[i]$. Then $r(\\pi) = 1$ for every prime $\\pi$ of $\\mathfrak{o}$ with\n$\\pi \\bar{\\pi}$ a rational prime and $\\pi \\mid 137$.\n\nHere $K$ is any number field of degree $2$ over $\\mathbb{Q}$ containing a square root of $-4$,\n$\\mathfrak{o} = \\mathcal{O}_K$, and $\\pi \\bar{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is the norm of\n$\\pi$, written `Algebra.norm ℤ π`.\n-/\n@[category research open, AMS 11 20 57]\ntheorem kourovka.«8.82».variants.example_d_neg_4 (K : Type*) [Field K] [NumberField K]\n    (hK : Module.finrank ℚ K = 2) (hD : ∃ x : K, x ^ 2 = -4)\n    (π : 𝓞 K) (hπ : Prime π) (hN : Prime (Algebra.norm ℤ π)) (h : π ∣ 137) :\n    r π = 1 := by\n  sorry\n\nend Kourovka.«8.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The primary 'Calculate r(π)' has no statable proposition and was correctly dropped. One minor remark: the table labels the examples as special cases of an open problem, but they are asserted facts (known computations), so `research solved` could be argued for them; I followed the instruction to use the status 'open'.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "K = ℚ(√D) is encoded as an arbitrary number field K with `Module.finrank ℚ K = 2` and `∃ x : K, x ^ 2 = D` (D = -3, resp. -4). Since D is not a rational square this pins K down up to isomorphism (ℚ(√-3), resp. ℚ(√-4) = ℚ(i)); the theorem is stated for all such K. 𝔬 is `𝓞 K = NumberField.RingOfIntegers K` (so ℤ[ω], resp. ℤ[i]). For D = -4 the literal radicand -4 is used rather than -1; both give ℚ(i).",
+    "ππ̄ is encoded as the field norm `Algebra.norm ℤ π : ℤ` (for an imaginary quadratic field the nontrivial automorphism is complex conjugation, so N(π) = ππ̄). 'ππ̄ is a prime in ℤ' is `Prime (Algebra.norm ℤ π)` in ℤ; the norm is nonnegative so this means a positive rational prime.",
+    "'π a prime' is `Prime π` in 𝓞 K (both rings have class number 1, so this agrees with Irreducible).",
+    "Γ uses the top-right entry b = g 0 1, exactly as in the notebook (not the usual Γ₀ convention with c ≡ 0); this is conjugate to Γ₀ and irrelevant to the abelianization, but the literal choice was kept.",
+    "r(π) is `Module.finrank ℚ (ℚ ⊗[ℤ] Additive (Abelianization Γ))`. `finrank` returns 0 for infinite-dimensional spaces, but Γ has finite index in the finitely generated group SL₂(𝓞), so Γ^ab ⊗ ℚ is finite-dimensional and no degenerate value is reachable.",
+    "'r(π) is distinct from zero for the first time for π ∣ 73' is read (per the decomposition notes) as: r(π) = 0 for every admissible π with N(π) < 73 (this includes the ramified prime √-3 of norm 3, which the notebook's hypothesis admits), and r(π) = 1 for every prime π dividing 73. All π are quantified, since r depends on π only through the ideal (π) up to Galois conjugation.",
+    "In the 'π ∣ 73' and 'π ∣ 137' parts the standing hypothesis `Prime (Algebra.norm ℤ π)` is kept although it is implied (73 and 137 split, so a prime divisor automatically has prime norm); it is redundant but faithful to the notebook's standing assumptions.",
+    "Category tag is `research open` as instructed by the task's status line, although these two examples are asserted as known computations (Grunewald–Helling–Mennicke) and a reviewer might prefer `research solved`.",
+    "AMS tags 11 20 57 (number theory, group theory, and 3-manifold/orbifold homology context of the source); the auxiliary test lemma uses AMS 11 20."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `CongruenceSubgroup.Gamma0`/`Gamma1` are only for SL(2, ℤ) with a natural-number level and use the lower-left entry; `Matrix.SpecialLinearGroup.diagonalSubgroup` in FormalConjecturesForMathlib is unrelated. No congruence subgroup over a general commutative ring / ring of integers exists in Mathlib or the repo.",
+     "name": "Kourovka.«8.82».Gamma",
+     "why_needed": "The statement's group Γ = {(a b; c d) ∈ SL₂(𝔬) | b ≡ 0 (mod π)} for an element π of a commutative ring R (here R = 𝓞 K). Defined as a `Subgroup SL(2, R)` with carrier {g | π ∣ g 0 1} (top-right entry), with full closure proofs (no sorry). Accompanied by a `category test` lemma `mem_Gamma_iff`."
+    },
+    {
+     "closest_existing_considered": "`Module.finrank ℤ (Additive (Abelianization _))` (torsion-free rank) would be equal but less literal; no Mathlib notion of 'rank of a group's abelianization' exists.",
+     "name": "Kourovka.«8.82».r",
+     "why_needed": "r(π) = dim_ℚ(Γ^ab ⊗ ℚ), formalized literally as `Module.finrank ℚ (ℚ ⊗[ℤ] Additive (Abelianization (Gamma π)))`."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.82».variants.example_d_neg_3": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as a conjunction: (i) r(π)=0 for every prime π of 𝓞 K with N(π)=ππ̄ a rational prime < 73, and (ii) r(π)=1 for every prime π of 𝓞 K with N(π) prime and π ∣ 73; K is any number field with [K:ℚ]=2 containing a square root of -3 (i.e. K ≅ ℚ(√-3)). Needed bespoke definitions of Γ(π) ⊆ SL₂(R) and r(π) = dim_ℚ(Γ^ab ⊗ ℚ)."
+    },
+    "kourovka.«8.82».variants.example_d_neg_4": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for K any number field with [K:ℚ]=2 containing a square root of -4 (i.e. K ≅ ℚ(i), 𝓞 K = ℤ[i]) and any prime π of 𝓞 K with N(π) prime and π ∣ 137, r(π)=1. No minimality claim, matching the source. Uses the same bespoke Γ and r."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.82».variants.example_d_neg_3": "/--\nLet $D = -3$, so that $K = \\mathbb{Q}(\\sqrt{-3})$ and $\\mathfrak{o} = \\mathbb{Z}[\\omega]$ with\n$\\omega$ a primitive cube root of unity. Then $r(\\pi)$ is nonzero for the first time for\n$\\pi \\mid 73$, and then $r(\\pi) = 1$. That is: $r(\\pi) = 0$ for every prime $\\pi$ of\n$\\mathfrak{o}$ with $\\pi \\bar{\\pi}$ a rational prime smaller than $73$, and $r(\\pi) = 1$ for\nevery prime $\\pi$ of $\\mathfrak{o}$ dividing $73$.\n\nHere $K$ is any number field of degree $2$ over $\\mathbb{Q}$ containing a square root of $-3$,\n$\\mathfrak{o} = \\mathcal{O}_K$, and $\\pi \\bar{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is the norm of\n$\\pi$, written `Algebra.norm ℤ π`. \"For the first time\" is read as ordering the primes $\\pi$ by\nthe rational prime $\\pi \\bar{\\pi}$.\n-/\n@[category research open, AMS 11 20 57]\ntheorem kourovka.«8.82».variants.example_d_neg_3 (K : Type*) [Field K] [NumberField K]\n    (hK : Module.finrank ℚ K = 2) (hD : ∃ x : K, x ^ 2 = -3) :\n    (∀ π : 𝓞 K, Prime π → Prime (Algebra.norm ℤ π) → Algebra.norm ℤ π < 73 → r π = 0) ∧\n    (∀ π : 𝓞 K, Prime π → Prime (Algebra.norm ℤ π) → π ∣ 73 → r π = 1) := by\n  sorry",
+    "kourovka.«8.82».variants.example_d_neg_4": "/--\nLet $D = -4$, so that $K = \\mathbb{Q}(\\sqrt{-4}) = \\mathbb{Q}(i)$ and\n$\\mathfrak{o} = \\mathbb{Z}[i]$. Then $r(\\pi) = 1$ for every prime $\\pi$ of $\\mathfrak{o}$ with\n$\\pi \\bar{\\pi}$ a rational prime and $\\pi \\mid 137$.\n\nHere $K$ is any number field of degree $2$ over $\\mathbb{Q}$ containing a square root of $-4$,\n$\\mathfrak{o} = \\mathcal{O}_K$, and $\\pi \\bar{\\pi} = N_{K/\\mathbb{Q}}(\\pi)$ is the norm of\n$\\pi$, written `Algebra.norm ℤ π`.\n-/\n@[category research open, AMS 11 20 57]\ntheorem kourovka.«8.82».variants.example_d_neg_4 (K : Type*) [Field K] [NumberField K]\n    (hK : Module.finrank ℚ K = 2) (hD : ∃ x : K, x ^ 2 = -4)\n    (π : 𝓞 K) (hπ : Prime π) (hN : Prime (Algebra.norm ℤ π)) (h : π ∣ 137) :\n    r π = 1 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.82\n\nby H. Helling\n\nLet $\\mathfrak{H} = \\{(z, r) \\mid z \\in \\mathbb{C},\\; r > 0\\}$ be the three-dimensional\nPoincaré space, on which $SL_2(\\mathbb{C})$ acts by\n$$(z, r) \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} =\n\\left(\\frac{(az + b)\\overline{(cz + d)} + a\\bar{c} r^2}{|cz + d|^2 + |c|^2 r^2},\\;\n\\frac{r}{|cz + d|^2 + |c|^2 r^2}\\right).$$\nLet $\\mathfrak{o}$ be the ring of integers of the field $K = \\mathbb{Q}(\\sqrt{D})$, where $D < 0$,\n$\\pi$ a prime such that $\\pi\\bar{\\pi}$ is a prime in $\\mathbb{Z}$, and let\n$$\\Gamma = \\left\\{ \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in SL_2(\\mathfrak{o})\n\\;\\middle|\\; b \\equiv 0 \\pmod{\\pi} \\right\\}.$$\nAdding to the space $\\Gamma \\setminus \\mathfrak{H}^3$ two vertices we get a three-dimensional\ncompact space $\\overline{\\Gamma \\setminus \\mathfrak{H}^3}$.\n\nCalculate\n$$r(\\pi) = \\dim_{\\mathbb{Q}} H_1(\\overline{\\Gamma \\setminus \\mathfrak{H}^3}, \\mathbb{Q})\n= \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q}).$$\n\nFor example, if $D = -3$ then $r(\\pi)$ is distinct from zero for the first time for\n$\\pi \\mid 73$ (then $r(\\pi) = 1$), and if $D = -4$ then $r(\\pi) = 1$ for $\\pi \\mid 137$.\n\n## Formalisation notes\n\n* Only the two examples are formalised; the main task \"calculate $r(\\pi)$\" is not a proposition.\n* $r(\\pi)$ is formalised through the group-theoretic expression\n  $\\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q})$ given in the statement.\n* $K = \\mathbb{Q}(\\sqrt{D})$ is realised as the subfield $\\mathbb{Q}(i\\sqrt{-D})$ of $\\mathbb{C}$\n  and $\\mathfrak{o}$ as its ring of integers. Here $D$ is the discriminant of $K$: for $D = -3$\n  one gets $\\mathfrak{o} = \\mathbb{Z}[\\omega]$, and for $D = -4$, i.e. $K = \\mathbb{Q}(i)$, one\n  gets $\\mathfrak{o} = \\mathbb{Z}[i]$. Complex conjugation on $\\mathbb{C}$ restricts to the\n  non-trivial automorphism of $K$, so $\\pi\\bar{\\pi}$ is computed in $\\mathbb{C}$.\n* \"For the first time\" is read as ordering the admissible primes $\\pi$ by the rational prime\n  $\\pi\\bar{\\pi}$: $r(\\pi) = 0$ whenever $\\pi\\bar{\\pi} < 73$.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen NumberField IntermediateField Matrix TensorProduct\nopen scoped MatrixGroups ComplexConjugate\n\nnamespace Kourovka.«8.82»\n\n/-- The field $K = \\mathbb{Q}(\\sqrt{D})$, $D < 0$, realised as the subfield\n$\\mathbb{Q}(i\\sqrt{-D})$ of $\\mathbb{C}$. Its ring of integers $\\mathfrak{o}$ is\n`𝓞 (quadraticField D)`. -/\nnoncomputable def quadraticField (D : ℤ) : IntermediateField ℚ ℂ :=\n  ℚ⟮(Complex.I * √(-D : ℝ) : ℂ)⟯\n\nvariable {R : Type*} [CommRing R]\n\n/-- The congruence subgroup\n$\\Gamma = \\left\\{ \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\in SL_2(R) \\;\\middle|\\;\nb \\equiv 0 \\pmod{\\pi} \\right\\}$ of $SL_2(R)$, for a commutative ring $R$ and $\\pi \\in R$. -/\ndef congruenceSubgroup (π : R) : Subgroup SL(2, R) where\n  carrier := {g | π ∣ (g : Matrix (Fin 2) (Fin 2) R) 0 1}\n  one_mem' := by simp\n  mul_mem' {g h} hg hh := by\n    show π ∣ ((g : Matrix (Fin 2) (Fin 2) R) * h) 0 1\n    rw [Matrix.mul_apply, Fin.sum_univ_two]\n    exact dvd_add (dvd_mul_of_dvd_right hh _) (dvd_mul_of_dvd_left hg _)\n  inv_mem' {g} hg := by\n    show π ∣ (adjugate (g : Matrix (Fin 2) (Fin 2) R)) 0 1\n    rw [Matrix.adjugate_fin_two]\n    simpa using hg\n\n@[category API, AMS 20]\ntheorem mem_congruenceSubgroup {π : R} {g : SL(2, R)} :\n    g ∈ congruenceSubgroup π ↔ π ∣ (g : Matrix (Fin 2) (Fin 2) R) 0 1 :=\n  Iff.rfl\n\n@[category test, AMS 20]\ntheorem congruenceSubgroup_one : congruenceSubgroup (1 : R) = ⊤ :=\n  Subgroup.eq_top_iff' _ |>.mpr fun _ => one_dvd _\n\n/-- The number $r(\\pi) = \\dim_{\\mathbb{Q}} (\\Gamma^{ab} \\otimes \\mathbb{Q})$, the rank of the\nabelianisation of $\\Gamma$ = `congruenceSubgroup π`. (For $\\Gamma$ of finite index in\n$SL_2(\\mathfrak{o})$ this dimension is finite, so `Module.finrank` is the actual dimension.) -/\nnoncomputable def abelianizationRank (π : R) : ℕ :=\n  Module.finrank ℚ (ℚ ⊗[ℤ] Additive (Abelianization (congruenceSubgroup π)))\n\n/--\nIf $D = -3$ (so $\\mathfrak{o} = \\mathbb{Z}[\\omega]$ is the ring of integers of\n$\\mathbb{Q}(\\sqrt{-3})$), then $r(\\pi)$ is distinct from zero for the first time for\n$\\pi \\mid 73$ (then $r(\\pi) = 1$).\n\nThat is, for every prime $\\pi$ of $\\mathfrak{o}$ such that $\\pi\\bar{\\pi} = p$ is a prime in\n$\\mathbb{Z}$: if $p < 73$ then $r(\\pi) = 0$, and if $\\pi \\mid 73$ then $r(\\pi) = 1$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_3 :\n    (∀ (π : 𝓞 (quadraticField (-3))) (p : ℤ), Prime π → Prime p →\n      (π : ℂ) * conj (π : ℂ) = p → p < 73 → abelianizationRank π = 0) ∧\n    (∀ (π : 𝓞 (quadraticField (-3))) (p : ℤ), Prime π → Prime p →\n      (π : ℂ) * conj (π : ℂ) = p → π ∣ 73 → abelianizationRank π = 1) := by\n  sorry\n\n/--\nIf $D = -4$ (so $K = \\mathbb{Q}(\\sqrt{-4}) = \\mathbb{Q}(i)$ and $\\mathfrak{o} = \\mathbb{Z}[i]$),\nthen $r(\\pi) = 1$ for $\\pi \\mid 137$.\n\nThat is, for every prime $\\pi$ of $\\mathfrak{o}$ such that $\\pi\\bar{\\pi}$ is a prime in\n$\\mathbb{Z}$ and $\\pi \\mid 137$, one has $r(\\pi) = 1$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_4 :\n    ∀ (π : 𝓞 (quadraticField (-4))) (p : ℤ), Prime π → Prime p →\n      (π : ℂ) * conj (π : ℂ) = p → π ∣ 137 → abelianizationRank π = 1 := by\n  sorry\n\nend Kourovka.«8.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.85,
+   "decomposition_objections": "None. The primary 'Calculate r(π)' has no statable Prop and is correctly dropped; the two examples are the only assertions.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "r(π) is formalised via the group-theoretic expression dim_ℚ(Γ^ab ⊗ ℚ) that the notebook asserts equals dim_ℚ H_1 of the compactified quotient; the topological side is not formalised.",
+    "K = ℚ(√D) is realised as the subfield ℚ⟮Complex.I * √(-D)⟯ of ℂ, and 𝔬 as 𝓞 of that field (integralClosure ℤ). For D = -3 this is ℤ[ω]; for D = -4 the field is ℚ(2i) = ℚ(i) and 𝔬 = ℤ[i], following the table's reading of D as a discriminant.",
+    "'ππ̄ is a prime in ℤ' is stated as ∃ p : ℤ, Prime p ∧ (π : ℂ) * conj (π : ℂ) = p, using complex conjugation of ℂ (which restricts to the non-trivial automorphism of K). The hypothesis Prime π (prime element of 𝔬) is kept as in the source even though it is implied by ππ̄ prime.",
+    "Γ uses the top-right entry b (π ∣ g 0 1), literally as written in the notebook, rather than the more common Γ₀ convention on c.",
+    "'For the first time for π | 73' is read as: r(π) = 0 for every admissible π with ππ̄ < 73 (ordering by the rational prime ππ̄), together with r(π) = 1 for admissible π ∣ 73. The π ∣ 73 clause quantifies over all such primes π (π, π̄ and unit multiples give conjugate/equal groups, so this is well defined).",
+    "abelianizationRank uses Module.finrank, which returns 0 for infinite-dimensional spaces; Γ has finite index in the finitely generated group SL_2(𝔬), so the dimension is finite and this convention is not reached.",
+    "Both slots carry @[category research open] as instructed (status of the problem), although the examples are asserted known computations (Grunewald–Helling–Mennicke); a reviewer may prefer research solved.",
+    "Two small proved API/test lemmas (mem_congruenceSubgroup, congruenceSubgroup_one) accompany the bespoke subgroup definition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "GaussianInt / Zsqrtd (only ℤ[√d], wrong for D=-3), CyclotomicField 3 ℚ (no conjugation defined), NumberField.IsCMField.complexConj (no instances for concrete fields), abstract K with NumberField.discr K = D (conjugation still unavailable).",
+     "name": "Kourovka.«8.82».quadraticField",
+     "why_needed": "The field K = ℚ(√D) for D < 0, realised as the IntermediateField ℚ⟮i√(-D)⟯ of ℂ, so that its ring of integers is 𝓞 (quadraticField D) and complex conjugation (ππ̄) is available via the embedding in ℂ. Mathlib has no quadratic-field construction with a conjugation; Zsqrtd (-3) is not the ring of integers of ℚ(√-3), and IsCMField.complexConj has no instances for concrete fields."
+    },
+    {
+     "closest_existing_considered": "CongruenceSubgroup.Gamma0 (SL(2,ℤ) only, lower-left entry), Matrix.SpecialLinearGroup.diagonalSubgroup in FormalConjecturesForMathlib.",
+     "name": "Kourovka.«8.82».congruenceSubgroup",
+     "why_needed": "The subgroup Γ = {(a b; c d) ∈ SL_2(R) | b ≡ 0 mod π} for a commutative ring R and π ∈ R (note: top-right entry, as written in the notebook). Mathlib's CongruenceSubgroup.Gamma0 exists only over ℤ with ZMod N and uses the bottom-left entry."
+    },
+    {
+     "closest_existing_considered": "Module.finrank ℤ (Additive (Abelianization G)) (equivalent but less literal than the tensor product with ℚ given in the statement).",
+     "name": "Kourovka.«8.82».abelianizationRank",
+     "why_needed": "r(π) = dim_ℚ(Γ^ab ⊗ ℚ), defined as Module.finrank ℚ (ℚ ⊗[ℤ] Additive (Abelianization Γ)). No existing notion of 'rank of the abelianization' / first Betti number of a group in Mathlib or the repo."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.82».variants.example_d_neg_3": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as a conjunction: (i) for every prime π of 𝔬 = 𝓞(ℚ(√-3)) with ππ̄ = p a rational prime and p < 73, r(π) = 0; (ii) for every such π with π ∣ 73, r(π) = 1. Uses bespoke definitions quadraticField, congruenceSubgroup, abelianizationRank."
+    },
+    "kourovka.«8.82».variants.example_d_neg_4": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every prime π of 𝔬 = 𝓞(ℚ(√-4)) = ℤ[i] with ππ̄ a rational prime and π ∣ 137, r(π) = 1. No minimality clause, as in the source. Same bespoke definitions."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.82».variants.example_d_neg_3": "/--\nIf $D = -3$ (so $\\mathfrak{o} = \\mathbb{Z}[\\omega]$ is the ring of integers of\n$\\mathbb{Q}(\\sqrt{-3})$), then $r(\\pi)$ is distinct from zero for the first time for\n$\\pi \\mid 73$ (then $r(\\pi) = 1$).\n\nThat is, for every prime $\\pi$ of $\\mathfrak{o}$ such that $\\pi\\bar{\\pi} = p$ is a prime in\n$\\mathbb{Z}$: if $p < 73$ then $r(\\pi) = 0$, and if $\\pi \\mid 73$ then $r(\\pi) = 1$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_3 :\n    (∀ (π : 𝓞 (quadraticField (-3))) (p : ℤ), Prime π → Prime p →\n      (π : ℂ) * conj (π : ℂ) = p → p < 73 → abelianizationRank π = 0) ∧\n    (∀ (π : 𝓞 (quadraticField (-3))) (p : ℤ), Prime π → Prime p →\n      (π : ℂ) * conj (π : ℂ) = p → π ∣ 73 → abelianizationRank π = 1) := by\n  sorry",
+    "kourovka.«8.82».variants.example_d_neg_4": "/--\nIf $D = -4$ (so $K = \\mathbb{Q}(\\sqrt{-4}) = \\mathbb{Q}(i)$ and $\\mathfrak{o} = \\mathbb{Z}[i]$),\nthen $r(\\pi) = 1$ for $\\pi \\mid 137$.\n\nThat is, for every prime $\\pi$ of $\\mathfrak{o}$ such that $\\pi\\bar{\\pi}$ is a prime in\n$\\mathbb{Z}$ and $\\pi \\mid 137$, one has $r(\\pi) = 1$.\n-/\n@[category research open, AMS 11 20]\ntheorem kourovka.«8.82».variants.example_d_neg_4 :\n    ∀ (π : 𝓞 (quadraticField (-4))) (p : ℤ), Prime π → Prime p →\n      (π : ℂ) * conj (π : ℂ) = p → π ∣ 137 → abelianizationRank π = 1 := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.82\n\nby H. Helling\n\nFor a prime $\\pi$ in the ring of integers $\\mathfrak{o}$ of an imaginary\nquadratic field, let $\\Gamma \\leq SL_2(\\mathfrak{o})$ consist of the matrices\nwhose upper-right entry is divisible by $\\pi$. Problem 8.82 asks for the\nrational first Betti number of the compactification of the corresponding\nthree-dimensional Poincaré-space quotient. The problem identifies this number\nwith the rational rank of $\\Gamma^{\\mathrm{ab}}$ and records the two examples\nstated below.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nopen scoped MatrixGroups\n\nnamespace Kourovka.«8.82»\n\n/-- The ring $\\mathbb{Z}[\\omega]$ of Eisenstein integers, where\n$\\omega^2+\\omega+1=0$. This is the ring of integers of\n$\\mathbb{Q}(\\sqrt{-3})$. -/\nabbrev EisensteinInt :=\n  AdjoinRoot (Polynomial.X ^ 2 + Polynomial.X + 1 : Polynomial ℤ)\n\n/-- The norm $z\\overline z$ of an Eisenstein integer. -/\nnoncomputable def eisensteinNorm (z : EisensteinInt) : ℤ := by\n  have hmonic : (Polynomial.X ^ 2 + Polynomial.X + 1 : Polynomial ℤ).Monic := by\n    monicity\n    norm_num\n  letI : Module.Free ℤ EisensteinInt := hmonic.free_adjoinRoot\n  letI : Module.Finite ℤ EisensteinInt := hmonic.finite_adjoinRoot\n  exact Algebra.norm ℤ z\n\n/-- The subgroup $\\Gamma_0(\\pi)$ of $SL_2(R)$ consisting of matrices whose\nupper-right entry belongs to the principal ideal generated by $\\pi$. -/\ndef gammaZero {R : Type*} [CommRing R] (π : R) : Subgroup SL(2, R) where\n  carrier := {g | g 0 1 ∈ Ideal.span {π}}\n  one_mem' := by simp\n  mul_mem' := by\n    intro a b ha hb\n    change ((↑(a * b) : Matrix (Fin 2) (Fin 2) R) 0 1) ∈ Ideal.span {π}\n    change ((↑a : Matrix (Fin 2) (Fin 2) R) 0 1) ∈ Ideal.span {π} at ha\n    change ((↑b : Matrix (Fin 2) (Fin 2) R) 0 1) ∈ Ideal.span {π} at hb\n    rw [Matrix.SpecialLinearGroup.coe_mul, Matrix.mul_apply, Fin.sum_univ_two]\n    exact Ideal.add_mem _ (Ideal.mul_mem_left _ _ hb) (Ideal.mul_mem_right _ _ ha)\n  inv_mem' := by\n    intro a ha\n    change ((↑(a⁻¹) : Matrix (Fin 2) (Fin 2) R) 0 1) ∈ Ideal.span {π}\n    change ((↑a : Matrix (Fin 2) (Fin 2) R) 0 1) ∈ Ideal.span {π} at ha\n    simpa [Matrix.SpecialLinearGroup.coe_inv, Matrix.adjugate_fin_two] using\n      (Ideal.span {π}).neg_mem ha\n\n/-- The rational rank of the abelianization of a group. -/\nnoncomputable def rationalAbelianizationRank (G : Type*) [Group G] : ℕ :=\n  Module.finrank ℚ (TensorProduct ℤ ℚ (Additive (Abelianization G)))\n\n/--\nFor $D=-3$, let $\\mathfrak{o}=\\mathbb{Z}[\\omega]$. Then\n$r(\\pi)=0$ for every prime $\\pi$ for which\n$\\pi\\overline\\pi$ is a rational prime less than $73$, while\n$r(\\pi)=1$ for every prime $\\pi$ dividing $73$. Thus $r(\\pi)$ is nonzero\nfor the first time at the rational prime $73$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.82».variants.example_d_neg_3 :\n    (∀ π : EisensteinInt, Prime π → (eisensteinNorm π).natAbs.Prime →\n      (eisensteinNorm π).natAbs < 73 →\n      rationalAbelianizationRank (gammaZero π) = 0) ∧\n    (∀ π : EisensteinInt, Prime π → π ∣ (73 : EisensteinInt) →\n      rationalAbelianizationRank (gammaZero π) = 1) := by\n  sorry\n\n/--\nFor $D=-4$, let $\\mathfrak{o}=\\mathbb{Z}[i]$. For every Gaussian prime\n$\\pi$ dividing $137$, one has $r(\\pi)=1$. For example, one may take\n$\\pi=11+4i$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.82».variants.example_d_neg_4 :\n    ∀ π : GaussianInt, Prime π → π ∣ (137 : GaussianInt) →\n      rationalAbelianizationRank (gammaZero π) = 1 := by\n  sorry\n\nend Kourovka.«8.82»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.97,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled the ring of integers for D = -3 as AdjoinRoot (X^2 + X + 1) over ℤ, i.e. ℤ[ω], rather than the index-two order ℤ[√-3].",
+    "Modeled π conjugate(π) for Eisenstein integers by Algebra.norm ℤ; natAbs converts its integer value to the natural norm used to order rational primes.",
+    "Modeled Γ as the subgroup of Matrix.SpecialLinearGroup (Fin 2) whose (0,1) entry lies in the principal ideal (π), exactly expressing b ≡ 0 mod π.",
+    "Modeled r(π) using the source's algebraic identification as the ℚ-finrank of ℚ tensor over ℤ with the additive form of the abelianization of Γ.",
+    "Read 'for the first time' as vanishing for every admissible Eisenstein prime of rational norm less than 73, together with rank one for every Eisenstein prime dividing 73.",
+    "Used universal quantification over prime divisors of 73 and 137, thereby covering conjugates and unit associates; made no minimality assertion in the D = -4 slot."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's Zsqrtd (-3) is ℤ[√-3], an index-two suborder and therefore unfaithful; AdjoinRoot (X^2 + X + 1) gives the correct ring.",
+     "name": "EisensteinInt",
+     "why_needed": "The D = -3 slot requires the full ring of integers ℤ[ω], which is not provided by a dedicated Mathlib type."
+    },
+    {
+     "closest_existing_considered": "Algebra.norm ℤ is the appropriate existing primitive, but a problem-local wrapper supplies the finite free module instances for the AdjoinRoot presentation.",
+     "name": "eisensteinNorm",
+     "why_needed": "The admissibility and ordering clauses require the rational norm π conjugate(π) on Eisenstein integers."
+    },
+    {
+     "closest_existing_considered": "Mathlib's modular-form Gamma0 is specialized to SL₂(ℤ) modulo a natural number, so it does not apply to Gaussian or Eisenstein integers.",
+     "name": "gammaZero",
+     "why_needed": "The source's Bianchi congruence subgroup requires the upper-right matrix entry to lie in the principal ideal generated by π; no general ring-valued Γ₀ subgroup was found."
+    },
+    {
+     "closest_existing_considered": "Mathlib provides Abelianization, Additive, TensorProduct, and Module.finrank separately, but no directly named rational abelianization-rank invariant.",
+     "name": "rationalAbelianizationRank",
+     "why_needed": "Both slots use the invariant r(π), the rational dimension of the rationalized group abelianization."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.82».variants.example_d_neg_3": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«8.82».variants.example_d_neg_4": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.82».variants.example_d_neg_3": "/--\nFor $D=-3$, let $\\mathfrak{o}=\\mathbb{Z}[\\omega]$. Then\n$r(\\pi)=0$ for every prime $\\pi$ for which\n$\\pi\\overline\\pi$ is a rational prime less than $73$, while\n$r(\\pi)=1$ for every prime $\\pi$ dividing $73$. Thus $r(\\pi)$ is nonzero\nfor the first time at the rational prime $73$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.82».variants.example_d_neg_3 :\n    (∀ π : EisensteinInt, Prime π → (eisensteinNorm π).natAbs.Prime →\n      (eisensteinNorm π).natAbs < 73 →\n      rationalAbelianizationRank (gammaZero π) = 0) ∧\n    (∀ π : EisensteinInt, Prime π → π ∣ (73 : EisensteinInt) →\n      rationalAbelianizationRank (gammaZero π) = 1) := by\n  sorry",
+    "kourovka.«8.82».variants.example_d_neg_4": "/--\nFor $D=-4$, let $\\mathfrak{o}=\\mathbb{Z}[i]$. For every Gaussian prime\n$\\pi$ dividing $137$, one has $r(\\pi)=1$. For example, one may take\n$\\pi=11+4i$.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.82».variants.example_d_neg_4 :\n    ∀ π : GaussianInt, Prime π → π ∣ (137 : GaussianInt) →\n      rationalAbelianizationRank (gammaZero π) = 1 := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«8.82».variants.example_d_neg_3": "c06",
+  "kourovka.«8.82».variants.example_d_neg_4": "c01"
+ },
+ "id": "kourovka-8.82",
+ "main_attempt": "c06"
+}

@@ -1,0 +1,499 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.78\n\nby P. I. Trofimov\n\nAny set of all subgroups of the same given order of a finite group $G$ that contains at\nleast one non-normal subgroup is called an $IE_{\\bar n}$-system of $G$. A positive integer\n$k$ is called a *soluble* (*non-soluble*; *simple*; *composite*; *absolutely simple*)\n*group-theoretic number* if every finite group having exactly $k$ $IE_{\\bar n}$-systems is\nsoluble (respectively, if there is at least one non-soluble finite group having $k$\n$IE_{\\bar n}$-systems; if there is at least one simple finite group having $k$\n$IE_{\\bar n}$-systems; if there are no simple finite groups having $k$ $IE_{\\bar n}$-systems;\nif there is at least one simple finite group having $k$ $IE_{\\bar n}$-systems and there are\nno non-soluble non-simple finite groups having $k$ $IE_{\\bar n}$-systems).\n\nAre the sets of all soluble and of all absolutely simple group-theoretic numbers finite or\ninfinite? Do there exist composite, but not soluble group-theoretic numbers?\n\nThe predicates `IsSolubleNumber`, `IsNonSolubleNumber`, `IsSimpleNumber`, `IsCompositeNumber`\nand `IsAbsolutelySimpleNumber` below are defined for every natural number $k$; the restriction\nto positive $k$ is imposed in the problem statements.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«2.78»\n\nvariable {G : Type*} [Group G]\n\n/-- A set $S$ of subgroups of a group $G$ is an $IE_{\\bar n}$-system of $G$ if $S$ is the set\nof all subgroups of $G$ of some given order $d$, and $S$ contains at least one non-normal\nsubgroup. -/\ndef IsIESystem (S : Set (Subgroup G)) : Prop :=\n  (∃ d : ℕ, S = {H : Subgroup G | Nat.card H = d}) ∧ ∃ H ∈ S, ¬ H.Normal\n\n/-- The number of $IE_{\\bar n}$-systems of a group $G$. For a finite group $G$ this is the\nnumber of orders $d$ such that $G$ has a non-normal subgroup of order $d$. -/\nnoncomputable def numIESystems (G : Type*) [Group G] : ℕ :=\n  {S : Set (Subgroup G) | IsIESystem S}.ncard\n\n/-- The number of $IE_{\\bar n}$-systems of $G$ is the number of orders $d$ such that $G$ has a\nnon-normal subgroup of order $d$. -/\n@[category API, AMS 20]\ntheorem numIESystems_eq_ncard (G : Type*) [Group G] :\n    numIESystems G = {d : ℕ | ∃ H : Subgroup G, ¬ H.Normal ∧ Nat.card H = d}.ncard := by\n  have himage : {S : Set (Subgroup G) | IsIESystem S} =\n      (fun d : ℕ => {H : Subgroup G | Nat.card H = d}) ''\n        {d : ℕ | ∃ H : Subgroup G, ¬ H.Normal ∧ Nat.card H = d} := by\n    ext S\n    constructor\n    · rintro ⟨⟨d, rfl⟩, H, hHd, hH⟩\n      exact ⟨d, ⟨H, hH, hHd⟩, rfl⟩\n    · rintro ⟨d, ⟨H, hH, hHd⟩, rfl⟩\n      exact ⟨⟨d, rfl⟩, H, hHd, hH⟩\n  rw [numIESystems, himage, Set.ncard_image_of_injOn]\n  rintro d ⟨H, -, hHd⟩ d' - h\n  have : H ∈ {H : Subgroup G | Nat.card H = d'} := by\n    rw [← show {H : Subgroup G | Nat.card H = d} = {H : Subgroup G | Nat.card H = d'} from h]\n    exact hHd\n  exact hHd.symm.trans this\n\n/-- A group in which every subgroup is normal has no $IE_{\\bar n}$-systems. -/\n@[category API, AMS 20]\ntheorem numIESystems_eq_zero_of_forall_normal (h : ∀ H : Subgroup G, H.Normal) :\n    numIESystems G = 0 := by\n  have : {S : Set (Subgroup G) | IsIESystem S} = ∅ := by\n    rw [Set.eq_empty_iff_forall_notMem]\n    rintro S ⟨-, H, -, hH⟩\n    exact hH (h H)\n  rw [numIESystems, this, Set.ncard_empty]\n\n/-- A positive integer $k$ is a *soluble group-theoretic number* if every finite group having\nexactly $k$ $IE_{\\bar n}$-systems is soluble. -/\ndef IsSolubleNumber (k : ℕ) : Prop :=\n  ∀ (G : Type) [Group G] [Finite G], numIESystems G = k → IsSolvable G\n\n/-- A positive integer $k$ is a *non-soluble group-theoretic number* if there is at least one\nnon-soluble finite group having $k$ $IE_{\\bar n}$-systems. -/\ndef IsNonSolubleNumber (k : ℕ) : Prop :=\n  ∃ (G : Type) (_ : Group G) (_ : Finite G), numIESystems G = k ∧ ¬ IsSolvable G\n\n/-- A positive integer $k$ is a *simple group-theoretic number* if there is at least one\nsimple finite group having $k$ $IE_{\\bar n}$-systems. -/\ndef IsSimpleNumber (k : ℕ) : Prop :=\n  ∃ (G : Type) (_ : Group G) (_ : Finite G), numIESystems G = k ∧ IsSimpleGroup G\n\n/-- A positive integer $k$ is a *composite group-theoretic number* if there are no simple\nfinite groups having $k$ $IE_{\\bar n}$-systems. -/\ndef IsCompositeNumber (k : ℕ) : Prop :=\n  ∀ (G : Type) [Group G] [Finite G], numIESystems G = k → ¬ IsSimpleGroup G\n\n/-- A positive integer $k$ is an *absolutely simple group-theoretic number* if there is at\nleast one simple finite group having $k$ $IE_{\\bar n}$-systems and there are no non-soluble\nnon-simple finite groups having $k$ $IE_{\\bar n}$-systems. -/\ndef IsAbsolutelySimpleNumber (k : ℕ) : Prop :=\n  IsSimpleNumber k ∧\n    ∀ (G : Type) [Group G] [Finite G], numIESystems G = k → ¬ IsSolvable G → IsSimpleGroup G\n\n/-- A positive integer $k$ is a non-soluble group-theoretic number if and only if it is not a\nsoluble group-theoretic number. -/\n@[category API, AMS 20]\ntheorem isNonSolubleNumber_iff_not_isSolubleNumber (k : ℕ) :\n    IsNonSolubleNumber k ↔ ¬ IsSolubleNumber k := by\n  simp only [IsNonSolubleNumber, IsSolubleNumber, not_forall, exists_prop]\n\n/--\nIs the set of all soluble group-theoretic numbers finite?\n\nA positive integer $k$ is a soluble group-theoretic number if every finite group having\nexactly $k$ $IE_{\\bar n}$-systems is soluble, where an $IE_{\\bar n}$-system of a finite group\n$G$ is a set of all subgroups of $G$ of the same given order that contains at least one\nnon-normal subgroup.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔\n    {k : ℕ | 0 < k ∧ IsSolubleNumber k}.Finite := by\n  sorry\n\n/--\nIs the set of all absolutely simple group-theoretic numbers finite?\n\nA positive integer $k$ is an absolutely simple group-theoretic number if there is at least one\nsimple finite group having exactly $k$ $IE_{\\bar n}$-systems and there are no non-soluble\nnon-simple finite groups having exactly $k$ $IE_{\\bar n}$-systems.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii : answer(sorry) ↔\n    {k : ℕ | 0 < k ∧ IsAbsolutelySimpleNumber k}.Finite := by\n  sorry\n\n/--\nDo there exist composite, but not soluble group-theoretic numbers?\n\nThat is, is there a positive integer $k$ such that no finite simple group has exactly $k$\n$IE_{\\bar n}$-systems, yet some non-soluble finite group has exactly $k$ $IE_{\\bar n}$-systems?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii : answer(sorry) ↔\n    ∃ k : ℕ, 0 < k ∧ IsCompositeNumber k ∧ IsNonSolubleNumber k := by\n  sorry\n\nend Kourovka.«2.78»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The three-slot split (finiteness of soluble numbers, finiteness of absolutely simple numbers, existence of composite-but-not-soluble numbers) matches the two questions in the statement, and the notes on positivity, counting convention, and existential form for 'not soluble' were all followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Subgroup 'order' is Nat.card ↥H; finite groups are quantified as (G : Type) [Group G] [Finite G], as in the other Kourovka files.",
+    "numIESystems is Set.ncard of the set of IE_n̄-systems in Set (Subgroup G); for finite G this ambient type is finite so ncard is the genuine count. Lemma numIESystems_eq_ncard confirms it equals the number of orders d for which G has a non-normal subgroup of order d.",
+    "'Soluble' is Mathlib's IsSolvable; 'simple' is Mathlib's IsSimpleGroup, which includes cyclic groups of prime order. These have 0 IE_n̄-systems, and every statement restricts to 0 < k, so the convention does not affect any slot (a simple group with ≥1 non-normal subgroup is non-abelian; non-soluble groups are never of prime order).",
+    "The five predicates are defined on all of ℕ; the notebook's restriction to positive integers is imposed by 0 < k in each theorem statement (documented in the module docstring).",
+    "'No non-soluble non-simple finite groups having k systems' is stated as ∀ finite G, numIESystems G = k → ¬ IsSolvable G → IsSimpleGroup G (classically equivalent to the negated existential).",
+    "Slot (iii) uses IsNonSolubleNumber (existential witness) for 'not soluble'; the API lemma isNonSolubleNumber_iff_not_isSolubleNumber proves this equals ¬ IsSolubleNumber.",
+    "'Finite or infinite?' is formalized as answer(sorry) ↔ Set.Finite …, so answer(True) means finite."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Subgroup.Normal, Nat.card on Subgroup; no existing predicate on sets of subgroups of a fixed order.",
+     "name": "Kourovka.«2.78».IsIESystem",
+     "why_needed": "The notebook's ad hoc notion of an IE_n̄-system (set of all subgroups of a given order containing at least one non-normal subgroup) has no counterpart in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Set.ncard / Nat.card directly on {d | ∃ H, ¬H.Normal ∧ Nat.card H = d}; chose the literal 'count the systems' definition and proved equivalence to the order-count.",
+     "name": "Kourovka.«2.78».numIESystems",
+     "why_needed": "The problem counts IE_n̄-systems of a finite group; defined as Set.ncard of the set of IE_n̄-systems (finite for finite G). API lemma numIESystems_eq_ncard proves it equals the number of orders d with a non-normal subgroup of order d; numIESystems_eq_zero_of_forall_normal checks the Dedekind case."
+    },
+    {
+     "closest_existing_considered": "IsSolvable (used inside).",
+     "name": "Kourovka.«2.78».IsSolubleNumber",
+     "why_needed": "Problem-specific: every finite group with exactly k IE_n̄-systems is solvable."
+    },
+    {
+     "closest_existing_considered": "¬ IsSolubleNumber; kept as an explicit existential per the decomposition notes.",
+     "name": "Kourovka.«2.78».IsNonSolubleNumber",
+     "why_needed": "Problem-specific: some non-solvable finite group has exactly k IE_n̄-systems (existential form required by slot iii). API lemma shows it is ¬ IsSolubleNumber."
+    },
+    {
+     "closest_existing_considered": "IsSimpleGroup (used inside).",
+     "name": "Kourovka.«2.78».IsSimpleNumber",
+     "why_needed": "Problem-specific: some finite simple group has exactly k IE_n̄-systems; used inside IsAbsolutelySimpleNumber."
+    },
+    {
+     "closest_existing_considered": "¬ IsSimpleNumber (equivalent); stated as a universal for readability.",
+     "name": "Kourovka.«2.78».IsCompositeNumber",
+     "why_needed": "Problem-specific: no finite simple group has exactly k IE_n̄-systems."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«2.78».IsAbsolutelySimpleNumber",
+     "why_needed": "Problem-specific: IsSimpleNumber k ∧ no non-soluble non-simple finite group has exactly k systems."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.78».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "answer(sorry) ↔ {k : ℕ | 0 < k ∧ IsSolubleNumber k}.Finite, where IsSolubleNumber k := ∀ finite group G with numIESystems G = k, IsSolvable G. numIESystems literally counts sets of all subgroups of a given order that contain a non-normal subgroup (Set.ncard on a finite ambient type); an API lemma proves it equals the number of orders d admitting a non-normal subgroup of order d."
+    },
+    "kourovka.«2.78».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "answer(sorry) ↔ {k : ℕ | 0 < k ∧ IsAbsolutelySimpleNumber k}.Finite, where IsAbsolutelySimpleNumber k := (∃ finite simple G with exactly k systems) ∧ (every non-soluble finite G with exactly k systems is simple), i.e. no non-soluble non-simple finite group has k systems. Mathlib's IsSimpleGroup includes prime-order cyclic groups, but these have 0 systems and 0 < k is imposed, so the convention is harmless."
+    },
+    "kourovka.«2.78».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "answer(sorry) ↔ ∃ k, 0 < k ∧ IsCompositeNumber k ∧ IsNonSolubleNumber k, where IsCompositeNumber k := no finite simple group has exactly k systems and IsNonSolubleNumber k := ∃ non-soluble finite group with exactly k systems (existential witness form). An API lemma proves IsNonSolubleNumber k ↔ ¬ IsSolubleNumber k, so this is exactly 'composite but not soluble'."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.78».parts.i": "/--\nIs the set of all soluble group-theoretic numbers finite?\n\nA positive integer $k$ is a soluble group-theoretic number if every finite group having\nexactly $k$ $IE_{\\bar n}$-systems is soluble, where an $IE_{\\bar n}$-system of a finite group\n$G$ is a set of all subgroups of $G$ of the same given order that contains at least one\nnon-normal subgroup.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔\n    {k : ℕ | 0 < k ∧ IsSolubleNumber k}.Finite := by\n  sorry",
+    "kourovka.«2.78».parts.ii": "/--\nIs the set of all absolutely simple group-theoretic numbers finite?\n\nA positive integer $k$ is an absolutely simple group-theoretic number if there is at least one\nsimple finite group having exactly $k$ $IE_{\\bar n}$-systems and there are no non-soluble\nnon-simple finite groups having exactly $k$ $IE_{\\bar n}$-systems.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii : answer(sorry) ↔\n    {k : ℕ | 0 < k ∧ IsAbsolutelySimpleNumber k}.Finite := by\n  sorry",
+    "kourovka.«2.78».parts.iii": "/--\nDo there exist composite, but not soluble group-theoretic numbers?\n\nThat is, is there a positive integer $k$ such that no finite simple group has exactly $k$\n$IE_{\\bar n}$-systems, yet some non-soluble finite group has exactly $k$ $IE_{\\bar n}$-systems?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii : answer(sorry) ↔\n    ∃ k : ℕ, 0 < k ∧ IsCompositeNumber k ∧ IsNonSolubleNumber k := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.78\n\nby P. I. Trofimov\n\nFor a finite group $G$, an $IE_{\\bar n}$-system is the set of all subgroups of a fixed order,\nprovided that this set contains a non-normal subgroup. A positive integer $k$ is called soluble\nif every finite group with exactly $k$ such systems is soluble. It is called absolutely simple if\nsome finite simple group has exactly $k$ such systems, while no finite non-soluble non-simple group\ndoes.\n\nAre the sets of soluble and absolutely simple group-theoretic numbers finite or infinite? Do there\nexist composite, but not soluble, group-theoretic numbers?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«2.78»\n\n/-- The number of $IE_{\\bar n}$-systems of a finite group $G$: the number of subgroup orders $d$\nfor which $G$ has at least one non-normal subgroup of order $d$. -/\nnoncomputable def numberOfIESystems (G : Type*) [Group G] [Finite G] : ℕ :=\n  Set.ncard {d : ℕ | ∃ H : Subgroup G, Nat.card H = d ∧ ¬ H.Normal}\n\n/--\nIs the set of all soluble group-theoretic numbers finite? Here $k$ is a positive integer and is\nsoluble group-theoretic when every finite group having exactly $k$ $IE_{\\bar n}$-systems is soluble.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    ∀ (G : Type) [Group G] [Finite G], numberOfIESystems G = k → IsSolvable G} := by\n  sorry\n\n/--\nIs the set of all absolutely simple group-theoretic numbers finite? Here $k$ is positive and is\nabsolutely simple group-theoretic when some finite simple group has exactly $k$\n$IE_{\\bar n}$-systems and no finite non-soluble non-simple group has exactly $k$ such systems.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    (∃ (G : Type) (_ : Group G) (_ : Finite G),\n      IsSimpleGroup G ∧ numberOfIESystems G = k) ∧\n    ¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ IsSolvable G ∧ ¬ IsSimpleGroup G ∧ numberOfIESystems G = k} := by\n  sorry\n\n/--\nDo there exist composite, but not soluble, group-theoretic numbers? That is, does there exist a\npositive integer $k$ such that no finite simple group has exactly $k$ $IE_{\\bar n}$-systems, but\nsome finite non-soluble group does?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii : answer(sorry) ↔ ∃ k : ℕ, 0 < k ∧\n    (¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      IsSimpleGroup G ∧ numberOfIESystems G = k) ∧\n    ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ IsSolvable G ∧ numberOfIESystems G = k := by\n  sorry\n\nend Kourovka.«2.78»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.98,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "An IE_n̄-system is counted once for each natural number d for which the group has a non-normal subgroup of order d; it is not counted once per non-normal subgroup.",
+    "Positive integers are represented as naturals satisfying 0 < k, so k = 0 is excluded in all three declarations.",
+    "Finite groups are quantified using a Group structure together with Mathlib's Finite typeclass; subgroup order is Nat.card of the subgroup subtype.",
+    "Mathlib's IsSolvable and IsSimpleGroup express soluble and simple groups. The absolutely simple condition explicitly excludes finite groups that are both non-soluble and non-simple.",
+    "The two finite-or-infinite questions use answer(sorry) ↔ Set.Finite ..., so a true answer corresponds to the relevant set being finite."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Set.ncard, Nat.card, Subgroup.Normal, and the finite type of subgroups provide the ingredients, but searches found no existing IE-system or equivalent group statistic definition.",
+     "name": "Kourovka.«2.78».numberOfIESystems",
+     "why_needed": "The problem depends on the number of subgroup orders represented by at least one non-normal subgroup, and no existing repository or Mathlib definition packages this statistic."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.78».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.78».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.78».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.78».parts.i": "/--\nIs the set of all soluble group-theoretic numbers finite? Here $k$ is a positive integer and is\nsoluble group-theoretic when every finite group having exactly $k$ $IE_{\\bar n}$-systems is soluble.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    ∀ (G : Type) [Group G] [Finite G], numberOfIESystems G = k → IsSolvable G} := by\n  sorry",
+    "kourovka.«2.78».parts.ii": "/--\nIs the set of all absolutely simple group-theoretic numbers finite? Here $k$ is positive and is\nabsolutely simple group-theoretic when some finite simple group has exactly $k$\n$IE_{\\bar n}$-systems and no finite non-soluble non-simple group has exactly $k$ such systems.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    (∃ (G : Type) (_ : Group G) (_ : Finite G),\n      IsSimpleGroup G ∧ numberOfIESystems G = k) ∧\n    ¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ IsSolvable G ∧ ¬ IsSimpleGroup G ∧ numberOfIESystems G = k} := by\n  sorry",
+    "kourovka.«2.78».parts.iii": "/--\nDo there exist composite, but not soluble, group-theoretic numbers? That is, does there exist a\npositive integer $k$ such that no finite simple group has exactly $k$ $IE_{\\bar n}$-systems, but\nsome finite non-soluble group does?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii : answer(sorry) ↔ ∃ k : ℕ, 0 < k ∧\n    (¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      IsSimpleGroup G ∧ numberOfIESystems G = k) ∧\n    ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ IsSolvable G ∧ numberOfIESystems G = k := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.78\n\nby P. I. Trofimov\n\nFor a finite group $G$, an $IE_{\\bar n}$-system is the set of all subgroups of a fixed order,\nprovided that this set contains a non-normal subgroup. Thus, the number of such systems is the\nnumber of distinct orders of non-normal subgroups of $G$.\n\nA positive integer $k$ is called a soluble group-theoretic number if every finite group with\nexactly $k$ such systems is soluble. It is called absolutely simple if some finite simple group\nhas exactly $k$ such systems, while no finite non-soluble non-simple group does. It is called\ncomposite if no finite simple group has exactly $k$ such systems.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 2.78.\n-/\n\nnamespace Kourovka.«2.78»\n\n/-- The number of $IE_{\\bar n}$-systems of a finite group $G$: the number of distinct orders\noccurring among the non-normal subgroups of $G$. -/\nnoncomputable def numberOfIESystems (G : Type*) [Group G] [Fintype G] : ℕ := by\n  classical\n  exact ((Finset.univ.filter fun H : Subgroup G => ¬ H.Normal).image\n    fun H : Subgroup G => Fintype.card H).card\n\nnamespace parts\n\n/--\nIs the set of positive integers $k$ for which every finite group having exactly $k$\n$IE_{\\bar n}$-systems is soluble finite (rather than infinite)?\n-/\n@[category research open, AMS 20]\ntheorem i : answer(sorry) ↔ Set.Finite\n    {k : ℕ | 0 < k ∧ ∀ (G : Type) [Group G] [Fintype G],\n      numberOfIESystems G = k → IsSolvable G} := by\n  sorry\n\n/--\nIs the set of absolutely simple group-theoretic numbers finite (rather than infinite)? More\nprecisely, these are the positive integers $k$ for which some finite simple group has exactly\n$k$ $IE_{\\bar n}$-systems and no finite non-soluble non-simple group has exactly $k$ such\nsystems.\n-/\n@[category research open, AMS 20]\ntheorem ii : answer(sorry) ↔ Set.Finite\n    {k : ℕ | 0 < k ∧\n      (∃ (G : Type) (g : Group G) (f : Fintype G),\n        @numberOfIESystems G g f = k ∧ @IsSimpleGroup G g) ∧\n      ¬ ∃ (G : Type) (g : Group G) (f : Fintype G),\n        @numberOfIESystems G g f = k ∧ ¬ @IsSolvable G g ∧ ¬ @IsSimpleGroup G g} := by\n  sorry\n\n/--\nDoes there exist a composite but not soluble group-theoretic number? That is, does there exist a\npositive integer $k$ such that no finite simple group has exactly $k$ $IE_{\\bar n}$-systems, but\nsome finite non-soluble group has exactly $k$ such systems?\n-/\n@[category research open, AMS 20]\ntheorem iii : answer(sorry) ↔ ∃ k : ℕ, 0 < k ∧\n    (¬ ∃ (G : Type) (g : Group G) (f : Fintype G),\n      @numberOfIESystems G g f = k ∧ @IsSimpleGroup G g) ∧\n    ∃ (G : Type) (g : Group G) (f : Fintype G),\n      @numberOfIESystems G g f = k ∧ ¬ @IsSolvable G g := by\n  sorry\n\nend parts\n\nend Kourovka.«2.78»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "An IE_n̄-system is counted once for each distinct order occurring among non-normal subgroups. This is implemented as the cardinality of the image of the finite set of non-normal subgroups under subgroup cardinality.",
+    "Finite groups are quantified using `Group G` and `Fintype G`, following existing Kourovka files in the repository.",
+    "Positive group-theoretic numbers are represented by the explicit condition `0 < k`, excluding the zero-system case.",
+    "The absolutely simple condition is represented by a finite simple-group witness together with the nonexistence of any finite group that is simultaneously non-soluble and non-simple with the same count.",
+    "In part (iii), 'not soluble' is represented by an existential finite non-soluble group witness, not by a potentially vacuous implication or merely by negating an inline universal."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib provides `Subgroup.Normal`, finite enumeration of `Subgroup G`, `Fintype.card` for subgroup order, and `Finset.image`, but no definition of IE_n̄-systems or their number.",
+     "name": "Kourovka.«2.78».numberOfIESystems",
+     "why_needed": "The statement requires the number of distinct subgroup orders for which at least one subgroup is non-normal; no existing Mathlib or FormalConjecturesForMathlib definition packages this problem-specific count."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.78».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.78».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.78».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.78».parts.i": "/--\nIs the set of positive integers $k$ for which every finite group having exactly $k$\n$IE_{\\bar n}$-systems is soluble finite (rather than infinite)?\n-/\n@[category research open, AMS 20]\ntheorem i : answer(sorry) ↔ Set.Finite\n    {k : ℕ | 0 < k ∧ ∀ (G : Type) [Group G] [Fintype G],\n      numberOfIESystems G = k → IsSolvable G} := by\n  sorry",
+    "kourovka.«2.78».parts.ii": "/--\nIs the set of absolutely simple group-theoretic numbers finite (rather than infinite)? More\nprecisely, these are the positive integers $k$ for which some finite simple group has exactly\n$k$ $IE_{\\bar n}$-systems and no finite non-soluble non-simple group has exactly $k$ such\nsystems.\n-/\n@[category research open, AMS 20]\ntheorem ii : answer(sorry) ↔ Set.Finite\n    {k : ℕ | 0 < k ∧\n      (∃ (G : Type) (g : Group G) (f : Fintype G),\n        @numberOfIESystems G g f = k ∧ @IsSimpleGroup G g) ∧\n      ¬ ∃ (G : Type) (g : Group G) (f : Fintype G),\n        @numberOfIESystems G g f = k ∧ ¬ @IsSolvable G g ∧ ¬ @IsSimpleGroup G g} := by\n  sorry",
+    "kourovka.«2.78».parts.iii": "/--\nDoes there exist a composite but not soluble group-theoretic number? That is, does there exist a\npositive integer $k$ such that no finite simple group has exactly $k$ $IE_{\\bar n}$-systems, but\nsome finite non-soluble group has exactly $k$ such systems?\n-/\n@[category research open, AMS 20]\ntheorem iii : answer(sorry) ↔ ∃ k : ℕ, 0 < k ∧\n    (¬ ∃ (G : Type) (g : Group G) (f : Fintype G),\n      @numberOfIESystems G g f = k ∧ @IsSimpleGroup G g) ∧\n    ∃ (G : Type) (g : Group G) (f : Fintype G),\n      @numberOfIESystems G g f = k ∧ ¬ @IsSolvable G g := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.78\n\nby P. I. Trofimov\n\nAny set of all subgroups of the same given order of a finite group $G$ that contains\nat least one non-normal subgroup is called an $IE_{\\bar n}$-system of $G$. A positive\ninteger $k$ is called a *soluble* (*non-soluble*; *simple*; *composite*; *absolutely\nsimple*) *group-theoretic number* if every finite group having exactly $k$\n$IE_{\\bar n}$-systems is soluble (respectively, if there is at least one non-soluble\nfinite group having $k$ $IE_{\\bar n}$-systems; if there is at least one simple finite\ngroup having $k$ $IE_{\\bar n}$-systems; if there are no simple finite groups having $k$\n$IE_{\\bar n}$-systems; if there is at least one simple finite group having $k$\n$IE_{\\bar n}$-systems and there are no non-soluble non-simple finite groups having $k$\n$IE_{\\bar n}$-systems).\n\nAre the sets of all soluble and of all absolutely simple group-theoretic numbers finite\nor infinite? Do there exist composite, but not soluble group-theoretic numbers?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), problem 2.78.\n-/\n\nnamespace Kourovka.«2.78»\n\n/--\nA set `S` of subgroups of a group `G` is an $IE_{\\bar n}$-system of `G` if it is the set\nof all subgroups of `G` of some given order `d` and it contains at least one non-normal\nsubgroup.\n-/\ndef IsIESystem {G : Type*} [Group G] (S : Set (Subgroup G)) : Prop :=\n  (∃ d : ℕ, S = {H : Subgroup G | Nat.card H = d}) ∧ ∃ H ∈ S, ¬ H.Normal\n\n/--\nThe number of $IE_{\\bar n}$-systems of a group `G`. For a finite group `G` this is the\nnumber of orders `d` such that `G` has at least one non-normal subgroup of order `d`.\n-/\nnoncomputable def numIESystems (G : Type*) [Group G] : ℕ :=\n  {S : Set (Subgroup G) | IsIESystem S}.ncard\n\n/-- A group all of whose subgroups are normal has no $IE_{\\bar n}$-systems. -/\n@[category test, AMS 20]\ntheorem numIESystems_eq_zero_of_forall_normal (G : Type*) [Group G]\n    (h : ∀ H : Subgroup G, H.Normal) : numIESystems G = 0 := by\n  have : {S : Set (Subgroup G) | IsIESystem S} = ∅ := by\n    ext S\n    simp [IsIESystem, h]\n  rw [numIESystems, this, Set.ncard_empty]\n\n/-- A commutative group has no $IE_{\\bar n}$-systems. -/\n@[category test, AMS 20]\ntheorem numIESystems_eq_zero_of_commGroup (G : Type*) [CommGroup G] : numIESystems G = 0 :=\n  numIESystems_eq_zero_of_forall_normal G fun H => H.normal_of_comm\n\n/--\nA positive integer `k` is a *soluble group-theoretic number* if every finite group having\nexactly `k` $IE_{\\bar n}$-systems is soluble.\n-/\ndef IsSolubleNumber (k : ℕ) : Prop :=\n  0 < k ∧ ∀ (G : Type) [Group G] [Finite G], numIESystems G = k → IsSolvable G\n\n/--\nA positive integer `k` is a *non-soluble group-theoretic number* if there is at least one\nnon-soluble finite group having exactly `k` $IE_{\\bar n}$-systems.\n-/\ndef IsNonSolubleNumber (k : ℕ) : Prop :=\n  0 < k ∧ ∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ IsSolvable G ∧ numIESystems G = k\n\n/--\nA positive integer `k` is a *simple group-theoretic number* if there is at least one\nsimple finite group having exactly `k` $IE_{\\bar n}$-systems.\n-/\ndef IsSimpleNumber (k : ℕ) : Prop :=\n  0 < k ∧ ∃ (G : Type) (_ : Group G) (_ : Finite G), IsSimpleGroup G ∧ numIESystems G = k\n\n/--\nA positive integer `k` is a *composite group-theoretic number* if there are no simple\nfinite groups having exactly `k` $IE_{\\bar n}$-systems.\n-/\ndef IsCompositeNumber (k : ℕ) : Prop :=\n  0 < k ∧ ¬ ∃ (G : Type) (_ : Group G) (_ : Finite G), IsSimpleGroup G ∧ numIESystems G = k\n\n/--\nA positive integer `k` is an *absolutely simple group-theoretic number* if there is at\nleast one simple finite group having exactly `k` $IE_{\\bar n}$-systems and there are no\nnon-soluble non-simple finite groups having exactly `k` $IE_{\\bar n}$-systems.\n-/\ndef IsAbsolutelySimpleNumber (k : ℕ) : Prop :=\n  IsSimpleNumber k ∧\n    ¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ IsSolvable G ∧ ¬ IsSimpleGroup G ∧ numIESystems G = k\n\n/--\nFor a positive integer `k`, being a simple group-theoretic number implies being a\nnon-soluble group-theoretic number: a simple group with at least one\n$IE_{\\bar n}$-system has a non-normal subgroup, so it is non-abelian and hence\nnon-soluble.\n-/\n@[category API, AMS 20]\ntheorem IsSimpleNumber.isNonSolubleNumber {k : ℕ} (hk : IsSimpleNumber k) :\n    IsNonSolubleNumber k := by\n  obtain ⟨hpos, G, _, _, hG, hk⟩ := hk\n  refine ⟨hpos, G, ‹_›, ‹_›, fun hsol => ?_, hk⟩\n  have hcomm : ∀ a b : G, a * b = b * a := IsSimpleGroup.comm_iff_isSolvable.mpr hsol\n  letI : CommGroup G := { ‹Group G› with mul_comm := hcomm }\n  exact hpos.ne' (hk ▸ numIESystems_eq_zero_of_commGroup G)\n\n/--\nIs the set of all soluble group-theoretic numbers finite?\n\nHere a positive integer $k$ is a soluble group-theoretic number if every finite group\nhaving exactly $k$ $IE_{\\bar n}$-systems is soluble, where an $IE_{\\bar n}$-system of a\nfinite group $G$ is a set of all subgroups of $G$ of the same given order that contains\nat least one non-normal subgroup. The answer `True` means that this set is finite and\nthe answer `False` means that it is infinite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔\n    {k : ℕ | IsSolubleNumber k}.Finite := by\n  sorry\n\n/--\nIs the set of all absolutely simple group-theoretic numbers finite?\n\nHere a positive integer $k$ is an absolutely simple group-theoretic number if there is at\nleast one simple finite group having exactly $k$ $IE_{\\bar n}$-systems and there are no\nnon-soluble non-simple finite groups having exactly $k$ $IE_{\\bar n}$-systems. The\nanswer `True` means that this set is finite and the answer `False` means that it is\ninfinite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii : answer(sorry) ↔\n    {k : ℕ | IsAbsolutelySimpleNumber k}.Finite := by\n  sorry\n\n/--\nDo there exist composite, but not soluble group-theoretic numbers?\n\nThat is, is there a positive integer $k$ such that no simple finite group has exactly $k$\n$IE_{\\bar n}$-systems, but some non-soluble finite group has exactly $k$\n$IE_{\\bar n}$-systems?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii : answer(sorry) ↔\n    ∃ k : ℕ, IsCompositeNumber k ∧ IsNonSolubleNumber k := by\n  sorry\n\nend Kourovka.«2.78»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The table's reading (count of IE-systems = number of orders with a non-normal subgroup; k positive; ¬soluble in (iii) rendered as the existential 'non-soluble') matches the notebook text and is what the file implements.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "IE-systems are modelled literally as sets of subgroups: S = {H | Nat.card H = d} for some d, containing a non-normal H; numIESystems is the Set.ncard of the set of such S. Since each IE-system is nonempty it determines d, so this equals the number of orders d with a non-normal subgroup of order d (the reading in the decomposition notes). For finite G the set is finite, so ncard is the genuine count.",
+    "Positivity 0 < k is baked into each group-theoretic-number predicate, following 'A positive integer k is called …'; hence the sets in slots (i)/(ii) and the witness in (iii) range over positive integers only.",
+    "Finite groups are quantified as (G : Type) [Group G] [Finite G] (universe 0), consistent with other Kourovka files; every finite group is isomorphic to one in Type and all properties used are isomorphism-invariant.",
+    "Mathlib's IsSimpleGroup counts cyclic groups of prime order as simple; these have 0 IE-systems (all subgroups normal), so for k ≥ 1 this does not affect any predicate. Mathlib's IsSolvable coincides with classical solubility for finite groups.",
+    "'Finite or infinite?' is rendered as answer(sorry) ↔ Set.Finite …, so answer True means finite and False means infinite (documented in the docstrings).",
+    "Added two @[category test] lemmas (a group with all subgroups normal / a commutative group has 0 IE-systems) and one @[category API] lemma (IsSimpleNumber k → IsNonSolubleNumber k) as short sanity checks of the definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Subgroup.Normal, Nat.card on subgroups; no existing predicate groups subgroups by order and tests for non-normality.",
+     "name": "Kourovka.«2.78».IsIESystem",
+     "why_needed": "The notebook's bespoke notion of an IE_n̄-system (the set of all subgroups of a given order containing at least one non-normal subgroup) has no counterpart in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Set.ncard / Nat.card of a subtype of ℕ (orders with a non-normal subgroup) — equivalent, but the set-of-sets version is the literal reading of the notebook.",
+     "name": "Kourovka.«2.78».numIESystems",
+     "why_needed": "The number of IE_n̄-systems of a group, as Set.ncard of the set of IE-systems; the statement counts these systems."
+    },
+    {
+     "closest_existing_considered": "IsSolvable (used as the building block).",
+     "name": "Kourovka.«2.78».IsSolubleNumber",
+     "why_needed": "Notebook's 'soluble group-theoretic number' (positive k such that every finite group with exactly k IE-systems is soluble)."
+    },
+    {
+     "closest_existing_considered": "¬IsSolubleNumber — rejected since the notebook defines it existentially and the table requires the witness form.",
+     "name": "Kourovka.«2.78».IsNonSolubleNumber",
+     "why_needed": "Notebook's 'non-soluble group-theoretic number' (existential witness form)."
+    },
+    {
+     "closest_existing_considered": "IsSimpleGroup (used as the building block).",
+     "name": "Kourovka.«2.78».IsSimpleNumber",
+     "why_needed": "Notebook's 'simple group-theoretic number'."
+    },
+    {
+     "closest_existing_considered": "¬IsSimpleNumber — equivalent for positive k, but stated separately to mirror the notebook and keep 0 < k explicit.",
+     "name": "Kourovka.«2.78».IsCompositeNumber",
+     "why_needed": "Notebook's 'composite group-theoretic number' (no simple finite group with exactly k systems)."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«2.78».IsAbsolutelySimpleNumber",
+     "why_needed": "Notebook's 'absolutely simple group-theoretic number'."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.78».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ {k : ℕ | IsSolubleNumber k}.Finite, where IsSolubleNumber k := 0 < k ∧ ∀ finite group G, numIESystems G = k → IsSolvable G. True = finite, False = infinite."
+    },
+    "kourovka.«2.78».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ {k : ℕ | IsAbsolutelySimpleNumber k}.Finite, where IsAbsolutelySimpleNumber k := IsSimpleNumber k ∧ ¬∃ finite G, ¬IsSolvable G ∧ ¬IsSimpleGroup G ∧ numIESystems G = k."
+    },
+    "kourovka.«2.78».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∃ k, IsCompositeNumber k ∧ IsNonSolubleNumber k; 'not soluble' is rendered by the notebook's own existential 'non-soluble' predicate (∃ non-soluble finite G with exactly k systems), per the decomposition note, not as ¬(implication)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.78».parts.i": "/--\nIs the set of all soluble group-theoretic numbers finite?\n\nHere a positive integer $k$ is a soluble group-theoretic number if every finite group\nhaving exactly $k$ $IE_{\\bar n}$-systems is soluble, where an $IE_{\\bar n}$-system of a\nfinite group $G$ is a set of all subgroups of $G$ of the same given order that contains\nat least one non-normal subgroup. The answer `True` means that this set is finite and\nthe answer `False` means that it is infinite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔\n    {k : ℕ | IsSolubleNumber k}.Finite := by\n  sorry",
+    "kourovka.«2.78».parts.ii": "/--\nIs the set of all absolutely simple group-theoretic numbers finite?\n\nHere a positive integer $k$ is an absolutely simple group-theoretic number if there is at\nleast one simple finite group having exactly $k$ $IE_{\\bar n}$-systems and there are no\nnon-soluble non-simple finite groups having exactly $k$ $IE_{\\bar n}$-systems. The\nanswer `True` means that this set is finite and the answer `False` means that it is\ninfinite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii : answer(sorry) ↔\n    {k : ℕ | IsAbsolutelySimpleNumber k}.Finite := by\n  sorry",
+    "kourovka.«2.78».parts.iii": "/--\nDo there exist composite, but not soluble group-theoretic numbers?\n\nThat is, is there a positive integer $k$ such that no simple finite group has exactly $k$\n$IE_{\\bar n}$-systems, but some non-soluble finite group has exactly $k$\n$IE_{\\bar n}$-systems?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii : answer(sorry) ↔\n    ∃ k : ℕ, IsCompositeNumber k ∧ IsNonSolubleNumber k := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.78\n\nby P. I. Trofimov\n\nAny set of all subgroups of the same given order of a finite group $G$ that contains at\nleast one non-normal subgroup is called an $IE_{\\bar n}$-system of $G$. A positive integer\n$k$ is called a *soluble* (*non-soluble*; *simple*; *composite*; *absolutely simple*)\n*group-theoretic number* if every finite group having exactly $k$ $IE_{\\bar n}$-systems is\nsoluble (respectively, if there is at least one non-soluble finite group having $k$\n$IE_{\\bar n}$-systems; if there is at least one simple finite group having $k$\n$IE_{\\bar n}$-systems; if there are no simple finite groups having $k$ $IE_{\\bar n}$-systems;\nif there is at least one simple finite group having $k$ $IE_{\\bar n}$-systems and there are\nno non-soluble non-simple finite groups having $k$ $IE_{\\bar n}$-systems).\n\nAre the sets of all soluble and of all absolutely simple group-theoretic numbers finite or\ninfinite? Do there exist composite, but not soluble group-theoretic numbers?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«2.78»\n\n/-- A set $S$ of subgroups of a group $G$ is an $IE_{\\bar n}$-system of $G$ if $S$ is the set\nof all subgroups of $G$ of some given order $d$ and $S$ contains at least one non-normal\nsubgroup. -/\ndef IsIESystem {G : Type*} [Group G] (S : Set (Subgroup G)) : Prop :=\n  (∃ d : ℕ, S = {H : Subgroup G | Nat.card H = d}) ∧ ∃ H ∈ S, ¬ H.Normal\n\n/-- The number of $IE_{\\bar n}$-systems of a group $G$. For a finite group $G$ this is the\nnumber of orders $d$ such that $G$ has a non-normal subgroup of order $d$. -/\nnoncomputable def numIESystems (G : Type*) [Group G] : ℕ :=\n  {S : Set (Subgroup G) | IsIESystem S}.ncard\n\n/-- A positive integer $k$ is a *soluble group-theoretic number* if every finite group having\nexactly $k$ $IE_{\\bar n}$-systems is soluble. -/\ndef IsSolubleNumber (k : ℕ) : Prop :=\n  0 < k ∧ ∀ (G : Type) [Group G] [Finite G], numIESystems G = k → IsSolvable G\n\n/-- A positive integer $k$ is a *non-soluble group-theoretic number* if there is at least one\nnon-soluble finite group having exactly $k$ $IE_{\\bar n}$-systems. -/\ndef IsNonSolubleNumber (k : ℕ) : Prop :=\n  0 < k ∧ ∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ IsSolvable G ∧ numIESystems G = k\n\n/-- A positive integer $k$ is a *simple group-theoretic number* if there is at least one\nsimple finite group having exactly $k$ $IE_{\\bar n}$-systems. -/\ndef IsSimpleNumber (k : ℕ) : Prop :=\n  0 < k ∧ ∃ (G : Type) (_ : Group G) (_ : Finite G), IsSimpleGroup G ∧ numIESystems G = k\n\n/-- A positive integer $k$ is a *composite group-theoretic number* if there are no simple\nfinite groups having exactly $k$ $IE_{\\bar n}$-systems. -/\ndef IsCompositeNumber (k : ℕ) : Prop :=\n  0 < k ∧ ¬ ∃ (G : Type) (_ : Group G) (_ : Finite G), IsSimpleGroup G ∧ numIESystems G = k\n\n/-- A positive integer $k$ is an *absolutely simple group-theoretic number* if there is at\nleast one simple finite group having exactly $k$ $IE_{\\bar n}$-systems and there are no\nnon-soluble non-simple finite groups having exactly $k$ $IE_{\\bar n}$-systems. -/\ndef IsAbsolutelySimpleNumber (k : ℕ) : Prop :=\n  IsSimpleNumber k ∧\n    ¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ IsSolvable G ∧ ¬ IsSimpleGroup G ∧ numIESystems G = k\n\n/-- A commutative group has no $IE_{\\bar n}$-systems, since all its subgroups are normal. -/\n@[category API, AMS 20]\ntheorem numIESystems_eq_zero (G : Type*) [CommGroup G] : numIESystems G = 0 := by\n  have : {S : Set (Subgroup G) | IsIESystem S} = ∅ := by\n    ext S\n    simp only [Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false]\n    rintro ⟨-, H, -, hH⟩\n    exact hH inferInstance\n  rw [numIESystems, this, Set.ncard_empty]\n\n/-- A positive integer is a non-soluble group-theoretic number if and only if it is not a\nsoluble group-theoretic number. -/\n@[category API, AMS 20]\ntheorem isNonSolubleNumber_iff (k : ℕ) (hk : 0 < k) :\n    IsNonSolubleNumber k ↔ ¬ IsSolubleNumber k := by\n  simp only [IsNonSolubleNumber, IsSolubleNumber, hk, true_and, not_forall]\n  constructor\n  · rintro ⟨G, _, _, hG, hGk⟩\n    exact ⟨G, ‹_›, ‹_›, hGk, hG⟩\n  · rintro ⟨G, _, _, hGk, hG⟩\n    exact ⟨G, ‹_›, ‹_›, hG, hGk⟩\n\n/-- A composite group-theoretic number is not a simple group-theoretic number. -/\n@[category API, AMS 20]\ntheorem IsCompositeNumber.not_isSimpleNumber {k : ℕ} (hk : IsCompositeNumber k) :\n    ¬ IsSimpleNumber k :=\n  fun h => hk.2 h.2\n\n/-- Is the set of all soluble group-theoretic numbers finite? Here a positive integer $k$\nis a soluble group-theoretic number if every finite group having exactly $k$\n$IE_{\\bar n}$-systems is soluble. -/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔ {k : ℕ | IsSolubleNumber k}.Finite := by\n  sorry\n\n/-- Is the set of all absolutely simple group-theoretic numbers finite? Here a positive\ninteger $k$ is an absolutely simple group-theoretic number if there is at least one simple\nfinite group having exactly $k$ $IE_{\\bar n}$-systems and there are no non-soluble non-simple\nfinite groups having exactly $k$ $IE_{\\bar n}$-systems. -/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii :\n    answer(sorry) ↔ {k : ℕ | IsAbsolutelySimpleNumber k}.Finite := by\n  sorry\n\n/-- Do there exist composite, but not soluble group-theoretic numbers? That is, is there a\npositive integer $k$ such that no simple finite group has exactly $k$ $IE_{\\bar n}$-systems,\nbut some non-soluble finite group has exactly $k$ $IE_{\\bar n}$-systems? For a positive\ninteger, \"not soluble\" is equivalent to \"non-soluble\" (see `isNonSolubleNumber_iff`). -/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii :\n    answer(sorry) ↔ ∃ k : ℕ, IsCompositeNumber k ∧ IsNonSolubleNumber k := by\n  sorry\n\nend Kourovka.«2.78»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The three-slot split (finiteness of soluble numbers, finiteness of absolutely simple numbers, existence of composite-but-not-soluble numbers) matches the two compound questions of the statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "IE_n̄-systems are counted literally as sets S of subgroups (Set.ncard of {S : Set (Subgroup G) | IsIESystem S}) rather than as the set of orders d; for finite groups these are in bijection (systems for different orders are disjoint and nonempty), so the count agrees with the decomposition notes' description.",
+    "'Positive integer k' is encoded as 0 < k inside every group-theoretic-number predicate, so k = 0 is excluded from all three slots (Dedekind groups have 0 systems; k = 0 would otherwise trivially be a composite number).",
+    "Finite groups are quantified as (G : Type) with [Group G] [Finite G], following the existing Kourovka files; universe Type suffices since every finite group is isomorphic to one in Type and all predicates used are isomorphism-invariant.",
+    "'Simple' uses Mathlib's IsSimpleGroup, which includes cyclic groups of prime order; these have 0 IE_n̄-systems so they never affect any predicate at k ≥ 1.",
+    "'Soluble' is Mathlib's IsSolvable. In part (iii), 'not soluble' is stated via IsNonSolubleNumber (existential witness), which the API lemma isNonSolubleNumber_iff proves equivalent to ¬IsSolubleNumber for positive k.",
+    "'Finite or infinite' is stated as Set.Finite of the relevant set with answer(sorry) ↔, per the decomposition notes; answer(True) means finite.",
+    "Three short proved API lemmas (numIESystems_eq_zero for CommGroup, isNonSolubleNumber_iff, IsCompositeNumber.not_isSimpleNumber) are included as basic tests of the bespoke definitions, as CONTRIBUTING.md requests."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Subgroup.Normal, Nat.card on Subgroup coercions; no existing notion of 'all subgroups of a given order' or Dedekind-type counting exists.",
+     "name": "Kourovka.«2.78».IsIESystem",
+     "why_needed": "The notebook's bespoke notion of an IE_n̄-system (the set of all subgroups of a given order, containing at least one non-normal subgroup) has no counterpart in Mathlib or FormalConjecturesForMathlib. Defined literally as (∃ d, S = {H | Nat.card H = d}) ∧ ∃ H ∈ S, ¬H.Normal."
+    },
+    {
+     "closest_existing_considered": "Set.ncard / Nat.card directly on an inline set; wrapped in a def for readability across five predicates.",
+     "name": "Kourovka.«2.78».numIESystems",
+     "why_needed": "The number of IE_n̄-systems of a group, defined as Set.ncard {S | IsIESystem S}. For finite G the set is finite so ncard is the genuine count; commutative groups give 0 (proved as an API lemma)."
+    },
+    {
+     "closest_existing_considered": "IsSolvable (used inside); no numeric predicate of this kind exists.",
+     "name": "Kourovka.«2.78».IsSolubleNumber",
+     "why_needed": "The notebook's 'soluble group-theoretic number': 0 < k ∧ every finite group with exactly k IE_n̄-systems is solvable (Mathlib's IsSolvable)."
+    },
+    {
+     "closest_existing_considered": "¬IsSolubleNumber k (classically equivalent for k > 0; the explicit existential form follows the notebook's own definition and the decomposition notes).",
+     "name": "Kourovka.«2.78».IsNonSolubleNumber",
+     "why_needed": "The notebook's 'non-soluble group-theoretic number': 0 < k ∧ some non-solvable finite group has exactly k IE_n̄-systems. Used for the 'not soluble' clause of part (iii) in existential-witness form; proven equivalent to ¬IsSolubleNumber for positive k."
+    },
+    {
+     "closest_existing_considered": "IsSimpleGroup (used inside).",
+     "name": "Kourovka.«2.78».IsSimpleNumber",
+     "why_needed": "The notebook's 'simple group-theoretic number': 0 < k ∧ some finite simple group (Mathlib IsSimpleGroup) has exactly k IE_n̄-systems. Building block of IsAbsolutelySimpleNumber."
+    },
+    {
+     "closest_existing_considered": "¬IsSimpleNumber k, but that would be trivially true for k = 0, so positivity is included explicitly.",
+     "name": "Kourovka.«2.78».IsCompositeNumber",
+     "why_needed": "The notebook's 'composite group-theoretic number': 0 < k ∧ no finite simple group has exactly k IE_n̄-systems."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«2.78».IsAbsolutelySimpleNumber",
+     "why_needed": "The notebook's 'absolutely simple group-theoretic number': IsSimpleNumber k ∧ no non-solvable non-simple finite group has exactly k IE_n̄-systems."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.78».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ {k | IsSolubleNumber k}.Finite, where IsSolubleNumber k := 0 < k ∧ ∀ finite group G, numIESystems G = k → IsSolvable G. The 'finite or infinite' dichotomy is encoded as Set.Finite per the decomposition notes."
+    },
+    "kourovka.«2.78».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ {k | IsAbsolutelySimpleNumber k}.Finite, where IsAbsolutelySimpleNumber k := IsSimpleNumber k ∧ ¬∃ finite G, ¬IsSolvable G ∧ ¬IsSimpleGroup G ∧ numIESystems G = k, and IsSimpleNumber k := 0 < k ∧ ∃ finite simple G with numIESystems G = k."
+    },
+    "kourovka.«2.78».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∃ k, IsCompositeNumber k ∧ IsNonSolubleNumber k. IsCompositeNumber k := 0 < k ∧ ¬∃ finite simple G with k systems; IsNonSolubleNumber k := 0 < k ∧ ∃ finite G, ¬IsSolvable G ∧ numIESystems G = k (existential witness form). An API lemma isNonSolubleNumber_iff proves that for positive k this is equivalent to ¬IsSolubleNumber k, so 'not soluble' is faithfully captured."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.78».parts.i": "/-- Is the set of all soluble group-theoretic numbers finite? Here a positive integer $k$\nis a soluble group-theoretic number if every finite group having exactly $k$\n$IE_{\\bar n}$-systems is soluble. -/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔ {k : ℕ | IsSolubleNumber k}.Finite := by\n  sorry",
+    "kourovka.«2.78».parts.ii": "/-- Is the set of all absolutely simple group-theoretic numbers finite? Here a positive\ninteger $k$ is an absolutely simple group-theoretic number if there is at least one simple\nfinite group having exactly $k$ $IE_{\\bar n}$-systems and there are no non-soluble non-simple\nfinite groups having exactly $k$ $IE_{\\bar n}$-systems. -/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii :\n    answer(sorry) ↔ {k : ℕ | IsAbsolutelySimpleNumber k}.Finite := by\n  sorry",
+    "kourovka.«2.78».parts.iii": "/-- Do there exist composite, but not soluble group-theoretic numbers? That is, is there a\npositive integer $k$ such that no simple finite group has exactly $k$ $IE_{\\bar n}$-systems,\nbut some non-soluble finite group has exactly $k$ $IE_{\\bar n}$-systems? For a positive\ninteger, \"not soluble\" is equivalent to \"non-soluble\" (see `isNonSolubleNumber_iff`). -/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii :\n    answer(sorry) ↔ ∃ k : ℕ, IsCompositeNumber k ∧ IsNonSolubleNumber k := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.78\n\nby P. I. Trofimov\n\nFor a finite group $G$, an $IE_{\\bar n}$-system is the set of all subgroups of\none fixed order, provided that this set contains a non-normal subgroup. The\nproblem classifies positive integers by the finite groups having that many\n$IE_{\\bar n}$-systems and asks three finiteness or existence questions.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«2.78»\n\n/--\nThe number of $IE_{\\bar n}$-systems of a finite group $G$: the number of\nsubgroup orders $d$ for which $G$ has at least one non-normal subgroup of\norder $d$.\n-/\nnoncomputable def numberOfIESystems (G : Type*) [Group G] [Finite G] : ℕ :=\n  Set.ncard {d : ℕ | ∃ H : Subgroup G, Nat.card H = d ∧ ¬ H.Normal}\n\n/--\nIs the set of soluble group-theoretic numbers finite? Here a positive integer\n$k$ is soluble group-theoretic if every finite group with exactly $k$\n$IE_{\\bar n}$-systems is soluble.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    ∀ (G : Type) [Group G] [Finite G], numberOfIESystems G = k → IsSolvable G} := by\n  sorry\n\n/--\nIs the set of absolutely simple group-theoretic numbers finite? Here a\npositive integer $k$ is absolutely simple group-theoretic if some finite\nsimple group has exactly $k$ $IE_{\\bar n}$-systems, while no finite group\nwhich is both non-soluble and non-simple has exactly $k$ such systems.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    (∃ (G : Type) (_ : Group G) (_ : Finite G),\n      numberOfIESystems G = k ∧ IsSimpleGroup G) ∧\n    ¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      numberOfIESystems G = k ∧ ¬ IsSolvable G ∧ ¬ IsSimpleGroup G} := by\n  sorry\n\n/--\nDoes there exist a composite but not soluble group-theoretic number? That is,\ndoes there exist a positive integer $k$ such that no finite simple group has\nexactly $k$ $IE_{\\bar n}$-systems, but some non-soluble finite group does?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii : answer(sorry) ↔\n    ∃ k : ℕ, 0 < k ∧\n      (¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n        numberOfIESystems G = k ∧ IsSimpleGroup G) ∧\n      ∃ (G : Type) (_ : Group G) (_ : Finite G),\n        numberOfIESystems G = k ∧ ¬ IsSolvable G := by\n  sorry\n\nend Kourovka.«2.78»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "An IE_n̄-system is counted by its subgroup order d; each d contributes once exactly when there exists a non-normal subgroup H with Nat.card H = d.",
+    "Finite groups are represented by a type with Group and proposition-valued Finite instances. Existential group witnesses explicitly quantify both instances.",
+    "Positive group-theoretic numbers are represented as natural numbers k satisfying 0 < k.",
+    "Mathlib's IsSolvable and IsSimpleGroup express soluble and simple groups. The inclusion of cyclic simple groups of prime order is harmless because k is positive and those groups have zero IE_n̄-systems.",
+    "The source's 'not soluble' condition in part iii is encoded by an explicit finite non-soluble group witness rather than by weakening or rearranging the defining universal implication."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Set.ncard, Subgroup.Normal, and Nat.card provide all underlying primitives, but no existing named IE_n̄-system count was found.",
+     "name": "Kourovka.«2.78».numberOfIESystems",
+     "why_needed": "The problem requires the number of distinct subgroup orders for which at least one non-normal subgroup exists; no existing Mathlib or FormalConjecturesForMathlib definition packages this invariant."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.78».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.78».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.78».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.78».parts.i": "/--\nIs the set of soluble group-theoretic numbers finite? Here a positive integer\n$k$ is soluble group-theoretic if every finite group with exactly $k$\n$IE_{\\bar n}$-systems is soluble.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    ∀ (G : Type) [Group G] [Finite G], numberOfIESystems G = k → IsSolvable G} := by\n  sorry",
+    "kourovka.«2.78».parts.ii": "/--\nIs the set of absolutely simple group-theoretic numbers finite? Here a\npositive integer $k$ is absolutely simple group-theoretic if some finite\nsimple group has exactly $k$ $IE_{\\bar n}$-systems, while no finite group\nwhich is both non-soluble and non-simple has exactly $k$ such systems.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    (∃ (G : Type) (_ : Group G) (_ : Finite G),\n      numberOfIESystems G = k ∧ IsSimpleGroup G) ∧\n    ¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      numberOfIESystems G = k ∧ ¬ IsSolvable G ∧ ¬ IsSimpleGroup G} := by\n  sorry",
+    "kourovka.«2.78».parts.iii": "/--\nDoes there exist a composite but not soluble group-theoretic number? That is,\ndoes there exist a positive integer $k$ such that no finite simple group has\nexactly $k$ $IE_{\\bar n}$-systems, but some non-soluble finite group does?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii : answer(sorry) ↔\n    ∃ k : ℕ, 0 < k ∧\n      (¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n        numberOfIESystems G = k ∧ IsSimpleGroup G) ∧\n      ∃ (G : Type) (_ : Group G) (_ : Finite G),\n        numberOfIESystems G = k ∧ ¬ IsSolvable G := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.78\n\nby P. I. Trofimov\n\nAny set of all subgroups of the same given order of a finite group $G$ that contains at\nleast one non-normal subgroup is called an $IE_{\\bar n}$-system of $G$. A positive integer\n$k$ is called a *soluble* (*non-soluble*; *simple*; *composite*; *absolutely simple*)\n*group-theoretic number* if every finite group having exactly $k$ $IE_{\\bar n}$-systems is\nsoluble (respectively, if there is at least one non-soluble finite group having $k$\n$IE_{\\bar n}$-systems; if there is at least one simple finite group having $k$\n$IE_{\\bar n}$-systems; if there are no simple finite groups having $k$ $IE_{\\bar n}$-systems;\nif there is at least one simple finite group having $k$ $IE_{\\bar n}$-systems and there are\nno non-soluble non-simple finite groups having $k$ $IE_{\\bar n}$-systems).\n\nAre the sets of all soluble and of all absolutely simple group-theoretic numbers finite or\ninfinite? Do there exist composite, but not soluble group-theoretic numbers?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«2.78»\n\nvariable (G : Type*) [Group G]\n\n/-- A set $S$ of subgroups of a group $G$ is an *$IE_{\\bar n}$-system* of $G$ if $S$ is the\nset of all subgroups of $G$ of some given order $d$ and $S$ contains at least one non-normal\nsubgroup. -/\ndef IsIESystem (S : Set (Subgroup G)) : Prop :=\n  (∃ d : ℕ, S = {H : Subgroup G | Nat.card H = d}) ∧ ∃ H ∈ S, ¬ H.Normal\n\n/-- The number of $IE_{\\bar n}$-systems of a group $G$. For a finite group $G$ this is the\nnumber of orders $d$ such that $G$ has a non-normal subgroup of order $d$. -/\nnoncomputable def numIESystems : ℕ :=\n  {S : Set (Subgroup G) | IsIESystem G S}.ncard\n\n/-- A group all of whose subgroups are normal has no $IE_{\\bar n}$-systems. -/\n@[category API, AMS 20]\ntheorem numIESystems_eq_zero (h : ∀ H : Subgroup G, H.Normal) : numIESystems G = 0 := by\n  have : {S : Set (Subgroup G) | IsIESystem G S} = ∅ := by\n    ext S\n    simp only [Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false, IsIESystem, not_and,\n      not_exists, not_not]\n    exact fun _ H _ => h H\n  rw [numIESystems, this, Set.ncard_empty]\n\n/-- A commutative group has no $IE_{\\bar n}$-systems. -/\n@[category test, AMS 20]\ntheorem numIESystems_of_commGroup (A : Type*) [CommGroup A] : numIESystems A = 0 :=\n  numIESystems_eq_zero A fun _ => inferInstance\n\n/-- A positive integer $k$ is a *soluble group-theoretic number* if every finite group having\nexactly $k$ $IE_{\\bar n}$-systems is soluble. -/\ndef IsSolubleNumber (k : ℕ) : Prop :=\n  ∀ (G : Type) [Group G] [Finite G], numIESystems G = k → IsSolvable G\n\n/-- A positive integer $k$ is a *non-soluble group-theoretic number* if there is at least one\nnon-soluble finite group having exactly $k$ $IE_{\\bar n}$-systems. -/\ndef IsNonSolubleNumber (k : ℕ) : Prop :=\n  ∃ (G : Type) (_ : Group G) (_ : Finite G), ¬ IsSolvable G ∧ numIESystems G = k\n\n/-- A positive integer $k$ is a *simple group-theoretic number* if there is at least one\nsimple finite group having exactly $k$ $IE_{\\bar n}$-systems. -/\ndef IsSimpleNumber (k : ℕ) : Prop :=\n  ∃ (G : Type) (_ : Group G) (_ : Finite G), IsSimpleGroup G ∧ numIESystems G = k\n\n/-- A positive integer $k$ is a *composite group-theoretic number* if there are no simple\nfinite groups having exactly $k$ $IE_{\\bar n}$-systems. -/\ndef IsCompositeNumber (k : ℕ) : Prop :=\n  ∀ (G : Type) [Group G] [Finite G], IsSimpleGroup G → numIESystems G ≠ k\n\n/-- A positive integer $k$ is an *absolutely simple group-theoretic number* if there is at\nleast one simple finite group having exactly $k$ $IE_{\\bar n}$-systems and there are no\nnon-soluble non-simple finite groups having exactly $k$ $IE_{\\bar n}$-systems. -/\ndef IsAbsolutelySimpleNumber (k : ℕ) : Prop :=\n  IsSimpleNumber k ∧\n    ∀ (G : Type) [Group G] [Finite G],\n      ¬ IsSolvable G → ¬ IsSimpleGroup G → numIESystems G ≠ k\n\n/--\nIs the set of all soluble group-theoretic numbers finite (or infinite)?\n\nHere a positive integer $k$ is a soluble group-theoretic number if every finite group having\nexactly $k$ $IE_{\\bar n}$-systems is soluble. The answer `True` means that this set is finite,\nand the answer `False` means that it is infinite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔\n    {k : ℕ | 0 < k ∧ IsSolubleNumber k}.Finite := by\n  sorry\n\n/--\nIs the set of all absolutely simple group-theoretic numbers finite (or infinite)?\n\nHere a positive integer $k$ is an absolutely simple group-theoretic number if there is at\nleast one simple finite group having exactly $k$ $IE_{\\bar n}$-systems and there are no\nnon-soluble non-simple finite groups having exactly $k$ $IE_{\\bar n}$-systems. The answer\n`True` means that this set is finite, and the answer `False` means that it is infinite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii : answer(sorry) ↔\n    {k : ℕ | 0 < k ∧ IsAbsolutelySimpleNumber k}.Finite := by\n  sorry\n\n/--\nDo there exist composite, but not soluble group-theoretic numbers?\n\nThat is, is there a positive integer $k$ such that no simple finite group has exactly $k$\n$IE_{\\bar n}$-systems, while some non-soluble finite group has exactly $k$\n$IE_{\\bar n}$-systems? (\"$k$ is not a soluble group-theoretic number\" means exactly that\n$k$ is a non-soluble group-theoretic number, i.e. that some non-soluble finite group has\nexactly $k$ $IE_{\\bar n}$-systems.)\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii : answer(sorry) ↔\n    ∃ k : ℕ, 0 < k ∧ IsCompositeNumber k ∧ IsNonSolubleNumber k := by\n  sorry\n\nend Kourovka.«2.78»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "None. The three-slot split (finiteness of soluble numbers, finiteness of absolutely simple numbers, existence of composite-but-not-soluble numbers) matches the two questions in the statement, and the notes' reading of the count of IE_n̄-systems and of the positivity of k agree with the text.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "An IE_n̄-system is modelled literally as a set S of subgroups with (∃ d, S = {H | Nat.card H = d}) ∧ ∃ H ∈ S, ¬H.Normal; numIESystems is the Set.ncard of the set of all such S. For a finite group Set (Subgroup G) is finite, so ncard is the genuine count, and since distinct orders give disjoint nonempty sets it equals the number of orders d admitting a non-normal subgroup of order d (as in the decomposition notes). ncard's junk value 0 for infinite sets is never reached since all statements quantify over finite groups.",
+    "'Having k IE_n̄-systems' is read as 'having exactly k IE_n̄-systems' throughout (numIESystems G = k), following the first definition's explicit 'exactly' and the decomposition notes.",
+    "Positivity of k ('A positive integer k') is imposed at statement level (0 < k in the sets / existential), not inside the predicates; the predicates themselves are the verbatim conditions on an arbitrary k : ℕ.",
+    "Finite groups are quantified as (G : Type) [Group G] [Finite G] (repository convention, e.g. Kourovka/1_40, 1_74); all notions involved are invariant under isomorphism so restricting to Type loses nothing.",
+    "'Soluble' is Mathlib's IsSolvable, 'simple' is Mathlib's IsSimpleGroup (which requires Nontrivial and counts cyclic groups of prime order as simple; these have 0 IE-systems and are soluble, so harmless for k ≥ 1 and for the 'non-soluble non-simple' clause).",
+    "Part iii's 'not soluble' is stated via IsNonSolubleNumber k (∃ finite non-soluble G with exactly k systems), an existential witness rather than ¬IsSolubleNumber, as the notes require; classically equivalent.",
+    "For parts i and ii, 'finite or infinite?' is a dichotomy, so answer(sorry) ↔ Set.Finite …; answer(True) means finite, answer(False) means infinite (documented in the docstrings).",
+    "Two short auxiliary lemmas (category API: a group whose subgroups are all normal has numIESystems = 0; category test: commutative groups have numIESystems = 0) are included with proofs to exercise the bespoke definitions, per CONTRIBUTING's request for basic API tests."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Subgroup.Normal, Nat.card on subgroups; no Mathlib notion of 'set of subgroups of a given order' or Dedekind-type counting exists (grepped GroupTheory and Algebra/Group/Subgroup).",
+     "name": "Kourovka.«2.78».IsIESystem",
+     "why_needed": "The notion of an IE_n̄-system (the set of all subgroups of a given order containing at least one non-normal subgroup) is specific to this problem and absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Set.ncard / Nat.card of a bespoke set; no existing count of this kind.",
+     "name": "Kourovka.«2.78».numIESystems",
+     "why_needed": "The number of IE_n̄-systems of a group, defined as Set.ncard of the set of IE-systems; needed for 'having exactly k IE_n̄-systems'."
+    },
+    {
+     "closest_existing_considered": "IsSolvable (used inside the definition).",
+     "name": "Kourovka.«2.78».IsSolubleNumber",
+     "why_needed": "Problem-specific notion 'soluble group-theoretic number'."
+    },
+    {
+     "closest_existing_considered": "¬IsSolubleNumber (classically equivalent, but the decomposition notes require the existential form).",
+     "name": "Kourovka.«2.78».IsNonSolubleNumber",
+     "why_needed": "Problem-specific notion 'non-soluble group-theoretic number' (existential witness form used for 'not soluble' in part iii)."
+    },
+    {
+     "closest_existing_considered": "IsSimpleGroup (used inside the definition).",
+     "name": "Kourovka.«2.78».IsSimpleNumber",
+     "why_needed": "Problem-specific notion 'simple group-theoretic number', a component of 'absolutely simple'."
+    },
+    {
+     "closest_existing_considered": "¬IsSimpleNumber (equivalent; stated directly as ∀ finite simple G, numIESystems G ≠ k to match the text 'there are no simple finite groups having k IE-systems').",
+     "name": "Kourovka.«2.78».IsCompositeNumber",
+     "why_needed": "Problem-specific notion 'composite group-theoretic number'."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«2.78».IsAbsolutelySimpleNumber",
+     "why_needed": "Problem-specific notion 'absolutely simple group-theoretic number'."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.78».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ {k : ℕ | 0 < k ∧ IsSolubleNumber k}.Finite, where IsSolubleNumber k := every finite group (G : Type) with numIESystems G = k is IsSolvable. answer(True) = finite, answer(False) = infinite, as explained in the docstring."
+    },
+    "kourovka.«2.78».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ {k : ℕ | 0 < k ∧ IsAbsolutelySimpleNumber k}.Finite, where IsAbsolutelySimpleNumber k := (∃ finite simple group with exactly k IE-systems) ∧ (∀ finite G, ¬IsSolvable G → ¬IsSimpleGroup G → numIESystems G ≠ k)."
+    },
+    "kourovka.«2.78».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as answer(sorry) ↔ ∃ k : ℕ, 0 < k ∧ IsCompositeNumber k ∧ IsNonSolubleNumber k, with IsCompositeNumber k := no finite simple group has exactly k IE-systems and IsNonSolubleNumber k := ∃ finite non-soluble G with exactly k IE-systems (existential witness form, classically equivalent to ¬IsSolubleNumber k)."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.78».parts.i": "/--\nIs the set of all soluble group-theoretic numbers finite (or infinite)?\n\nHere a positive integer $k$ is a soluble group-theoretic number if every finite group having\nexactly $k$ $IE_{\\bar n}$-systems is soluble. The answer `True` means that this set is finite,\nand the answer `False` means that it is infinite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.i : answer(sorry) ↔\n    {k : ℕ | 0 < k ∧ IsSolubleNumber k}.Finite := by\n  sorry",
+    "kourovka.«2.78».parts.ii": "/--\nIs the set of all absolutely simple group-theoretic numbers finite (or infinite)?\n\nHere a positive integer $k$ is an absolutely simple group-theoretic number if there is at\nleast one simple finite group having exactly $k$ $IE_{\\bar n}$-systems and there are no\nnon-soluble non-simple finite groups having exactly $k$ $IE_{\\bar n}$-systems. The answer\n`True` means that this set is finite, and the answer `False` means that it is infinite.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.ii : answer(sorry) ↔\n    {k : ℕ | 0 < k ∧ IsAbsolutelySimpleNumber k}.Finite := by\n  sorry",
+    "kourovka.«2.78».parts.iii": "/--\nDo there exist composite, but not soluble group-theoretic numbers?\n\nThat is, is there a positive integer $k$ such that no simple finite group has exactly $k$\n$IE_{\\bar n}$-systems, while some non-soluble finite group has exactly $k$\n$IE_{\\bar n}$-systems? (\"$k$ is not a soluble group-theoretic number\" means exactly that\n$k$ is a non-soluble group-theoretic number, i.e. that some non-soluble finite group has\nexactly $k$ $IE_{\\bar n}$-systems.)\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«2.78».parts.iii : answer(sorry) ↔\n    ∃ k : ℕ, 0 < k ∧ IsCompositeNumber k ∧ IsNonSolubleNumber k := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 2.78\n\nby P. I. Trofimov\n\nFor a finite group $G$, an $IE_{\\bar n}$-system is the set of all subgroups of some fixed\norder, provided that this set contains a non-normal subgroup. The problem classifies positive\nintegers by the finite groups having exactly that many $IE_{\\bar n}$-systems and asks three\nquestions about these classes.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«2.78»\n\n/-- The number of $IE_{\\bar n}$-systems of a finite group $G$: the number of subgroup orders\n$d$ for which $G$ has at least one non-normal subgroup of order $d$. -/\nnoncomputable def numberOfIESystems (G : Type*) [Group G] [Finite G] : ℕ :=\n  Set.ncard {d : ℕ | ∃ H : Subgroup G, Nat.card H = d ∧ ¬ H.Normal}\n\n/--\nIs the set of all soluble group-theoretic numbers finite? Here a positive integer $k$ is\nsoluble group-theoretic when every finite group with exactly $k$ $IE_{\\bar n}$-systems is\nsoluble.\n-/\n@[category research open, AMS 20]\ntheorem parts.i : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    ∀ (G : Type) [Group G] [Finite G], numberOfIESystems G = k → IsSolvable G} := by\n  sorry\n\n/--\nIs the set of all absolutely simple group-theoretic numbers finite? Here a positive integer\n$k$ is absolutely simple group-theoretic when some finite simple group has exactly $k$\n$IE_{\\bar n}$-systems, while no finite non-soluble non-simple group has exactly $k$ such\nsystems.\n-/\n@[category research open, AMS 20]\ntheorem parts.ii : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    (∃ (G : Type) (_ : Group G) (_ : Finite G),\n      IsSimpleGroup G ∧ numberOfIESystems G = k) ∧\n    ¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ IsSolvable G ∧ ¬ IsSimpleGroup G ∧ numberOfIESystems G = k} := by\n  sorry\n\n/--\nDoes there exist a composite but not soluble group-theoretic number? In other words, is there\na positive integer $k$ for which no finite simple group has exactly $k$ $IE_{\\bar n}$-systems,\nbut some finite non-soluble group does?\n-/\n@[category research open, AMS 20]\ntheorem parts.iii : answer(sorry) ↔ ∃ k : ℕ, 0 < k ∧\n    (¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      IsSimpleGroup G ∧ numberOfIESystems G = k) ∧\n    ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ IsSolvable G ∧ numberOfIESystems G = k := by\n  sorry\n\nend Kourovka.«2.78»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.99,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "An IE_n̄-system is counted once per natural number d for which there exists a non-normal subgroup of order d; individual subgroups are not counted separately.",
+    "Finite groups are represented by a type with Group and Finite instances, and subgroup order is expressed with Nat.card.",
+    "Positive group-theoretic numbers are represented by natural numbers satisfying 0 < k.",
+    "The finite-or-infinite questions are represented using answer(sorry) ↔ Set.Finite of the corresponding set, as required by the decomposition and repository convention.",
+    "For 'not soluble' in part iii, the statement explicitly existentially quantifies a finite non-soluble group with exactly k systems."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's Subgroup.Normal, Nat.card, and Set.ncard provide the components, but searches of Mathlib, FormalConjecturesForMathlib, and nearby Kourovka files found no existing IE-system count.",
+     "name": "Kourovka.«2.78».numberOfIESystems",
+     "why_needed": "The problem depends on the number of subgroup orders for which at least one non-normal subgroup exists; no existing repository or Mathlib invariant expresses this count."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«2.78».parts.i": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.78».parts.ii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    },
+    "kourovka.«2.78».parts.iii": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«2.78».parts.i": "/--\nIs the set of all soluble group-theoretic numbers finite? Here a positive integer $k$ is\nsoluble group-theoretic when every finite group with exactly $k$ $IE_{\\bar n}$-systems is\nsoluble.\n-/\n@[category research open, AMS 20]\ntheorem parts.i : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    ∀ (G : Type) [Group G] [Finite G], numberOfIESystems G = k → IsSolvable G} := by\n  sorry",
+    "kourovka.«2.78».parts.ii": "/--\nIs the set of all absolutely simple group-theoretic numbers finite? Here a positive integer\n$k$ is absolutely simple group-theoretic when some finite simple group has exactly $k$\n$IE_{\\bar n}$-systems, while no finite non-soluble non-simple group has exactly $k$ such\nsystems.\n-/\n@[category research open, AMS 20]\ntheorem parts.ii : answer(sorry) ↔ Set.Finite {k : ℕ | 0 < k ∧\n    (∃ (G : Type) (_ : Group G) (_ : Finite G),\n      IsSimpleGroup G ∧ numberOfIESystems G = k) ∧\n    ¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ IsSolvable G ∧ ¬ IsSimpleGroup G ∧ numberOfIESystems G = k} := by\n  sorry",
+    "kourovka.«2.78».parts.iii": "/--\nDoes there exist a composite but not soluble group-theoretic number? In other words, is there\na positive integer $k$ for which no finite simple group has exactly $k$ $IE_{\\bar n}$-systems,\nbut some finite non-soluble group does?\n-/\n@[category research open, AMS 20]\ntheorem parts.iii : answer(sorry) ↔ ∃ k : ℕ, 0 < k ∧\n    (¬ ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      IsSimpleGroup G ∧ numberOfIESystems G = k) ∧\n    ∃ (G : Type) (_ : Group G) (_ : Finite G),\n      ¬ IsSolvable G ∧ numberOfIESystems G = k := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«2.78».parts.i": "c01",
+  "kourovka.«2.78».parts.ii": "c01",
+  "kourovka.«2.78».parts.iii": "c01"
+ },
+ "id": "kourovka-2.78",
+ "main_attempt": "c01"
+}

@@ -3,9 +3,10 @@ import { Disclosure } from "./Disclosure";
 import { MathText } from "./MathText";
 import { firstSentence, shorten } from "./StatusLine";
 
-// The one-line statement with each claim's span marked, the article lead
-// behind a disclosure, and the Coverage list when there is more than one
-// passage or anything was left out.
+// The statement with each claim's span marked, where it comes from (the
+// Wikipedia list entry and article, or the notebook problem), the article
+// lead or the TeX as written behind a disclosure, and the Coverage list when
+// there is more than one passage or anything was left out.
 export function SourcePane({ entry, onJump }: { entry: Entry; onJump: (block: number) => void }) {
   const claims = entry.claims;
   const showCoverage = claims.length > 1 || claims.some((c) => c.kind !== "stated");
@@ -26,27 +27,7 @@ export function SourcePane({ entry, onJump }: { entry: Entry; onJump: (block: nu
           );
         })}
       </blockquote>
-      <p className="source-links muted">
-        From{" "}
-        <a href={entry.list_url} target="_blank" rel="noopener noreferrer">
-          Wikipedia's list of unsolved problems
-        </a>
-        {entry.article_title && (
-          <>
-            {" "}
-            · article:{" "}
-            <a href={entry.article_url} target="_blank" rel="noopener noreferrer">
-              {entry.article_title}
-            </a>
-          </>
-        )}
-        {entry.record_title !== entry.title && entry.record_title !== entry.statement && (
-          <>
-            {" "}
-            · list entry: <em>{entry.record_title}</em>
-          </>
-        )}
-      </p>
+      <SourceLine entry={entry} />
       {entry.context && (
         <Disclosure summary="From the article" className="context">
           <p>
@@ -54,8 +35,51 @@ export function SourcePane({ entry, onJump }: { entry: Entry; onJump: (block: nu
           </p>
         </Disclosure>
       )}
+      {entry.statement_tex && (
+        <Disclosure summary="TeX as written in the notebook" className="context">
+          <pre className="tex">{entry.statement_tex}</pre>
+        </Disclosure>
+      )}
       {showCoverage && <Coverage claims={claims} onJump={onJump} />}
     </section>
+  );
+}
+
+function SourceLine({ entry }: { entry: Entry }) {
+  const ref = entry.source_ref;
+  if (entry.source === "kourovka" && ref) {
+    return (
+      <p className="source-links muted">
+        From{" "}
+        <a href={entry.list_url} target="_blank" rel="noopener noreferrer">
+          the Kourovka Notebook
+        </a>
+        , problem {ref.number} (issue {ref.issue}, {ref.year}), proposed by {ref.author}.
+      </p>
+    );
+  }
+  return (
+    <p className="source-links muted">
+      From{" "}
+      <a href={entry.list_url} target="_blank" rel="noopener noreferrer">
+        Wikipedia's list of unsolved problems
+      </a>
+      {entry.article_title && entry.article_url && (
+        <>
+          {" "}
+          · article:{" "}
+          <a href={entry.article_url} target="_blank" rel="noopener noreferrer">
+            {entry.article_title}
+          </a>
+        </>
+      )}
+      {entry.record_title !== entry.title && entry.record_title !== entry.statement && (
+        <>
+          {" "}
+          · list entry: <em>{entry.record_title}</em>
+        </>
+      )}
+    </p>
   );
 }
 

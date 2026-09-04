@@ -1,6 +1,7 @@
 // Fetch + cache of the exporter's JSON. data/ is Vite's public directory, so
 // the committed files are served as-is at the site root.
 import { useEffect, useState } from "react";
+import { setKatexMacros } from "../components/MathText";
 import type { Alts, Entry, FcStatus, IndexFile } from "./schema";
 
 const cache = new Map<string, Promise<unknown>>();
@@ -22,7 +23,14 @@ function fetchJson<T>(rel: string): Promise<T> {
   return p as Promise<T>;
 }
 
-export const loadIndex = () => fetchJson<IndexFile>("index.json");
+export const loadIndex = () =>
+  fetchJson<IndexFile>("index.json").then((index) => {
+    // the sources' TeX macros for KaTeX (kourovka) — set once, before any statement renders
+    const macros: Record<string, string> = {};
+    for (const s of Object.values(index.meta.sources)) Object.assign(macros, s.katex_macros ?? {});
+    setKatexMacros(macros);
+    return index;
+  });
 export const loadEntry = (id: string) => fetchJson<Entry>(`entries/${encodeURIComponent(id)}.json`);
 export const loadAlts = (id: string) => fetchJson<Alts>(`alts/${encodeURIComponent(id)}.json`);
 export const loadFcStatus = () => fetchJson<FcStatus>("fc_status.json");

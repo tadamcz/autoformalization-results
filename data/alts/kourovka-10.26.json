@@ -1,0 +1,584 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.26\n\nby G. S. Makanin\n\nb) Does there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nHere $x^{\\varphi}$ denotes the image of $x$ under $\\varphi$, the $x_i$ are unknowns (the same\nunknown may occur several times, under different automorphisms) and $w$ is a group word in\n$n$ letters and in constants of the free group.\n\n## Formalisation\n\nThe free group is $F = F_r$ with basis $a_0, \\ldots, a_{r-1}$, modelled as `FreeGroup (Fin r)`.\nThe source does not say whether the rank is fixed or part of the input; we fix it, and ask for\nan algorithm for every rank $r$.\n\nThe word $w$ is allowed to contain constants from $F$ (as in Makanin's setting of equations in\nfree groups). The source does not say so explicitly, but without constants every such equation\nhas the trivial solution $x_1 = \\dots = x_m = 1$ and the question would be vacuous.\n\nThe left-hand side $w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n})$ is entered as a word\n(`TwistedWord`) whose letters, each with an exponent $\\pm 1$, are basis elements $a_k$ of $F$\nand twisted unknowns $x_i^{\\varphi}$. An automorphism $\\varphi$ is specified by the images\n$\\varphi(a_0), \\ldots, \\varphi(a_{r-1})$ of the basis, given as words (`BasisImages`). Such data\nalways determine an endomorphism of $F$, so the requirement that the $\\varphi_j$ be automorphisms\nis a promise on the input: the algorithm must answer correctly on every input all of whose\ntwists are automorphisms.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«10.26»\n\nvariable {r : ℕ}\n\n/-- Data specifying an endomorphism of the free group `FreeGroup (Fin r)` with basis\n`a_0, …, a_{r-1}`: the image of each `a_k` is given as a word, i.e. a list of letters\n`a_l^{±1}`, where `(l, true)` stands for `a_l` and `(l, false)` for `a_l⁻¹`. -/\nabbrev BasisImages (r : ℕ) := Fin r → List (Fin r × Bool)\n\n/-- The endomorphism of `FreeGroup (Fin r)` sending each basis element `a_k` to the word\n`f k`. -/\ndef BasisImages.toHom (f : BasisImages r) : FreeGroup (Fin r) →* FreeGroup (Fin r) :=\n  FreeGroup.lift fun k => FreeGroup.mk (f k)\n\n/-- The basis images `f` specify an automorphism of `FreeGroup (Fin r)`. -/\ndef BasisImages.IsAut (f : BasisImages r) : Prop :=\n  Function.Bijective f.toHom\n\n/-- The basis images of the identity automorphism. -/\ndef BasisImages.identity (r : ℕ) : BasisImages r := fun k => [(k, true)]\n\n/-- A letter of a twisted word over `FreeGroup (Fin r)`: either a constant, namely a basis\nelement `a_k` (`Sum.inl k`), or a twisted unknown `x_i^φ` (`Sum.inr (i, φ)`), where the\nunknowns are `x_i` for `i : ℕ` and `φ` is given by its basis images. -/\nabbrev Letter (r : ℕ) := Fin r ⊕ (ℕ × BasisImages r)\n\n/-- A twisted word over `FreeGroup (Fin r)`, i.e. the left-hand side\n`w(x_{i_1}^{φ_1}, …, x_{i_n}^{φ_n})` of a twisted equation `w(…) = 1`, written as a list of\nletters with exponents `±1` (`true` for `+1`, `false` for `-1`). -/\nabbrev TwistedWord (r : ℕ) := List (Letter r × Bool)\n\n/-- The value of the twisted word `w` when the unknowns take the values `x i`: each constant\n`a_k` is evaluated to itself and each twisted unknown `x_i^φ` to `φ (x i)`. -/\ndef TwistedWord.eval (w : TwistedWord r) (x : ℕ → FreeGroup (Fin r)) : FreeGroup (Fin r) :=\n  FreeGroup.lift (Sum.elim FreeGroup.of fun p => p.2.toHom (x p.1)) (FreeGroup.mk w)\n\n/-- The twisted equation `w = 1` is soluble in `FreeGroup (Fin r)`. -/\ndef TwistedWord.IsSoluble (w : TwistedWord r) : Prop :=\n  ∃ x : ℕ → FreeGroup (Fin r), w.eval x = 1\n\n/-- All twists `φ` occurring in the twisted word `w` are automorphisms of `FreeGroup (Fin r)`. -/\ndef TwistedWord.IsAutTwisted (w : TwistedWord r) : Prop :=\n  ∀ (i : ℕ) (φ : BasisImages r) (b : Bool), (Sum.inr (i, φ), b) ∈ w → φ.IsAut\n\n/--\nb) Does there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nFormally: for every rank $r$, is there a computable function `TwistedWord r → Bool` which, on\nevery twisted word all of whose twists are automorphisms of $F_r$, returns `true` exactly when\nthe equation is soluble in $F_r$? The rank $r$ is fixed (not part of the input), and the word\nmay contain constants from $F_r$; see the module docstring.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«10.26».parts.b : answer(sorry) ↔\n    ∀ r : ℕ, ∃ alg : TwistedWord r → Bool, Computable alg ∧\n      ∀ w : TwistedWord r, w.IsAutTwisted → (alg w = true ↔ w.IsSoluble) := by\n  sorry\n\n/-- The identity basis images specify an automorphism. -/\n@[category test, AMS 3 20]\ntheorem BasisImages.isAut_identity : (BasisImages.identity r).IsAut := by\n  have h : (BasisImages.identity r).toHom = MonoidHom.id _ := by\n    rw [← FreeGroup.lift_of_eq_id]\n    rfl\n  rw [IsAut, h]\n  exact Function.bijective_id\n\n/-- The (untwisted) equation `x_0 a_0⁻¹ = 1` is soluble in the free group of rank `1`. -/\n@[category test, AMS 3 20]\ntheorem isSoluble_example :\n    TwistedWord.IsSoluble\n      ([(Sum.inr (0, BasisImages.identity 1), true), (Sum.inl 0, false)] : TwistedWord 1) :=\n  ⟨fun _ => FreeGroup.of 0, by\n    simp [TwistedWord.eval, BasisImages.toHom, BasisImages.identity]\n    exact mul_inv_cancel _⟩\n\n/-- The equation `a_0 = 1` (with no unknowns) is not soluble in the free group of rank `1`. -/\n@[category test, AMS 3 20]\ntheorem not_isSoluble_example :\n    ¬ TwistedWord.IsSoluble ([(Sum.inl 0, true)] : TwistedWord 1) := by\n  rintro ⟨x, hx⟩\n  simp [TwistedWord.eval] at hx\n\nend Kourovka.«10.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's reading (single yes/no decidability question, automorphisms given by basis images, the same unknown allowed under several twists, constants allowed, rank fixed-vs-input left to the docstring) was followed.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Rank of the free group is FIXED (quantified outside: `∀ r, ∃ alg …`), i.e. the question asks for an algorithm for each finite rank r; the rank is not part of the input. The source leaves this implicit; recorded in the module and theorem docstrings. A positive answer to the uniform version implies this one, and a negative answer for any fixed rank refutes both.",
+    "The word w may contain constants (coefficients) from F, encoded as signed basis letters a_k^{±1} (every element of F is such a product). Justification: without constants x_i = 1 is always a solution and the question would be vacuous; this is also Makanin's standard setting. Recorded in the docstrings.",
+    "The equation w(x_{i_1}^{φ_1},…,x_{i_n}^{φ_n}) = 1 is entered directly as the substituted word: a list of signed letters, each a constant a_k or a twisted unknown x_i^φ (`Sum.inr (i, φ)`). This is exactly the class of equations obtained from a word w(y_1,…,y_n) with constants plus an index assignment i_j and twists φ_j by substituting y_j ↦ x_{i_j}^{φ_j} (and conversely, each occurrence is a slot). It avoids dependent input types (Mathlib has no `Primcodable` for Sigma types or for `FreeGroup`). Unknowns are indexed by ℕ rather than Fin m (only finitely many occur).",
+    "Automorphisms are specified by the images of the free basis (as words), per the decomposition notes. Such data always give an endomorphism (`BasisImages.toHom = FreeGroup.lift`), so 'the φ_j are automorphisms' (`Function.Bijective`) is imposed as a promise: `∃ alg, Computable alg ∧ ∀ w, w.IsAutTwisted → (alg w = true ↔ w.IsSoluble)`, instead of `ComputablePred` on a subtype (which would require a `PrimrecPred` proof of automorphism-checking). `ComputablePred p ↔ ∃ f, Computable f ∧ p = (f · = true)` in Mathlib, so this is the standard promise-problem generalization.",
+    "A twisted-unknown letter with exponent −1 evaluates to (φ(x_i))⁻¹ = φ(x_i⁻¹); `FreeGroup.mk` identifies words up to free reduction on the letter alphabet, which is consistent with evaluation since evaluation is a group homomorphism.",
+    "Three `@[category test]` lemmas are included: identity basis images are an automorphism (so the promise is satisfiable), the untwisted equation x_0 a_0⁻¹ = 1 is soluble, and a_0 = 1 is not soluble (so solubility is not trivial)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "MulAut (FreeGroup (Fin r)) / FreeGroup (Fin r) ≃* FreeGroup (Fin r) (not encodable as algorithm input); FreeGroup.lift (used to interpret the data).",
+     "name": "Kourovka.«10.26».BasisImages",
+     "why_needed": "Finite, Primcodable input specifying an endomorphism/automorphism of `FreeGroup (Fin r)` by the images of the basis elements as words; `MulAut (FreeGroup (Fin r))` is not Primcodable."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift (used directly).",
+     "name": "Kourovka.«10.26».BasisImages.toHom",
+     "why_needed": "The endomorphism `FreeGroup.lift (fun k => FreeGroup.mk (f k))` determined by basis images."
+    },
+    {
+     "closest_existing_considered": "MulEquiv / Function.Bijective (used directly).",
+     "name": "Kourovka.«10.26».BasisImages.IsAut",
+     "why_needed": "The promise that the twist data specify an automorphism (`Function.Bijective f.toHom`)."
+    },
+    {
+     "closest_existing_considered": "MonoidHom.id / FreeGroup.of.",
+     "name": "Kourovka.«10.26».BasisImages.identity",
+     "why_needed": "Basis images of the identity automorphism, used only in the test lemmas."
+    },
+    {
+     "closest_existing_considered": "Plain Sum type (it is an abbrev of one).",
+     "name": "Kourovka.«10.26».Letter",
+     "why_needed": "Alphabet of a twisted word: `Fin r ⊕ (ℕ × BasisImages r)` (constant basis element or twisted unknown x_i^φ)."
+    },
+    {
+     "closest_existing_considered": "FreeGroup (Fin n ⊕ Fin r) with a dependent slot assignment (no Primcodable for FreeGroup or Sigma types in Mathlib).",
+     "name": "Kourovka.«10.26».TwistedWord",
+     "why_needed": "The input of the algorithm: `List (Letter r × Bool)`, the left-hand side w(x_{i_1}^{φ_1},…,x_{i_n}^{φ_n}) as a list of signed letters; Primcodable via Mathlib's List/Prod/Sum/Fin/finArrow instances. `FreeGroup (Letter r)` has no Primcodable instance."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift / FreeGroup.mk (used directly).",
+     "name": "Kourovka.«10.26».TwistedWord.eval",
+     "why_needed": "Value of the twisted word at an assignment x : ℕ → F, via `FreeGroup.lift (Sum.elim FreeGroup.of fun p => p.2.toHom (x p.1)) (FreeGroup.mk w)`."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib (no notion of equations in groups).",
+     "name": "Kourovka.«10.26».TwistedWord.IsSoluble",
+     "why_needed": "Solubility of the twisted equation w = 1 in F: `∃ x : ℕ → FreeGroup (Fin r), w.eval x = 1`."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«10.26».TwistedWord.IsAutTwisted",
+     "why_needed": "The promise 'φ_1,…,φ_n are automorphisms': every twist occurring in w satisfies `IsAut`."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ r, ∃ alg : TwistedWord r → Bool, Computable alg ∧ ∀ w, w.IsAutTwisted → (alg w = true ↔ w.IsSoluble)`. The free group is `FreeGroup (Fin r)`; the left-hand side w(x_{i_1}^{φ_1},…,x_{i_n}^{φ_n}) is a list of signed letters, each either a basis element a_k (constant) or a twisted unknown x_i^φ with φ given by the images of the basis (words); solubility is ∃ x : ℕ → F, value = 1; the requirement that the φ_j be automorphisms is a promise on the input (the algorithm must be correct on all inputs whose twists are automorphisms). Mathlib's `Computable`/`Primcodable` (List, Prod, Sum, Fin, ℕ, Fin n → α, Bool) supply the notion of algorithm."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.26».parts.b": "/--\nb) Does there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nFormally: for every rank $r$, is there a computable function `TwistedWord r → Bool` which, on\nevery twisted word all of whose twists are automorphisms of $F_r$, returns `true` exactly when\nthe equation is soluble in $F_r$? The rank $r$ is fixed (not part of the input), and the word\nmay contain constants from $F_r$; see the module docstring.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«10.26».parts.b : answer(sorry) ↔\n    ∀ r : ℕ, ∃ alg : TwistedWord r → Bool, Computable alg ∧\n      ∀ w : TwistedWord r, w.IsAutTwisted → (alg w = true ↔ w.IsSoluble) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.26\n\nby G. S. Makanin\n\nb) Does there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nHere $w$ is a word in the twisted unknowns $x_{i_j}^{\\varphi_j}$ and in constants of the\nfree group, $x^{\\varphi}$ denotes the image of $x$ under $\\varphi$, and the same unknown\n$x_i$ may occur several times under different automorphisms. The current edition of the\nnotebook lists only part b) of this problem.\n\nFormalisation choices (the source leaves these implicit):\n\n* The free group is $F_r = $ `FreeGroup (Fin r)` for a finite rank $r$. The rank is not part\n  of the input of the algorithm: the question is asked for every fixed $r$.\n* The word $w$ may contain constants, namely the elements of the free basis of $F_r$ and\n  their inverses (so arbitrary constants of $F_r$ can occur as subwords).\n* The word $w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n})$ is recorded letter by\n  letter: each letter is a constant or a twisted unknown $x_i^{\\varphi}$ (an index $i$\n  together with an automorphism $\\varphi$), with a sign. This is the same as giving $w$ as a\n  word in $n$ symbols together with the data $i_1, \\ldots, i_n$ and\n  $\\varphi_1, \\ldots, \\varphi_n$.\n* The unknowns $x_0, x_1, \\ldots$ are indexed by `ℕ`; a solution assigns an element of $F_r$\n  to every index. Only the finitely many unknowns occurring in $w$ matter.\n* An automorphism $\\varphi_j$ is given to the algorithm by the images of the free basis\n  (as words). The algorithm only has to be correct on inputs in which every such description\n  really is an automorphism of $F_r$.\n* \"Algorithm\" is `Computable`, Mathlib's notion of a computable function between\n  `Primcodable` types.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«10.26»\n\nopen FreeGroup\n\nvariable {r : ℕ}\n\n/-- A word in the elements of the free basis of `FreeGroup (Fin r)` and their inverses\n(`true` stands for a basis element, `false` for its inverse). It describes the element\n`FreeGroup.mk` of the free group. -/\nabbrev Word (r : ℕ) := List (Fin r × Bool)\n\n/-- A description of an endomorphism of `FreeGroup (Fin r)` by the images of the elements\nof the free basis, each given as a word. -/\nabbrev EndoDesc (r : ℕ) := Fin r → Word r\n\n/-- The endomorphism of `FreeGroup (Fin r)` described by `f`: it sends the `i`-th element of\nthe free basis to the element described by the word `f i`. -/\ndef EndoDesc.toMonoidHom (f : EndoDesc r) : FreeGroup (Fin r) →* FreeGroup (Fin r) :=\n  lift fun i => mk (f i)\n\n/-- The description `f` defines an automorphism of `FreeGroup (Fin r)`. -/\ndef EndoDesc.IsAut (f : EndoDesc r) : Prop :=\n  Function.Bijective f.toMonoidHom\n\n/-- A letter of a twisted equation over `FreeGroup (Fin r)`: either a constant (an element of\nthe free basis, `Sum.inl i`) or a twisted unknown $x_i^{\\varphi}$ (`Sum.inr (i, φ)`), given\nby the index `i` of the unknown and a description `φ` of the automorphism. -/\nabbrev Letter (r : ℕ) := Fin r ⊕ (ℕ × EndoDesc r)\n\n/-- A twisted equation $w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ over\n`FreeGroup (Fin r)`, given by the word $w$ in the twisted unknowns and constants: a list of\nletters, each with a sign (`true` for the letter, `false` for its inverse). The same unknown may\noccur several times, under different automorphisms. -/\nabbrev TwistedEquation (r : ℕ) := List (Letter r × Bool)\n\n/-- The value of the left-hand side of the twisted equation `e` at the assignment `x` of the\nunknowns: each constant is left as it is, and the twisted unknown $x_i^{\\varphi}$ is replaced\nby $\\varphi(x_i)$. -/\ndef TwistedEquation.eval (e : TwistedEquation r) (x : ℕ → FreeGroup (Fin r)) :\n    FreeGroup (Fin r) :=\n  lift (Sum.elim of fun p => p.2.toMonoidHom (x p.1)) (mk e)\n\n/-- The twisted equation `e` is soluble in `FreeGroup (Fin r)`: some assignment of the unknowns\nmakes its left-hand side equal to `1`. -/\ndef TwistedEquation.IsSoluble (e : TwistedEquation r) : Prop :=\n  ∃ x : ℕ → FreeGroup (Fin r), e.eval x = 1\n\n/-- Every twisted unknown occurring in `e` is twisted by an automorphism of `FreeGroup (Fin r)`\n(and not merely by an endomorphism). -/\ndef TwistedEquation.IsValid (e : TwistedEquation r) : Prop :=\n  ∀ (i : ℕ) (f : EndoDesc r) (b : Bool), (Sum.inr (i, f), b) ∈ e → f.IsAut\n\n/--\nDoes there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nFormalised as: for every finite rank $r$ there is a computable function which, on every\ntwisted equation over $F_r$ whose twists $\\varphi_j$ (given by the images of a free basis) are\nautomorphisms of $F_r$, returns `true` if and only if the equation has a solution in $F_r$.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«10.26».parts.b : answer(sorry) ↔\n    ∀ r : ℕ, ∃ alg : TwistedEquation r → Bool, Computable alg ∧\n      ∀ e : TwistedEquation r, e.IsValid → (alg e = true ↔ e.IsSoluble) := by\n  sorry\n\n/-- The identity description, sending each basis element to itself. -/\ndef EndoDesc.id (r : ℕ) : EndoDesc r := fun i => [(i, true)]\n\n/-- The identity description defines the identity endomorphism. -/\n@[category test, AMS 3 20]\ntheorem EndoDesc.toMonoidHom_id : (EndoDesc.id r).toMonoidHom = MonoidHom.id _ :=\n  lift_of_eq_id _\n\n/-- The identity description defines an automorphism. -/\n@[category test, AMS 3 20]\ntheorem EndoDesc.isAut_id : (EndoDesc.id r).IsAut := by\n  unfold EndoDesc.IsAut\n  rw [EndoDesc.toMonoidHom_id]\n  exact Function.bijective_id\n\n/-- The untwisted equation $x_0 = 1$ is soluble. -/\n@[category test, AMS 3 20]\ntheorem isSoluble_var :\n    TwistedEquation.IsSoluble [((Sum.inr (0, EndoDesc.id r) : Letter r), true)] :=\n  ⟨fun _ => 1, by simp [TwistedEquation.eval, lift_mk]⟩\n\n/-- The constant equation $a_0 = 1$ over a free group of positive rank is not soluble. -/\n@[category test, AMS 3 20]\ntheorem not_isSoluble_const :\n    ¬ TwistedEquation.IsSoluble [((Sum.inl 0 : Letter (r + 1)), true)] := by\n  rintro ⟨x, hx⟩\n  simp only [TwistedEquation.eval, lift_mk, List.map_cons, List.map_nil, cond_true,\n    Sum.elim_inl, List.prod_cons, List.prod_nil, mul_one] at hx\n  exact of_ne_one _ hx\n\nend Kourovka.«10.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's single slot (part b), yes/no decidability question) matches the source; its notes about constants, repeated unknowns under different twists, basis-image specification of automorphisms, and the implicit rank question were all followed and recorded in the docstring.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Rank of the free group is fixed, not part of the algorithm's input: the statement is `∀ r, ∃ algorithm` (non-uniform in r), matching the phrase 'a free group ... automorphisms of this group' and Makanin's setting (fixed F of finite rank). A uniform-in-r algorithm would imply this statement; the two differ only if decidability held for each rank but not uniformly. Recorded in the module docstring.",
+    "The word w may contain constants (the free basis elements and their inverses, hence arbitrary constants as subwords), as in Makanin's setting; the constant-free case is a special case. Recorded in the docstring.",
+    "The word w(x_{i_1}^{φ_1},…,x_{i_n}^{φ_n}) is encoded letter by letter (`List (Letter r × Bool)` with `Letter r = Fin r ⊕ (ℕ × EndoDesc r)`), i.e. each occurrence of an unknown carries its own index i and twist φ. This is equivalent to giving w as a word in n symbols y_1..y_n plus the data i_1..i_n and φ_1..φ_n (substitute; conversely enumerate the distinct (i, φ) pairs). Chosen because Mathlib has no `Primcodable` instance for Sigma types, so `Fin n`-dependent data cannot be part of a computable input.",
+    "Unknowns are indexed by ℕ and a solution is a function ℕ → FreeGroup (Fin r); only finitely many unknowns occur in w, so this is equivalent to x_1,…,x_m ∈ F.",
+    "Automorphisms are specified by the images of the free basis, given as words (`EndoDesc r = Fin r → List (Fin r × Bool)`), and `EndoDesc.IsAut` means the induced endomorphism `FreeGroup.lift (fun i => FreeGroup.mk (f i))` is bijective. The algorithm is required to be correct only on inputs whose twists are automorphisms (promise-problem form `e.IsValid → (alg e = true ↔ e.IsSoluble)`), rather than `ComputablePred (IsValid ∧ IsSoluble)`, so that no claim about the decidability of 'f describes an automorphism' is built into the statement.",
+    "'Algorithm' is formalized as `Computable` (Mathlib), with the input type made `Primcodable` automatically via the `List`/`Prod`/`Sum`/`Fin`/`finArrow`/`Bool` instances (hence the use of `abbrev` for the encoding types).",
+    "Part a) of the problem is not in the current edition's statement and is not formalized; the notes confirm b) is the sole remaining part."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FreeGroup (Fin r)` directly (not Primcodable); `FreeGroup.mk : List (α × Bool) → FreeGroup α` is used to interpret the word.",
+     "name": "Kourovka.«10.26».Word",
+     "why_needed": "Primcodable representation of an element of `FreeGroup (Fin r)` as a list of signed basis letters (via `FreeGroup.mk`); `FreeGroup` itself has no `Primcodable`/`Encodable` instance."
+    },
+    {
+     "closest_existing_considered": "`MulAut (FreeGroup (Fin r))` / `FreeGroup (Fin r) →* FreeGroup (Fin r)` (not Primcodable).",
+     "name": "Kourovka.«10.26».EndoDesc",
+     "why_needed": "Primcodable description of an endomorphism of `FreeGroup (Fin r)` by the images of the free basis, so that automorphisms can be part of an algorithm's input."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift` (used directly in the definition).",
+     "name": "Kourovka.«10.26».EndoDesc.toMonoidHom",
+     "why_needed": "The endomorphism `FreeGroup.lift (fun i => FreeGroup.mk (f i))` described by an `EndoDesc`."
+    },
+    {
+     "closest_existing_considered": "`MulAut`, `MulEquiv` (would need an existential over an equiv agreeing with f on the basis; bijectivity of the induced hom is equivalent and simpler).",
+     "name": "Kourovka.«10.26».EndoDesc.IsAut",
+     "why_needed": "The promise that a description defines an automorphism: `Function.Bijective f.toMonoidHom`."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib/FormalConjecturesForMathlib; plain `Sum`/`Prod` types.",
+     "name": "Kourovka.«10.26».Letter",
+     "why_needed": "Letters of a twisted equation: a basis constant or a twisted unknown x_i^φ (index in ℕ plus an `EndoDesc`)."
+    },
+    {
+     "closest_existing_considered": "No notion of (twisted) group equations exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«10.26».TwistedEquation",
+     "why_needed": "The input type of the algorithm: the word w(x_{i_1}^{φ_1},…,x_{i_n}^{φ_n}) as a list of signed letters; automatically Primcodable."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`, `FreeGroup.mk` (used directly).",
+     "name": "Kourovka.«10.26».TwistedEquation.eval",
+     "why_needed": "Value of the left-hand side at an assignment of the unknowns, substituting φ(x_i) for x_i^φ via `FreeGroup.lift` and `FreeGroup.mk`."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«10.26».TwistedEquation.IsSoluble",
+     "why_needed": "Solubility in the free group: `∃ x : ℕ → FreeGroup (Fin r), e.eval x = 1`."
+    },
+    {
+     "closest_existing_considered": "None.",
+     "name": "Kourovka.«10.26».TwistedEquation.IsValid",
+     "why_needed": "The hypothesis of the problem that all twists φ_j occurring in the equation are automorphisms."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.of` / `MonoidHom.id` (the test proves `toMonoidHom` of it is `MonoidHom.id`).",
+     "name": "Kourovka.«10.26».EndoDesc.id",
+     "why_needed": "Test helper (identity description) used by the `category test` statements that check the definitions."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ r : ℕ, ∃ alg : TwistedEquation r → Bool, Computable alg ∧ ∀ e, e.IsValid → (alg e = true ↔ e.IsSoluble)`. The algorithm is Mathlib's `Computable` (same idiom as FormalConjectures/Paper/BranchingVAS.lean); the input is a twisted equation over the free group `FreeGroup (Fin r)` encoded as a `Primcodable` type (a word whose letters are basis constants or twisted unknowns x_i^φ, with φ given by the images of the free basis); `IsValid` is the promise that every φ occurring is an automorphism (bijective endomorphism); `IsSoluble` is the existence of an assignment ℕ → F_r making the word equal to 1. Bespoke, problem-local definitions were needed because Mathlib has no `Primcodable` instance for `FreeGroup` or for automorphisms, and no notion of a twisted equation."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.26».parts.b": "/--\nDoes there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nFormalised as: for every finite rank $r$ there is a computable function which, on every\ntwisted equation over $F_r$ whose twists $\\varphi_j$ (given by the images of a free basis) are\nautomorphisms of $F_r$, returns `true` if and only if the equation has a solution in $F_r$.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«10.26».parts.b : answer(sorry) ↔\n    ∀ r : ℕ, ∃ alg : TwistedEquation r → Bool, Computable alg ∧\n      ∀ e : TwistedEquation r, e.IsValid → (alg e = true ↔ e.IsSoluble) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.26\n\nby G. S. Makanin\n\nPart (b) asks whether there is an algorithm deciding solubility in a free group of equations\n$$\n  w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1,\n$$\nwhere the $\\varphi_j$ are automorphisms of that free group.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«10.26»\n\nnamespace parts\n\n/-- A finite signed word. The Boolean is `true` for a positive letter and `false` for an\ninverse letter. -/\nabbrev SignedWord := List (ℕ × Bool)\n\n/-- An encoded twisted equation over a finite-rank free group. In `word`, a left natural number\nis an argument slot of $w$, while a right natural number is a basis letter used as a constant.\nThe entries of `automorphismImages` list the images of the free basis under each twist. -/\nstructure TwistedEquationInput where\n  rank : ℕ\n  numVariables : ℕ\n  word : List ((ℕ ⊕ ℕ) × Bool)\n  indices : List ℕ\n  automorphismImages : List (List SignedWord)\n\ninstance : Primcodable TwistedEquationInput :=\n  .ofEquiv\n    (ℕ × ℕ × List ((ℕ ⊕ ℕ) × Bool) × List ℕ × List (List SignedWord))\n    { toFun := fun p => (p.rank, p.numVariables, p.word, p.indices, p.automorphismImages)\n      invFun := fun p => ⟨p.1, p.2.1, p.2.2.1, p.2.2.2.1, p.2.2.2.2⟩\n      left_inv := fun _ => rfl\n      right_inv := fun _ => rfl }\n\n/-- Evaluate an encoded word in the free group of rank `rank`. Out-of-range letters are sent to\none; well-formed equation inputs contain none. -/\ndef evaluateBasisWord (rank : ℕ) (word : SignedWord) : FreeGroup (Fin rank) :=\n  List.prod <| word.map fun letter =>\n    let value := if h : letter.1 < rank then FreeGroup.of ⟨letter.1, h⟩ else 1\n    if letter.2 then value else value⁻¹\n\n/-- The endomorphism of a free group induced by a list of images of its basis. -/\ndef inducedEndomorphism (rank : ℕ) (images : List SignedWord) :\n    FreeGroup (Fin rank) →* FreeGroup (Fin rank) :=\n  FreeGroup.lift fun i => (images[i.val]?).map (evaluateBasisWord rank) |>.getD 1\n\n/-- The encoded data describe an equation with valid indices and automorphisms of the indicated\nfinite-rank free group. -/\ndef TwistedEquationInput.WellFormed (p : TwistedEquationInput) : Prop :=\n  p.indices.length = p.automorphismImages.length ∧\n  (∀ i ∈ p.indices, i < p.numVariables) ∧\n  (∀ letter ∈ p.word, match letter.1 with\n    | .inl j => j < p.indices.length\n    | .inr k => k < p.rank) ∧\n  ∀ images ∈ p.automorphismImages,\n    images.length = p.rank ∧\n    (∀ word ∈ images, ∀ letter ∈ word, letter.1 < p.rank) ∧\n    Function.Bijective (inducedEndomorphism p.rank images)\n\n/-- The value of an encoded twisted equation at an assignment to its variables. -/\ndef TwistedEquationInput.evaluate (p : TwistedEquationInput)\n    (assignment : Fin p.numVariables → FreeGroup (Fin p.rank)) : FreeGroup (Fin p.rank) :=\n  List.prod <| p.word.map fun letter =>\n    let value := match letter.1 with\n      | .inl j =>\n          match p.indices[j]?, p.automorphismImages[j]? with\n          | some i, some images =>\n              if h : i < p.numVariables then\n                inducedEndomorphism p.rank images (assignment ⟨i, h⟩)\n              else 1\n          | _, _ => 1\n      | .inr k => if h : k < p.rank then FreeGroup.of ⟨k, h⟩ else 1\n    if letter.2 then value else value⁻¹\n\n/-- An encoded twisted equation is soluble if some assignment of elements of the free group to\nits variables makes its left-hand side equal to one. -/\ndef TwistedEquationInput.IsSoluble (p : TwistedEquationInput) : Prop :=\n  ∃ assignment : Fin p.numVariables → FreeGroup (Fin p.rank), p.evaluate assignment = 1\n\n/--\nDoes there exist an algorithm deciding whether an equation\n$w(x_{i_1}^{\\varphi_1},\\ldots,x_{i_n}^{\\varphi_n})=1$ is soluble in a free group, where every\n$\\varphi_j$ is an automorphism of that group?\n\nHere a finite-rank free group, the word $w$, the index assignment, and the automorphisms are all\nfinitely encoded. The word may contain constants from the free group. An automorphism is specified\nby the images of a free basis, and repeated entries in `indices` allow the same variable to occur\nunder different automorphisms. The source does not specify whether the rank is fixed or part of the\ninput, nor whether constants are allowed; this formulation makes the rank part of the input and\nallows constants, as in Makanin's setting.\n-/\n@[category research open, AMS 20]\ntheorem b : answer(sorry) ↔\n    ∃ decide : TwistedEquationInput → Bool,\n      Computable decide ∧\n      ∀ p, p.WellFormed → (decide p = true ↔ p.IsSoluble) := by\n  sorry\n\nend parts\n\nend Kourovka.«10.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The rank of the finite-rank free group is part of the algorithm's encoded input; the source leaves open whether rank is fixed or variable, and the theorem docstring records this choice.",
+    "The word may contain constants from the free group. It is encoded as a finite signed mixed word whose argument-slot letters represent the arguments of w and whose basis letters represent constants; arbitrary free-group constants are therefore expressible as subwords.",
+    "Automorphisms are encoded by their images on a finite free basis. Well-formedness requires that each induced free-group endomorphism be bijective.",
+    "The algorithm is a computable Boolean function on all raw finite encodings, with correctness required on well-formed encodings. This avoids demanding a Primcodable instance for a subtype whose well-formedness includes bijectivity.",
+    "The list `indices` maps each argument slot of w to an unknown, so repeated entries faithfully allow one unknown to occur under different automorphisms."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `FreeGroup` and `FreeGroup.toWord`; `FreeGroup` has no `Primcodable` instance suitable for the computability statement.",
+     "name": "Kourovka.«10.26».parts.SignedWord",
+     "why_needed": "Provides the effective finite signed-word representation required to state algorithmic decidability."
+    },
+    {
+     "closest_existing_considered": "No equation-with-automorphism input encoding exists in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«10.26».parts.TwistedEquationInput",
+     "why_needed": "Packages the variable-rank finite encoding of the word, index assignment, and automorphism basis images."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.mk`/`FreeGroup.lift`; these operate on Mathlib free-group words or quotient values rather than this uniform natural-number encoding.",
+     "name": "Kourovka.«10.26».parts.evaluateBasisWord",
+     "why_needed": "Interprets an encoded signed basis word as an element of the indicated finite-rank free group."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift`, which is used internally but does not package the problem's encoded list of basis images.",
+     "name": "Kourovka.«10.26».parts.inducedEndomorphism",
+     "why_needed": "Turns encoded basis images into the endomorphism whose bijectivity expresses that the input specifies an automorphism."
+    },
+    {
+     "closest_existing_considered": "No corresponding validity predicate exists for this bespoke input encoding.",
+     "name": "Kourovka.«10.26».parts.TwistedEquationInput.WellFormed",
+     "why_needed": "States all bounds, arity agreement, and the requirement that the encoded twists are automorphisms."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift` supplies free-word evaluation but not the indexed, independently twisted substitution semantics.",
+     "name": "Kourovka.«10.26».parts.TwistedEquationInput.evaluate",
+     "why_needed": "Gives the semantics of substitution of each twisted indexed unknown into the encoded word with constants."
+    },
+    {
+     "closest_existing_considered": "No existing general equation-solubility predicate covers these encoded twisted free-group equations.",
+     "name": "Kourovka.«10.26».parts.TwistedEquationInput.IsSoluble",
+     "why_needed": "Expresses existence of an assignment making the encoded equation equal to the identity."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.26».parts.b": "/--\nDoes there exist an algorithm deciding whether an equation\n$w(x_{i_1}^{\\varphi_1},\\ldots,x_{i_n}^{\\varphi_n})=1$ is soluble in a free group, where every\n$\\varphi_j$ is an automorphism of that group?\n\nHere a finite-rank free group, the word $w$, the index assignment, and the automorphisms are all\nfinitely encoded. The word may contain constants from the free group. An automorphism is specified\nby the images of a free basis, and repeated entries in `indices` allow the same variable to occur\nunder different automorphisms. The source does not specify whether the rank is fixed or part of the\ninput, nor whether constants are allowed; this formulation makes the rank part of the input and\nallows constants, as in Makanin's setting.\n-/\n@[category research open, AMS 20]\ntheorem b : answer(sorry) ↔\n    ∃ decide : TwistedEquationInput → Bool,\n      Computable decide ∧\n      ∀ p, p.WellFormed → (decide p = true ↔ p.IsSoluble) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.26\n\nby G. S. Makanin\n\nb) Does there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group,\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nHere $x^{\\varphi}$ denotes the image of $x$ under $\\varphi$, the $x_i$ are unknowns,\nand $w$ is a word in the $n$ letters $y_j = x_{i_j}^{\\varphi_j}$ and in constants from\nthe free group (as in Makanin's setting of equations with coefficients; without\nconstants every such equation has the trivial solution $x_i = 1$). The same unknown\n$x_i$ may occur several times, twisted by different automorphisms.\n\n## Formalisation\n\nAn instance of the problem is encoded by finite data (`TwistedEquation`): the rank $r$\nof the free group $F = $ `FreeGroup (Fin r)` and the word $w$ over the alphabet\n`Letter`, whose letters are the constants (basis elements of $F$) and the twisted\nunknowns $x_i^{\\varphi}$, where $\\varphi$ is specified by the list of the images of the\nfree basis, each image being a word in the basis. The rank $r$ is thus part of the input,\nso a positive answer asks for a single algorithm uniform in the free group; the source\ndoes not say explicitly whether the free group is fixed or given as input. Basis elements are\nreferred to by natural numbers; the reading of out-of-range data as `1` in `generator` and\n`endoOfImages` only makes the decoding total: every input denotes a genuine instance, and every\ninstance is denoted by some input.\n\nSince the source only asks about inputs whose twists are automorphisms, the question is\nformalised as a promise problem: is there a computable function that returns `true`\nexactly on the soluble instances among those whose twists are all bijective?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«10.26»\n\n/-- The `a`-th element of the free basis of `FreeGroup (Fin r)`. Indices `a ≥ r` do not name\na basis element and are read as `1`; this only serves to make the reading of encoded data\ntotal. -/\ndef generator (r a : ℕ) : FreeGroup (Fin r) :=\n  if h : a < r then FreeGroup.of ⟨a, h⟩ else 1\n\n/-- The element of `FreeGroup (Fin r)` denoted by a word `w` over the alphabet `ℕ`, where the\nletter `a` stands for the basis element `generator r a`. -/\ndef readWord (r : ℕ) (w : List (ℕ × Bool)) : FreeGroup (Fin r) :=\n  FreeGroup.lift (generator r) (FreeGroup.mk w)\n\n/-- The endomorphism of `FreeGroup (Fin r)` specified by the list `imgs` of the images of the\nfree basis: the `a`-th basis element is sent to the element denoted by the `a`-th word of\n`imgs`. A missing word is read as `1`; this only serves to make the reading of encoded data\ntotal. -/\ndef endoOfImages (r : ℕ) (imgs : List (List (ℕ × Bool))) :\n    FreeGroup (Fin r) →* FreeGroup (Fin r) :=\n  FreeGroup.lift fun a : Fin r => readWord r (imgs.getD a [])\n\n/-- A letter of the alphabet in which the left-hand side $w$ of a twisted equation is written:\neither a constant, namely the `a`-th basis element of the free group, or a twisted unknown\n$x_i^{\\varphi}$, where the endomorphism $\\varphi$ is specified by the list of the images of the\nfree basis (see `endoOfImages`). -/\ninductive Letter\n  /-- The constant `generator r a`, the `a`-th element of the free basis. -/\n  | const (a : ℕ)\n  /-- The twisted unknown $x_i^{\\varphi}$, with $\\varphi$ specified by `imgs` as in\n  `endoOfImages`. -/\n  | unknown (i : ℕ) (imgs : List (List (ℕ × Bool)))\n\ninstance : Primcodable Letter :=\n  .ofEquiv (ℕ ⊕ ℕ × List (List (ℕ × Bool)))\n    { toFun := fun\n        | .const a => .inl a\n        | .unknown i imgs => .inr (i, imgs)\n      invFun := fun\n        | .inl a => .const a\n        | .inr (i, imgs) => .unknown i imgs\n      left_inv := fun l => by cases l <;> rfl\n      right_inv := fun s => by rcases s with _ | ⟨_, _⟩ <;> rfl }\n\n/-- The value of a letter in `FreeGroup (Fin r)` at the assignment `x` of the unknowns. -/\ndef Letter.eval (r : ℕ) (x : ℕ → FreeGroup (Fin r)) : Letter → FreeGroup (Fin r)\n  | const a => generator r a\n  | unknown i imgs => endoOfImages r imgs (x i)\n\n/-- A letter is admissible if it is a constant, or a twisted unknown whose twist is an\nautomorphism of `FreeGroup (Fin r)`, i.e. a bijective endomorphism. -/\ndef Letter.IsAdmissible (r : ℕ) : Letter → Prop\n  | const _ => True\n  | unknown _ imgs => Function.Bijective (endoOfImages r imgs)\n\n/-- The data of an equation $w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ over a\nfree group of finite rank: the rank of the free group and the word $w$ over the alphabet\n`Letter`, whose letters are constants and twisted unknowns $x_{i_j}^{\\varphi_j}$. -/\nstructure TwistedEquation where\n  /-- The rank `r` of the free group `FreeGroup (Fin r)`. -/\n  rank : ℕ\n  /-- The word `w`, as a list of letters together with the sign of their exponent. -/\n  word : List (Letter × Bool)\n\ninstance : Primcodable TwistedEquation :=\n  .ofEquiv (ℕ × List (Letter × Bool))\n    { toFun := fun e => (e.rank, e.word)\n      invFun := fun p => ⟨p.1, p.2⟩\n      left_inv := fun _ => rfl\n      right_inv := fun _ => rfl }\n\nnamespace TwistedEquation\n\n/-- The value of the left-hand side $w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n})$ at the\nassignment `x` of the unknowns. -/\ndef eval (e : TwistedEquation) (x : ℕ → FreeGroup (Fin e.rank)) : FreeGroup (Fin e.rank) :=\n  FreeGroup.lift (Letter.eval e.rank x) (FreeGroup.mk e.word)\n\n/-- The equation is soluble in the free group if some assignment of the unknowns makes its\nleft-hand side equal to `1`. -/\ndef IsSoluble (e : TwistedEquation) : Prop :=\n  ∃ x : ℕ → FreeGroup (Fin e.rank), e.eval x = 1\n\n/-- The data is admissible if every twist occurring in the word is an automorphism of the free\ngroup. -/\ndef IsAdmissible (e : TwistedEquation) : Prop :=\n  ∀ l ∈ e.word, l.1.IsAdmissible e.rank\n\nend TwistedEquation\n\n/--\nDoes there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group,\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nHere $x^{\\varphi}$ is the image of $x$ under $\\varphi$, and $w$ is a word in the letters\n$x_{i_j}^{\\varphi_j}$ and in constants from the free group. The algorithm receives the rank\n$r$ of the free group, the word $w$ and the automorphisms $\\varphi_j$ (each given by the\nimages of the free basis) as input, and must answer correctly on every input whose twists are\nautomorphisms of $F_r$, i.e. it decides the promise problem. The answer is `True` if such an\nalgorithm exists, and `False` otherwise.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«10.26».parts.b : answer(sorry) ↔\n    ∃ f : TwistedEquation → Bool, Computable f ∧\n      ∀ e : TwistedEquation, e.IsAdmissible → (f e = true ↔ e.IsSoluble) := by\n  sorry\n\n/-- The list of the images of the free basis under the identity automorphism. -/\ndef identityImages (r : ℕ) : List (List (ℕ × Bool)) :=\n  List.ofFn fun a : Fin r => [(a.1, true)]\n\n/-- The identity data specifies the identity endomorphism. -/\n@[category test, AMS 3 20]\ntheorem endoOfImages_identityImages (r : ℕ) :\n    endoOfImages r (identityImages r) = MonoidHom.id (FreeGroup (Fin r)) := by\n  refine FreeGroup.ext_hom _ _ fun a => ?_\n  simp [endoOfImages, identityImages, readWord, generator]\n\n/-- The identity data is admissible. -/\n@[category test, AMS 3 20]\ntheorem isAdmissible_unknown_identityImages (r i : ℕ) :\n    (Letter.unknown i (identityImages r)).IsAdmissible r := by\n  simp [Letter.IsAdmissible, endoOfImages_identityImages, Function.bijective_id]\n\n/-- The equation `x_0 = a` (in rank one, with `a` the basis element) is soluble. -/\n@[category test, AMS 3 20]\ntheorem isSoluble_example :\n    TwistedEquation.IsSoluble\n      ⟨1, [(Letter.unknown 0 (identityImages 1), true), (Letter.const 0, false)]⟩ := by\n  refine ⟨fun _ => FreeGroup.of 0, ?_⟩\n  simp [TwistedEquation.eval, FreeGroup.lift_mk, Letter.eval, endoOfImages_identityImages,\n    generator]\n\n/-- The equation `a = 1` (in rank one, with `a` the basis element) is not soluble. -/\n@[category test, AMS 3 20]\ntheorem not_isSoluble_example :\n    ¬ TwistedEquation.IsSoluble ⟨1, [(Letter.const 0, true)]⟩ := by\n  rintro ⟨x, hx⟩\n  simp [TwistedEquation.eval, FreeGroup.lift_mk, Letter.eval, generator] at hx\n\nend Kourovka.«10.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The table's single slot (part b), its reading of x^φ as the image of x under φ, the repeated-unknown/different-twist feature, and the flagged implicit choices (rank fixed vs input; constants) all match my reading of the source; both implicit choices are resolved and recorded in the docstrings.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Rank of the free group is part of the algorithm's input (uniform algorithm), following the decomposition notes' description; the source is silent on this and the docstring records it. The alternative reading `∀ r, ∃ algorithm` is weaker in principle but expected to have the same answer.",
+    "The word w may contain constants (basis elements of F and their inverses); without constants every such equation has the trivial solution x_i = 1, so the question is only meaningful with constants. Words with no constants are still allowed as a special case.",
+    "The letters of w are constants and twisted unknowns x_i^φ, each occurrence carrying its own (i, φ); the source's letters y_j = x_{i_j}^{φ_j} correspond to the distinct twisted-unknown letters. Same class of equations, the same unknown may occur under different twists.",
+    "'Automorphism' is formalised as Function.Bijective of the endomorphism FreeGroup.lift of the given basis images.",
+    "Promise-problem formulation: a total computable f : TwistedEquation → Bool that is correct on all inputs whose twists are all automorphisms; behaviour on non-admissible data is unconstrained. This avoids relying on the (known) decidability of whether basis images define an automorphism. A partial-recursive variant (halting only on admissible inputs) would coincide given that known result.",
+    "Encoding conventions for totality: basis indices ≥ r and missing basis images are read as 1 (`generator`, `endoOfImages`). Every input denotes a genuine instance (rank, constants, endomorphisms of F_r) and every genuine instance (with automorphisms given by reduced words of basis images) is denoted, so the promise problem on data is exactly the problem on instances.",
+    "Unknowns are indexed by ℕ (x : ℕ → FreeGroup (Fin r)); only finitely many occur in w, so this is equivalent to x_1,…,x_m.",
+    "'Algorithm' is formalised as Mathlib's `Computable` on `Primcodable` types, matching the repository idiom (BranchingVAS uses ComputablePred)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FreeGroup.of (partial in the index; would need Fin r-typed data and hence a dependent Sigma input type with no Primcodable instance).",
+     "name": "Kourovka.«10.26».generator",
+     "why_needed": "Total reading of a natural-number index as a basis element of FreeGroup (Fin r) (indices ≥ r read as 1), needed because inputs must be Primcodable and Mathlib has no Primcodable instance for Σ r, (data over Fin r)."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.mk (only for words typed over the basis type Fin r).",
+     "name": "Kourovka.«10.26».readWord",
+     "why_needed": "Element of FreeGroup (Fin r) denoted by a word over ℕ × Bool; composition of FreeGroup.lift (generator r) with FreeGroup.mk."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift / MulAut (FreeGroup (Fin r)) (MulAut is not Primcodable, so automorphisms must be given by finite data).",
+     "name": "Kourovka.«10.26».endoOfImages",
+     "why_needed": "The endomorphism of FreeGroup (Fin r) specified by a finite list of images of the free basis (the finite datum encoding an automorphism); admissibility asks it to be bijective."
+    },
+    {
+     "closest_existing_considered": "ℕ ⊕ (ℕ × List (List (ℕ × Bool))) (used as the Primcodable target of the ofEquiv instance; a named inductive is more readable).",
+     "name": "Kourovka.«10.26».Letter (with Letter.eval, Letter.IsAdmissible, Primcodable instance)",
+     "why_needed": "Alphabet for the word w: constants and twisted unknowns x_i^φ, so that w(x_{i_1}^{φ_1},…,x_{i_n}^{φ_n}) is literally FreeGroup.lift of the letter evaluation applied to FreeGroup.mk w."
+    },
+    {
+     "closest_existing_considered": "BranchingVAS.Bvas-style structure with Primcodable via ofEquiv (repo idiom); no existing notion of an equation over a free group in Mathlib or FormalConjecturesForMathlib.",
+     "name": "Kourovka.«10.26».TwistedEquation (with eval, IsSoluble, IsAdmissible, Primcodable instance)",
+     "why_needed": "The finite input datum of the decision problem (rank and word) and the solubility / promise predicates the algorithm must decide."
+    },
+    {
+     "closest_existing_considered": "List.ofFn (it is a thin wrapper around List.ofFn).",
+     "name": "Kourovka.«10.26».identityImages",
+     "why_needed": "Test-only helper: images of the basis under the identity, used in the @[category test] API lemmas."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∃ f : TwistedEquation → Bool, Computable f ∧ ∀ e, e.IsAdmissible → (f e = true ↔ e.IsSoluble)`. An input is the rank r of F = FreeGroup (Fin r) together with the word w over an alphabet of letters that are either constants (basis elements of F) or twisted unknowns x_i^φ, φ given by the images of the free basis; IsSoluble asks for x : ℕ → F with w(...) = 1; IsAdmissible requires every twist occurring in w to be a bijective endomorphism (an automorphism). Mathlib has no Primcodable instance for dependent Sigma types, so the input uses ℕ-indexed basis letters with a total decoding; this needed bespoke definitions."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.26».parts.b": "/--\nDoes there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group,\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nHere $x^{\\varphi}$ is the image of $x$ under $\\varphi$, and $w$ is a word in the letters\n$x_{i_j}^{\\varphi_j}$ and in constants from the free group. The algorithm receives the rank\n$r$ of the free group, the word $w$ and the automorphisms $\\varphi_j$ (each given by the\nimages of the free basis) as input, and must answer correctly on every input whose twists are\nautomorphisms of $F_r$, i.e. it decides the promise problem. The answer is `True` if such an\nalgorithm exists, and `False` otherwise.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«10.26».parts.b : answer(sorry) ↔\n    ∃ f : TwistedEquation → Bool, Computable f ∧\n      ∀ e : TwistedEquation, e.IsAdmissible → (f e = true ↔ e.IsSoluble) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.26\n\nby G. S. Makanin\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 10.26(b)\n-/\n\nnamespace Kourovka.«10.26»\n\n/-- A finite word in the generators of a free group and their inverses. The Boolean is `true`\nfor a generator and `false` for its inverse. -/\nabbrev GroupWord := List (ℕ × Bool)\n\n/-- A word in argument places (`Sum.inl`) and constants from the ambient free group\n(`Sum.inr`). -/\nabbrev EquationWord := List ((ℕ ⊕ ℕ) × Bool)\n\n/-- An encoded instance consists of the rank, the number of unknowns, the equation word, the\nunknown-index assigned to each argument place, and the basis images for the automorphism at each\nargument place. -/\nabbrev Input := ℕ × ℕ × EquationWord × List ℕ × List (List GroupWord)\n\n/-- The element of the free group on `ℕ` represented by a raw word. -/\ndef groupElement (w : GroupWord) : FreeGroup ℕ :=\n  FreeGroup.mk w\n\n/-- The endomorphism specified by a finite list of images of basis generators. Generators beyond\nthe list are fixed. -/\ndef inducedEndomorphism (images : List GroupWord) : FreeGroup ℕ →* FreeGroup ℕ :=\n  FreeGroup.lift fun i => groupElement (images.getD i [(i, true)])\n\n/-- A raw group word only uses the first `rank` basis generators. -/\ndef IsBoundedGroupWord (rank : ℕ) (w : GroupWord) : Prop :=\n  ∀ letter ∈ w, letter.1 < rank\n\n/-- The list encodes an automorphism of the free group of rank `rank`: it gives one image for each\nbasis generator, all images remain in that finite-rank free factor, and the induced endomorphism\n(which fixes the other generators) is bijective. -/\ndef IsAutomorphismEncoding (rank : ℕ) (images : List GroupWord) : Prop :=\n  images.length = rank ∧\n    (∀ w ∈ images, IsBoundedGroupWord rank w) ∧\n    Function.Bijective (inducedEndomorphism images)\n\n/-- Evaluate an encoded equation after assigning raw group words to its unknowns. -/\ndef evaluate (w : EquationWord) (indices : List ℕ) (automorphisms : List (List GroupWord))\n    (values : ℕ → GroupWord) : FreeGroup ℕ :=\n  FreeGroup.lift (fun\n    | Sum.inl j => inducedEndomorphism (automorphisms.getD j [])\n        (groupElement (values (indices.getD j 0)))\n    | Sum.inr k => FreeGroup.of k) (FreeGroup.mk w)\n\n/-- An input is well formed for an equation over the free group of the encoded finite rank. -/\ndef IsValidInput (input : Input) : Prop :=\n  match input with\n  | (rank, numberOfUnknowns, w, indices, automorphisms) =>\n      indices.length = automorphisms.length ∧\n      (∀ i ∈ indices, i < numberOfUnknowns) ∧\n      (∀ letter ∈ w, match letter.1 with\n        | Sum.inl j => j < indices.length\n        | Sum.inr k => k < rank) ∧\n      ∀ images ∈ automorphisms, IsAutomorphismEncoding rank images\n\n/-- Solubility of the equation encoded by an input. -/\ndef IsSoluble (input : Input) : Prop :=\n  match input with\n  | (rank, numberOfUnknowns, w, indices, automorphisms) =>\n      ∃ values : ℕ → GroupWord,\n        (∀ i < numberOfUnknowns, IsBoundedGroupWord rank (values i)) ∧\n        evaluate w indices automorphisms values = 1\n\n/--\nDoes there exist an algorithm deciding whether an equation\n$w(x_{i_1}^{\\varphi_1},\\ldots,x_{i_n}^{\\varphi_n})=1$ is soluble in a free group, where\n$\\varphi_1,\\ldots,\\varphi_n$ are automorphisms of that group?\n\nHere $x^\\varphi$ means $\\varphi(x)$. The same unknown may occur at multiple argument places, with\npossibly different automorphisms. Automorphisms are input by the images of a free basis. This\nformalization treats the finite rank as part of the input and permits $w$ to contain constants from\nthe free group. The source leaves both of these conventions implicit.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    ∃ algorithm : Input → Bool, Computable algorithm ∧\n      ∀ input, IsValidInput input → ((algorithm input : Prop) ↔ IsSoluble input) := by\n  sorry\n\nend Kourovka.«10.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The finite rank is part of the encoded input; the source does not say whether it is fixed or variable.",
+    "The equation word may contain constants from the free group, represented by constant basis letters; the source leaves the presence of constants implicit.",
+    "The n entries of the index list associate each argument place of w with one of m unknowns, so repeated indices allow the same unknown to occur under different automorphisms.",
+    "An automorphism is encoded by the images of the finite free basis. Validity requires these words to use only that basis and the induced endomorphism to be bijective.",
+    "Finite-rank free groups are represented as the free factors on the first r generators inside FreeGroup ℕ. Encoded endomorphisms fix all generators outside that free factor.",
+    "The computable Boolean algorithm is required to be correct on well-formed inputs. No behavior is prescribed on malformed encodings."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's FreeGroup and its List-based quotient representation; FreeGroup itself has no Primcodable instance.",
+     "name": "Kourovka.«10.26».GroupWord",
+     "why_needed": "Provides a computably encodable raw syntax for elements of a finite-rank free group."
+    },
+    {
+     "closest_existing_considered": "Mathlib's FreeGroup over a sum type, used semantically through FreeGroup.mk, but no problem-specific encoded equation syntax exists.",
+     "name": "Kourovka.«10.26».EquationWord",
+     "why_needed": "Encodes a word containing both twisted argument places and optional ambient-group constants."
+    },
+    {
+     "closest_existing_considered": "Mathlib's products, lists, and Primcodable instances; no existing input type models twisted equations.",
+     "name": "Kourovka.«10.26».Input",
+     "why_needed": "Packages rank, unknown count, equation, index assignment, and finite basis-image encodings into a Primcodable product type."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.mk, which this definition wraps for the local syntax.",
+     "name": "Kourovka.«10.26».groupElement",
+     "why_needed": "Interprets raw signed words as Mathlib free-group elements."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift, which supplies the universal-property construction but not the finite image-list encoding.",
+     "name": "Kourovka.«10.26».inducedEndomorphism",
+     "why_needed": "Interprets finite basis-image data as the corresponding free-group endomorphism."
+    },
+    {
+     "closest_existing_considered": "No existing Mathlib predicate bounds the generator indices of this raw List syntax.",
+     "name": "Kourovka.«10.26».IsBoundedGroupWord",
+     "why_needed": "Expresses that a raw word belongs to the encoded finite-rank free factor."
+    },
+    {
+     "closest_existing_considered": "MulEquiv and Function.Bijective; MulEquiv itself is not finite input data specified by basis images.",
+     "name": "Kourovka.«10.26».IsAutomorphismEncoding",
+     "why_needed": "States that finite basis-image data really specifies an automorphism of the encoded free group."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift; no existing evaluator combines argument-place indices, automorphism encodings, and constants.",
+     "name": "Kourovka.«10.26».evaluate",
+     "why_needed": "Gives the semantics of an equation whose argument places are independently twisted and indexed."
+    },
+    {
+     "closest_existing_considered": "No existing validation predicate covers this problem-specific encoding.",
+     "name": "Kourovka.«10.26».IsValidInput",
+     "why_needed": "Defines the well-formedness promise for the raw computability input."
+    },
+    {
+     "closest_existing_considered": "No existing Mathlib or FormalConjecturesForMathlib predicate models twisted free-group equations.",
+     "name": "Kourovka.«10.26».IsSoluble",
+     "why_needed": "States existential solubility of the encoded twisted equation in its finite-rank free group."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.26».parts.b": "/--\nDoes there exist an algorithm deciding whether an equation\n$w(x_{i_1}^{\\varphi_1},\\ldots,x_{i_n}^{\\varphi_n})=1$ is soluble in a free group, where\n$\\varphi_1,\\ldots,\\varphi_n$ are automorphisms of that group?\n\nHere $x^\\varphi$ means $\\varphi(x)$. The same unknown may occur at multiple argument places, with\npossibly different automorphisms. Automorphisms are input by the images of a free basis. This\nformalization treats the finite rank as part of the input and permits $w$ to contain constants from\nthe free group. The source leaves both of these conventions implicit.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    ∃ algorithm : Input → Bool, Computable algorithm ∧\n      ∀ input, IsValidInput input → ((algorithm input : Prop) ↔ IsSoluble input) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.26\n\nby G. S. Makanin\n\nDoes there exist an algorithm deciding whether an equation\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group,\nwhere the $\\varphi_j$ are automorphisms of that group?\n\nThe source leaves implicit whether the finite rank is fixed or is part of the input, and whether\n$w$ may contain constants. Here the rank is part of the input and constants from the free group\nare allowed.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«10.26»\n\n/-- A description of an endomorphism of a finite-rank free group by the images of its basis.\nEach image is a signed word in basis indices. -/\nstructure EndomorphismCode where\n  images : List (List (ℕ × Bool))\n  deriving Encodable\n\n/-- An encoded twisted equation over a finite-rank free group.\n\nAn atom `Sum.inl k` is the $k$-th free-group basis element (and thus permits constants in the\nword), while `Sum.inr j` is the $j$-th displayed argument $x_{i_j}^{\\varphi_j}$. The Boolean on\nan atom records whether it occurs positively or inversely. -/\nstructure EquationCode where\n  rank : ℕ\n  variableCount : ℕ\n  word : List ((ℕ ⊕ ℕ) × Bool)\n  variableIndices : List ℕ\n  twists : List EndomorphismCode\n  deriving Encodable\n\n/-- Interpret a possibly out-of-range natural number as a free generator, using the identity for\nan out-of-range number. Valid equation codes never use the fallback case. -/\ndef generator (rank k : ℕ) : FreeGroup (Fin rank) :=\n  if h : k < rank then FreeGroup.of ⟨k, h⟩ else 1\n\n/-- Evaluate a signed basis word in the free group of the indicated rank. -/\ndef evalGroupWord (rank : ℕ) (word : List (ℕ × Bool)) : FreeGroup (Fin rank) :=\n  word.foldl (fun value letter =>\n    value * if letter.2 then generator rank letter.1 else (generator rank letter.1)⁻¹) 1\n\n/-- The free-group endomorphism specified by a list of basis images. -/\ndef EndomorphismCode.toMonoidHom (rank : ℕ) (code : EndomorphismCode) :\n    FreeGroup (Fin rank) →* FreeGroup (Fin rank) :=\n  FreeGroup.lift fun j => evalGroupWord rank (code.images.getD j.val [])\n\n/-- A code is valid when all indices have their declared meanings and every listed twist really\nspecifies an automorphism of the free group. -/\ndef EquationCode.IsValid (code : EquationCode) : Prop :=\n  code.variableIndices.length = code.twists.length ∧\n  (∀ k ∈ code.variableIndices, k < code.variableCount) ∧\n  (∀ letter ∈ code.word, match letter.1 with\n    | Sum.inl k => k < code.rank\n    | Sum.inr j => j < code.twists.length) ∧\n  ∀ twist ∈ code.twists,\n    twist.images.length = code.rank ∧\n    (∀ image ∈ twist.images, ∀ letter ∈ image, letter.1 < code.rank) ∧\n    Function.Bijective (twist.toMonoidHom code.rank)\n\n/-- Read a variable by its natural-number index, with an irrelevant fallback for invalid codes. -/\ndef variableValue {rank variableCount : ℕ}\n    (values : Fin variableCount → FreeGroup (Fin rank)) (index : ℕ) : FreeGroup (Fin rank) :=\n  if h : index < variableCount then values ⟨index, h⟩ else 1\n\n/-- Evaluate the left-hand side of a valid encoded equation at values for its variables. -/\ndef EquationCode.eval (code : EquationCode)\n    (values : Fin code.variableCount → FreeGroup (Fin code.rank)) : FreeGroup (Fin code.rank) :=\n  code.word.foldl (fun value letter =>\n    let atomValue := match letter.1 with\n      | Sum.inl k => generator code.rank k\n      | Sum.inr j =>\n          (code.twists.getD j ⟨[]⟩).toMonoidHom code.rank\n            (variableValue values (code.variableIndices.getD j 0))\n    value * if letter.2 then atomValue else atomValue⁻¹) 1\n\n/-- The encoded twisted equation is soluble if some assignment to all its variables makes its\nleft-hand side equal to the identity. -/\ndef EquationCode.IsSolvable (code : EquationCode) : Prop :=\n  ∃ values : Fin code.variableCount → FreeGroup (Fin code.rank), code.eval values = 1\n\n/--\nDoes there exist an algorithm which decides whether\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group,\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of that group?\n\nThe algorithm receives the finite rank, the word (possibly containing constants), the variable\nindices $i_1, \\ldots, i_n$, and each automorphism through its images on the free basis. Repeated\nvariable indices are allowed. Correctness is required on valid encodings of these data.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    ∃ decideSolvable : ℕ → Bool, Computable decideSolvable ∧\n      ∀ code : EquationCode, code.IsValid →\n        (decideSolvable (Encodable.encode code) : Prop) ↔ code.IsSolvable := by\n  sorry\n\nend Kourovka.«10.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.94,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The finite rank is part of the algorithm's input. The source does not specify whether it is fixed; this choice is recorded in the module docstring.",
+    "The equation word may contain constants from the free group. Constants are encoded as signed free-basis letters, so arbitrary free-group constants can be represented by sequences of such letters.",
+    "The displayed arguments of w are separate slots, each linked to an underlying variable index and a twist. Thus the same variable can occur in several slots under different automorphisms.",
+    "An automorphism is input by the images of the standard free basis. Validity requires that the induced free-group endomorphism be bijective.",
+    "The algorithm is a total computable Boolean function on natural-number codes, with correctness required only for valid descriptions. This treats well-formed automorphism descriptions as promise inputs and does not add an unasked-for requirement on malformed data.",
+    "Boolean true denotes a positive signed letter and false denotes its inverse. The free group of rank r is modeled as FreeGroup (Fin r), including rank zero."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's FreeGroup.lift and MulEquiv represent semantic homomorphisms/equivalences, but no finite encoded basis-image input type was found.",
+     "name": "EndomorphismCode",
+     "why_needed": "Provides the finite basis-image representation of an input automorphism required by the problem."
+    },
+    {
+     "closest_existing_considered": "No encoded syntax for twisted equations over free groups was found in Mathlib or FormalConjecturesForMathlib.",
+     "name": "EquationCode",
+     "why_needed": "Packages the variable finite rank, equation word with constants, repeated variable-index assignment, and list of twists into an encodable algorithm input."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.of accepts an already bounded Fin index and does not decode natural-number input.",
+     "name": "generator",
+     "why_needed": "Totally decodes a natural basis index into FreeGroup (Fin rank), with validity ensuring the fallback is unused."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.mk interprets words whose letters already have type Fin rank; the input format uses natural indices requiring checked decoding.",
+     "name": "evalGroupWord",
+     "why_needed": "Interprets finite signed basis-image words as elements of the relevant finite-rank free group."
+    },
+    {
+     "closest_existing_considered": "Built from Mathlib's FreeGroup.lift; no existing decoder from finite basis-image lists was found.",
+     "name": "EndomorphismCode.toMonoidHom",
+     "why_needed": "Semantically interprets a finite list of basis images via the universal property of the free group."
+    },
+    {
+     "closest_existing_considered": "Function.Bijective and FreeGroup.lift supply components, but no validity predicate for this bespoke encoded input exists.",
+     "name": "EquationCode.IsValid",
+     "why_needed": "Expresses well-formed index bounds and the requirement that every basis-image description actually induces an automorphism."
+    },
+    {
+     "closest_existing_considered": "Direct Fin-indexed function application requires an in-range proof; no applicable total natural-index lookup was found.",
+     "name": "variableValue",
+     "why_needed": "Makes equation evaluation total on all natural-number codes while agreeing with indexed lookup for valid codes."
+    },
+    {
+     "closest_existing_considered": "No existing evaluator for words combining free-group constants with separately twisted variable slots was found.",
+     "name": "EquationCode.eval",
+     "why_needed": "Gives the semantics of the twisted equation by substituting each selected variable after applying its corresponding encoded automorphism."
+    },
+    {
+     "closest_existing_considered": "No existing solubility predicate for this twisted free-group equation syntax was found.",
+     "name": "EquationCode.IsSolvable",
+     "why_needed": "States the existential solution semantics that the requested algorithm must decide."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.26».parts.b": "/--\nDoes there exist an algorithm which decides whether\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group,\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of that group?\n\nThe algorithm receives the finite rank, the word (possibly containing constants), the variable\nindices $i_1, \\ldots, i_n$, and each automorphism through its images on the free basis. Repeated\nvariable indices are allowed. Correctness is required on valid encodings of these data.\n-/\n@[category research open, AMS 20]\ntheorem parts.b : answer(sorry) ↔\n    ∃ decideSolvable : ℕ → Bool, Computable decideSolvable ∧\n      ∀ code : EquationCode, code.IsValid →\n        (decideSolvable (Encodable.encode code) : Prop) ↔ code.IsSolvable := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.26\n\nby G. S. Makanin\n\nPart (b) asks whether solubility of equations with variables twisted by\nautomorphisms is decidable in a free group.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«10.26»\n\n/-- A word in the standard basis of the free group of rank `d`. The Boolean\nrecords whether a basis letter occurs positively or inversely. -/\nabbrev BasisWord (d : ℕ) := List (Fin d × Bool)\n\n/-- The finite data specifying an endomorphism of the free group of rank `d`:\nthe image of each standard basis element. -/\nabbrev EndomorphismData (d : ℕ) := Fin d → BasisWord d\n\n/-- A letter in an equation over the free group of rank `d` is either a\nconstant basis letter or a variable together with the basis images specifying\nthe automorphism twisting that occurrence. -/\nabbrev EquationLetter (d : ℕ) := Fin d ⊕ (ℕ × EndomorphismData d)\n\n/-- An encoded equation over the free group of rank `d`. The Boolean records\nwhether an equation letter occurs positively or inversely. -/\nabbrev Equation (d : ℕ) := List (EquationLetter d × Bool)\n\n/-- The endomorphism induced by specified images of the standard basis. -/\ndef inducedEndomorphism {d : ℕ} (φ : EndomorphismData d) :\n    FreeGroup (Fin d) →* FreeGroup (Fin d) :=\n  FreeGroup.lift fun i => FreeGroup.mk (φ i)\n\n/-- The specified basis images define an automorphism. -/\ndef SpecifiesAutomorphism {d : ℕ} (φ : EndomorphismData d) : Prop :=\n  Function.Bijective (inducedEndomorphism φ)\n\n/-- Every twist occurring in an encoded equation specifies an automorphism. -/\ndef HasAutomorphicTwists {d : ℕ} (e : Equation d) : Prop :=\n  ∀ letter ∈ e, match letter.1 with\n    | Sum.inl _ => True\n    | Sum.inr (_, φ) => SpecifiesAutomorphism φ\n\n/-- Evaluate an encoded equation at an assignment of its variables. -/\ndef equationValue {d : ℕ} (e : Equation d) (x : ℕ → FreeGroup (Fin d)) :\n    FreeGroup (Fin d) :=\n  FreeGroup.lift (fun letter => match letter with\n    | Sum.inl i => FreeGroup.of i\n    | Sum.inr (j, φ) => inducedEndomorphism φ (x j)) (FreeGroup.mk e)\n\n/-- An encoded equation is soluble if some assignment of its variables makes\nits value the identity. -/\ndef IsSoluble {d : ℕ} (e : Equation d) : Prop :=\n  ∃ x : ℕ → FreeGroup (Fin d), equationValue e x = 1\n\n/--\nDoes there exist an algorithm deciding whether an equation\n$w(x_{i_1}^{\\varphi_1},\\ldots,x_{i_n}^{\\varphi_n})=1$ is soluble in a free\ngroup, where every $\\varphi_j$ is an automorphism of that group?\n\nHere a twist is encoded by the images of a standard free basis, and repeated\nindices make occurrences depend on the same unknown $x_i$. Constants are\nallowed and are written as signed basis letters. Correctness is required on\ninputs whose twist data induce automorphisms. The source does not say whether\nthe rank is fixed or belongs to the input; this formulation asks for an\nalgorithm for each fixed finite rank.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.26».parts.b : answer(sorry) ↔\n    ∀ d : ℕ, ∃ decide : Equation d → Bool, Computable decide ∧\n      ∀ e : Equation d, HasAutomorphicTwists e →\n        ((decide e : Prop) ↔ IsSoluble e) := by\n  sorry\n\nend Kourovka.«10.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.93,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "The free group is modeled as `FreeGroup (Fin d)`, and the theorem asks for an algorithm separately for every fixed finite rank `d`. This follows the usual fixed-group reading; the docstring records that the source leaves fixed rank versus rank-as-input implicit.",
+    "Words, constants, and automorphism images are encoded by finite signed basis words. Constants are expanded into signed standard-basis letters.",
+    "Each occurrence of a variable carries its own twist data, while a natural-number index ensures that repeated occurrences with the same index receive the same unknown group element.",
+    "Correctness of the computable Boolean procedure is required only when every supplied basis-image map induces an automorphism. Thus malformed endomorphism data are outside the promised input domain, rather than being assigned an artificial answer.",
+    "Solubility quantifies over assignments indexed by all natural numbers; because an encoded equation is finite, only the finitely many indices occurring in it affect evaluation."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`FreeGroup (Fin d)` is the semantic object, but its quotient representation is not the desired direct algorithm-input syntax.",
+     "name": "BasisWord",
+     "why_needed": "Provides a primitive-recursively encodable syntax for elements of the finite-rank free group."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift` constructs the induced homomorphism but does not itself package finite syntactic input data.",
+     "name": "EndomorphismData",
+     "why_needed": "Encodes an endomorphism by the finite list of images of a standard free basis, as required by the decomposition."
+    },
+    {
+     "closest_existing_considered": "No existing Mathlib syntax combines free-group constants, indexed variables, and encoded basis-image maps.",
+     "name": "EquationLetter",
+     "why_needed": "Distinguishes constant basis letters from occurrence-specific twisted variables while retaining repeated variable indices."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup` supplies semantic words modulo reduction, but no matching encoded equation type with twists and constants.",
+     "name": "Equation",
+     "why_needed": "Defines the finite, computably encoded input word whose solubility is to be decided."
+    },
+    {
+     "closest_existing_considered": "This is a problem-specific wrapper around `FreeGroup.lift`.",
+     "name": "inducedEndomorphism",
+     "why_needed": "Interprets encoded basis images as the corresponding free-group endomorphism."
+    },
+    {
+     "closest_existing_considered": "A `MulEquiv` could witness the same condition, but bijectivity of the induced `FreeGroup.lift` directly checks the supplied data.",
+     "name": "SpecifiesAutomorphism",
+     "why_needed": "Expresses the promise that encoded basis images induce an automorphism."
+    },
+    {
+     "closest_existing_considered": "No existing predicate traverses this problem-specific equation syntax.",
+     "name": "HasAutomorphicTwists",
+     "why_needed": "States that all variable-occurrence twists in an encoded equation satisfy the automorphism promise."
+    },
+    {
+     "closest_existing_considered": "`FreeGroup.lift` performs the underlying evaluation but needs the problem-specific letter interpretation.",
+     "name": "equationValue",
+     "why_needed": "Gives the semantic substitution of indexed unknowns followed by their occurrence-specific automorphisms."
+    },
+    {
+     "closest_existing_considered": "No existing Mathlib predicate states solubility for this twisted equation syntax.",
+     "name": "IsSoluble",
+     "why_needed": "Defines existence of a variable assignment making the encoded equation equal to the identity."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.26».parts.b": "/--\nDoes there exist an algorithm deciding whether an equation\n$w(x_{i_1}^{\\varphi_1},\\ldots,x_{i_n}^{\\varphi_n})=1$ is soluble in a free\ngroup, where every $\\varphi_j$ is an automorphism of that group?\n\nHere a twist is encoded by the images of a standard free basis, and repeated\nindices make occurrences depend on the same unknown $x_i$. Constants are\nallowed and are written as signed basis letters. Correctness is required on\ninputs whose twist data induce automorphisms. The source does not say whether\nthe rank is fixed or belongs to the input; this formulation asks for an\nalgorithm for each fixed finite rank.\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«10.26».parts.b : answer(sorry) ↔\n    ∀ d : ℕ, ∃ decide : Equation d → Bool, Computable decide ∧\n      ∀ e : Equation d, HasAutomorphicTwists e →\n        ((decide e : Prop) ↔ IsSoluble e) := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 10.26\n\nby G. S. Makanin\n\nThis file formalises part b), the only part of the problem stated in the cited edition of\nthe notebook:\n\nDoes there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group,\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nHere $F$ is a free group of finite rank $r$ with free basis $a_1, \\ldots, a_r$, the\n$x_i$ are unknowns ranging over $F$, and $x^{\\varphi}$ denotes the image of $x$ under\nthe automorphism $\\varphi$. The word $w$ is a word in the letters\n$y_1, \\ldots, y_n$ and in constants from $F$ (as in Makanin's setting of equations with\nconstants; without constants every such equation has the trivial solution\n$x_1 = \\cdots = x_m = 1$), and the letter $y_j$ is replaced by $x_{i_j}^{\\varphi_j}$.\nThe same unknown $x_i$ may appear several times with different twists\n$\\varphi_j$. Thus an equation of the given form is the same thing as a word in the\nconstants $a_k^{\\pm 1}$ and in twisted unknowns $(x_i^{\\varphi})^{\\pm 1}$, and this is how\nsuch an equation is encoded below (`TwistedEquation`). The automorphisms $\\varphi_j$ are\nspecified by the images of the free basis (`TwistedUnknown.twist`, `twistHom`).\n\nThe source does not say whether the rank of the free group is fixed or is part of the\ninput of the algorithm. We formalise the reading in which the free group $F$ is fixed\n(the algorithm may depend on the rank $r$); the answer is required for every finite\nrank $r$. The requirement that the $\\varphi_j$ be automorphisms is formalised as a\npromise: the algorithm must answer correctly on every input all of whose twists are\nautomorphisms.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«10.26»\n\n/-- The endomorphism of the free group $F_r$ on the basis `Fin r` determined by prescribing\nthe images `φ a` of the basis elements `a`, each given as a word (a list of letters\nwith exponent signs, as in `FreeGroup.mk`). -/\ndef twistHom {r : ℕ} (φ : Fin r → List (Fin r × Bool)) :\n    FreeGroup (Fin r) →* FreeGroup (Fin r) :=\n  FreeGroup.lift fun a => FreeGroup.mk (φ a)\n\n/-- A twisted unknown $x_i^{\\varphi}$ of an equation over the free group $F_r$: the index $i$ of\nthe unknown $x_i$ together with a description of the endomorphism $\\varphi$ of $F_r$ by the\nimages of the basis elements. -/\nstructure TwistedUnknown (r : ℕ) where\n  /-- The index $i$ of the unknown $x_i$. -/\n  index : ℕ\n  /-- The images of the basis elements $a_1, \\ldots, a_r$ under $\\varphi$, as words. -/\n  twist : Fin r → List (Fin r × Bool)\n\ninstance {r : ℕ} : Primcodable (TwistedUnknown r) :=\n  .ofEquiv (ℕ × (Fin r → List (Fin r × Bool)))\n    { toFun := fun u => (u.index, u.twist)\n      invFun := fun p => ⟨p.1, p.2⟩\n      left_inv := fun _ => rfl\n      right_inv := fun _ => rfl }\n\n/-- The endomorphism $\\varphi$ of $F_r$ attached to a twisted unknown $x_i^{\\varphi}$. -/\ndef TwistedUnknown.hom {r : ℕ} (u : TwistedUnknown r) :\n    FreeGroup (Fin r) →* FreeGroup (Fin r) :=\n  twistHom u.twist\n\n/-- A letter of an equation over $F_r$: either a constant, namely a basis element $a_k$ of $F_r$\n(`Sum.inl k`), or a twisted unknown $x_i^{\\varphi}$ (`Sum.inr`). -/\nabbrev Letter (r : ℕ) := Fin r ⊕ TwistedUnknown r\n\n/-- An equation $w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ over the free group $F_r$,\nencoded as the word $w$ in the constants $a_k^{\\pm 1}$ and the twisted unknowns\n$(x_i^{\\varphi})^{\\pm 1}$ (a list of letters with exponent signs, as in `FreeGroup.mk`). -/\nabbrev TwistedEquation (r : ℕ) := List (Letter r × Bool)\n\n/-- The value $w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) \\in F_r$ of the left-hand side\nof the equation `w` at the assignment `x` of values in $F_r$ to the unknowns: each constant\n$a_k$ is sent to itself and each twisted unknown $x_i^{\\varphi}$ is sent to $\\varphi(x_i)$. -/\ndef TwistedEquation.eval {r : ℕ} (w : TwistedEquation r) (x : ℕ → FreeGroup (Fin r)) :\n    FreeGroup (Fin r) :=\n  FreeGroup.lift (Sum.elim FreeGroup.of fun u : TwistedUnknown r => u.hom (x u.index))\n    (FreeGroup.mk w)\n\n/-- The equation `w` is soluble in $F_r$: there are values $x_i \\in F_r$ of the unknowns with\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$. -/\ndef TwistedEquation.IsSoluble {r : ℕ} (w : TwistedEquation r) : Prop :=\n  ∃ x : ℕ → FreeGroup (Fin r), w.eval x = 1\n\n/-- Every twist $\\varphi$ occurring in the equation `w` is an automorphism of $F_r$, i.e. the\nendomorphism determined by the prescribed images of the basis is bijective. -/\ndef TwistedEquation.IsTwistedByAutomorphisms {r : ℕ} (w : TwistedEquation r) : Prop :=\n  ∀ l ∈ w, ∀ u : TwistedUnknown r, l.1 = Sum.inr u → Function.Bijective u.hom\n\n/--\nDoes there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group,\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nFormally: is it true that for every finite rank $r$ there is a computable function\n`f : TwistedEquation r → Bool` such that, for every equation\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ over the free group $F_r$ all of whose\ntwists $\\varphi_j$ (given by the images of a free basis) are automorphisms of $F_r$,\n`f w = true` if and only if the equation has a solution $x_1, \\ldots, x_m \\in F_r$?\n\nThe word $w$ may contain constants from $F_r$, and the same unknown $x_i$ may occur several\ntimes under different twists. The free group is fixed: the algorithm may depend on the rank $r$.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«10.26».parts.b : answer(sorry) ↔\n    ∀ r : ℕ, ∃ f : TwistedEquation r → Bool, Computable f ∧\n      ∀ w : TwistedEquation r, w.IsTwistedByAutomorphisms → (f w = true ↔ w.IsSoluble) := by\n  sorry\n\n/-- The description of the identity automorphism of $F_r$ by the images of the basis. -/\ndef idTwist (r : ℕ) : Fin r → List (Fin r × Bool) := fun a => [(a, true)]\n\n/-- The identity twist determines the identity endomorphism. -/\n@[category API, AMS 3 20]\ntheorem twistHom_idTwist (r : ℕ) : twistHom (idTwist r) = MonoidHom.id (FreeGroup (Fin r)) :=\n  FreeGroup.lift_of_eq_id (Fin r)\n\n/-- The identity twist is an automorphism. -/\n@[category API, AMS 3 20]\ntheorem bijective_twistHom_idTwist (r : ℕ) : Function.Bijective (twistHom (idTwist r)) := by\n  rw [twistHom_idTwist]\n  exact Function.bijective_id\n\n/-- An equation without constants is always soluble, by the trivial solution $x_i = 1$. -/\n@[category API, AMS 3 20]\ntheorem TwistedEquation.isSoluble_of_forall_isRight {r : ℕ} (w : TwistedEquation r)\n    (hw : ∀ l ∈ w, l.1.isRight) : w.IsSoluble := by\n  refine ⟨fun _ => 1, ?_⟩\n  rw [TwistedEquation.eval, FreeGroup.lift_mk]\n  refine List.prod_eq_one fun y hy => ?_\n  obtain ⟨⟨l, b⟩, hl, rfl⟩ := List.mem_map.mp hy\n  obtain ⟨u, hu⟩ := Sum.isRight_iff.mp (hw _ hl)\n  simp only at hu\n  subst hu\n  cases b <;> simp\n\n/-- The equation $x_0 a_0^{-1} = 1$ (with the identity twist) over $F_1$ is soluble. -/\n@[category test, AMS 3 20]\ntheorem isSoluble_example :\n    TwistedEquation.IsSoluble (r := 1)\n      [(Sum.inr ⟨0, idTwist 1⟩, true), (Sum.inl 0, false)] := by\n  refine ⟨fun _ => FreeGroup.of 0, ?_⟩\n  simp [TwistedEquation.eval, FreeGroup.lift_mk, TwistedUnknown.hom, twistHom_idTwist]\n\n/-- The equation $a_0 = 1$ over $F_1$ has no solution. -/\n@[category test, AMS 3 20]\ntheorem not_isSoluble_example :\n    ¬ TwistedEquation.IsSoluble (r := 1) [(Sum.inl 0, true)] := by\n  rintro ⟨x, hx⟩\n  simp [TwistedEquation.eval, FreeGroup.lift_mk] at hx\n\nend Kourovka.«10.26»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None. The single slot matches the sole lettered part b) of the source statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Rank fixed vs. input: the source says 'in a free group'; I fix the free group F_r and require an algorithm for every finite rank r (`∀ r, ∃ f, Computable f ∧ …`), so the algorithm may depend on r. The uniform-in-r reading (rank as part of the input) is stronger; both readings agree unless the problem is decidable for each fixed rank but not uniformly. Recorded in the module and theorem docstrings.",
+    "Constants: the word w may contain constants from F_r (basis letters a_k^{±1}, which generate F_r), as in Makanin's setting; without constants every such equation has the trivial solution x_i = 1 (proved as API lemma `isSoluble_of_forall_isRight`).",
+    "Encoding of the equation: instead of a word in letters y_1..y_n plus an index map i_j and a list of automorphisms φ_j (which would need a Primcodable Sigma type that Mathlib lacks), an equation is a word over the alphabet {constants a_k} ∪ {twisted unknowns x_i^φ}, each occurrence carrying its unknown index i ∈ ℕ and its twist φ. This is exactly the same set of equations (a letter y_j is determined by (i_j, φ_j)); the same unknown may occur under different twists.",
+    "Automorphisms are specified by the images of the free basis, as words `Fin r → List (Fin r × Bool)`, inducing an endomorphism via `FreeGroup.lift`; 'automorphism' is formalised as `Function.Bijective` of that endomorphism. x^φ is interpreted as φ(x).",
+    "Promise formulation: the requirement that the φ_j be automorphisms is a hypothesis on the inputs on which the computable f must be correct (`w.IsTwistedByAutomorphisms → (f w = true ↔ w.IsSoluble)`), rather than folding it into a `ComputablePred (IsTwistedByAutomorphisms ∧ IsSoluble)`. The latter would be equivalent only via the (true but external) decidability of whether basis images define an automorphism; the promise form is self-contained.",
+    "Unknowns are indexed by ℕ and a solution is an assignment `x : ℕ → FreeGroup (Fin r)`; since only finitely many indices occur in w this is equivalent to a finite tuple x_1..x_m.",
+    "'Computable' is with respect to Mathlib's standard `Primcodable` encodings of lists/products/sums/Fin/ℕ/finite function types (the `TwistedUnknown` instance is transported from `ℕ × (Fin r → List (Fin r × Bool))` via `Primcodable.ofEquiv`)."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "FreeGroup.lift (used in the definition); MulAut (FreeGroup _) / MulEquiv have no Primcodable instance so cannot be algorithm inputs directly.",
+     "name": "Kourovka.«10.26».twistHom",
+     "why_needed": "The endomorphism of FreeGroup (Fin r) determined by prescribed images (as words) of the basis; needed to describe automorphisms by finite data that is Primcodable."
+    },
+    {
+     "closest_existing_considered": "Plain product type ℕ × (Fin r → List (Fin r × Bool)); a structure was preferred for readability, following the BranchingVAS precedent in the repo.",
+     "name": "Kourovka.«10.26».TwistedUnknown (with Primcodable instance) and TwistedUnknown.hom",
+     "why_needed": "A twisted unknown x_i^φ: the index i together with the basis-image description of φ; the instance is transported by Primcodable.ofEquiv from ℕ × (Fin r → List (Fin r × Bool))."
+    },
+    {
+     "closest_existing_considered": "FreeGroup (Fin r ⊕ TwistedUnknown r) has no Primcodable instance; Mathlib lacks Primcodable for Sigma types so the n-letter-word-plus-index-map presentation was not encodable directly.",
+     "name": "Kourovka.«10.26».Letter and Kourovka.«10.26».TwistedEquation",
+     "why_needed": "Alphabet (basis constants ⊕ twisted unknowns) and words over it with exponent signs, i.e. the encoded input of the algorithm."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.lift / FreeGroup.mk (used); ComputablePred (not used, see modeling decisions).",
+     "name": "Kourovka.«10.26».TwistedEquation.eval, TwistedEquation.IsSoluble, TwistedEquation.IsTwistedByAutomorphisms",
+     "why_needed": "Value of w(x_{i_1}^{φ_1},…,x_{i_n}^{φ_n}) at an assignment of the unknowns (via FreeGroup.lift on FreeGroup.mk w), existence of a solution, and the promise that all twists are automorphisms (bijective)."
+    },
+    {
+     "closest_existing_considered": "FreeGroup.of / MonoidHom.id (related by the API lemma twistHom_idTwist).",
+     "name": "Kourovka.«10.26».idTwist",
+     "why_needed": "Basis-image description of the identity automorphism, used only in API/test lemmas."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«10.26».parts.b": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as: for every finite rank r there is a computable f : TwistedEquation r → Bool such that for every twisted equation over F_r all of whose twists are automorphisms, f w = true ↔ the equation w(x_{i_1}^{φ_1},…,x_{i_n}^{φ_n}) = 1 has a solution in F_r. Existing primitives (FreeGroup, FreeGroup.lift, Computable, Primcodable) suffice for the semantics, but bespoke encodings of twisted equations were needed because Mathlib has no Primcodable instance for FreeGroup, for automorphism groups, or for Sigma types."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«10.26».parts.b": "/--\nDoes there exist an algorithm which decides whether the equation of the form\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ is soluble in a free group,\nwhere $\\varphi_1, \\ldots, \\varphi_n$ are automorphisms of this group?\n\nFormally: is it true that for every finite rank $r$ there is a computable function\n`f : TwistedEquation r → Bool` such that, for every equation\n$w(x_{i_1}^{\\varphi_1}, \\ldots, x_{i_n}^{\\varphi_n}) = 1$ over the free group $F_r$ all of whose\ntwists $\\varphi_j$ (given by the images of a free basis) are automorphisms of $F_r$,\n`f w = true` if and only if the equation has a solution $x_1, \\ldots, x_m \\in F_r$?\n\nThe word $w$ may contain constants from $F_r$, and the same unknown $x_i$ may occur several\ntimes under different twists. The free group is fixed: the algorithm may depend on the rank $r$.\n-/\n@[category research open, AMS 3 20]\ntheorem kourovka.«10.26».parts.b : answer(sorry) ↔\n    ∀ r : ℕ, ∃ f : TwistedEquation r → Bool, Computable f ∧\n      ∀ w : TwistedEquation r, w.IsTwistedByAutomorphisms → (f w = true ↔ w.IsSoluble) := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«10.26».parts.b": "c01"
+ },
+ "id": "kourovka-10.26",
+ "main_attempt": "c01"
+}

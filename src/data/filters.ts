@@ -6,6 +6,7 @@ export type DefsFilter = "any" | "none" | "some";
 
 export interface ListState {
   q: string;
+  source: string | null;
   area: string | null;
   subarea: string | null;
   hideFc: boolean;
@@ -18,7 +19,7 @@ export interface ListState {
   defs: DefsFilter;
 }
 
-// everything in the filter row (not area, search or sort)
+// everything in the filter row (not source/area, search or sort)
 export const NO_FILTERS = {
   confMin: null,
   confMax: null,
@@ -28,7 +29,7 @@ export const NO_FILTERS = {
   hideFc: false,
 };
 
-export const DEFAULT_STATE: ListState = { q: "", area: null, subarea: null, sort: "area", ...NO_FILTERS };
+export const DEFAULT_STATE: ListState = { q: "", source: null, area: null, subarea: null, sort: "area", ...NO_FILTERS };
 
 // thresholds offered for the length filter (lines); the data's own values are used for confidence
 export const LINE_STEPS = [50, 75, 100, 150, 200, 300, 500];
@@ -43,6 +44,7 @@ export function parseState(params: URLSearchParams): ListState {
   const defs = params.get("defs");
   return {
     q: params.get("q") ?? "",
+    source: params.get("src"),
     area: params.get("area"),
     subarea: params.get("sub"),
     hideFc: params.get("fc") === "hide",
@@ -58,6 +60,7 @@ export function parseState(params: URLSearchParams): ListState {
 export function serializeState(state: ListState): URLSearchParams {
   const p = new URLSearchParams();
   if (state.q) p.set("q", state.q);
+  if (state.source) p.set("src", state.source);
   if (state.area) p.set("area", state.area);
   if (state.subarea) p.set("sub", state.subarea);
   if (state.hideFc) p.set("fc", "hide");
@@ -95,8 +98,13 @@ export function median(values: number[]): number | null {
 export function fold(text: string): string {
   return text
     .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase();
+}
+
+// "Conjecture 1.9" sorts before "Conjecture 1.10"; "Issue 2" before "Issue 10"
+export function compareNatural(a: string, b: string): number {
+  return fold(a).localeCompare(fold(b), "en", { numeric: true });
 }
 
 export function matchesQuery(entry: IndexEntry, q: string): boolean {
@@ -111,6 +119,7 @@ export function applyFilters(
   fc: FcStatus | null,
 ): IndexEntry[] {
   let out = entries;
+  if (state.source) out = out.filter((e) => e.source === state.source);
   if (state.area) out = out.filter((e) => e.area === state.area);
   if (state.subarea) out = out.filter((e) => e.subarea === state.subarea);
   if (state.hideFc && fc) out = out.filter((e) => !fc.entries[e.id]);
@@ -122,17 +131,11 @@ export function applyFilters(
   if (state.defs === "none") out = out.filter((e) => e.counts.defs === 0);
   if (state.defs === "some") out = out.filter((e) => e.counts.defs > 0);
   if (state.q) out = out.filter((e) => matchesQuery(e, state.q));
-  const byTitle = (a: IndexEntry, b: IndexEntry) => fold(a.title).localeCompare(fold(b.title)) || a.id.localeCompare(b.id);
   if (state.sort === "title") {
-    out = [...out].sort(byTitle);
-  } else {
-    out = [...out].sort(
-      (a, b) =>
-        a.area.localeCompare(b.area) ||
-        (a.subarea ?? "").localeCompare(b.subarea ?? "") ||
-        byTitle(a, b),
-    );
+    out = [...out].sort((a, b) => compareNatural(a.title, b.title) || a.id.localeCompare(b.id));
   }
+  // "by area" is the exporter's order: source, then area, subarea and title
+  // with numbers compared as numbers (index.json is written that way)
   return out;
 }
 

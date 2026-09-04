@@ -1,0 +1,372 @@
+{
+ "attempts": [
+  {
+   "bailed": false,
+   "cid": "c01",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.16\n\nby Sh. S. Kemkhadze\n\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n\nThe class of $\\overline{Z}$-groups is one of Kurosh's classes of generalized nilpotent\ngroups, defined via normal, invariant and central systems of subgroups\n(A. G. Kurosh, *The Theory of Groups*, Vol. II, Chapter XV).\n\n* A *normal system* of a group $G$ is a set of subgroups of $G$ that contains $1$ and $G$,\n  is linearly ordered by inclusion, is complete (it contains the union and the intersection\n  of each of its subsets), and is such that $A$ is normal in $B$ for every *jump*\n  $A \\subset B$ of the system (two members with no member strictly between them).\n* An *invariant system* is a normal system all of whose members are normal in $G$.\n* A *central system* is an invariant system in which the factor $B/A$ of every jump\n  $A \\subset B$ lies in the centre of $G/A$, i.e. $[B, G] \\le A$.\n* $G$ is a *$Z$-group* if it has a central system, and a *$\\overline{Z}$-group* if every\n  invariant system of $G$ can be refined to a central system, i.e. is contained in some\n  central system of $G$.\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 8.16\n* A. G. Kurosh, *The Theory of Groups*, Vol. II, Chelsea, 1960, Chapter XV\n  (generalized nilpotent groups)\n-/\n\nnamespace Kourovka.«8.16»\n\nvariable {G : Type*} [Group G]\n\n/-- A pair of subgroups $A < B$ is a *jump* of a set $S$ of subgroups if both belong to $S$\nand no member of $S$ lies strictly between them. -/\ndef IsJump (S : Set (Subgroup G)) (A B : Subgroup G) : Prop :=\n  A ∈ S ∧ B ∈ S ∧ A < B ∧ ∀ C ∈ S, ¬ (A < C ∧ C < B)\n\n/-- A *normal system* of $G$ (Kurosh) is a set of subgroups of $G$ containing $1$ and $G$,\nlinearly ordered by inclusion, complete (closed under unions and intersections of arbitrary\nsubsets), and such that $A$ is a normal subgroup of $B$ for every jump $A < B$. -/\nstructure IsNormalSystem (S : Set (Subgroup G)) : Prop where\n  bot_mem : ⊥ ∈ S\n  top_mem : ⊤ ∈ S\n  isChain : IsChain (· ≤ ·) S\n  sSup_mem : ∀ T ⊆ S, sSup T ∈ S\n  sInf_mem : ∀ T ⊆ S, sInf T ∈ S\n  normal_of_isJump : ∀ A B, IsJump S A B → (A.subgroupOf B).Normal\n\n/-- An *invariant system* of $G$ (Kurosh) is a normal system all of whose members are normal\nsubgroups of $G$. -/\nstructure IsInvariantSystem (S : Set (Subgroup G)) : Prop extends IsNormalSystem S where\n  normal_of_mem : ∀ A ∈ S, A.Normal\n\n/-- A *central system* of $G$ (Kurosh) is an invariant system such that for every jump\n$A < B$ the factor $B/A$ lies in the centre of $G/A$, i.e. $[B, G] \\le A$. -/\nstructure IsCentralSystem (S : Set (Subgroup G)) : Prop extends IsInvariantSystem S where\n  commutator_le_of_isJump : ∀ A B, IsJump S A B → ⁅B, (⊤ : Subgroup G)⁆ ≤ A\n\n/-- A group is a *$Z$-group* in the sense of Kurosh if it possesses a central system.\nThis is unrelated to Mathlib's `IsZGroup` (finite groups with cyclic Sylow subgroups). -/\ndef IsZGroupKurosh (G : Type*) [Group G] : Prop :=\n  ∃ S : Set (Subgroup G), IsCentralSystem S\n\n/-- A group is a *$\\overline{Z}$-group* (Kurosh) if every invariant system of $G$ can be\nrefined to a central system, i.e. is contained in some central system of $G$. -/\ndef IsZBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ S : Set (Subgroup G), IsInvariantSystem S →\n    ∃ S' : Set (Subgroup G), IsCentralSystem S' ∧ S ⊆ S'\n\n/-- The system $\\{1, G\\}$ is an invariant system of $G$. -/\n@[category API, AMS 20]\ntheorem isInvariantSystem_pair_bot_top : IsInvariantSystem ({⊥, ⊤} : Set (Subgroup G)) where\n  bot_mem := by simp\n  top_mem := by simp\n  isChain := IsChain.pair bot_le\n  sSup_mem T hT := by\n    by_cases h : ⊤ ∈ T\n    · exact Or.inr (top_unique (le_sSup h))\n    · refine Or.inl (le_bot_iff.mp (sSup_le fun x hx => ?_))\n      rcases hT hx with rfl | rfl\n      · exact le_rfl\n      · exact absurd hx h\n  sInf_mem T hT := by\n    by_cases h : ⊥ ∈ T\n    · exact Or.inl (le_bot_iff.mp (sInf_le h))\n    · refine Or.inr (top_unique (le_sInf fun x hx => ?_))\n      rcases hT hx with rfl | rfl\n      · exact absurd hx h\n      · exact le_rfl\n  normal_of_isJump A B hAB := by\n    obtain ⟨hA, -, hlt, -⟩ := hAB\n    rcases hA with rfl | rfl\n    · rw [Subgroup.bot_subgroupOf]\n      infer_instance\n    · exact absurd hlt not_top_lt\n  normal_of_mem A hA := by\n    rcases hA with rfl | rfl <;> infer_instance\n\n/-- Every $\\overline{Z}$-group is a $Z$-group. -/\n@[category API, AMS 20]\ntheorem IsZBarGroup.isZGroupKurosh (h : IsZBarGroup G) : IsZGroupKurosh G :=\n  let ⟨S, hS, _⟩ := h _ isInvariantSystem_pair_bot_top\n  ⟨S, hS⟩\n\n/-- Every abelian group is a $\\overline{Z}$-group: each of its invariant systems is already\ncentral. -/\n@[category test, AMS 20]\ntheorem isZBarGroup_of_commGroup {G : Type*} [CommGroup G] : IsZBarGroup G := fun S hS =>\n  ⟨S, { toIsInvariantSystem := hS\n        commutator_le_of_isJump := fun A _ _ => Subgroup.commutator_le.mpr fun b _ g _ => by\n          rw [commutatorElement_eq_one_iff_mul_comm.mpr (mul_comm b g)]\n          exact A.one_mem }, subset_rfl⟩\n\n/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n\nThat is, if $G$ is a $\\overline{Z}$-group and $N$ is a normal subgroup of $G$, is $N$\nnecessarily a $\\overline{Z}$-group?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G → ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry\n\nend Kourovka.«8.16»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.7,
+   "decomposition_objections": "None. The single-slot decomposition and the suggested shape `answer(sorry) ↔ ∀ G [Group G], Z̄ G → ∀ N ⊴ G, Z̄ N` match the statement.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Z̄-group is formalized as Kurosh's class: every invariant system (complete chain of normal subgroups of G containing 1 and G) can be refined to (is contained in) a central system. The Kurosh/Kurosh–Chernikov sources were not available offline; the definition was reconstructed from memory of Kurosh, Theory of Groups Vol. II, Ch. XV, and of the parallel 'bar' classes (RN̄, RĪ). Reviewer should confirm against Kurosh's text. Note that the equivalent-looking alternatives 'every normal subgroup of G is a member of some central system' and 'between any two normal subgroups A < B of G there is a central system' define the same class, so the formalization is robust to that phrasing; the reading 'every *normal* (rather than invariant) system refines to a central system' was rejected because it would exclude finite nilpotent groups such as D_8.",
+    "Kurosh's 'normal system' is formalized as in Robinson's notion of a 'series': a set S of subgroups with ⊥, ⊤ ∈ S, `IsChain (· ≤ ·) S`, completeness (`sSup T ∈ S` and `sInf T ∈ S` for all T ⊆ S; for chains of subgroups sSup is the set-theoretic union, and T = ∅ only reproduces ⊥, ⊤ ∈ S), and `(A.subgroupOf B).Normal` for every jump (A, B) (members A < B of S with no member strictly between).",
+    "The centrality condition 'B/A lies in the centre of G/A' for a jump (A, B) is stated as `⁅B, (⊤ : Subgroup G)⁆ ≤ A` (equivalent by `Subgroup.commutator_le`). `IsCentralSystem` extends `IsInvariantSystem`, as in Kurosh; the normality conditions are in fact implied by the centrality condition, so the redundancy is harmless.",
+    "Refinement is formalized as set inclusion S ⊆ S' of the systems.",
+    "Groups are quantified over `Type` (universe 0) after `answer(sorry)`, following the convention of the existing Kourovka files (e.g. 1_40.lean).",
+    "The file also contains three short proved API/test statements (`{⊥, ⊤}` is an invariant system; every Z̄-group is a Z-group; every abelian group is a Z̄-group) to exercise the bespoke definitions, as CONTRIBUTING.md recommends."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "`CovBy` (⋖) in Mathlib is covering in the whole lattice `Subgroup G`, not relative to a given set of subgroups; `IsChain`/`Flag` do not provide jumps.",
+     "name": "Kourovka.«8.16».IsJump",
+     "why_needed": "A jump (A, B) of a set of subgroups (members A < B with no member strictly between) is the basic notion in Kurosh's definition of normal/central systems; no such notion exists in Mathlib or the repo."
+    },
+    {
+     "closest_existing_considered": "`CompositionSeries`/`RelSeries` (finite, indexed), `Flag` (maximal chains, no normality), `IsChain` (only the chain condition).",
+     "name": "Kourovka.«8.16».IsNormalSystem",
+     "why_needed": "Kurosh's normal system (Robinson's 'series'): complete chain of subgroups containing 1 and G with A normal in B at each jump. Not in Mathlib."
+    },
+    {
+     "closest_existing_considered": "None in Mathlib beyond `Subgroup.Normal` for a single subgroup.",
+     "name": "Kourovka.«8.16».IsInvariantSystem",
+     "why_needed": "Kurosh's invariant system: a normal system all of whose members are normal in G; the systems quantified over in the definition of Z̄-group."
+    },
+    {
+     "closest_existing_considered": "`upperCentralSeries`/`lowerCentralSeries` in Mathlib.GroupTheory.Nilpotent are only the finite (ℕ-indexed) series; `Group.IsNilpotent` is too strong.",
+     "name": "Kourovka.«8.16».IsCentralSystem",
+     "why_needed": "Kurosh's central system: invariant system with [B, G] ≤ A at each jump; needed to define Z- and Z̄-groups."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `IsZGroup` (all Sylow subgroups cyclic) — a different notion; `Group.IsNilpotent` — too strong.",
+     "name": "Kourovka.«8.16».IsZGroupKurosh",
+     "why_needed": "Kurosh's Z-group (has a central system); used in the API lemma showing every Z̄-group is a Z-group. Named to avoid clashing with Mathlib's unrelated `IsZGroup`."
+    },
+    {
+     "closest_existing_considered": "`Group.IsNilpotent`, Mathlib's `IsZGroup`; neither is the class in question.",
+     "name": "Kourovka.«8.16».IsZBarGroup",
+     "why_needed": "The Z̄-groups of Kurosh (every invariant system can be refined to a central system) are the subject of the problem and are not defined in Mathlib or the repo."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.16»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type) [Group G], IsZBarGroup G → ∀ N : Subgroup G, N.Normal → IsZBarGroup N`, i.e. `answer(True)` means the class of Z̄-groups is closed under normal subgroups. The Z̄-group notion (Kurosh) does not exist in Mathlib/the repo (Mathlib's `IsZGroup` is the unrelated cyclic-Sylow notion), so Kurosh's definitions of jump, normal system, invariant system, central system, Z-group and Z̄-group were supplied in the problem file."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.16»": "/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n\nThat is, if $G$ is a $\\overline{Z}$-group and $N$ is a normal subgroup of $G$, is $N$\nnecessarily a $\\overline{Z}$-group?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G → ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c02",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.16\n\nby Sh. S. Kemkhadze\n\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n\nHere a $\\overline{Z}$-group is one of the classes of generalized nilpotent groups introduced by\nKurosh and Chernikov: a group $G$ is a $\\overline{Z}$-group if every non-trivial normal subgroup\nof $G$ has non-trivial intersection with the centre of $G$. Every $ZA$-group (hypercentral group)\nis a $\\overline{Z}$-group, but the class of $\\overline{Z}$-groups is not closed under taking\nsubgroups or factor groups; the problem asks about normal subgroups.\n\n*References:*\n- [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n- A. G. Kurosh, *The Theory of Groups*, Vol. II, Chapter XV (Generalized nilpotent groups)\n-/\n\nnamespace Kourovka.«8.16»\n\n/-- A group $G$ is a $\\overline{Z}$-group (in the sense of Kurosh and Chernikov) if every\nnon-trivial normal subgroup of $G$ has non-trivial intersection with the centre of $G$. -/\ndef IsZBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ N : Subgroup G, N.Normal → N ≠ ⊥ → N ⊓ Subgroup.center G ≠ ⊥\n\n/-- Every commutative group is a $\\overline{Z}$-group. -/\n@[category API, AMS 20]\ntheorem IsZBarGroup.of_commGroup (G : Type*) [CommGroup G] : IsZBarGroup G := by\n  intro N _ hN\n  rwa [CommGroup.center_eq_top, inf_top_eq]\n\n/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n\nThat is, if $G$ is a $\\overline{Z}$-group (every non-trivial normal subgroup of $G$ meets the\ncentre of $G$ non-trivially) and $N$ is a normal subgroup of $G$, is $N$ itself a\n$\\overline{Z}$-group?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry\n\nend Kourovka.«8.16»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.8,
+   "decomposition_objections": "None as to the slot structure (single yes/no question, one declaration). Minor: the note describes Z̄-groups as 'defined via central systems'; in Kurosh's terminology the groups with a central system are the Z-groups (which are closed under all subgroups, making the question trivial), whereas the Z̄-groups are the groups in which every non-trivial normal subgroup meets the centre non-trivially. I formalized the latter.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The definition of Z̄-group is not given in the notebook; it is taken from the Kurosh–Chernikov classification of generalized nilpotent groups (Kurosh, Theory of Groups, vol. II, ch. XV, and Kemkhadze's papers): G is a Z̄-group iff every non-trivial normal subgroup of G has non-trivial intersection with the centre of G. This is the class that contains all ZA-(hypercentral) groups, is not closed under subgroups or quotients, and for which closure under normal subgroups is a genuine question (for finite groups it holds by a Clifford-type argument; the infinite case is what is asked). A reviewer with access to Kurosh's book should confirm this is the intended definition; the decomposition note's phrase 'defined via central systems' describes Kurosh's Z-groups (groups with a central system), a class which is closed under all subgroups, so it cannot be the intended reading of 8.16.",
+    "'Non-trivial intersection with the centre' is encoded as `N ⊓ Subgroup.center G ≠ ⊥` and 'non-trivial normal subgroup' as `N.Normal → N ≠ ⊥`; the trivial group is vacuously a Z̄-group, matching the literature.",
+    "'Closed under taking normal subgroups' is read as: for every Z̄-group G and every normal subgroup N of G, the group N (with its induced group structure) is a Z̄-group. Groups are quantified over `Type`, following the other Kourovka files in the repository.",
+    "An extra proven `@[category API]` lemma (commutative groups are Z̄-groups) is added as a basic API test for the bespoke definition, as CONTRIBUTING.md requests for bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `IsZGroup` (finite groups with all Sylow subgroups cyclic — an unrelated notion despite the name), `Group.IsNilpotent`, `upperCentralSeries`, and `IsAscendingCentralSeries`/`IsDescendingCentralSeries` in Mathlib.GroupTheory.Nilpotent (finite-index-only central series; they capture nilpotency/ZA-type notions, not the Z̄ condition). None matches.",
+     "name": "Kourovka.«8.16».IsZBarGroup",
+     "why_needed": "The statement is about Kurosh–Chernikov's class of Z̄-groups (a generalized-nilpotent class from Kurosh, Theory of Groups vol. II, ch. XV): a group G is a Z̄-group if every non-trivial normal subgroup N of G satisfies N ∩ Z(G) ≠ 1. Neither Mathlib nor FormalConjecturesForMathlib has this notion. Formalized as `∀ N : Subgroup G, N.Normal → N ≠ ⊥ → N ⊓ Subgroup.center G ≠ ⊥`. One proven `category API` lemma (commutative groups are Z̄-groups) is included as a basic test."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.16»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type) [Group G], IsZBarGroup G → ∀ N : Subgroup G, N.Normal → IsZBarGroup N`, with all quantifiers after `answer(sorry)`; `answer(True)` is the positive answer (the class is closed under normal subgroups), `answer(False)` the negative one. The term Z̄-group is not in Mathlib or the repo, so a bespoke definition `IsZBarGroup` is supplied following Kurosh–Chernikov (Kurosh, Theory of Groups vol. II, ch. XV): every non-trivial normal subgroup meets the centre non-trivially."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.16»": "/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n\nThat is, if $G$ is a $\\overline{Z}$-group (every non-trivial normal subgroup of $G$ meets the\ncentre of $G$ non-trivially) and $N$ is a normal subgroup of $G$, is $N$ itself a\n$\\overline{Z}$-group?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c03",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.16\n\nby Sh. S. Kemkhadze\n\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\nHere a $\\overline{Z}$-group is a generalized nilpotent group in the sense of\nKurosh: it has a central system, namely a complete chain of normal subgroups\nwhose every jump is a central factor.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.16»\n\n/-- A central system in a group $G$ is a complete chain of normal subgroups\ncontaining $1$ and $G$ such that every jump $A < B$ is central: $[B,G] \\le A$.\nCompleteness is expressed by closure under arbitrary infima and suprema; in\nparticular, closure for the empty set forces the two endpoints to belong to\nthe system. -/\ndef IsCentralSystem {G : Type*} [Group G] (S : Set (Subgroup G)) : Prop :=\n  IsChain (· ≤ ·) S ∧\n    (∀ H ∈ S, H.Normal) ∧\n    (∀ T : Set (Subgroup G), T ⊆ S → sInf T ∈ S ∧ sSup T ∈ S) ∧\n    ∀ A ∈ S, ∀ B ∈ S, A < B →\n      (∀ C ∈ S, ¬(A < C ∧ C < B)) → ⁅B, (⊤ : Subgroup G)⁆ ≤ A\n\n/-- A $\\overline{Z}$-group (a generalized nilpotent group in the sense of\nKurosh) is a group admitting a central system. -/\ndef IsZBarGroup (G : Type*) [Group G] : Prop :=\n  ∃ S : Set (Subgroup G), IsCentralSystem S\n\n/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry\n\nend Kourovka.«8.16»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "A Kurosh central system is modeled as a complete chain S of normal subgroups, with completeness expressed by closure under arbitrary subgroup-lattice infima and suprema.",
+    "For each jump A < B in the chain, centrality of B/A in G/A is expressed as the subgroup-commutator inclusion ⁅B, ⊤⁆ ≤ A.",
+    "A normal subgroup is quantified as N : Subgroup G together with N.Normal, and the Z̄-group predicate is then applied to the abstract group N."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's IsAscendingCentralSeries, which is ℕ-indexed and therefore does not capture Kurosh's generalized central systems.",
+     "name": "Kourovka.«8.16».IsCentralSystem",
+     "why_needed": "Mathlib has finite natural-number-indexed central series but no Kurosh complete central systems with potentially non-well-ordered jumps."
+    },
+    {
+     "closest_existing_considered": "Group.IsNilpotent and IsAscendingCentralSeries; both capture only finite or ℕ-indexed central-series behavior, not existence of a complete central system.",
+     "name": "Kourovka.«8.16».IsZBarGroup",
+     "why_needed": "Neither Mathlib nor FormalConjecturesForMathlib defines Kurosh's class of generalized nilpotent Z̄-groups."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.16»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.16»": "/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c04",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.16\n\nby Sh. S. Kemkhadze\n\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n\nHere an $\\overline{Z}$-group is a generalized nilpotent group: a group admitting a complete\ncentral system of normal subgroups.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.16»\n\n/-- A complete normal system in a group is a chain of normal subgroups closed under arbitrary\ninfima and suprema. -/\ndef IsCompleteNormalSystem {G : Type*} [Group G] (𝒮 : Set (Subgroup G)) : Prop :=\n  IsChain (· ≤ ·) 𝒮 ∧\n    (∀ H ∈ 𝒮, H.Normal) ∧\n    ∀ 𝒯 : Set (Subgroup G), 𝒯 ⊆ 𝒮 → sInf 𝒯 ∈ 𝒮 ∧ sSup 𝒯 ∈ 𝒮\n\n/-- A central system is a complete normal system whose jump factors are central. Thus, if\n$A < B$ are consecutive members of the system, then $[B,G] \\leq A$, equivalently\n$B/A \\leq Z(G/A)$. -/\ndef IsCentralSystem {G : Type*} [Group G] (𝒮 : Set (Subgroup G)) : Prop :=\n  IsCompleteNormalSystem 𝒮 ∧\n    ∀ A ∈ 𝒮, ∀ B ∈ 𝒮, A < B →\n      (∀ C ∈ 𝒮, C ≤ A ∨ B ≤ C) → ⁅B, (⊤ : Subgroup G)⁆ ≤ A\n\n/-- An $\\overline{Z}$-group (generalized nilpotent group) is a group possessing a complete\ncentral system. -/\ndef IsZBarGroup (G : Type*) [Group G] : Prop :=\n  ∃ 𝒮 : Set (Subgroup G), IsCentralSystem 𝒮\n\n/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry\n\nend Kourovka.«8.16»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled a Kurosh complete normal system as a set of normal subgroups that is linearly ordered by inclusion and closed under arbitrary infima and suprema in the subgroup lattice; closure for the empty subfamily includes both the trivial and whole subgroups.",
+    "Modeled centrality of a jump A < B by the standard equivalent condition ⁅B, ⊤⁆ ≤ A, expressing B/A ≤ Z(G/A). The no-intermediate-member condition is stated as every system member C satisfying C ≤ A or B ≤ C.",
+    "Interpreted “closed under taking normal subgroups” as quantifying over every group G and every subgroup N with N.Normal, with the Z̄-group property on N using its induced group structure.",
+    "Used Mathlib subgroup commutators rather than quotient centers to avoid adding quotient-normality plumbing while preserving the exact central-factor condition."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's IsAscendingCentralSeries is indexed only by natural numbers and does not represent arbitrary complete chains.",
+     "name": "Kourovka.«8.16».IsCompleteNormalSystem",
+     "why_needed": "Kurosh's complete systems of normal subgroups are not represented in Mathlib or FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's IsAscendingCentralSeries handles successive natural-numbered terms, not jumps in an arbitrary complete normal system.",
+     "name": "Kourovka.«8.16».IsCentralSystem",
+     "why_needed": "The defining central-jump condition for a Kurosh central system is absent from Mathlib and FormalConjecturesForMathlib."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Group.IsNilpotent concerns finite nilpotency class, while Mathlib's IsZGroup is an unrelated predicate asserting cyclic Sylow subgroups.",
+     "name": "Kourovka.«8.16».IsZBarGroup",
+     "why_needed": "The problem's Z̄-group/generalized nilpotent predicate is absent from Mathlib and the repository."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.16»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.16»": "/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c05",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.16\n\nby Sh. S. Kemkhadze\n\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n\nThe class of $\\overline{Z}$-groups is one of Kurosh's classes of generalized nilpotent\ngroups, defined via systems of subgroups. A *system* of subgroups of a group $G$ is a set\nof subgroups of $G$ that contains $E$ and $G$, is linearly ordered by inclusion, and is\ncomplete (closed under unions and intersections of its subfamilies). A *jump* of the system\nis a pair $A \\subset B$ of members with no member strictly between them; $B/A$ is the\ncorresponding *factor* of the system. A system is *invariant* if all of its members are\nnormal in $G$, and it is *central* if it is invariant and every factor $B/A$ is central,\ni.e. $B/A \\subseteq Z(G/A)$, equivalently $[B, G] \\subseteq A$. A system $\\mathfrak{B}$\n*refines* a system $\\mathfrak{A}$ if $\\mathfrak{A} \\subseteq \\mathfrak{B}$.\n\nA group $G$ is a *$\\overline{Z}$-group* if every invariant system of $G$ can be refined to a\ncentral system of $G$. Groups with an ascending central series ($ZA$-groups, i.e.\nhypercentral groups) are $\\overline{Z}$-groups, and $\\overline{Z}$-groups are $Z$-groups\n(groups possessing a central system).\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46), Problem 8.16\n* A. G. Kurosh, *The Theory of Groups*, Vol. II, Chapter XV, § 62 (Generalized nilpotent\n  groups); the notions of normal, invariant and central systems and their refinements are\n  introduced in Chapter XIV, § 56.\n-/\n\nnamespace Kourovka.«8.16»\n\nvariable {G : Type*} [Group G]\n\n/-- An *invariant system* of a group $G$ (Kurosh): a set $\\mathfrak{A}$ of normal subgroups\nof $G$ that contains the trivial subgroup and $G$, is linearly ordered by inclusion, and is\ncomplete, i.e. contains the union and the intersection of every nonempty subfamily. -/\nstructure IsInvariantSystem (𝒜 : Set (Subgroup G)) : Prop where\n  normal : ∀ A ∈ 𝒜, A.Normal\n  bot_mem : ⊥ ∈ 𝒜\n  top_mem : ⊤ ∈ 𝒜\n  isChain : IsChain (· ≤ ·) 𝒜\n  sSup_mem : ∀ S ⊆ 𝒜, S.Nonempty → sSup S ∈ 𝒜\n  sInf_mem : ∀ S ⊆ 𝒜, S.Nonempty → sInf S ∈ 𝒜\n\n/-- The pair $A \\subset B$ is a *jump* of the system $\\mathfrak{A}$: both are members of\n$\\mathfrak{A}$, $A$ is properly contained in $B$, and no member of $\\mathfrak{A}$ lies\nstrictly between them. The quotient $B/A$ is the corresponding *factor* of the system. -/\ndef IsJump (𝒜 : Set (Subgroup G)) (A B : Subgroup G) : Prop :=\n  A ∈ 𝒜 ∧ B ∈ 𝒜 ∧ A < B ∧ ∀ C ∈ 𝒜, ¬ (A < C ∧ C < B)\n\n/-- A *central system* of a group $G$ (Kurosh): an invariant system all of whose factors are\ncentral, i.e. for every jump $A \\subset B$ the factor $B/A$ lies in the centre of $G/A$,\nequivalently $[B, G] \\subseteq A$. -/\nstructure IsCentralSystem (𝒜 : Set (Subgroup G)) : Prop\n    extends IsInvariantSystem 𝒜 where\n  central : ∀ A B, IsJump 𝒜 A B → ⁅B, (⊤ : Subgroup G)⁆ ≤ A\n\n/-- A group $G$ is a *$\\overline{Z}$-group* (Kurosh) if every invariant system of $G$ can be\nrefined to a central system of $G$, i.e. is contained in some central system of $G$. -/\ndef IsZBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ 𝒜 : Set (Subgroup G), IsInvariantSystem 𝒜 → ∃ 𝒞, 𝒜 ⊆ 𝒞 ∧ IsCentralSystem 𝒞\n\n/-- In an abelian group every invariant system is already central, so every abelian group\nis a $\\overline{Z}$-group. -/\n@[category test, AMS 20]\ntheorem isZBarGroup_of_commGroup (H : Type*) [CommGroup H] : IsZBarGroup H := by\n  intro 𝒜 h𝒜\n  refine ⟨𝒜, le_rfl, h𝒜, fun A _ _ => Subgroup.commutator_le.mpr fun g _ h _ => ?_⟩\n  rw [commutatorElement_eq_one_iff_mul_comm.mpr (mul_comm g h)]\n  exact A.one_mem\n\n/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups? That is, is\nevery normal subgroup of a $\\overline{Z}$-group again a $\\overline{Z}$-group?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G → ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry\n\nend Kourovka.«8.16»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.78,
+   "decomposition_objections": "None. The single-slot table (∀ G [Group G], Z̄ G → ∀ N ⊴ G, Z̄ N, stated as answer(sorry) ↔ …) matches the statement; the file conforms to it.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "The term Z̄-group is not defined in the notebook; I used Kurosh's definition (Theory of Groups, Vol. II, §62): G is a Z̄-group iff every invariant system of G can be refined to a central system. Reviewers should confirm against Kurosh that the class is defined via *invariant* systems (all members normal in G), not via arbitrary *normal* systems (each member normal only in the next) — since central systems are automatically invariant, the invariant-system reading is the natural one and is the one I used, but I could not consult the book offline.",
+    "A system of subgroups is modelled as `𝒜 : Set (Subgroup G)` with ⊥ ∈ 𝒜, ⊤ ∈ 𝒜, `IsChain (· ≤ ·) 𝒜`, and closure under `sSup`/`sInf` of nonempty subfamilies (Kurosh's completeness: unions and intersections of subfamilies; for a chain of subgroups `sSup` is the union).",
+    "A jump is a pair A < B of members with no member strictly between (explicit definition `IsJump` rather than `CovBy` on the subtype, for readability).",
+    "Centrality of a factor B/A (i.e. B/A ≤ Z(G/A)) is encoded as `⁅B, (⊤ : Subgroup G)⁆ ≤ A` using Mathlib's subgroup commutator.",
+    "Refinement of 𝒜 by 𝒞 is encoded as `𝒜 ⊆ 𝒞`, as in Kurosh.",
+    "Normal subgroups are quantified as `N : Subgroup G` with `N.Normal`, and the Z̄ property of N is asserted for the coerced group `↥N`; the ambient group is quantified over `Type` (repository convention in Kourovka files).",
+    "An extra `@[category test]` lemma (every abelian group is a Z̄-group) with a short proof was added to exercise the bespoke definitions, per CONTRIBUTING's request for basic API tests of bespoke definitions."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `CompleteSublattice (Subgroup G)` together with `IsChain` (bundled, less transparent; sSup ∅/sInf ∅ conditions replace ⊥/⊤ membership); `CompositionSeries`/`IsAscendingCentralSeries` are finite ℕ-indexed and cannot express transfinite systems.",
+     "name": "Kourovka.«8.16».IsInvariantSystem",
+     "why_needed": "Kurosh's notion of an invariant system (complete chain of normal subgroups from E to G) is the basic ingredient of the definition of Z̄-groups and is absent from Mathlib/the repo."
+    },
+    {
+     "closest_existing_considered": "`CovBy` (`⋖`) on the subtype `↥𝒜`; an explicit definition was preferred for readability.",
+     "name": "Kourovka.«8.16».IsJump",
+     "why_needed": "Factors of a system are indexed by jumps (adjacent members of the chain); needed to state the centrality condition."
+    },
+    {
+     "closest_existing_considered": "`IsAscendingCentralSeries`/`IsDescendingCentralSeries` in Mathlib.GroupTheory.Nilpotent (finite, ℕ-indexed only).",
+     "name": "Kourovka.«8.16».IsCentralSystem",
+     "why_needed": "Kurosh's central system: invariant system all of whose factors B/A are central in G/A ([B,G] ≤ A)."
+    },
+    {
+     "closest_existing_considered": "`Group.IsNilpotent` (far too strong); no hypercentral/Z-group notion exists in Mathlib.",
+     "name": "Kourovka.«8.16».IsZBarGroup",
+     "why_needed": "The class of Z̄-groups (every invariant system can be refined to a central system) is the object of the problem and exists nowhere in Mathlib or the repo."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.16»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type) [Group G], IsZBarGroup G → ∀ N : Subgroup G, N.Normal → IsZBarGroup N`, with Kurosh's definition of Z̄-groups (every invariant system refines to a central system) supplied in the file via bespoke definitions of invariant systems, jumps and central systems."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.16»": "/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups? That is, is\nevery normal subgroup of a $\\overline{Z}$-group again a $\\overline{Z}$-group?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G → ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c06",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.16\n\nby Sh. S. Kemkhadze\n\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.16»\n\n/-- A central system in a group $G$ is a linearly ordered system of normal subgroups containing\n$1$ and $G$, such that every nontrivial interval contains a jump and every jump $A < B$ is\ncentral: $B/A$ is contained in the center of $G/A$.\n\nHere a jump means that no member of the system lies strictly between $A$ and $B$. The requirement\nthat every nontrivial interval contain a jump prevents the centrality condition from becoming\nvacuous for a dense system. -/\ndef IsCentralSystem {G : Type*} [Group G] (𝒮 : Set (Subgroup G)) : Prop :=\n  ⊥ ∈ 𝒮 ∧ ⊤ ∈ 𝒮 ∧\n    IsChain (· ≤ ·) 𝒮 ∧\n    (∀ H ∈ 𝒮, H.Normal) ∧\n    (∀ H ∈ 𝒮, ∀ K ∈ 𝒮, H < K →\n      ∃ A ∈ 𝒮, ∃ B ∈ 𝒮, H ≤ A ∧ A < B ∧ B ≤ K ∧\n        ¬ ∃ L ∈ 𝒮, A < L ∧ L < B) ∧\n    ∀ A ∈ 𝒮, ∀ B ∈ 𝒮, A < B →\n      (¬ ∃ L ∈ 𝒮, A < L ∧ L < B) → ⁅B, ⊤⁆ ≤ A\n\n/-- A $\\overline{Z}$-group (a generalized nilpotent group in the sense of Kurosh) is a group\nthat possesses a central system. -/\ndef IsZBarGroup (G : Type*) [Group G] : Prop :=\n  ∃ 𝒮 : Set (Subgroup G), IsCentralSystem 𝒮\n\n/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry\n\nend Kourovka.«8.16»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.9,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Modeled a Kurosh central system as a chain of normal subgroups containing the trivial and whole subgroups, with a jump in every nontrivial interval and every jump B/A central in G/A.",
+    "Expressed centrality of a jump A < B by the equivalent commutator condition ⁅B, ⊤⁆ ≤ A.",
+    "Expressed closure under normal subgroups using N.Normal in the ambient group and IsZBarGroup N for the inherited group structure on the subgroup subtype."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's IsAscendingCentralSeries and Group.IsNilpotent, which only describe ordinary countable/finite-step central series and therefore do not capture Kurosh's generalized systems.",
+     "name": "Kourovka.«8.16».IsCentralSystem",
+     "why_needed": "Kurosh's generalized central systems are not available in Mathlib or FormalConjecturesForMathlib; Mathlib only provides natural-number-indexed central series."
+    },
+    {
+     "closest_existing_considered": "Mathlib's Group.IsNilpotent; it is strictly tied to a finite stage of the natural-number-indexed upper central series rather than possession of a Kurosh central system.",
+     "name": "Kourovka.«8.16».IsZBarGroup",
+     "why_needed": "The problem's class of generalized nilpotent Z̄-groups is not defined in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.16»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.16»": "/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c07",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.16\n\nby Sh. S. Kemkhadze\n\nIs the class of all $\\overline{Z}$-groups closed under taking normal\nsubgroups?\n\nHere $\\overline{Z}$ denotes Kurosh's class of generalized nilpotent groups:\ngroups possessing a central system.\n\n*Reference:* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n-/\n\nnamespace Kourovka.«8.16»\n\nvariable {G : Type*} [Group G]\n\n/-- A central system in $G$ is a family of nontrivial sections $B/A$ whose\nendpoints are normal in $G$, which are linearly arranged without overlap and\ncover every nonidentity element of $G$, and for which $B/A$ is central in\n$G/A$. The last condition is expressed as $[B,G] \\leq A$. -/\ndef IsCentralSystem (𝒮 : Set (Subgroup G × Subgroup G)) : Prop :=\n  (∀ p ∈ 𝒮, p.1 < p.2) ∧\n  (∀ p ∈ 𝒮, p.1.Normal ∧ p.2.Normal) ∧\n  (∀ p ∈ 𝒮, ∀ q ∈ 𝒮, p = q ∨ p.2 ≤ q.1 ∨ q.2 ≤ p.1) ∧\n  (∀ x : G, x ≠ 1 → ∃ p ∈ 𝒮, x ∈ p.2 ∧ x ∉ p.1) ∧\n  (∀ p ∈ 𝒮, ⁅p.2, (⊤ : Subgroup G)⁆ ≤ p.1)\n\n/-- A $\\overline{Z}$-group, in Kurosh's terminology, is a generalized\nnilpotent group: a group possessing a central system. -/\ndef IsZBarGroup (G : Type*) [Group G] : Prop :=\n  ∃ 𝒮 : Set (Subgroup G × Subgroup G), IsCentralSystem 𝒮\n\n/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal\nsubgroups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry\n\nend Kourovka.«8.16»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.87,
+   "decomposition_objections": "",
+   "model": "epoch/gpt-5.6-sol",
+   "model_name": "GPT-5.6 Sol",
+   "modeling_decisions": [
+    "Represented a Kurosh central system as a set of subgroup sections (A, B): every section is nontrivial, its endpoints are normal in the ambient group, distinct sections are linearly arranged without overlap, and the section layers cover every nonidentity element.",
+    "Expressed centrality of the section B/A in G/A by the standard commutator condition ⁅B, ⊤⁆ ≤ A.",
+    "Defined a Z̄-group as a group admitting such a central system. This is intentionally not Mathlib's `IsZGroup`, which means that all Sylow subgroups are cyclic, and not `Group.IsNilpotent`, which only asks for a finite natural-number-indexed central series.",
+    "Allowed the empty central system for the trivial group; the covering condition forces a nonempty collection of nontrivial sections for every nontrivial group."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib's `IsAscendingCentralSeries` and `IsDescendingCentralSeries`; these encode only ℕ-indexed series and therefore do not capture Kurosh's generalized central systems.",
+     "name": "Kourovka.«8.16».IsCentralSystem",
+     "why_needed": "Kurosh's arbitrary central systems are needed to define the generalized nilpotent class occurring in the question, but Mathlib only provides natural-number-indexed ascending and descending central series."
+    },
+    {
+     "closest_existing_considered": "Mathlib's `Group.IsNilpotent` is restricted to finite central-series length, while Mathlib's `IsZGroup` is the unrelated property that all Sylow subgroups are cyclic.",
+     "name": "Kourovka.«8.16».IsZBarGroup",
+     "why_needed": "The source's Z̄-group terminology has no corresponding predicate in Mathlib or FormalConjecturesForMathlib."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.16»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": ""
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.16»": "/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal\nsubgroups?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry"
+   }
+  },
+  {
+   "bailed": false,
+   "cid": "c08",
+   "code": "/-\nCopyright 2026 The Formal Conjectures Authors.\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\n    https://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\nSee the License for the specific language governing permissions and\nlimitations under the License.\n-/\n\nimport FormalConjecturesUtil\n\n/-!\n# Conjecture 8.16\n\nby Sh. S. Kemkhadze\n\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\n\nThe notion of a $\\overline{Z}$-group is one of Kurosh's classes of generalized\nnilpotent groups, defined via central systems. Following Kurosh, an *invariant\nsystem* of a group $G$ is a set of normal subgroups of $G$ which contains $1$\nand $G$, is linearly ordered by inclusion, and is complete, i.e. closed under\nunions and intersections of nonempty subfamilies. A *jump* of a system is a\npair of members $A < B$ with no member strictly between them. A *central\nsystem* is an invariant system all of whose factors are central: for every\njump $A < B$ one has $[B, G] \\le A$, i.e. $B/A \\le Z(G/A)$. A group with a\ncentral system is a *$Z$-group*, and a group every invariant system of which\ncan be refined to a central system is a *$\\overline{Z}$-group*. Equivalently,\n$G$ is a $\\overline{Z}$-group if and only if every factor group of $G$ is a\n$Z$-group; in particular every factor group of a $\\overline{Z}$-group is again\na $\\overline{Z}$-group, and Kemkhadze asks about normal subgroups instead.\n\n*References:*\n* [The Kourovka Notebook](https://arxiv.org/abs/1401.0300v46)\n* A. G. Kurosh, *The Theory of Groups*, Vol. II, Chapter XV\n  (generalized nilpotent groups).\n-/\n\nnamespace Kourovka.«8.16»\n\nvariable {G : Type*} [Group G]\n\n/-- A set `S` of subgroups of `G` is an *invariant system* of `G` (in the sense of\nKurosh) if all its members are normal in `G`, it contains `⊥` and `⊤`, it is\nlinearly ordered by inclusion, and it is complete: the union (supremum) and the\nintersection (infimum) of every nonempty subfamily of `S` again belong to `S`. -/\nstructure IsInvariantSystem (S : Set (Subgroup G)) : Prop where\n  normal : ∀ H ∈ S, H.Normal\n  bot_mem : ⊥ ∈ S\n  top_mem : ⊤ ∈ S\n  isChain : IsChain (· ≤ ·) S\n  sSup_mem : ∀ T ⊆ S, T.Nonempty → sSup T ∈ S\n  sInf_mem : ∀ T ⊆ S, T.Nonempty → sInf T ∈ S\n\n/-- The pair `A < B` is a *jump* of the system `S`: both `A` and `B` are members of\n`S` and no member of `S` lies strictly between them. -/\ndef IsJump (S : Set (Subgroup G)) (A B : Subgroup G) : Prop :=\n  A ∈ S ∧ B ∈ S ∧ A < B ∧ ∀ C ∈ S, A ≤ C → C ≤ B → C = A ∨ C = B\n\n/-- A *central system* of `G` is an invariant system of `G` all of whose factors are\ncentral: for every jump `A < B` of the system, `⁅B, G⁆ ≤ A`, i.e. `B / A` lies in\nthe centre of `G / A`. -/\nstructure IsCentralSystem (S : Set (Subgroup G)) : Prop extends IsInvariantSystem S where\n  central : ∀ A B, IsJump S A B → ⁅B, (⊤ : Subgroup G)⁆ ≤ A\n\n/-- A group is a *$Z$-group* if it has a central system. -/\ndef IsZGroup (G : Type*) [Group G] : Prop :=\n  ∃ S : Set (Subgroup G), IsCentralSystem S\n\n/-- A group `G` is a *$\\overline{Z}$-group* if every invariant system of `G` can be\nrefined to a central system of `G`, i.e. is contained in some central system of `G`. -/\ndef IsZBarGroup (G : Type*) [Group G] : Prop :=\n  ∀ S : Set (Subgroup G), IsInvariantSystem S →\n    ∃ T : Set (Subgroup G), IsCentralSystem T ∧ S ⊆ T\n\n/-- The system `{⊥, ⊤}` is an invariant system of `G`. -/\n@[category API, AMS 20]\ntheorem isInvariantSystem_pair : IsInvariantSystem ({⊥, ⊤} : Set (Subgroup G)) where\n  normal H hH := by\n    rcases hH with rfl | rfl <;> infer_instance\n  bot_mem := by simp\n  top_mem := by simp\n  isChain := by\n    intro x hx y hy _\n    rcases hx with rfl | rfl <;> rcases hy with rfl | rfl <;> simp\n  sSup_mem T hT _ := by\n    by_cases h : ⊤ ∈ T\n    · simp [top_unique (le_sSup h)]\n    · have : sSup T = ⊥ := sSup_eq_bot.mpr fun a ha => by\n        rcases hT ha with rfl | rfl\n        · rfl\n        · exact absurd ha h\n      simp [this]\n  sInf_mem T hT _ := by\n    by_cases h : ⊥ ∈ T\n    · simp [bot_unique (sInf_le h)]\n    · have : sInf T = ⊤ := sInf_eq_top.mpr fun a ha => by\n        rcases hT ha with rfl | rfl\n        · exact absurd ha h\n        · rfl\n      simp [this]\n\n/-- Every $\\overline{Z}$-group is a $Z$-group: refine the invariant system `{⊥, ⊤}`. -/\n@[category API, AMS 20]\ntheorem IsZBarGroup.isZGroup (h : IsZBarGroup G) : IsZGroup G :=\n  let ⟨T, hT, _⟩ := h _ isInvariantSystem_pair\n  ⟨T, hT⟩\n\n/-- Every abelian group is a $\\overline{Z}$-group: every invariant system is already\ncentral, since all commutators are trivial. -/\n@[category API, AMS 20]\ntheorem IsZBarGroup.of_commGroup (A : Type*) [CommGroup A] : IsZBarGroup A := by\n  intro S hS\n  refine ⟨S, ⟨hS, fun B C _ => ?_⟩, le_rfl⟩\n  refine Subgroup.commutator_le.mpr fun g₁ _ g₂ _ => ?_\n  rw [commutatorElement_eq_one_iff_mul_comm.mpr (mul_comm g₁ g₂)]\n  exact B.one_mem\n\n/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\nThat is, if $G$ is a $\\overline{Z}$-group and $N \\trianglelefteq G$, is $N$\nnecessarily a $\\overline{Z}$-group?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry\n\nend Kourovka.«8.16»\n",
+   "compile_errors": [],
+   "compile_ok": true,
+   "confidence": 0.6,
+   "decomposition_objections": "None. The single-slot yes/no decomposition is correct; the only difficulty is that the statement leaves 'Z̄-group' undefined, as the table notes.",
+   "model": "epoch/claude-fable-5-1",
+   "model_name": "Claude Fable 5.1",
+   "modeling_decisions": [
+    "Definition of Z̄-group (the crux; the sandbox has no network so Kurosh's text could not be re-checked): I used Kurosh's class 'every invariant system of G can be refined to a central system' (Theory of Groups, Vol. II, ch. XV), which is provably equivalent to 'every factor group of G is a Z-group' and to 'every chief factor of G is central'. This matches the decomposition note ('defined via central systems') and Kurosh's bar-notation pattern (\\overline{RN}, \\overline{RI} = every normal/invariant system has a solvable refinement). Rejected alternatives: (a) 'every nontrivial normal subgroup of every factor group meets the centre nontrivially' — this is equivalent to being hypercentral (ZA), so it cannot be a separate class; (b) 'every nontrivial normal subgroup of G meets the centre nontrivially' — not via central systems and contains e.g. SL(2,5), so not a generalized nilpotent class. A reviewer with access to Kurosh/Kemkhadze should confirm the definition.",
+    "Completeness of a system is formalized as closure under lattice `sSup`/`sInf` of nonempty subfamilies, with `⊥ ∈ S` and `⊤ ∈ S` stated explicitly; for a chain of subgroups `sSup` is the set-theoretic union, so this is Kurosh's 'closed under unions and intersections'.",
+    "Centrality of the factor B/A in G/A is expressed as `⁅B, (⊤ : Subgroup G)⁆ ≤ A` (Mathlib subgroup commutator), i.e. all commutators [b, g] lie in A.",
+    "A jump is A < B with A, B ∈ S and no member of S strictly between (relative to S, not to the whole subgroup lattice).",
+    "The normal subgroup N is treated as a group via the subtype `↥N` with its induced group structure; `IsZBarGroup N` then refers to N's own invariant/central systems (subgroups of N normal in N), which is what 'closed under taking normal subgroups' means.",
+    "Quantification over `G : Type` (universe 0) follows the idiom of the existing Kourovka files (1_40, 19_25).",
+    "Added three API lemmas (with proofs, no sorry) as sanity checks of the bespoke definitions: {⊥, ⊤} is an invariant system, Z̄ ⊆ Z, and abelian groups are Z̄."
+   ],
+   "new_definitions": [
+    {
+     "closest_existing_considered": "Mathlib `IsChain (· ≤ ·)` (used as one field), `IsAscendingCentralSeries`/`upperCentralSeries` (ℕ-indexed only, cannot express complete linearly ordered systems).",
+     "name": "Kourovka.«8.16».IsInvariantSystem",
+     "why_needed": "Kurosh's notion of an invariant system (a complete chain of normal subgroups containing 1 and G) is the raw material for central systems; nothing in Mathlib/FormalConjecturesForMathlib models transfinite 'systems' of subgroups (Mathlib only has ℕ-indexed central series in GroupTheory/Nilpotent)."
+    },
+    {
+     "closest_existing_considered": "`CovBy` (⋖) on the ambient lattice — not usable, since a jump is relative to membership in the system S, not to all subgroups.",
+     "name": "Kourovka.«8.16».IsJump",
+     "why_needed": "Kurosh's factors of a system are indexed by jumps A < B with no member in between; needed to state centrality of factors."
+    },
+    {
+     "closest_existing_considered": "`IsAscendingCentralSeries` / `IsDescendingCentralSeries` (finite ℕ-indexed series only; they would give nilpotency, not Z-groups).",
+     "name": "Kourovka.«8.16».IsCentralSystem",
+     "why_needed": "An invariant system all of whose factors are central (⁅B, G⁆ ≤ A for every jump A < B); the defining notion of Kurosh's Z-groups."
+    },
+    {
+     "closest_existing_considered": "`Group.IsNilpotent` (much stronger, finite series only).",
+     "name": "Kourovka.«8.16».IsZGroup",
+     "why_needed": "Group with a central system; used for the API lemma Z̄ ⊆ Z, which sanity-checks the definitions and documents the place of Z̄ among Kurosh's classes."
+    },
+    {
+     "closest_existing_considered": "Nothing in Mathlib or FormalConjecturesForMathlib; `Group.IsNilpotent` and hypercentral-type notions are strictly stronger/different.",
+     "name": "Kourovka.«8.16».IsZBarGroup",
+     "why_needed": "The class the problem is about: every invariant system can be refined to (is contained in) a central system. Equivalent to 'every factor group is a Z-group' and to 'every chief factor is central'."
+    }
+   ],
+   "per_slot": {
+    "kourovka.«8.16»": {
+     "outcome": "formalized_with_new_definitions",
+     "why": "Stated as `answer(sorry) ↔ ∀ (G : Type) [Group G], IsZBarGroup G → ∀ N : Subgroup G, N.Normal → IsZBarGroup N`. The term Z̄-group is absent from the notebook, Mathlib and the repo, so the file supplies Kurosh's definition (every invariant system of G can be refined to a central system) together with the auxiliary Kurosh notions it rests on."
+    }
+   },
+   "split_error": null,
+   "statement_blocks": {
+    "kourovka.«8.16»": "/--\nIs the class of all $\\overline{Z}$-groups closed under taking normal subgroups?\nThat is, if $G$ is a $\\overline{Z}$-group and $N \\trianglelefteq G$, is $N$\nnecessarily a $\\overline{Z}$-group?\n-/\n@[category research open, AMS 20]\ntheorem kourovka.«8.16» : answer(sorry) ↔\n    ∀ (G : Type) [Group G], IsZBarGroup G →\n      ∀ N : Subgroup G, N.Normal → IsZBarGroup N := by\n  sorry"
+   }
+  }
+ ],
+ "chosen": {
+  "kourovka.«8.16»": "c05"
+ },
+ "id": "kourovka-8.16",
+ "main_attempt": "c05"
+}
