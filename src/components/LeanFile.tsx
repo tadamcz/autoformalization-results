@@ -108,38 +108,10 @@ function Rendered({ entry, alts, requestAlts, altsLoading }: Omit<Props, "view" 
       i += 1;
       continue;
     }
-    if (isBoilerplate(b)) {
-      // like FC's source pages: namespace / open / section / end lines are file
-      // scaffolding, folded to one line (the Plain view has them all)
-      let j = i;
-      while (j < blocks.length && isBoilerplate(blocks[j])) j += 1;
-      items.push(<Boilerplate key={`bp-${b.i}`} blocks={blocks.slice(i, j)} />);
-      i = j;
-      continue;
-    }
     items.push(<CommandLine key={b.i} block={b} />);
     i += 1;
   }
   return <div className="rendered">{items}</div>;
-}
-
-const BOILERPLATE_COMMANDS = new Set(["namespace", "open", "section", "noncomputable section", "end", "import"]);
-
-function isBoilerplate(b: Block): boolean {
-  return b.kind === "command" && !!b.command && BOILERPLATE_COMMANDS.has(b.command);
-}
-
-function Boilerplate({ blocks }: { blocks: Block[] }) {
-  const text = blocks.map((b) => b.text).join("").replace(/\n+$/, "");
-  const summary = blocks.map((b) => `${b.command}${b.command_arg ? " " + b.command_arg.split(/\s+/).slice(0, 2).join(" ") : ""}`);
-  return (
-    <details className="boilerplate">
-      <summary>
-        <code className="muted">{summary.join(" · ")}</code>
-      </summary>
-      <Code code={text} startLine={blocks[0].line} />
-    </details>
-  );
 }
 
 function Preamble({ blocks }: { blocks: Block[] }) {
@@ -204,27 +176,19 @@ function Checks({ blocks }: { blocks: Block[] }) {
       </summary>
       <div className="checks-body">
         {blocks.map((b) => (
-          <div key={b.i} className={`decl check fc-box fc-box--${declTheme(b.decl_kind)}`} id={blockAnchor(b)}>
+          <div key={b.i} className="decl check" id={blockAnchor(b)}>
             <div className="decl-head">
-              <span className={`fc-label fc-label--${declTheme(b.decl_kind)}`} aria-hidden="true">{b.decl_kind}</span>
               <CategoryChip category={b.category} outlined />
               <code className="fq">{b.fq_name ?? b.decl_kind}</code>
+              <span className="muted kind">{b.decl_kind}</span>
             </div>
-            <Code code={b.code ?? ""} startLine={b.code_line} />
             {b.docstring && <Markdown text={b.docstring} className="docstring" />}
+            <Code code={b.code ?? ""} startLine={b.code_line} />
           </div>
         ))}
       </div>
     </details>
   );
-}
-
-// FC's source-page grouping: theorem-like, structure-like, class, or def.
-function declTheme(kind: string | undefined): "theorem" | "structure" | "class" | "def" {
-  if (kind === "theorem" || kind === "lemma" || kind === "axiom" || kind === "example") return "theorem";
-  if (kind === "structure" || kind === "inductive" || kind === "class inductive") return "structure";
-  if (kind === "class") return "class";
-  return "def";
 }
 
 function copyText(text: string) {
@@ -250,19 +214,16 @@ function DeclBlock({ block: b, entry, claim, alts, requestAlts, altsLoading }: D
   const uses = (b.uses ?? []).map((i) => blocksById[i]).filter((x) => x.role === "definition");
   const caption =
     kept && claim && claim.source_text !== entry.statement ? claim.source_text : known ? (kept ? "known result, stated as part of the problem" : "known result") : null;
-  const theme = declTheme(b.decl_kind);
   return (
-    <div className={`decl fc-box fc-box--${theme} role-${role} ${known ? "tinted" : ""}`} id={blockAnchor(b)}>
+    <div className={`decl role-${role} ${known ? "tinted" : ""}`} id={blockAnchor(b)}>
       <div className="decl-head">
-        <span className={`fc-label fc-label--${theme}`} aria-hidden="true">
-          {[...(b.modifiers ?? []).filter((m) => m !== "noncomputable"), b.decl_kind].join(" ")}
-        </span>
         <CategoryChip category={b.category} outlined={known || role === "check"} />
         {kept && <span className="chip statement-no">statement {claim?.position}</span>}
         {additional && <span className="chip muted" title="A research open theorem the pipeline added beyond the claims it was asked to state">additional statement</span>}
         <code className="fq" title="Fully qualified name (click to copy)" onClick={() => b.fq_name && copyText(b.fq_name)}>
           {b.fq_name ?? (b.decl_kind === "instance" ? "instance" : b.decl_kind)}
         </code>
+        <span className="muted kind">{[...(b.modifiers ?? []), b.decl_kind].join(" ")}</span>
       </div>
       {caption && (
         <div className={`caption ${known ? "known" : "source"}`}>
@@ -271,8 +232,8 @@ function DeclBlock({ block: b, entry, claim, alts, requestAlts, altsLoading }: D
       )}
       {b.leading_comment && <Code code={b.leading_comment} className="leading-comment" />}
       {b.prefix && <Code code={b.prefix} className="prefix" />}
-      <Code code={b.code ?? ""} startLine={b.code_line} />
       {b.docstring && <Markdown text={b.docstring} className="docstring" />}
+      <Code code={b.code ?? ""} startLine={b.code_line} />
       {(kept || additional || known) && uses.length > 0 && (
         <p className="uses muted">
           uses:{" "}
