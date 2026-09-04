@@ -3,6 +3,7 @@ import type { Alts, Block, Claim, Entry } from "../data/schema";
 import { CategoryChip } from "./CategoryChip";
 import { Code } from "./Code";
 import { Disclosure } from "./Disclosure";
+import { CompileLine } from "./EntryHeader";
 import { Markdown } from "./Markdown";
 import { MathText } from "./MathText";
 import { firstSentence, shorten } from "./StatusLine";
@@ -64,6 +65,7 @@ export function LeanFile({ entry, view, setView, alts, requestAlts, altsLoading,
       ) : (
         <Rendered entry={entry} alts={alts} requestAlts={requestAlts} altsLoading={altsLoading} onJump={onJump} search={search} />
       )}
+      <CompileLine entry={entry} />
     </section>
   );
 }

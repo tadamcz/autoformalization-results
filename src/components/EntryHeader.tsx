@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import type { Entry, FcStatusEntry, Meta } from "../data/schema";
 import { capitalize, formatDate, plural } from "../data/filters";
-import { Tip } from "./Tip";
 
 function basename(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
@@ -108,8 +107,20 @@ export function Actions({ entry, fc }: { entry: Entry; fc: FcStatusEntry | undef
 }
 
 export function FileLine({ entry }: { entry: Entry }) {
+  return (
+    <p className="fileline muted">
+      <code>{entry.fc.path}</code> · {plural(entry.lean_lines, "line")} ·{" "}
+      <span className="confidence" title="The automated reviewer's confidence, from 0 to 1, that every statement in this file is faithful to the source. Files below the cut described on the About page are not shown.">
+        Automated reviewer's confidence: {entry.confidence.toFixed(2)}
+      </span>
+    </p>
+  );
+}
+
+// Below the Lean file: what it was compiled against.
+export function CompileLine({ entry }: { entry: Entry }) {
   const c = entry.checks;
-  const mathlib = entry.fc.mathlib_rev ? ` · Mathlib ${entry.fc.mathlib_rev.slice(0, 7)}` : "";
+  const mathlib = entry.fc.mathlib_rev ? `, Mathlib ${entry.fc.mathlib_rev.slice(0, 7)}` : "";
   const lean = entry.fc.lean_toolchain.replace("leanprover/lean4:", "Lean 4 ").replace(/^Lean 4 v/, "Lean ");
   // "Compiles" already says no errors; only warnings other than sorry are worth a word
   const warnings =
@@ -118,15 +129,10 @@ export function FileLine({ entry }: { entry: Entry }) {
       : c.other_warnings.length > 0
         ? ` with ${plural(c.other_warnings.length, "allowed warning")} besides sorry`
         : "";
-  // the pin's facts live behind a hover
-  const pin = `commit ${entry.fc.commit.slice(0, 7)} · ${formatDate(entry.fc.commit_date)} · ${lean}${mathlib}`;
   return (
-    <p className="fileline muted">
-      <code>{entry.fc.path}</code> · {plural(entry.lean_lines, "line")} · Compiles against <Tip tip={pin}>Formal Conjectures</Tip>
-      {warnings}.{" "}
-      <span className="confidence" title="The automated reviewer's confidence, from 0 to 1, that every statement in this file is faithful to the source. Files below the cut described on the About page are not shown.">
-        Automated reviewer's confidence: {entry.confidence.toFixed(2)}.
-      </span>
+    <p className="compile-line muted">
+      Compiles against Formal Conjectures <code>{entry.fc.commit.slice(0, 7)}</code> ({formatDate(entry.fc.commit_date)}; {lean}
+      {mathlib}){warnings}.
     </p>
   );
 }
