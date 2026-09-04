@@ -1,8 +1,11 @@
 import type { Block, Entry } from "../data/schema";
 import { blockHref } from "./anchors";
+import { categoryCss } from "./CategoryChip";
 
 // "In this file" chip row (≥3 declarations); click scrolls to the block in
-// either view, the link itself is a deep link (#/p/<id>?at=…).
+// either view, the link itself is a deep link (#/p/<id>?at=…). Theorems take
+// the colour of their FC category (as the chips on the declarations do);
+// definitions stay grey.
 export function InFileChips({ entry, onJump, search }: { entry: Entry; onJump: (block: number) => void; search: string }) {
   const decls = entry.blocks.filter((b): b is Block & { fq_name: string } => b.kind === "decl" && !!b.fq_name && b.role !== "check");
   const checks = entry.blocks.filter((b) => b.kind === "decl" && b.role === "check").length;
@@ -14,12 +17,12 @@ export function InFileChips({ entry, onJump, search }: { entry: Entry; onJump: (
         <a
           key={b.i}
           href={blockHref(entry.id, search, b)}
-          className={`chip infile-chip role-${b.role}`}
+          className={`chip infile-chip role-${b.role} ${b.role === "definition" ? "" : categoryCss(b.category)}`}
           onClick={(e) => {
             e.preventDefault();
             onJump(b.i);
           }}
-          title={b.fq_name}
+          title={b.role !== "definition" && b.category ? `${b.category} · ${b.fq_name}` : b.fq_name}
         >
           {b.fq_name.split(".").slice(-1)[0]}
         </a>

@@ -7,6 +7,11 @@ const META: Record<string, { label: string; css: string }> = {
   API: { label: "API", css: "cat-api" },
 };
 
+/** CSS class carrying FC's colour for a category ("" when unknown or absent). */
+export function categoryCss(category: string | null | undefined): string {
+  return category ? (META[category]?.css ?? "cat-unknown") : "";
+}
+
 export function CategoryChip({ category, outlined = false, title }: { category: string | null | undefined; outlined?: boolean; title?: string }) {
   if (!category) return null;
   const m = META[category] ?? { label: category, css: "cat-unknown" };
