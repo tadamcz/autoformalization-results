@@ -6,6 +6,7 @@ import { Disclosure } from "./Disclosure";
 import { Markdown } from "./Markdown";
 import { MathText } from "./MathText";
 import { firstSentence, shorten } from "./StatusLine";
+import { blockAnchor, blockHref } from "./anchors";
 
 export type View = "rendered" | "plain";
 const VIEW_KEY = "lean-view";
@@ -29,10 +30,6 @@ export function useView(): [View, (v: View) => void] {
   return [view, set];
 }
 
-export function blockAnchor(b: Block): string {
-  return b.fq_name ? `decl-${b.fq_name.replace(/[^\w.]/g, "_")}` : `block-${b.i}`;
-}
-
 function shortName(fq: string): string {
   return fq.split(".").slice(-1)[0];
 }
@@ -44,9 +41,11 @@ interface Props {
   alts: Alts | null;
   requestAlts: () => void;
   altsLoading: boolean;
+  onJump: (block: number) => void;
+  search: string;
 }
 
-export function LeanFile({ entry, view, setView, alts, requestAlts, altsLoading }: Props) {
+export function LeanFile({ entry, view, setView, alts, requestAlts, altsLoading, onJump, search }: Props) {
   return (
     <section className="lean-file" id="lean">
       <div className="section-head">
@@ -63,13 +62,13 @@ export function LeanFile({ entry, view, setView, alts, requestAlts, altsLoading 
       {view === "plain" ? (
         <Code code={entry.lean} startLine={1} className="whole-file" />
       ) : (
-        <Rendered entry={entry} alts={alts} requestAlts={requestAlts} altsLoading={altsLoading} />
+        <Rendered entry={entry} alts={alts} requestAlts={requestAlts} altsLoading={altsLoading} onJump={onJump} search={search} />
       )}
     </section>
   );
 }
 
-function Rendered({ entry, alts, requestAlts, altsLoading }: Omit<Props, "view" | "setView">) {
+function Rendered({ entry, alts, requestAlts, altsLoading, onJump, search }: Omit<Props, "view" | "setView">) {
   const blocks = entry.blocks;
   const claimByPos = new Map(entry.claims.map((c) => [c.position, c]));
   const items: React.ReactNode[] = [];
@@ -103,6 +102,8 @@ function Rendered({ entry, alts, requestAlts, altsLoading }: Omit<Props, "view" 
           alts={alts}
           requestAlts={requestAlts}
           altsLoading={altsLoading}
+          onJump={onJump}
+          search={search}
         />,
       );
       i += 1;
@@ -202,9 +203,11 @@ interface DeclProps {
   alts: Alts | null;
   requestAlts: () => void;
   altsLoading: boolean;
+  onJump: (block: number) => void;
+  search: string;
 }
 
-function DeclBlock({ block: b, entry, claim, alts, requestAlts, altsLoading }: DeclProps) {
+function DeclBlock({ block: b, entry, claim, alts, requestAlts, altsLoading, onJump, search }: DeclProps) {
   const role = b.role ?? "other";
   const known = role === "known_result";
   const kept = role === "statement";
@@ -240,7 +243,13 @@ function DeclBlock({ block: b, entry, claim, alts, requestAlts, altsLoading }: D
           {uses.map((u, k) => (
             <span key={u.i}>
               {k > 0 ? ", " : ""}
-              <a href={`#${blockAnchor(u)}`} onClick={jumpTo(u)}>
+              <a
+                href={blockHref(entry.id, search, u)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onJump(u.i);
+                }}
+              >
                 <code>{shortName(u.fq_name ?? "")}</code>
               </a>
             </span>
@@ -259,14 +268,6 @@ function DeclBlock({ block: b, entry, claim, alts, requestAlts, altsLoading }: D
       )}
     </div>
   );
-}
-
-function jumpTo(target: Block) {
-  return (e: React.MouseEvent) => {
-    e.preventDefault();
-    document.getElementById(blockAnchor(target))?.scrollIntoView({ behavior: "smooth", block: "start" });
-    history.replaceState(null, "", `#${blockAnchor(target)}`);
-  };
 }
 
 function DefinitionNotes({ block: b }: { block: Block }) {

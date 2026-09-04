@@ -1,8 +1,9 @@
 import type { Block, Entry } from "../data/schema";
-import { blockAnchor } from "./LeanFile";
+import { blockHref } from "./anchors";
 
-// "In this file" chip row (≥3 declarations); click scrolls to the block.
-export function InFileChips({ entry }: { entry: Entry }) {
+// "In this file" chip row (≥3 declarations); click scrolls to the block in
+// either view, the link itself is a deep link (#/p/<id>?at=…).
+export function InFileChips({ entry, onJump, search }: { entry: Entry; onJump: (block: number) => void; search: string }) {
   const decls = entry.blocks.filter((b): b is Block & { fq_name: string } => b.kind === "decl" && !!b.fq_name && b.role !== "check");
   const checks = entry.blocks.filter((b) => b.kind === "decl" && b.role === "check").length;
   if (decls.length + (checks ? 1 : 0) < 3) return null;
@@ -12,11 +13,11 @@ export function InFileChips({ entry }: { entry: Entry }) {
       {decls.map((b) => (
         <a
           key={b.i}
-          href={`#${blockAnchor(b)}`}
+          href={blockHref(entry.id, search, b)}
           className={`chip infile-chip role-${b.role}`}
           onClick={(e) => {
             e.preventDefault();
-            document.getElementById(blockAnchor(b))?.scrollIntoView({ behavior: "smooth", block: "start" });
+            onJump(b.i);
           }}
           title={b.fq_name}
         >
