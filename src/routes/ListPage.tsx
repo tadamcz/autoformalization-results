@@ -10,7 +10,6 @@ import {
   applyFilters,
   capitalize,
   distinctConfidences,
-  formatDate,
   hasFilters,
   parseState,
   serializeState,
@@ -71,11 +70,7 @@ export function ListPage() {
   return (
     <Shell>
       <p className="count-line">
-        {meta.n_entries} files · {nAreas} areas · compiled against Formal Conjectures{" "}
-        <code>{meta.fc.commit.slice(0, 7)}</code> ({formatDate(meta.fc.commit_date)})
-        {fcData && fcData.head_date && (
-          <span className="muted"> · FC status checked at {formatDate(fcData.head_date)}</span>
-        )}
+        {meta.n_entries} files · {nAreas} areas
       </p>
       <div className="list-layout">
         <aside className="list-side">
