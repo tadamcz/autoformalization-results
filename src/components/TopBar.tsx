@@ -14,6 +14,7 @@ export function TopBar({ children }: { children?: React.ReactNode }) {
         </span>
         <nav className="topbar-nav">
           {children}
+          <Link to="/defs">Shared defs</Link>
           <Link to="/about">About</Link>
         </nav>
       </div>

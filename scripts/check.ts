@@ -2,7 +2,7 @@
 // invariants the site relies on. Runs first in `pnpm build`.
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { Alts, Entry, FcStatus, IndexFile } from "../src/data/schema";
+import { Alts, Entry, FcStatus, IndexFile, SharedDefs } from "../src/data/schema";
 
 const DATA = join(process.cwd(), "data");
 const problems: string[] = [];
@@ -55,6 +55,8 @@ const same = (a: string[], b: string[]) => a.length === b.length && a.every((x, 
 if (!same(indexIds, entryIds)) problems.push("index ids != entries/*.json ids");
 if (!same(indexIds, altIds)) problems.push("index ids != alts/*.json ids");
 
+// for shared_defs.json: each entry's definition blocks by index
+const defBlocks = new Map<string, Map<number, string | null>>();
 let blocks = 0;
 for (const row of index.entries) {
   const path = join(DATA, "entries", `${row.id}.json`);
@@ -87,6 +89,7 @@ for (const row of index.entries) {
     blocks += 1;
     if (b.i !== i) problems.push(`${row.id}: block ${i} has i=${b.i}`);
   });
+  defBlocks.set(e.id, new Map(e.blocks.filter((b) => b.role === "definition").map((b) => [b.i, b.fq_name ?? null])));
   for (const c of e.claims) {
     if (c.kind === "stated") {
       const b = c.block === null ? undefined : e.blocks[c.block];
@@ -129,7 +132,42 @@ if (existsSync(fcPath)) {
   problems.push("data/fc_status.json missing");
 }
 
-console.log(`check: ${index.entries.length} entries (${Object.entries(sources).map(([k, s]) => `${k} ${s.n_entries}`).join(", ")}), ${blocks} blocks`);
+// shared_defs.json is optional; when present, every member must be a definition
+// block of a shown entry (the pages deep-link to it) and the groups must be sound
+const sdPath = join(DATA, "shared_defs.json");
+let nSharedGroups = 0;
+if (existsSync(sdPath)) {
+  const sd = SharedDefs.parse(readJson(sdPath));
+  nSharedGroups = sd.groups.length;
+  const gids = sd.groups.map((g) => g.id);
+  if (new Set(gids).size !== gids.length) problems.push("shared_defs: duplicate group ids");
+  const seen = new Set<string>();
+  for (const g of sd.groups) {
+    const files = new Set(g.members.map((m) => m.entry_id));
+    if (files.size !== g.n_files) problems.push(`shared_defs ${g.id}: n_files=${g.n_files} but ${files.size} entries`);
+    if (g.n_files < sd.min_files) problems.push(`shared_defs ${g.id}: fewer than min_files entries`);
+    const reps = g.members.filter((m) => m.relation === "representative").length;
+    if (g.adjudicated ? reps !== 1 : reps !== 0) problems.push(`shared_defs ${g.id}: ${reps} representatives (adjudicated=${g.adjudicated})`);
+    const counts: Record<string, number> = {};
+    for (const m of g.members) {
+      if (seen.has(m.def_id)) problems.push(`shared_defs: ${m.def_id} in two groups`);
+      seen.add(m.def_id);
+      if (!sources[m.source]) problems.push(`shared_defs ${g.id}: unknown source ${m.source}`);
+      if (!g.sources.includes(m.source)) problems.push(`shared_defs ${g.id}: member source ${m.source} not in group sources`);
+      const defs = defBlocks.get(m.entry_id);
+      if (!defs) problems.push(`shared_defs ${g.id}: ${m.entry_id} is not a shown entry`);
+      else if (!defs.has(m.block) || defs.get(m.block) !== m.fq_name) problems.push(`shared_defs ${g.id}: ${m.def_id} is not definition block ${m.block} of ${m.entry_id}`);
+      for (const u of m.uses) {
+        if (defs && (!defs.has(u.block) || defs.get(u.block) !== u.fq_name)) problems.push(`shared_defs ${g.id}: ${m.def_id} uses a non-definition block ${u.block}`);
+      }
+      if (g.adjudicated !== (m.relation !== null)) problems.push(`shared_defs ${g.id}: ${m.def_id} relation does not match adjudicated`);
+      if (m.relation && m.relation !== "representative") counts[m.relation] = (counts[m.relation] ?? 0) + 1;
+    }
+    for (const [k, n] of Object.entries(g.verdicts)) if ((counts[k] ?? 0) !== n) problems.push(`shared_defs ${g.id}: verdicts.${k}=${n} but ${counts[k] ?? 0} members`);
+  }
+}
+
+console.log(`check: ${index.entries.length} entries (${Object.entries(sources).map(([k, s]) => `${k} ${s.n_entries}`).join(", ")}), ${blocks} blocks, ${nSharedGroups} shared-definition groups`);
 if (problems.length) {
   console.error(`check: ${problems.length} problem(s)`);
   for (const p of problems) console.error("  " + p);

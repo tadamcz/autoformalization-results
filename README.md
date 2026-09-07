@@ -23,6 +23,10 @@ these files (Lean is highlighted in the browser):
 - `alts/<id>.json` — every attempt (loaded on demand)
 - `fc_status.json` — which entries Formal Conjectures has since gained a file for
 - `overrides.json` — hand corrections (display titles, FC status)
+- `shared_defs.json` — the notions two or more files defined for themselves, with
+  every variant's code and a language model's verdict against the group's
+  representative (the "Shared definitions" pages; produced by
+  `autoformalization/shared_defs/`, optional)
 
 ## Local development
 

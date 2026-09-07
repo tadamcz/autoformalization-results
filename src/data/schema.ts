@@ -310,6 +310,59 @@ export const FcStatus = z.object({
   shared_files: z.record(z.string(), z.array(z.string())),
 });
 
+// data/shared_defs.json (autoformalization/shared_defs/site.py): the notions two or
+// more files defined for themselves, with a language model's verdict per variant
+// against the group's representative. Its own version: the file is optional and
+// regenerated independently of the entries.
+export const SHARED_DEFS_SCHEMA_VERSION = 1;
+
+export const Relation = z.enum(["representative", "identical", "defeq", "equivalent", "different", "unclear"]);
+
+export const SharedDefMember = z.object({
+  def_id: z.string(),
+  entry_id: z.string(),
+  block: z.number(),
+  fq_name: z.string(),
+  name: z.string(),
+  decl_kind: z.string(),
+  source: z.string(),
+  area: nullableString,
+  title: z.string(),
+  variables: z.array(z.string()),
+  docstring: nullableString,
+  code: z.string(),
+  meaning: z.string(),
+  closest_existing_considered: nullableString,
+  // same-file definitions this one mentions (blocks of its entry)
+  uses: z.array(z.object({ fq_name: z.string(), block: z.number() })),
+  // null until the group is adjudicated
+  relation: Relation.nullable(),
+  why: nullableString,
+});
+
+export const SharedDefGroup = z.object({
+  id: z.string(),
+  concept: z.string(),
+  labels: z.array(z.string()),
+  sources: z.array(z.string()),
+  n_files: z.number(),
+  adjudicated: z.boolean(),
+  notes: z.string(),
+  verdicts: z.record(z.string(), z.number()),
+  members: z.array(SharedDefMember),
+});
+
+export const SharedDefs = z.object({
+  schema_version: z.literal(SHARED_DEFS_SCHEMA_VERSION),
+  generated_at: z.string(),
+  model: ModelRef,
+  min_files: z.number(),
+  n_definitions: z.number(),
+  n_files: z.number(),
+  n_concepts: z.number(),
+  groups: z.array(SharedDefGroup),
+});
+
 export type Counts = z.infer<typeof Counts>;
 export type Outcome = z.infer<typeof Outcome>;
 export type IndexEntry = z.infer<typeof IndexEntry>;
@@ -326,3 +379,7 @@ export type AltAttempt = z.infer<typeof AltAttempt>;
 export type FcStatus = z.infer<typeof FcStatus>;
 export type FcStatusEntry = z.infer<typeof FcStatusEntry>;
 export type Justification = z.infer<typeof Justification>;
+export type Relation = z.infer<typeof Relation>;
+export type SharedDefMember = z.infer<typeof SharedDefMember>;
+export type SharedDefGroup = z.infer<typeof SharedDefGroup>;
+export type SharedDefs = z.infer<typeof SharedDefs>;

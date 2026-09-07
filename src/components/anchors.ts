@@ -9,8 +9,14 @@ export function blockAnchor(b: Block): string {
 }
 
 export function blockHref(entryId: string, search: string, b: Block): string {
+  return declHref(entryId, search, b.fq_name ?? null, b.i);
+}
+
+/** The same deep link from a declaration's name and block index, for pages
+ * (shared definitions) that hold members of other entries, not Blocks. */
+export function declHref(entryId: string, search: string, fqName: string | null, i: number): string {
   const params = new URLSearchParams(search);
-  params.set("at", blockAnchor(b));
+  params.set("at", blockAnchor({ fq_name: fqName, i } as Block));
   return `#/p/${entryId}?${params.toString()}`;
 }
 

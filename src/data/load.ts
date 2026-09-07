@@ -2,7 +2,7 @@
 // the committed files are served as-is at the site root.
 import { useEffect, useState } from "react";
 import { setKatexMacros } from "../components/MathText";
-import type { Alts, Entry, FcStatus, IndexFile } from "./schema";
+import type { Alts, Entry, FcStatus, IndexFile, SharedDefs } from "./schema";
 
 const cache = new Map<string, Promise<unknown>>();
 
@@ -34,6 +34,7 @@ export const loadIndex = () =>
 export const loadEntry = (id: string) => fetchJson<Entry>(`entries/${encodeURIComponent(id)}.json`);
 export const loadAlts = (id: string) => fetchJson<Alts>(`alts/${encodeURIComponent(id)}.json`);
 export const loadFcStatus = () => fetchJson<FcStatus>("fc_status.json");
+export const loadSharedDefs = () => fetchJson<SharedDefs>("shared_defs.json");
 
 export type Loaded<T> =
   | { status: "loading" }
@@ -72,4 +73,8 @@ export function useAlts(id: string | undefined, enabled: boolean): Loaded<Alts> 
 
 export function useFcStatus(): Loaded<FcStatus> {
   return useLoaded(loadFcStatus, "fc");
+}
+
+export function useSharedDefs(): Loaded<SharedDefs> {
+  return useLoaded(loadSharedDefs, "shared-defs");
 }
