@@ -101,8 +101,12 @@ export function SharedDefsPage() {
   }
   const meta = index.data.meta;
   const data = sd.data;
-  // within a section: most variants judged the same notion first
-  const bySame = (groups: SharedDefGroup[]) => [...groups].sort((a, b) => sameCount(b) - sameCount(a) || b.n_files - a.n_files || a.concept.localeCompare(b.concept));
+  // within a section: most variants judged the same notion first; groups where the
+  // model found no two variants alike (a label that lumped different things) are
+  // left out of the list but keep their pages
+  const bySame = (groups: SharedDefGroup[]) =>
+    groups.filter((g) => sameCount(g) > 0).sort((a, b) => sameCount(b) - sameCount(a) || b.n_files - a.n_files || a.concept.localeCompare(b.concept));
+  const nListed = data.groups.filter((g) => sameCount(g) > 0).length;
   const sections: Array<{ id: string; title: string; groups: SharedDefGroup[] }> = [
     ...orderedSources(meta).map(([key, s]) => ({
       id: key,
@@ -116,9 +120,10 @@ export function SharedDefsPage() {
       <h1>Shared definitions</h1>
       <p className="defs-intro">
         The files often had to define notions Mathlib lacks — a locally finite group, a planar graph, a knot's crossing number — and did so independently, each in its own
-        file. These are the {data.groups.length} notions that {data.min_files} or more of the {data.n_files} files defined for themselves, out of {data.n_concepts} distinct
-        notions across {data.n_definitions} definitions. {data.model.name} read every definition with its docstring and the formalizer's stated reason for adding it, named the
-        notion it expresses, and then, for each notion below, judged whether each variant defines the same thing as one representative.
+        file. {data.model.name} read every one of the {data.n_definitions} definitions in the {data.n_files} files with its docstring and the formalizer's stated reason for
+        adding it, named the notion it expresses ({data.n_concepts} distinct notions), and, for each notion that {data.min_files} or more files defined, judged whether each
+        variant defines the same thing as one representative. Listed below are the {nListed} notions where at least two files' definitions were judged the same; the{" "}
+        {data.groups.length - nListed} groups where the model found no two alike are not listed.
       </p>
       <Caveat sd={data} />
       <p className="toc">
